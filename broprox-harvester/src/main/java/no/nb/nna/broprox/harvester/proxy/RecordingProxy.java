@@ -53,6 +53,7 @@ public class RecordingProxy {
                 .withFiltersSource(new CoalesceUriFilter())
                 .start();
 
+        System.out.println("RESOLVER: " + ((DefaultHttpProxyServer) server).getServerResolver());
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             LOG.info("Shutting down recording proxy.");
             server.stop();

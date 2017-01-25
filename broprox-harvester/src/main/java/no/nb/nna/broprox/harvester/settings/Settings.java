@@ -30,6 +30,12 @@ public class Settings {
 
     private String workDir;
 
+    private String dbHost;
+
+    private int dbPort;
+
+    private String dbName;
+
     public int getProxyPort() {
         return proxyPort;
     }
@@ -68,6 +74,30 @@ public class Settings {
 
     public void setBrowserPort(int browserPort) {
         this.browserPort = browserPort;
+    }
+
+    public String getDbHost() {
+        return dbHost;
+    }
+
+    public void setDbHost(String dbHost) {
+        this.dbHost = dbHost;
+    }
+
+    public int getDbPort() {
+        return dbPort;
+    }
+
+    public void setDbPort(int dbPort) {
+        this.dbPort = dbPort;
+    }
+
+    public String getDbName() {
+        return dbName;
+    }
+
+    public void setDbName(String dbName) {
+        this.dbName = dbName;
     }
 
 }

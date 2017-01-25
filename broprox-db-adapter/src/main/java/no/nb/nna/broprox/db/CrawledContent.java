@@ -27,6 +27,6 @@ public interface CrawledContent {
 
     public String getWarcId();
 
-    public CrawlLog withWarcId(String id);
+    public CrawledContent withWarcId(String id);
 
 }

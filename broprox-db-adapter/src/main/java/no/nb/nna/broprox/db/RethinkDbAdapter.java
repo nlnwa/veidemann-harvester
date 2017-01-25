@@ -61,14 +61,14 @@ public class RethinkDbAdapter implements DbAdapter {
         return DbObjectFactory.of(CrawledContent.class, response);
     }
 
-    public void delete(String digest) {
+    public void deleteCrawledContent(String digest) {
         r.table("crawled_content").get(digest).delete().run(conn);
     }
 
     public void addCrawledContent(CrawledContent cc) {
         Object response = r.table("crawled_content")
                 .insert(((DbObjectFactory.DbBasics)cc).getMap())
-                .optArg("conflict", "update")
+                .optArg("conflict", "error")
                 .run(conn);
     }
 

@@ -13,12 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package no.nb.nna.broprox.db;
+
+import java.util.Optional;
 
 /**
  * Adapter for Broprox's database.
  */
 public interface DbAdapter {
+
+    void addCrawledContent(CrawledContent cc);
+
+    Optional<CrawledContent> isDuplicateContent(String digest);
+
+    CrawlLog addCrawlLog(CrawlLog cl);
 
 }

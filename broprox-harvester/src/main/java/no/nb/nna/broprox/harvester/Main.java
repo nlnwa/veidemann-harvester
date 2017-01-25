@@ -41,8 +41,6 @@ public final class Main {
 //        System.setProperty("sun.net.spi.nameservice.provider.1", "dns,sun");
 //        System.setProperty("sun.net.spi.nameservice.provider.2", "default");
 
-        System.out.println("MAIN has set properties");
-
         new Harvester().start();
     }
 

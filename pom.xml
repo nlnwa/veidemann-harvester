@@ -22,6 +22,7 @@
     <modules>
         <module>broprox-harvester</module>
         <module>broprox-db-adapter</module>
+        <module>broprox-chrome</module>
     </modules>
 
     <properties>

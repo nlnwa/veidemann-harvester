@@ -22,6 +22,7 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.CodeBlock;
@@ -60,9 +61,9 @@ public class EntryPoint {
 
     final FieldSpec port = FieldSpec.builder(int.class, "port", Modifier.FINAL).build();
 
-//    final FieldSpec contextId = FieldSpec.builder(String.class, "contextId", Modifier.FINAL).build();
-//
-//    final FieldSpec targetId = FieldSpec.builder(String.class, "targetId", Modifier.FINAL).build();
+    final FieldSpec closed = FieldSpec.builder(AtomicBoolean.class, "closed", Modifier.FINAL)
+            .initializer("new $T(false)", AtomicBoolean.class).build();
+
     final CodeBlock timeoutGet = CodeBlock.of("get($N, $T.MILLISECONDS)", timeout, TimeUnit.class);
 
     final List<Domain> domains;
@@ -81,7 +82,8 @@ public class EntryPoint {
                 .addField(host)
                 .addField(port)
                 .addField(protocolClient)
-                .addField(sessions);
+                .addField(sessions)
+                .addField(closed);
     }
 
     static void generate(List<Domain> domains, File outdir) throws IOException {
@@ -128,11 +130,15 @@ public class EntryPoint {
         ParameterSpec clientHeight = ParameterSpec.builder(int.class, "clientHeight", Modifier.FINAL).build();
         classBuilder.addMethod(MethodSpec.methodBuilder("newSession")
                 .addException(IOException.class)
-                .addModifiers(Modifier.PUBLIC)
+                .addModifiers(Modifier.PUBLIC, Modifier.SYNCHRONIZED)
                 .addParameter(clientWidth)
                 .addParameter(clientHeight)
                 .returns(Session.type)
-                .addStatement("$1T s = new $1T(this, $2N, $3N, $4N, $5N)", Session.type, host, port, clientWidth, clientHeight)
+                .beginControlFlow("if ($N.get())", closed)
+                .addStatement("throw new $T($S)", IOException.class, "Client is closed")
+                .endControlFlow()
+                .addStatement("$1T s = new $1T(this, $2N, $3N, $4N, $5N)",
+                        Session.type, host, port, clientWidth, clientHeight)
                 .addStatement("$N.add(s)", sessions)
                 .addStatement("return s")
                 .build());
@@ -141,7 +147,7 @@ public class EntryPoint {
     void genOnSessionClosedMethod() {
         ParameterSpec session = ParameterSpec.builder(Session.type, "session", Modifier.FINAL).build();
         classBuilder.addMethod(MethodSpec.methodBuilder("onSessionClosed")
-                .addModifiers(Modifier.PUBLIC)
+                .addModifiers(Modifier.PUBLIC, Modifier.SYNCHRONIZED)
                 .addParameter(session)
                 .addStatement("$N.remove($N)", sessions, session)
                 .build());
@@ -149,8 +155,9 @@ public class EntryPoint {
 
     void genCloseMethod() {
         classBuilder.addMethod(MethodSpec.methodBuilder("close")
-                .addModifiers(Modifier.PUBLIC)
+                .addModifiers(Modifier.PUBLIC, Modifier.SYNCHRONIZED)
                 .addAnnotation(Override.class)
+                .addStatement("$N.set(true)", closed)
                 .beginControlFlow("while (!$N.isEmpty())", sessions)
                 .addStatement("$N.get(0).close()", sessions)
                 .endControlFlow()

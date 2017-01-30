@@ -105,7 +105,6 @@ public class Cdp implements WebSocketCallback {
     public void onMessageReceived(String msg) {
         LOG.trace("Message: {}", msg.substring(0, Math.min(msg.length(), 2048)));
         CdpResponse response = gson.fromJson(msg, CdpResponse.class);
-//        System.out.println("RRR " + response);
 
         if (response.method == null) {
             dispatchResponse(response);
@@ -115,7 +114,7 @@ public class Cdp implements WebSocketCallback {
     }
 
     synchronized void dispatchResponse(CdpResponse response) {
-        CompletableFuture future = methodFutures.remove(response.id);
+        CompletableFuture<JsonElement> future = methodFutures.remove(response.id);
         if (future != null) {
             if (response.error != null) {
                 future.completeExceptionally(new CdpException(response.error.code, response.error.message));

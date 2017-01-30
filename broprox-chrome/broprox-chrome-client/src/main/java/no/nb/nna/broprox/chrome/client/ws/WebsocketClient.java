@@ -56,6 +56,11 @@ public class WebsocketClient {
 
     private static final Logger LOG = LoggerFactory.getLogger(WebsocketClient.class);
 
+    /**
+     * Must be large enough to carry snapshot of web page.
+     */
+    private static final int MAX_FRAME_PAYLOAD_LENGTH = 8 * 1024 * 1024;
+
     private Channel channel;
 
     private EventLoopGroup workerGroup;
@@ -113,10 +118,9 @@ public class WebsocketClient {
 
         try {
             final WebSocketClientHandshaker handshaker = WebSocketClientHandshakerFactory.newHandshaker(
-                    uri, WebSocketVersion.V13, null, true, new DefaultHttpHeaders(), 8192 * 1024, true, true);
+                    uri, WebSocketVersion.V13, null, true, new DefaultHttpHeaders(), MAX_FRAME_PAYLOAD_LENGTH);
+//                    uri, WebSocketVersion.V13, null, true, new DefaultHttpHeaders(), MAX_FRAME_PAYLOAD_LENGTH, true, true);
 
-//            final WebSocketClientHandler handler = new WebSocketClientHandler(handshaker);
-//            final WebSocketClientProtocolHandler handler = new WebSocketClientProtocolHandler(handshaker);
             final ResponseHandler handler = new ResponseHandler();
 
             Bootstrap b = new Bootstrap();
@@ -131,7 +135,7 @@ public class WebsocketClient {
                     }
                     p.addLast(
                             new HttpClientCodec(),
-                            new HttpObjectAggregator(8192 * 1024),
+                            new HttpObjectAggregator(8192),
                             new WebSocketClientProtocolHandler(handshaker, false),
                             handler);
                 }
@@ -203,7 +207,6 @@ public class WebsocketClient {
         public void channelRead0(ChannelHandlerContext ctx, WebSocketFrame frame) throws Exception {
             if (frame instanceof TextWebSocketFrame) {
                 TextWebSocketFrame textFrame = (TextWebSocketFrame) frame;
-                System.out.println(hashCode() + " :: WebSocket Client received message: " + textFrame.text());
                 callback.onMessageReceived(textFrame.text());
             } else if (frame instanceof CloseWebSocketFrame) {
                 System.out.println("WebSocket Client received closing");

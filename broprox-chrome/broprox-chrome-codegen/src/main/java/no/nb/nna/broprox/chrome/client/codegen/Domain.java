@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package no.nb.nna.broprox.chrome.client.codegen;
 
 import java.util.List;
@@ -22,6 +21,7 @@ import java.util.function.Consumer;
 
 import com.squareup.javapoet.AnnotationSpec;
 import com.squareup.javapoet.ClassName;
+import com.squareup.javapoet.FieldSpec;
 import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeSpec;
@@ -48,13 +48,20 @@ public class Domain {
 
     TypeSpec.Builder builder;
 
+    final FieldSpec sessionClient = FieldSpec
+            .builder(Codegen.CLIENT_CLASS, "sessionClient", Modifier.PRIVATE, Modifier.FINAL).build();
+
     void init(AnnotationSpec generatedAnnotation) {
         javaName = domain + "Domain";
         className = ClassName.get(Codegen.PACKAGE, javaName);
-        builder = TypeSpec.classBuilder(className).addModifiers(Modifier.PUBLIC).addAnnotation(generatedAnnotation);
-        builder.addField(Codegen.CLIENT_CLASS, "protocolClient", Modifier.PRIVATE);
-        builder.addMethod(MethodSpec.constructorBuilder().addModifiers(Modifier.PUBLIC)
-                .addParameter(Codegen.CLIENT_CLASS, "protocolClient").addStatement("this.protocolClient = protocolClient").build());
+        builder = TypeSpec.classBuilder(className)
+                .addModifiers(Modifier.PUBLIC)
+                .addAnnotation(generatedAnnotation)
+                .addField(sessionClient)
+                .addMethod(MethodSpec.constructorBuilder().addModifiers(Modifier.PUBLIC)
+                        .addParameter(sessionClient.type, sessionClient.name)
+                        .addStatement("this.$1N = $1N", sessionClient)
+                        .build());
     }
 
     public void buildType(Protocol protocol) {
@@ -64,27 +71,28 @@ public class Domain {
 
         if (events != null) {
             for (Command event : events) {
-                ClassName struct = Codegen.buildStruct(builder, Codegen.cap(event.name), event.description, event.parameters, protocol, this);
-                {
-                    MethodSpec.Builder methodSpec = MethodSpec.methodBuilder("on" + Codegen.cap(event.name))
-                            .addModifiers(Modifier.PUBLIC)
-                            .addParameter(ParameterizedTypeName.get(ClassName.get(Consumer.class), struct), "listener")
-                            .addStatement("protocolClient.addEventListener($S, listener, $T.class)", domain + "." + event.name, struct);
-                    if (event.description != null) {
-                        methodSpec.addJavadoc(event.description.replace("$", "$$") + "\n");
-                    }
-                    builder.addMethod(methodSpec.build());
+                ClassName struct = Codegen
+                        .buildStruct(builder, Codegen.cap(event.name), event.description, event.parameters, protocol, this);
+
+                MethodSpec.Builder onEventSpec = MethodSpec.methodBuilder("on" + Codegen.cap(event.name))
+                        .addModifiers(Modifier.PUBLIC)
+                        .addParameter(ParameterizedTypeName.get(ClassName.get(Consumer.class), struct), "listener")
+                        .addStatement("$N.addEventListener($S, listener, $T.class)",
+                                sessionClient, domain + "." + event.name, struct);
+                if (event.description != null) {
+                    onEventSpec.addJavadoc(event.description.replace("$", "$$") + "\n");
                 }
-                {
-                    MethodSpec.Builder methodSpec = MethodSpec.methodBuilder("on" + Codegen.cap(event.name))
-                            .addModifiers(Modifier.PUBLIC)
-                            .returns(ParameterizedTypeName.get(ClassName.get(CompletableFuture.class), struct))
-                            .addStatement("return protocolClient.eventFuture($S, $T.class)", domain + "." + event.name, struct);
-                    if (event.description != null) {
-                        methodSpec.addJavadoc(event.description.replace("$", "$$") + "\n");
-                    }
-                    builder.addMethod(methodSpec.build());
+                builder.addMethod(onEventSpec.build());
+
+                MethodSpec.Builder onEventListener = MethodSpec.methodBuilder("on" + Codegen.cap(event.name))
+                        .addModifiers(Modifier.PUBLIC)
+                        .returns(ParameterizedTypeName.get(ClassName.get(CompletableFuture.class), struct))
+                        .addStatement("return $N.eventFuture($S, $T.class)",
+                                sessionClient, domain + "." + event.name, struct);
+                if (event.description != null) {
+                    onEventListener.addJavadoc(event.description.replace("$", "$$") + "\n");
                 }
+                builder.addMethod(onEventListener.build());
             }
         }
     }

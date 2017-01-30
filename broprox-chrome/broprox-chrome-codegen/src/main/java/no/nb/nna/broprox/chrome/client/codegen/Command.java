@@ -78,7 +78,8 @@ public class Command {
         for (Parameter param : parameters) {
             methodSpec.addStatement("params.put($S, $N)", param.name, param.spec);
         }
-        methodSpec.addStatement("return protocolClient.call($S, params, $T.class)", domain.domain + "." + name, resultType);
+        methodSpec.addStatement("return $N.call($S, params, $T.class)",
+                domain.sessionClient, domain.domain + "." + name, resultType);
         b.addMethod(methodSpec.build());
     }
 

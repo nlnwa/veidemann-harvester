@@ -15,24 +15,16 @@
  */
 package no.nb.nna.broprox.chrome.client.codegen;
 
-import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
-import java.net.URI;
 import java.time.Instant;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import com.squareup.javapoet.AnnotationSpec;
-import com.squareup.javapoet.CodeBlock;
-import com.squareup.javapoet.FieldSpec;
 import com.squareup.javapoet.JavaFile;
-import com.squareup.javapoet.MethodSpec;
-import com.squareup.javapoet.ParameterSpec;
-import com.squareup.javapoet.TypeSpec;
 import javax.annotation.Generated;
-import javax.lang.model.element.Modifier;
 
 /**
  *
@@ -64,61 +56,6 @@ public class Protocol {
         EntryPoint.generate(domains, outdir);
         Session.generate(domains, outdir);
     }
-
-//    private void genEntrypoint(File outdir) throws IOException {
-//        TypeSpec.Builder entrypoint = TypeSpec.classBuilder("ChromeDebugProtocol").addModifiers(Modifier.PUBLIC)
-//                .addSuperinterface(Closeable.class)
-//                .addField(Codegen.CLIENT_CLASS, "protocolClient", Modifier.PUBLIC, Modifier.FINAL);
-//
-//        entrypoint.addMethod(
-//                MethodSpec.constructorBuilder().addParameter(String.class, "webSocketDebuggerUrl")
-//                .addModifiers(Modifier.PUBLIC)
-//                .addStatement("this(new $T(webSocketDebuggerUrl))", Codegen.CLIENT_CLASS).build());
-//
-//        entrypoint.addMethod(
-//                MethodSpec.constructorBuilder().addParameter(URI.class, "webSocketDebuggerUrl")
-//                .addModifiers(Modifier.PUBLIC)
-//                .addStatement("this(new $T(webSocketDebuggerUrl))", Codegen.CLIENT_CLASS).build());
-//
-//        MethodSpec.Builder constructor = MethodSpec.constructorBuilder()
-//                .addParameter(Codegen.CLIENT_CLASS, "protocolClient").addModifiers(Modifier.PRIVATE)
-//                .addStatement("this.protocolClient = protocolClient");
-//        for (Domain domain : domains) {
-//            FieldSpec field = FieldSpec.builder(domain.className, uncap(domain.domain), Modifier.PUBLIC, Modifier.FINAL)
-//                    .build();
-//            entrypoint.addField(field);
-//            constructor.addStatement("$N = new $T(protocolClient)", field, domain.className);
-//        }
-//        entrypoint.addMethod(constructor.build());
-//
-//        entrypoint.addMethod(MethodSpec.methodBuilder("close")
-//                .addModifiers(Modifier.PUBLIC)
-//                .addStatement("protocolClient.close()")
-//                .build());
-//
-//        MethodSpec version = MethodSpec.methodBuilder("version")
-//                .addModifiers(Modifier.PUBLIC)
-//                .returns(String.class)
-//                .addStatement("return $S", "Chrome/" + Codegen.CHROME_VERSION)
-//                .build();
-//        entrypoint.addMethod(version);
-//
-//        entrypoint.addMethod(MethodSpec.methodBuilder("toString")
-//                .addAnnotation(Override.class)
-//                .addModifiers(Modifier.PUBLIC)
-//                .returns(String.class)
-//                .addStatement("return $S + $N()", "Chrome Debug Protocol ", version)
-//                .build());
-//
-//        TypeSpec type = entrypoint.build();
-//
-//        JavaFile javaFile = JavaFile.builder(Codegen.PACKAGE, type).build();
-//        if (outdir == null) {
-//            javaFile.writeTo(System.out);
-//        } else {
-//            javaFile.writeTo(outdir);
-//        }
-//    }
 
     public static String uncap(String name) {
         Matcher m = pattern.matcher(name);

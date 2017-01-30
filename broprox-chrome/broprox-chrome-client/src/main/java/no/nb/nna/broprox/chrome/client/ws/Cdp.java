@@ -66,7 +66,7 @@ public class Cdp implements WebSocketCallback {
         methodFutures.put(request.id, future);
 
         String msg = gson.toJson(request);
-        LOG.trace(msg);
+        LOG.trace("Sent: {}", msg);
 
         websocketClient.sendMessage(msg);
 
@@ -103,7 +103,7 @@ public class Cdp implements WebSocketCallback {
 
     @Override
     public void onMessageReceived(String msg) {
-        LOG.trace("Message: {}", msg.substring(0, Math.min(msg.length(), 2048)));
+        LOG.trace("Received: {}", msg.substring(0, Math.min(msg.length(), 2048)));
         CdpResponse response = gson.fromJson(msg, CdpResponse.class);
 
         if (response.method == null) {

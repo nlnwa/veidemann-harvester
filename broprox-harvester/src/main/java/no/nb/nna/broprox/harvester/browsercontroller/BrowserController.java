@@ -16,27 +16,25 @@
 package no.nb.nna.broprox.harvester.browsercontroller;
 
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.net.MalformedURLException;
-import java.net.URL;
 import java.util.Base64;
-import java.util.List;
-import java.util.Map;
+import java.util.Collections;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import chropro.Chropro;
-import chropro.PageDomain;
-import com.google.gson.Gson;
+import no.nb.nna.broprox.chrome.client.ChromeDebugProtocol;
+import no.nb.nna.broprox.chrome.client.PageDomain;
+import no.nb.nna.broprox.chrome.client.Session;
+import no.nb.nna.broprox.chrome.client.ws.CompleteMany;
+
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 /**
  *
  */
 public class BrowserController implements AutoCloseable {
 
-    private final Chropro chrome;
+    private final ChromeDebugProtocol chrome;
 
     private final String chromeHost;
 
@@ -45,41 +43,67 @@ public class BrowserController implements AutoCloseable {
     public BrowserController(String chromeHost, int chromePort) throws IOException {
         this.chromeHost = chromeHost;
         this.chromePort = chromePort;
-        this.chrome = getBaseConnection();
+        this.chrome = new ChromeDebugProtocol(chromeHost, chromePort);
     }
 
     public byte[] render(String url, int w, int h, int timeout, int sleep) throws ExecutionException, InterruptedException, IOException, TimeoutException {
-        String contextId;
 
-        try {
-            contextId = chrome.target.createBrowserContext().get(timeout, TimeUnit.MILLISECONDS).browserContextId;
-        } catch (ExecutionException e) {
-            contextId = null; // browser contexts are only supported on headless chrome
-        }
-        String targetId = null;
+        try (Session tab = chrome.newSession(w, h)) {
+            new CompleteMany(
+                    tab.debugger.enable(),
+                    tab.page.enable(),
+                    tab.runtime.enable(),
+                    tab.network.enable(null, null),
+                    tab.network.setCacheDisabled(true),
+                    tab.runtime.evaluate("navigator.userAgent;", null, false, false, null, false, false, false, false)
+                    .thenAccept(e -> {
+                        tab.network.setUserAgentOverride(((String) e.result.value)
+                                .replace("HeadlessChrome", tab.version()));
+                    }),
+                    tab.debugger
+                    .setBreakpointByUrl(1, null, "https?://www.google-analytics.com/analytics.js", null, null),
+                    tab.debugger.setBreakpointByUrl(1, null, "https?://www.google-analytics.com/ga.js", null, null),
+                    tab.network.setExtraHTTPHeaders(Collections.singletonMap("x-ray", "foo")),
+                    tab.page.setControlNavigations(Boolean.TRUE)
+            ).get(timeout, MILLISECONDS);
 
-        try {
-            targetId = chrome.target.createTarget("about:blank", w, h, contextId)
-                    .get(timeout, TimeUnit.MILLISECONDS).targetId;
+            tab.debugger.onPaused(p -> {
+                String scriptId = p.callFrames.get(0).location.scriptId;
+                System.out.println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>> SCRIPT BLE PAUSET: " + scriptId);
+                tab.debugger.setScriptSource(scriptId, "console.log(\"google analytics is no more!\");", null);
+                tab.debugger.resume();
+                System.out.println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>> SCRIPT RESUMED: " + scriptId);
+            });
 
-            // Chrome is buggy and won't let us connect unless we've refreshed the json endpoint
-            new URL("http://" + chromeHost + ":" + chromePort + "/json").openStream().close();
-            try (Chropro tab = new Chropro("ws://" + chromeHost + ":" + chromePort + "/devtools/page/" + targetId)) {
+            System.out.println("=====================================");
 
-                tab.page.enable().get(timeout, TimeUnit.MILLISECONDS);
-                CompletableFuture<PageDomain.LoadEventFired> loaded = tab.page.onLoadEventFired();
+            CompletableFuture<PageDomain.LoadEventFired> loaded = tab.page.onLoadEventFired();
 
-                tab.page.navigate(url).get(timeout, TimeUnit.MILLISECONDS);
+            tab.page.onNavigationRequested(nr -> {
+                System.out.println("NAV REQUESTED " + nr);
+//                try {
+                    tab.network.setExtraHTTPHeaders(Collections.singletonMap("Discovery-Path", "E"));
+//                } catch (InterruptedException | ExecutionException ex) {
+//                    throw new RuntimeException(ex);
+//                }
+//                tab.page.setControlNavigations(Boolean.FALSE);
+                tab.page.processNavigation("Proceed", nr.navigationId);
+            });
 
-                loaded.get(timeout, TimeUnit.MILLISECONDS);
+//            tab.page.onNavigationRequested(nr -> {
+//                System.out.println("NAV REQUESTED");
+//                tab.page.processNavigation(nr.url, nr.navigationId);
+//            });
+            tab.page.navigate(url).get(timeout, MILLISECONDS);
 
-                // disable scrollbars
-                tab.runtime.evaluate("document.getElementsByTagName('body')[0].style.overflow='hidden'",
-                        null, null, null, null, null, null, null, null)
-                        .get(timeout, TimeUnit.MILLISECONDS);
+            loaded.get(timeout, MILLISECONDS);
+            // disable scrollbars
+            tab.runtime.evaluate("document.getElementsByTagName('body')[0].style.overflow='hidden'",
+                    null, null, null, null, null, null, null, null)
+                    .get(timeout, MILLISECONDS);
 
-                // wait a little for any onload javascript to fire
-                Thread.sleep(sleep);
+            // wait a little for any onload javascript to fire
+            Thread.sleep(sleep);
 
 //                System.out.println("LINKS >>>>>>");
 //                for (PageDomain.FrameResource fs : tab.page.getResourceTree().get().frameTree.resources) {
@@ -89,29 +113,10 @@ public class BrowserController implements AutoCloseable {
 //                    }
 //                }
 //                System.out.println("<<<<<<");
-                String data = tab.page.captureScreenshot().get(timeout, TimeUnit.MILLISECONDS).data;
-                return Base64.getDecoder().decode(data);
+            String data = tab.page.captureScreenshot().get(timeout, MILLISECONDS).data;
+            return Base64.getDecoder().decode(data);
 //                return null;
-            }
-        } finally {
-            if (targetId != null) {
-                chrome.target.closeTarget(targetId).get(timeout, TimeUnit.MILLISECONDS);
-            }
-            if (contextId != null) {
-                chrome.target.disposeBrowserContext(contextId).get(timeout, TimeUnit.MILLISECONDS);
-            }
         }
-    }
-
-    private Chropro getBaseConnection() throws MalformedURLException, IOException {
-        Gson gson = new Gson();
-        List l = gson.fromJson(new InputStreamReader(new URL("http://" + chromeHost + ":" + chromePort + "/json")
-                .openStream()), List.class);
-        if (l.isEmpty()) {
-            throw new RuntimeException();
-        }
-        Map<String, String> m = (Map) l.get(0);
-        return new Chropro(m.get("webSocketDebuggerUrl"));
     }
 
     @Override

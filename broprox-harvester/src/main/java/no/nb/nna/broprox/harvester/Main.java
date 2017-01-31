@@ -36,6 +36,11 @@ public final class Main {
         // This is necessary to be able to replace the LogManager. The system property must be set before any other
         // logging is even loaded.
         System.setProperty("java.util.logging.manager", "org.apache.logging.log4j.jul.LogManager");
+
+//        System.setProperty("sun.net.spi.nameservice.nameservers", "8.8.8.8");
+//        System.setProperty("sun.net.spi.nameservice.provider.1", "dns,sun");
+//        System.setProperty("sun.net.spi.nameservice.provider.2", "default");
+
         new Harvester().start();
     }
 

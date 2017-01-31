@@ -18,6 +18,7 @@ package no.nb.nna.broprox.harvester.proxy;
 import java.io.File;
 import java.io.IOException;
 
+import no.nb.nna.broprox.db.DbAdapter;
 import org.littleshoot.proxy.HttpProxyServer;
 import org.littleshoot.proxy.impl.DefaultHttpProxyServer;
 import org.littleshoot.proxy.mitm.CertificateSniffingMitmManager;
@@ -41,7 +42,7 @@ public class RecordingProxy {
      * @throws RootCertificateException is thrown if there where problems with the root certificate
      * @throws IOException is thrown if certificate directory could not be created
      */
-    public RecordingProxy(File workDir, int port) throws RootCertificateException, IOException {
+    public RecordingProxy(File workDir, int port, DbAdapter db) throws RootCertificateException, IOException {
         LOG.info("Starting recording proxy listening on port {}.", port);
 
         File certificateDir = new File(workDir, "certificates");
@@ -50,7 +51,7 @@ public class RecordingProxy {
                 .withAllowLocalOnly(false)
                 .withPort(port)
                 .withManInTheMiddle(new CertificateSniffingMitmManager(new SelfSignedAuthority(certificateDir)))
-                .withFiltersSource(new CoalesceUriFilter())
+                .withFiltersSource(new CoalesceUriFilter(db))
                 .start();
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {

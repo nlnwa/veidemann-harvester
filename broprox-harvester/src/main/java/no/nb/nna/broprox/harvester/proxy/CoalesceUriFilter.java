@@ -19,6 +19,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.util.AttributeKey;
+import no.nb.nna.broprox.db.DbAdapter;
 import org.littleshoot.proxy.HttpFilters;
 import org.littleshoot.proxy.HttpFiltersAdapter;
 import org.littleshoot.proxy.HttpFiltersSourceAdapter;
@@ -29,6 +30,12 @@ import org.littleshoot.proxy.HttpFiltersSourceAdapter;
 public class CoalesceUriFilter extends HttpFiltersSourceAdapter {
 
     private static final AttributeKey<String> CONNECTED_URL = AttributeKey.valueOf("connected_url");
+
+    private final DbAdapter db;
+
+    public CoalesceUriFilter(DbAdapter db) {
+        this.db = db;
+    }
 
     @Override
     public HttpFilters filterRequest(HttpRequest originalRequest, ChannelHandlerContext clientCtx) {
@@ -42,10 +49,10 @@ public class CoalesceUriFilter extends HttpFiltersSourceAdapter {
         }
         String connectedUrl = clientCtx.channel().attr(CONNECTED_URL).get();
         if (connectedUrl == null) {
-            return new RecorderFilter(uri, originalRequest, clientCtx);
+            return new RecorderFilter(uri, originalRequest, clientCtx, db);
         }
         originalRequest.setUri(uri);
-        return new RecorderFilter(connectedUrl + uri, originalRequest, clientCtx);
+        return new RecorderFilter(connectedUrl + uri, originalRequest, clientCtx, db);
     }
 
 }

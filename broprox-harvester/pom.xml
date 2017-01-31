@@ -15,6 +15,21 @@
 
     <dependencies>
         <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>broprox-db-adapter</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>broprox-chrome-client</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.netpreserve.commons</groupId>
+            <artifactId>webarchive-commons-uri</artifactId>
+            <version>2.0.0-SNAPSHOT</version>
+        </dependency>
+        <dependency>
             <groupId>org.littleshoot</groupId>
             <artifactId>littleproxy</artifactId>
         </dependency>
@@ -40,10 +55,10 @@
             <groupId>org.glassfish.jersey.containers</groupId>
             <artifactId>jersey-container-netty-http</artifactId>
         </dependency>
-        <dependency>
+<!--        <dependency>
             <groupId>org.meshy.chropro</groupId>
             <artifactId>chropro-client</artifactId>
-        </dependency>
+        </dependency>-->
         <dependency>
             <groupId>com.google.code.gson</groupId>
             <artifactId>gson</artifactId>

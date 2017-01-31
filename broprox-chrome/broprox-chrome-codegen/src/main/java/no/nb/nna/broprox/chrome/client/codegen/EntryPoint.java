@@ -18,7 +18,6 @@ package no.nb.nna.broprox.chrome.client.codegen;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -36,7 +35,6 @@ import com.squareup.javapoet.TypeSpec;
 import javax.lang.model.element.Modifier;
 
 import static no.nb.nna.broprox.chrome.client.codegen.Protocol.uncap;
-import static no.nb.nna.broprox.chrome.client.codegen.Session.createUrl;
 
 /**
  *
@@ -44,7 +42,8 @@ import static no.nb.nna.broprox.chrome.client.codegen.Session.createUrl;
 public class EntryPoint {
     static final ClassName type = ClassName.get(Codegen.PACKAGE, "ChromeDebugProtocol");
 
-    static final FieldSpec protocolClient = FieldSpec.builder(Codegen.CLIENT_CLASS, "protocolClient", Modifier.FINAL).build();
+    static final FieldSpec protocolClient = FieldSpec.builder(Codegen.CLIENT_CLASS, "protocolClient", Modifier.FINAL)
+            .build();
 
     final TypeName sessionListType = ParameterizedTypeName.get(ClassName.get(List.class), Session.type);
 

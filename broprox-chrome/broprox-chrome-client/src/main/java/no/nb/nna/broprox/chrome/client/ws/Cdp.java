@@ -39,7 +39,7 @@ public class Cdp implements WebSocketCallback {
 
     static Gson gson = new Gson();
 
-    final AtomicLong idSeq = new AtomicLong(0);
+    final AtomicLong idSeq = new AtomicLong(1);
 
     final ConcurrentHashMap<Long, CompletableFuture<JsonElement>> methodFutures = new ConcurrentHashMap<>();
 
@@ -66,7 +66,13 @@ public class Cdp implements WebSocketCallback {
         methodFutures.put(request.id, future);
 
         String msg = gson.toJson(request);
-        LOG.trace("Sent: {}", msg);
+        if (LOG.isDebugEnabled()) {
+            if (LOG.isTraceEnabled()) {
+                LOG.trace("Sent: {}", msg);
+            } else {
+                LOG.debug("Sent: id={}, method={}", request.id, request.method);
+            }
+        }
 
         websocketClient.sendMessage(msg);
 
@@ -103,12 +109,27 @@ public class Cdp implements WebSocketCallback {
 
     @Override
     public void onMessageReceived(String msg) {
-        LOG.trace("Received: {}", msg.substring(0, Math.min(msg.length(), 2048)));
         CdpResponse response = gson.fromJson(msg, CdpResponse.class);
 
         if (response.method == null) {
+            if (LOG.isDebugEnabled()) {
+                if (LOG.isTraceEnabled()) {
+                    LOG.trace("Received: {}", msg.substring(0, Math.min(msg.length(), 2048)));
+                } else {
+                    LOG.debug("Received: id={}, error={}", response.id, response.method, response.error != null);
+                }
+            }
+
             dispatchResponse(response);
         } else {
+            if (LOG.isDebugEnabled()) {
+                if (LOG.isTraceEnabled()) {
+                    LOG.trace("Received: {}", msg.substring(0, Math.min(msg.length(), 2048)));
+                } else {
+                    LOG.debug("Received: event={}", response.method);
+                }
+            }
+
             dispatchEvent(response.method, response.params);
         }
     }

@@ -18,6 +18,8 @@ package no.nb.nna.broprox.harvester.proxy;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.Iterator;
+import java.util.Map;
 import java.util.Optional;
 
 import io.netty.channel.ChannelHandlerContext;
@@ -60,10 +62,16 @@ public class RecorderFilter extends HttpFiltersAdapter {
     public HttpResponse clientToProxyRequest(HttpObject httpObject) {
         if (httpObject instanceof HttpRequest) {
             HttpRequest req = (HttpRequest) httpObject;
-//                System.out.println(this.hashCode() + " :: PROXY URI: " + uri);
+            System.out.println(this.hashCode() + " :: PROXY URI: " + uri);
+            System.out.println("HEADERS: ");
+            for (Iterator<Map.Entry<CharSequence, CharSequence>> it = req.headers().iteratorCharSequence(); it.hasNext();) {
+                Map.Entry<CharSequence, CharSequence> e = it.next();
+                System.out.println("   " + e.getKey() + " = " + e.getValue());
+            }
             req.headers().set("Accept-Encoding", "identity");
             crawlLog.withFetchTimeStamp(OffsetDateTime.now().withOffsetSameInstant(ZoneOffset.UTC))
-                    .withReferrer(req.headers().get("referer"));
+                    .withReferrer(req.headers().get("referer"))
+                    .withDiscoveryPath(req.headers().get("Discovery-Path"));
         }
 
         return null;

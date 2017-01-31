@@ -16,21 +16,18 @@
 package no.nb.nna.broprox.harvester.browsercontroller;
 
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.net.MalformedURLException;
-import java.net.URL;
 import java.util.Base64;
-import java.util.List;
-import java.util.Map;
+import java.util.Collections;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import com.google.gson.Gson;
 import no.nb.nna.broprox.chrome.client.ChromeDebugProtocol;
 import no.nb.nna.broprox.chrome.client.PageDomain;
 import no.nb.nna.broprox.chrome.client.Session;
+import no.nb.nna.broprox.chrome.client.ws.CompleteMany;
+
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 /**
  *
@@ -43,77 +40,6 @@ public class BrowserController implements AutoCloseable {
 
     private final int chromePort;
 
-    private static final String versionScript = "var nVer = navigator.appVersion;\n" +
-"var nAgt = navigator.userAgent;\n" +
-"var browserName  = navigator.appName;\n" +
-"var fullVersion  = ''+parseFloat(navigator.appVersion); \n" +
-"var majorVersion = parseInt(navigator.appVersion,10);\n" +
-"var nameOffset,verOffset,ix;\n" +
-"\n" +
-"// In Opera 15+, the true version is after \"OPR/\"\n" +
-"if ((verOffset=nAgt.indexOf(\"OPR/\"))!=-1) {\n" +
-" browserName = \"Opera\";\n" +
-" fullVersion = nAgt.substring(verOffset+4);\n" +
-"}\n" +
-"// In older Opera, the true version is after \"Opera\" or after \"Version\"\n" +
-"else if ((verOffset=nAgt.indexOf(\"Opera\"))!=-1) {\n" +
-" browserName = \"Opera\";\n" +
-" fullVersion = nAgt.substring(verOffset+6);\n" +
-" if ((verOffset=nAgt.indexOf(\"Version\"))!=-1) \n" +
-"   fullVersion = nAgt.substring(verOffset+8);\n" +
-"}\n" +
-"// In MSIE, the true version is after \"MSIE\" in userAgent\n" +
-"else if ((verOffset=nAgt.indexOf(\"MSIE\"))!=-1) {\n" +
-" browserName = \"Microsoft Internet Explorer\";\n" +
-" fullVersion = nAgt.substring(verOffset+5);\n" +
-"}\n" +
-"// In Chrome, the true version is after \"Chrome\"\n" +
-"else if ((verOffset=nAgt.indexOf(\"Chrome\"))!=-1) {\n" +
-" browserName = \"Chrome\";\n" +
-" fullVersion = nAgt.substring(verOffset+7);\n" +
-"}\n" +
-"// In Safari, the true version is after \"Safari\" or after \"Version\"\n" +
-"else if ((verOffset=nAgt.indexOf(\"Safari\"))!=-1) {\n" +
-" browserName = \"Safari\";\n" +
-" fullVersion = nAgt.substring(verOffset+7);\n" +
-" if ((verOffset=nAgt.indexOf(\"Version\"))!=-1) \n" +
-"   fullVersion = nAgt.substring(verOffset+8);\n" +
-"}\n" +
-"// In Firefox, the true version is after \"Firefox\"\n" +
-"else if ((verOffset=nAgt.indexOf(\"Firefox\"))!=-1) {\n" +
-" browserName = \"Firefox\";\n" +
-" fullVersion = nAgt.substring(verOffset+8);\n" +
-"}\n" +
-"// In most other browsers, \"name/version\" is at the end of userAgent\n" +
-"else if ( (nameOffset=nAgt.lastIndexOf(' ')+1) < \n" +
-"          (verOffset=nAgt.lastIndexOf('/')) ) \n" +
-"{\n" +
-" browserName = nAgt.substring(nameOffset,verOffset);\n" +
-" fullVersion = nAgt.substring(verOffset+1);\n" +
-" if (browserName.toLowerCase()==browserName.toUpperCase()) {\n" +
-"  browserName = navigator.appName;\n" +
-" }\n" +
-"}\n" +
-"// trim the fullVersion string at semicolon/space if present\n" +
-"if ((ix=fullVersion.indexOf(\";\"))!=-1)\n" +
-"   fullVersion=fullVersion.substring(0,ix);\n" +
-"if ((ix=fullVersion.indexOf(\" \"))!=-1)\n" +
-"   fullVersion=fullVersion.substring(0,ix);\n" +
-"\n" +
-"majorVersion = parseInt(''+fullVersion,10);\n" +
-"if (isNaN(majorVersion)) {\n" +
-" fullVersion  = ''+parseFloat(navigator.appVersion); \n" +
-" majorVersion = parseInt(navigator.appVersion,10);\n" +
-"}\n" +
-"\n" +
-"document.write(''\n" +
-" +'Browser name  = '+browserName+'<br>'\n" +
-" +'Full version  = '+fullVersion+'<br>'\n" +
-" +'Major version = '+majorVersion+'<br>'\n" +
-" +'navigator.appName = '+navigator.appName+'<br>'\n" +
-" +'navigator.userAgent = '+navigator.userAgent+'<br>'\n" +
-")";
-
     public BrowserController(String chromeHost, int chromePort) throws IOException {
         this.chromeHost = chromeHost;
         this.chromePort = chromePort;
@@ -121,21 +47,63 @@ public class BrowserController implements AutoCloseable {
     }
 
     public byte[] render(String url, int w, int h, int timeout, int sleep) throws ExecutionException, InterruptedException, IOException, TimeoutException {
+
         try (Session tab = chrome.newSession(w, h)) {
-                tab.page.enable().get(timeout, TimeUnit.MILLISECONDS);
-                CompletableFuture<PageDomain.LoadEventFired> loaded = tab.page.onLoadEventFired();
+            new CompleteMany(
+                    tab.debugger.enable(),
+                    tab.page.enable(),
+                    tab.runtime.enable(),
+                    tab.network.enable(null, null),
+                    tab.network.setCacheDisabled(true),
+                    tab.runtime.evaluate("navigator.userAgent;", null, false, false, null, false, false, false, false)
+                    .thenAccept(e -> {
+                        tab.network.setUserAgentOverride(((String) e.result.value)
+                                .replace("HeadlessChrome", tab.version()));
+                    }),
+                    tab.debugger
+                    .setBreakpointByUrl(1, null, "https?://www.google-analytics.com/analytics.js", null, null),
+                    tab.debugger.setBreakpointByUrl(1, null, "https?://www.google-analytics.com/ga.js", null, null),
+                    tab.network.setExtraHTTPHeaders(Collections.singletonMap("x-ray", "foo")),
+                    tab.page.setControlNavigations(Boolean.TRUE)
+            ).get(timeout, MILLISECONDS);
 
-                tab.page.navigate(url).get(timeout, TimeUnit.MILLISECONDS);
+            tab.debugger.onPaused(p -> {
+                String scriptId = p.callFrames.get(0).location.scriptId;
+                System.out.println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>> SCRIPT BLE PAUSET: " + scriptId);
+                tab.debugger.setScriptSource(scriptId, "console.log(\"google analytics is no more!\");", null);
+                tab.debugger.resume();
+                System.out.println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>> SCRIPT RESUMED: " + scriptId);
+            });
 
-                loaded.get(timeout, TimeUnit.MILLISECONDS);
+            System.out.println("=====================================");
 
-                // disable scrollbars
-                tab.runtime.evaluate("document.getElementsByTagName('body')[0].style.overflow='hidden'",
-                        null, null, null, null, null, null, null, null)
-                        .get(timeout, TimeUnit.MILLISECONDS);
+            CompletableFuture<PageDomain.LoadEventFired> loaded = tab.page.onLoadEventFired();
 
-                // wait a little for any onload javascript to fire
-                Thread.sleep(sleep);
+            tab.page.onNavigationRequested(nr -> {
+                System.out.println("NAV REQUESTED " + nr);
+//                try {
+                    tab.network.setExtraHTTPHeaders(Collections.singletonMap("Discovery-Path", "E"));
+//                } catch (InterruptedException | ExecutionException ex) {
+//                    throw new RuntimeException(ex);
+//                }
+//                tab.page.setControlNavigations(Boolean.FALSE);
+                tab.page.processNavigation("Proceed", nr.navigationId);
+            });
+
+//            tab.page.onNavigationRequested(nr -> {
+//                System.out.println("NAV REQUESTED");
+//                tab.page.processNavigation(nr.url, nr.navigationId);
+//            });
+            tab.page.navigate(url).get(timeout, MILLISECONDS);
+
+            loaded.get(timeout, MILLISECONDS);
+            // disable scrollbars
+            tab.runtime.evaluate("document.getElementsByTagName('body')[0].style.overflow='hidden'",
+                    null, null, null, null, null, null, null, null)
+                    .get(timeout, MILLISECONDS);
+
+            // wait a little for any onload javascript to fire
+            Thread.sleep(sleep);
 
 //                System.out.println("LINKS >>>>>>");
 //                for (PageDomain.FrameResource fs : tab.page.getResourceTree().get().frameTree.resources) {
@@ -145,10 +113,10 @@ public class BrowserController implements AutoCloseable {
 //                    }
 //                }
 //                System.out.println("<<<<<<");
-                String data = tab.page.captureScreenshot().get(timeout, TimeUnit.MILLISECONDS).data;
-                return Base64.getDecoder().decode(data);
+            String data = tab.page.captureScreenshot().get(timeout, MILLISECONDS).data;
+            return Base64.getDecoder().decode(data);
 //                return null;
-            }
+        }
     }
 
     @Override

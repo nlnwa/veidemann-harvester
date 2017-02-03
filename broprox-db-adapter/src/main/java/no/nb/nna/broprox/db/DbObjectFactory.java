@@ -15,22 +15,95 @@
  */
 package no.nb.nna.broprox.db;
 
-import java.lang.annotation.Annotation;
+import java.io.IOException;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.TypeAdapter;
+import com.google.gson.TypeAdapterFactory;
+import com.google.gson.reflect.TypeToken;
+import com.google.gson.stream.JsonReader;
+import com.google.gson.stream.JsonWriter;
 
 /**
  *
  */
 public final class DbObjectFactory {
 
+    private static final Gson gson = new GsonBuilder()
+            .registerTypeAdapterFactory(new TypeAdapterFactory() {
+                @Override
+                public <T> TypeAdapter<T> create(Gson gson, TypeToken<T> type) {
+                    final Class<T> rawType = (Class<T>) type.getRawType();
+
+                    if (!rawType.isInterface()) {
+                        return null;
+                    }
+
+                    Map<String, TypeAdapter> fieldTypes = new LinkedHashMap<>();
+                    for (Method m : rawType.getMethods()) {
+                        if (m.getName().startsWith("with") && m.getParameterTypes().length == 1) {
+                            String fieldName = uncapFieldName(m.getName(), 4);
+                            fieldTypes.put(fieldName, gson.getAdapter(m.getParameterTypes()[0]));
+                        }
+                    }
+
+                    return (TypeAdapter<T>) new TypeAdapter<Object>() {
+                        public void write(JsonWriter out, Object value) throws IOException {
+                            if (value == null) {
+                                out.nullValue();
+                            } else {
+                                System.out.println("WRITE VAL: " + value);
+                            }
+                        }
+
+                        public Object read(JsonReader in) throws IOException {
+                            switch (in.peek()) {
+                                case BEGIN_OBJECT:
+
+                                    DbObject result = (DbObject) DbObjectFactory.create(rawType);
+                                    in.beginObject();
+                                    while (in.hasNext()) {
+                                        String fieldName = in.nextName();
+                                        result.getMap().put(fieldName, fieldTypes.get(fieldName).read(in));
+                                    }
+                                    in.endObject();
+                                    return result;
+
+                                case STRING:
+                                    return in.nextString();
+
+                                case NUMBER:
+                                    return in.nextDouble();
+
+                                case BOOLEAN:
+                                    return in.nextBoolean();
+
+                                case NULL:
+                                    in.nextNull();
+                                    return null;
+
+                                default:
+                                    throw new IllegalStateException();
+
+                            }
+                        }
+
+                    };
+                }
+
+            }).create();
+
     public static <T> T create(Class<T> type) {
         return (T) Proxy.newProxyInstance(type.getClassLoader(),
-                new Class<?>[]{type, DbBasics.class},
+                new Class<?>[]{type, DbObject.class},
                 new DbMapInvocationHandler(type, new HashMap<>()));
     }
 
@@ -39,18 +112,19 @@ public final class DbObjectFactory {
             return Optional.empty();
         } else {
             return Optional.of((T) Proxy.newProxyInstance(type.getClassLoader(),
-                    new Class<?>[]{type, DbBasics.class},
+                    new Class<?>[]{type, DbObject.class},
                     new DbMapInvocationHandler(type, src)));
         }
     }
 
-    public interface DbBasics {
-
-        Map<String, Object> getMap();
-
-        Object getKey();
-
+    public static <T> Optional<T> of(Class<T> type, String jsonString) {
+        if (jsonString == null) {
+            return Optional.empty();
+        } else {
+            return Optional.of(gson.fromJson(jsonString, type));
+        }
     }
+
 
     private static class DbMapInvocationHandler implements InvocationHandler {
 
@@ -58,17 +132,9 @@ public final class DbObjectFactory {
 
         private final Map<String, Object> src;
 
-        private final String keyField;
-
         public DbMapInvocationHandler(Class type, Map<String, Object> src) {
             this.type = type;
             this.src = src;
-            Annotation ann = type.getAnnotation(Key.class);
-            if (ann != null) {
-                keyField = ((Key) ann).value();
-            } else {
-                keyField = null;
-            }
         }
 
         @Override
@@ -76,8 +142,8 @@ public final class DbObjectFactory {
             switch (method.getName()) {
                 case "getMap":
                     return src;
-                case "getKey":
-                    return src.get("id");
+                case "toJson":
+                    return gson.toJson(src);
                 case "toString":
                     return getString();
 
@@ -90,24 +156,16 @@ public final class DbObjectFactory {
             String mName = method.getName();
 
             if (mName.startsWith("get")) {
-                return src.get(extractFieldName(mName, 3));
+                return src.get(uncapFieldName(mName, 3));
             }
             if (mName.startsWith("with") && args.length == 1) {
-                src.put(extractFieldName(mName, 4), args[0]);
+                src.put(uncapFieldName(mName, 4), args[0]);
                 return proxy;
             }
             if (mName.startsWith("is")) {
-                return src.get(extractFieldName(mName, 2));
+                return src.get(uncapFieldName(mName, 2));
             }
             return null;
-        }
-
-        private String extractFieldName(String methodName, int prefixLen) {
-            String name = Character.toLowerCase(methodName.charAt(prefixLen)) + methodName.substring(prefixLen + 1);
-            if (keyField != null && keyField.equals(name)) {
-                name = "id";
-            }
-            return name;
         }
 
         private String getString() {
@@ -128,4 +186,10 @@ public final class DbObjectFactory {
         }
 
     }
+
+    private static String uncapFieldName(String methodName, int prefixLen) {
+        String name = Character.toLowerCase(methodName.charAt(prefixLen)) + methodName.substring(prefixLen + 1);
+        return name;
+    }
+
 }

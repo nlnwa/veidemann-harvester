@@ -33,8 +33,11 @@ public class CoalesceUriFilter extends HttpFiltersSourceAdapter {
 
     private final DbAdapter db;
 
-    public CoalesceUriFilter(DbAdapter db) {
+    private final ContentWriterClient contentWriterClient;
+
+    public CoalesceUriFilter(final DbAdapter db, final ContentWriterClient contentWriterClient) {
         this.db = db;
+        this.contentWriterClient = contentWriterClient;
     }
 
     @Override
@@ -49,10 +52,10 @@ public class CoalesceUriFilter extends HttpFiltersSourceAdapter {
         }
         String connectedUrl = clientCtx.channel().attr(CONNECTED_URL).get();
         if (connectedUrl == null) {
-            return new RecorderFilter(uri, originalRequest, clientCtx, db);
+            return new RecorderFilter(uri, originalRequest, clientCtx, db, contentWriterClient);
         }
         originalRequest.setUri(uri);
-        return new RecorderFilter(connectedUrl + uri, originalRequest, clientCtx, db);
+        return new RecorderFilter(connectedUrl + uri, originalRequest, clientCtx, db, contentWriterClient);
     }
 
 }

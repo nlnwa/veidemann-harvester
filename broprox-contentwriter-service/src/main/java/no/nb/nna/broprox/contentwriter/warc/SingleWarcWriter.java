@@ -45,8 +45,8 @@ public class SingleWarcWriter implements AutoCloseable {
 
     WarcFileWriter warcFileWriter;
 
-    public SingleWarcWriter(File targetDir, long maxFileSize, boolean compress) {
-        WarcFileNaming warcFileNaming = new WarcFileNamingDefault("test", null, "host", null);
+    public SingleWarcWriter(File targetDir, long maxFileSize, boolean compress, int seq) {
+        WarcFileNaming warcFileNaming = new WarcFileNamingDefault("test", null, "host-" + seq, null);
         WarcFileWriterConfig writerConfig = new WarcFileWriterConfig(targetDir, compress, maxFileSize, false);
         warcFileWriter = WarcFileWriter.getWarcWriterInstance(warcFileNaming, writerConfig);
     }
@@ -73,11 +73,11 @@ public class SingleWarcWriter implements AutoCloseable {
 //        record.header
 //                .addHeader(FN_WARC_IP_ADDRESS, arcRecord.header.inetAddress, arcRecord.header.ipAddressStr);
 //        record.header.addHeader(FN_WARC_WARCINFO_ID, "<urn:uuid:" + warcinfoUuid + ">");
-            if (logEntry.getDigest() != null) {
-//            record.header.addHeader(FN_WARC_BLOCK_DIGEST, warcBlockDigest, null);
-//            if (managedPayload.httpHeaderLength > 0 && managedPayload.payloadLength > 0) {
-                record.header.addHeader(FN_WARC_PAYLOAD_DIGEST, logEntry.getDigest());
-//            }
+            if (logEntry.getBlockDigest() != null) {
+                record.header.addHeader(FN_WARC_BLOCK_DIGEST, logEntry.getBlockDigest());
+            }
+            if (logEntry.getPayloadDigest() != null) {
+                record.header.addHeader(FN_WARC_PAYLOAD_DIGEST, logEntry.getPayloadDigest());
             }
 
 //        contentLength = managedPayload.httpHeaderLength + managedPayload.payloadLength;
@@ -97,17 +97,17 @@ public class SingleWarcWriter implements AutoCloseable {
         }
     }
 
-    public void addPayload(byte[] data) throws UncheckedIOException {
+    public long addPayload(byte[] data) throws UncheckedIOException {
         try {
-            warcFileWriter.getWriter().writePayload(data);
+            return warcFileWriter.getWriter().writePayload(data);
         } catch (IOException ex) {
             throw new UncheckedIOException(ex);
         }
     }
 
-    public void addPayload(InputStream data) throws UncheckedIOException {
+    public long addPayload(InputStream data) throws UncheckedIOException {
         try {
-            warcFileWriter.getWriter().streamPayload(data);
+            return warcFileWriter.getWriter().streamPayload(data);
         } catch (IOException ex) {
             throw new UncheckedIOException(ex);
         }
@@ -139,7 +139,7 @@ public class SingleWarcWriter implements AutoCloseable {
         record.header.addHeader(FN_WARC_RECORD_ID, "<" + warcFileWriter.warcinfoRecordId + ">");
         record.header.addHeader(FN_CONTENT_TYPE, "application/warc-fields");
         record.header.addHeader(FN_CONTENT_LENGTH, "0");
-                // Standard says no.
+        // Standard says no.
         //record.header.addHeader(FN_WARC_CONCURRENT_TO, "<urn:uuid:" + filedescUuid + ">");
         writer.writeHeader(record);
         writer.closeRecord();

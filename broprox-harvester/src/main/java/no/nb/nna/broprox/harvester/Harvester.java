@@ -25,6 +25,7 @@ import com.typesafe.config.ConfigFactory;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
 import no.nb.nna.broprox.harvester.api.ApiServer;
+import no.nb.nna.broprox.harvester.proxy.ContentWriterClient;
 import no.nb.nna.broprox.harvester.proxy.RecordingProxy;
 import no.nb.nna.broprox.harvester.settings.Settings;
 import org.littleshoot.proxy.mitm.RootCertificateException;
@@ -60,8 +61,12 @@ public class Harvester {
     public Harvester start() {
         try {
             DbAdapter db = new RethinkDbAdapter(SETTINGS.getDbHost(), SETTINGS.getDbPort(), SETTINGS.getDbName());
+            ContentWriterClient contentWriterClient
+                    = new ContentWriterClient(SETTINGS.getContentWriterHost(), SETTINGS.getContentWriterPort());
 
-            RecordingProxy proxy = new RecordingProxy(new File(SETTINGS.getWorkDir()), SETTINGS.getProxyPort(), db);
+            RecordingProxy proxy = new RecordingProxy(
+                    new File(SETTINGS.getWorkDir()), SETTINGS.getProxyPort(), db, contentWriterClient);
+
             ApiServer apiServer = new ApiServer();
 
             LOG.info("Broprox harvester (v. {}) started", Harvester.class.getPackage().getImplementationVersion());

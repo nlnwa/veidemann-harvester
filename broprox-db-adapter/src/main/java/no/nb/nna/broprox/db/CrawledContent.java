@@ -18,7 +18,7 @@ package no.nb.nna.broprox.db;
 /**
  *
  */
-public interface CrawledContent extends DbObject {
+public interface CrawledContent extends DbObject<CrawledContent> {
 
     public String getDigest();
 

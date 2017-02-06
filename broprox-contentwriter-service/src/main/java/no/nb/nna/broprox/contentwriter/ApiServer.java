@@ -17,19 +17,15 @@
 package no.nb.nna.broprox.contentwriter;
 
 import java.net.URI;
-import java.util.Set;
 
 import io.netty.channel.Channel;
 import javax.ws.rs.core.UriBuilder;
-import javax.ws.rs.ext.Provider;
 import no.nb.nna.broprox.contentwriter.warc.WarcWriterPool;
-import org.glassfish.hk2.api.ServiceLocator;
+import no.nb.nna.broprox.db.DbAdapter;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
-import org.glassfish.hk2.utilities.binding.BindingBuilderFactory;
 import org.glassfish.jersey.media.multipart.MultiPartFeature;
 import org.glassfish.jersey.netty.httpserver.NettyHttpContainerProvider;
 import org.glassfish.jersey.server.ResourceConfig;
-import org.glassfish.jersey.server.spi.ComponentProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,7 +38,7 @@ private static final Logger LOG = LoggerFactory.getLogger(ApiServer.class);
     /**
      * Construct a new REST API server.
      */
-    public ApiServer(WarcWriterPool warcWriterPool) {
+    public ApiServer(DbAdapter db, WarcWriterPool warcWriterPool) {
         final int port = ContentWriter.getSettings().getApiPort();
 
         LOG.info("Starting server listening on port {}.", port);
@@ -54,6 +50,13 @@ private static final Logger LOG = LoggerFactory.getLogger(ApiServer.class);
                     @Override
                     protected void configure() {
                         bind(warcWriterPool);
+                    }
+
+                })
+                .register(new AbstractBinder() {
+                    @Override
+                    protected void configure() {
+                        bind(db).to(DbAdapter.class);
                     }
 
                 });

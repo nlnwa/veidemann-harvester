@@ -60,7 +60,7 @@ public class ContentWriter {
             WarcWriterPool warcWriterPool = new WarcWriterPool(new File(SETTINGS.getWarcDir()),
                     SETTINGS.getWarcFileSize(), SETTINGS.isCompressWarc(), SETTINGS.getWarcWriterPoolSize());
 
-            ApiServer apiServer = new ApiServer(warcWriterPool);
+            ApiServer apiServer = new ApiServer(db, warcWriterPool);
 
             LOG.info("Broprox content writer (v. {}) started",
                     ContentWriter.class.getPackage().getImplementationVersion());

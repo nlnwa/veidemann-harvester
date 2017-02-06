@@ -65,11 +65,8 @@ public class RethinkDbAdapter implements DbAdapter {
         r.table("crawled_content").get(digest).delete().run(conn);
     }
 
-    public void addCrawledContent(CrawledContent cc) {
-        Object response = r.table("crawled_content")
-                .insert(((DbObject)cc).getMap())
-                .optArg("conflict", "error")
-                .run(conn);
+    public CrawledContent addCrawledContent(CrawledContent cc) {
+        return insert("crawled_content", cc);
     }
 
     public CrawlLog addCrawlLog(CrawlLog cl) {
@@ -77,14 +74,36 @@ public class RethinkDbAdapter implements DbAdapter {
         if (!data.containsKey("timeStamp")) {
             data.put("timeStamp", r.now());
         }
-        Map response = r.table("crawl_log")
-                .insert(data)
-                .optArg("conflict", "error")
-                .run(conn);
 
-        data.put("id", ((List<String>) response.get("generated_keys")).get(0));
-
-        return cl;
+        return insert("crawl_log", cl);
     }
 
+    public CrawlLog updateCrawlLog(CrawlLog cl) {
+        Map<String, Object> data = ((DbObject)cl).getMap();
+        if (!data.containsKey("timeStamp")) {
+            data.put("timeStamp", r.now());
+        }
+
+        return update("crawl_log", cl.getWarcId(), cl);
+    }
+
+    private <T extends DbObject> T insert(String table, T data) {
+        Map response = r.table(table)
+                .insert(data.getMap())
+                .optArg("conflict", "error")
+                .optArg("return_changes", "always")
+                .run(conn);
+        data.setMap(((List<Map<String, Map<String, Object>>>)response.get("changes")).get(0).get("new_val"));
+        return data;
+    }
+
+    private <T extends DbObject> T update(String table, Object key, T data) {
+        Map response = r.table(table)
+                .get(key)
+                .update(data.getMap())
+                .optArg("return_changes", "always")
+                .run(conn);
+        data.setMap(((List<Map<String, Map<String, Object>>>)response.get("changes")).get(0).get("new_val"));
+        return data;
+    }
 }

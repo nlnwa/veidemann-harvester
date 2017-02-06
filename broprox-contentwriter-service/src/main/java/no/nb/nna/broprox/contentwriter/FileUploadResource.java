@@ -17,7 +17,6 @@ package no.nb.nna.broprox.contentwriter;
 
 import java.io.InputStream;
 import java.net.URI;
-import java.net.URISyntaxException;
 
 import javax.ws.rs.Consumes;
 import javax.ws.rs.POST;
@@ -29,33 +28,64 @@ import javax.ws.rs.core.Response;
 import no.nb.nna.broprox.contentwriter.warc.SingleWarcWriter;
 import no.nb.nna.broprox.contentwriter.warc.WarcWriterPool;
 import no.nb.nna.broprox.db.CrawlLog;
+import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.db.DbObjectFactory;
 import org.glassfish.jersey.media.multipart.FormDataParam;
+
+import static io.netty.handler.codec.http.HttpConstants.CR;
+import static io.netty.handler.codec.http.HttpConstants.LF;
 
 /**
  *
  */
 @Path("/")
 public class FileUploadResource {
+
+    static final byte[] CRLF = {CR, LF};
+
     @Context
     WarcWriterPool warcWriterPool;
+
+    @Context
+    DbAdapter db;
+
+    public FileUploadResource() {
+    }
 
     @Path("warcrecord")
     @POST
     @Consumes(MediaType.MULTIPART_FORM_DATA)
     public Response postWarcRecord(
-            @FormDataParam("logEntry") String logEntry,
+            @FormDataParam("logEntry") String logEntryJson,
+            @FormDataParam("headers") InputStream headers,
             @FormDataParam("payload") InputStream payload) {
+
+        long size = 0L;
 
         SingleWarcWriter warcWriter = null;
         try {
+            CrawlLog logEntry = DbObjectFactory.of(CrawlLog.class, logEntryJson).get();
             warcWriter = warcWriterPool.borrow();
-            URI ref = warcWriter.writeHeader(DbObjectFactory.of(CrawlLog.class, logEntry).get());
-            warcWriter.addPayload(payload);
+
+            URI ref = warcWriter.writeHeader(logEntry);
+            logEntry.withStorageRef(ref.toString());
+            db.updateCrawlLog(logEntry);
+
+            if (headers != null) {
+                size += warcWriter.addPayload(headers);
+                size += warcWriter.addPayload(CRLF);
+            }
+            if (payload != null) {
+                size += warcWriter.addPayload(payload);
+            }
             warcWriter.closeRecord();
+            if (logEntry.getSize() != size) {
+                throw new WebApplicationException("Size doesn't match metadata", Response.Status.NOT_ACCEPTABLE);
+            }
             return Response.created(ref).build();
-        } catch (InterruptedException ex) {
-            throw new WebApplicationException(ex);
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            throw new WebApplicationException(ex.getMessage(), ex);
         } finally {
             warcWriterPool.release(warcWriter);
         }

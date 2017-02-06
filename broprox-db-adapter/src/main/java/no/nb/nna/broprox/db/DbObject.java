@@ -20,9 +20,11 @@ import java.util.Map;
 /**
  *
  */
-public interface DbObject {
+public interface DbObject<T> {
 
     Map<String, Object> getMap();
+
+    T setMap(Map<String, Object> src);
 
     String toJson();
 

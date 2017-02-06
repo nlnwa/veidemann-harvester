@@ -130,7 +130,7 @@ public final class DbObjectFactory {
 
         private final Class type;
 
-        private final Map<String, Object> src;
+        private Map<String, Object> src;
 
         public DbMapInvocationHandler(Class type, Map<String, Object> src) {
             this.type = type;
@@ -142,6 +142,9 @@ public final class DbObjectFactory {
             switch (method.getName()) {
                 case "getMap":
                     return src;
+                case "setMap":
+                    src = (Map<String, Object>) args[0];
+                    return proxy;
                 case "toJson":
                     return gson.toJson(src);
                 case "toString":
@@ -177,7 +180,7 @@ public final class DbObjectFactory {
                         response.append(", ");
                     }
                     String fieldName = Character.toLowerCase(m.getName().charAt(3)) + m.getName().substring(4);
-                    response.append(fieldName).append("=").append(getOrSetValue(null, m, null));
+                    response.append(fieldName).append("=").append(String.valueOf(getOrSetValue(null, m, null)));
                     notFirst = true;
                 }
             }

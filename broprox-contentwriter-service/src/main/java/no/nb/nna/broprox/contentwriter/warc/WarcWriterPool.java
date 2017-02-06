@@ -16,7 +16,6 @@
 package no.nb.nna.broprox.contentwriter.warc;
 
 import java.io.File;
-import java.util.Objects;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -85,10 +84,12 @@ public class WarcWriterPool implements AutoCloseable {
     }
 
     private void initialize() {
+        targetDir.mkdirs();
+
         pool = new LinkedBlockingDeque<>();
 
         for (int i = 0; i < poolSize.get(); i++) {
-            pool.add(new SingleWarcWriter(targetDir, maxFileSize, compress));
+            pool.add(new SingleWarcWriter(targetDir, maxFileSize, compress, i));
         }
     }
 

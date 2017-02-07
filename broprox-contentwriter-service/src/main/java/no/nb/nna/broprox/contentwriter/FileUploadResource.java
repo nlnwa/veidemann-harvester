@@ -17,6 +17,9 @@ package no.nb.nna.broprox.contentwriter;
 
 import java.io.InputStream;
 import java.net.URI;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinTask;
 
 import javax.ws.rs.Consumes;
 import javax.ws.rs.POST;
@@ -25,11 +28,13 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import no.nb.nna.broprox.contentwriter.text.TextExtracter;
 import no.nb.nna.broprox.contentwriter.warc.SingleWarcWriter;
 import no.nb.nna.broprox.contentwriter.warc.WarcWriterPool;
 import no.nb.nna.broprox.db.CrawlLog;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.db.DbObjectFactory;
+import org.glassfish.jersey.media.multipart.FormDataBodyPart;
 import org.glassfish.jersey.media.multipart.FormDataParam;
 
 import static io.netty.handler.codec.http.HttpConstants.CR;
@@ -49,6 +54,9 @@ public class FileUploadResource {
     @Context
     DbAdapter db;
 
+    @Context
+    TextExtracter textExtracter;
+
     public FileUploadResource() {
     }
 
@@ -56,16 +64,15 @@ public class FileUploadResource {
     @POST
     @Consumes(MediaType.MULTIPART_FORM_DATA)
     public Response postWarcRecord(
-            @FormDataParam("logEntry") String logEntryJson,
-            @FormDataParam("headers") InputStream headers,
-            @FormDataParam("payload") InputStream payload) {
+            @FormDataParam("logEntry") final String logEntryJson,
+            @FormDataParam("headers") final InputStream headers,
+            @FormDataParam("payload") final FormDataBodyPart payload) {
 
         long size = 0L;
 
-        SingleWarcWriter warcWriter = null;
-        try {
+        try (WarcWriterPool.PooledWarcWriter pooledWarcWriter = warcWriterPool.borrow()) {
             CrawlLog logEntry = DbObjectFactory.of(CrawlLog.class, logEntryJson).get();
-            warcWriter = warcWriterPool.borrow();
+            SingleWarcWriter warcWriter = pooledWarcWriter.getWarcWriter();
 
             URI ref = warcWriter.writeHeader(logEntry);
             logEntry.withStorageRef(ref.toString());
@@ -76,7 +83,25 @@ public class FileUploadResource {
                 size += warcWriter.addPayload(CRLF);
             }
             if (payload != null) {
-                size += warcWriter.addPayload(payload);
+                ForkJoinTask<Long> writeWarcJob = ForkJoinPool.commonPool().submit(new Callable<Long>() {
+                    @Override
+                    public Long call() throws Exception {
+                        return warcWriter.addPayload(payload.getValueAs(InputStream.class));
+                    }
+
+                });
+                ForkJoinTask<Void> extractTextJob = ForkJoinPool.commonPool().submit(new Callable<Void>() {
+                    @Override
+                    public Void call() throws Exception {
+                        textExtracter.analyze(payload.getValueAs(InputStream.class), logEntry, db);
+                        return null;
+                    }
+
+                });
+                size += writeWarcJob.get();
+                extractTextJob.get();
+//                size += warcWriter.addPayload(payload.getValueAs(InputStream.class));
+//                textExtracter.analyze(payload.getValueAs(InputStream.class), logEntry, db);
             }
             warcWriter.closeRecord();
             if (logEntry.getSize() != size) {
@@ -86,8 +111,6 @@ public class FileUploadResource {
         } catch (Exception ex) {
             ex.printStackTrace();
             throw new WebApplicationException(ex.getMessage(), ex);
-        } finally {
-            warcWriterPool.release(warcWriter);
         }
     }
 

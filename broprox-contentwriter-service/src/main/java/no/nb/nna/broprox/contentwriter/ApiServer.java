@@ -20,6 +20,7 @@ import java.net.URI;
 
 import io.netty.channel.Channel;
 import javax.ws.rs.core.UriBuilder;
+import no.nb.nna.broprox.contentwriter.text.TextExtracter;
 import no.nb.nna.broprox.contentwriter.warc.WarcWriterPool;
 import no.nb.nna.broprox.db.DbAdapter;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
@@ -38,7 +39,7 @@ private static final Logger LOG = LoggerFactory.getLogger(ApiServer.class);
     /**
      * Construct a new REST API server.
      */
-    public ApiServer(DbAdapter db, WarcWriterPool warcWriterPool) {
+    public ApiServer(DbAdapter db, WarcWriterPool warcWriterPool, TextExtracter textExtracter) {
         final int port = ContentWriter.getSettings().getApiPort();
 
         LOG.info("Starting server listening on port {}.", port);
@@ -57,6 +58,13 @@ private static final Logger LOG = LoggerFactory.getLogger(ApiServer.class);
                     @Override
                     protected void configure() {
                         bind(db).to(DbAdapter.class);
+                    }
+
+                })
+                .register(new AbstractBinder() {
+                    @Override
+                    protected void configure() {
+                        bind(textExtracter);
                     }
 
                 });

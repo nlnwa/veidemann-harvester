@@ -32,7 +32,7 @@ public class WarcWriterPool implements AutoCloseable {
 
     private final boolean compress;
 
-    private LinkedBlockingDeque<SingleWarcWriter> pool;
+    private LinkedBlockingDeque<PooledWarcWriter> pool;
 
     private final AtomicBoolean closed = new AtomicBoolean(false);
 
@@ -58,16 +58,16 @@ public class WarcWriterPool implements AutoCloseable {
      * <p>
      * @return T borrowed object
      */
-    public SingleWarcWriter borrow() throws InterruptedException {
+    public PooledWarcWriter borrow() throws InterruptedException {
         if (closed.get()) {
-            throw new IllegalStateException("The WarcWriter poll is closed");
+            throw new IllegalStateException("The WarcWriter pool is closed");
         }
         return pool.takeFirst();
     }
 
-    public SingleWarcWriter borrow(long timeout, TimeUnit unit) throws InterruptedException {
+    public PooledWarcWriter borrow(long timeout, TimeUnit unit) throws InterruptedException {
         if (closed.get()) {
-            throw new IllegalStateException("The WarcWriter poll is closed");
+            throw new IllegalStateException("The WarcWriter pool is closed");
         }
         return pool.pollFirst(timeout, unit);
     }
@@ -77,7 +77,7 @@ public class WarcWriterPool implements AutoCloseable {
      * <p>
      * @param object object to be returned
      */
-    public void release(SingleWarcWriter object) {
+    public void release(PooledWarcWriter object) {
         if (object != null) {
             pool.addFirst(object);
         }
@@ -89,7 +89,7 @@ public class WarcWriterPool implements AutoCloseable {
         pool = new LinkedBlockingDeque<>();
 
         for (int i = 0; i < poolSize.get(); i++) {
-            pool.add(new SingleWarcWriter(targetDir, maxFileSize, compress, i));
+            pool.add(new PooledWarcWriter(new SingleWarcWriter(targetDir, maxFileSize, compress, i)));
         }
     }
 
@@ -107,4 +107,22 @@ public class WarcWriterPool implements AutoCloseable {
         }
     }
 
+    public class PooledWarcWriter implements AutoCloseable {
+
+        final SingleWarcWriter warcWriter;
+
+        public PooledWarcWriter(SingleWarcWriter warcWriter) {
+            this.warcWriter = warcWriter;
+        }
+
+        public SingleWarcWriter getWarcWriter() {
+            return warcWriter;
+        }
+
+        @Override
+        public void close() throws Exception {
+            release(this);
+        }
+
+    }
 }

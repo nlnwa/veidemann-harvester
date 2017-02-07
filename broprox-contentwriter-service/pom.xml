@@ -46,10 +46,6 @@
             <groupId>org.jwat</groupId>
             <artifactId>jwat-gzip</artifactId>
         </dependency>
-        <!--        <dependency>
-            <groupId>org.jwat</groupId>
-            <artifactId>jwat-arc</artifactId>
-        </dependency>-->
         <dependency>
             <groupId>org.jwat</groupId>
             <artifactId>jwat-warc</artifactId>
@@ -57,6 +53,19 @@
         <dependency>
             <groupId>org.jwat</groupId>
             <artifactId>jwat-archive</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-parsers</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-langdetect</artifactId>
         </dependency>
 
         <!-- Configuration framework -->

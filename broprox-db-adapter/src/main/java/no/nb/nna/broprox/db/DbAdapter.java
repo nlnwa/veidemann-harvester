@@ -30,4 +30,6 @@ public interface DbAdapter {
 
     CrawlLog updateCrawlLog(CrawlLog cl);
 
+    ExtractedText addExtractedText(ExtractedText et);
+
 }

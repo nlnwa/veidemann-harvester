@@ -33,6 +33,7 @@
         <log4j.version>2.7</log4j.version>
         <org.jwat.version>1.0.4</org.jwat.version>
         <org.glassfish.jersey.version>2.25.1</org.glassfish.jersey.version>
+        <org.apache.tika.version>1.14</org.apache.tika.version>
     </properties>
 
     <dependencyManagement>
@@ -61,7 +62,7 @@
             <dependency>
                 <groupId>io.netty</groupId>
                 <artifactId>netty-all</artifactId>
-                <version>4.1.6.Final</version>
+                <version>4.1.8.Final</version>
             </dependency>
             <dependency>
                 <groupId>org.glassfish.jersey.containers</groupId>
@@ -90,6 +91,28 @@
                 <groupId>com.rethinkdb</groupId>
                 <artifactId>rethinkdb-driver</artifactId>
                 <version>2.3.3</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.apache.tika</groupId>
+                <artifactId>tika-core</artifactId>
+                <version>${org.apache.tika.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.tika</groupId>
+                <artifactId>tika-parsers</artifactId>
+                <version>${org.apache.tika.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.tika</groupId>
+                <artifactId>tika-langdetect</artifactId>
+                <version>${org.apache.tika.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.optimaize.languagedetector</groupId>
+                <artifactId>language-detector</artifactId>
+                <version>0.6</version>
             </dependency>
 
             <!-- ARC/WARC libraries -->

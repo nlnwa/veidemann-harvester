@@ -125,7 +125,6 @@ public final class DbObjectFactory {
         }
     }
 
-
     private static class DbMapInvocationHandler implements InvocationHandler {
 
         private final Class type;
@@ -159,7 +158,20 @@ public final class DbObjectFactory {
             String mName = method.getName();
 
             if (mName.startsWith("get")) {
-                return src.get(uncapFieldName(mName, 3));
+                Class returnType = method.getReturnType();
+                Object value = src.get(uncapFieldName(mName, 3));
+
+                if (value == null) {
+                    if (returnType == Integer.TYPE) {
+                        value = Integer.valueOf(0);
+                    } else if (returnType == Long.TYPE) {
+                        value = Long.valueOf(0);
+                    }
+                }
+                if (returnType == Integer.TYPE && (value instanceof Long)) {
+                    return ((Long) value).intValue();
+                }
+                return value;
             }
             if (mName.startsWith("with") && args.length == 1) {
                 src.put(uncapFieldName(mName, 4), args[0]);

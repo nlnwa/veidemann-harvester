@@ -24,6 +24,7 @@ import com.typesafe.config.ConfigFactory;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
 import no.nb.nna.broprox.contentwriter.settings.Settings;
+import no.nb.nna.broprox.contentwriter.text.TextExtracter;
 import no.nb.nna.broprox.contentwriter.warc.WarcWriterPool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,8 +60,9 @@ public class ContentWriter {
             DbAdapter db = new RethinkDbAdapter(SETTINGS.getDbHost(), SETTINGS.getDbPort(), SETTINGS.getDbName());
             WarcWriterPool warcWriterPool = new WarcWriterPool(new File(SETTINGS.getWarcDir()),
                     SETTINGS.getWarcFileSize(), SETTINGS.isCompressWarc(), SETTINGS.getWarcWriterPoolSize());
+            TextExtracter textExtracter = new TextExtracter();
 
-            ApiServer apiServer = new ApiServer(db, warcWriterPool);
+            ApiServer apiServer = new ApiServer(db, warcWriterPool, textExtracter);
 
             LOG.info("Broprox content writer (v. {}) started",
                     ContentWriter.class.getPackage().getImplementationVersion());

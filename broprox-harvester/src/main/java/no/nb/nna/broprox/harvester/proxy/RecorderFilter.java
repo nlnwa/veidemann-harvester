@@ -15,12 +15,8 @@
  */
 package no.nb.nna.broprox.harvester.proxy;
 
-import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Optional;
 
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpContent;
@@ -28,7 +24,6 @@ import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import no.nb.nna.broprox.db.CrawlLog;
-import no.nb.nna.broprox.db.CrawledContent;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.db.DbObjectFactory;
 import org.littleshoot.proxy.HttpFiltersAdapter;
@@ -48,26 +43,34 @@ public class RecorderFilter extends HttpFiltersAdapter {
 
     private final ContentInterceptor contentInterceptor;
 
-    public RecorderFilter(String uri, HttpRequest originalRequest, ChannelHandlerContext ctx, DbAdapter db) {
+    private final ContentWriterClient contentWriterClient;
+
+    private long payloadSizeField;
+
+    public RecorderFilter(final String uri, final HttpRequest originalRequest, final ChannelHandlerContext ctx,
+            final DbAdapter db, final ContentWriterClient contentWriterClient) {
+
         super(originalRequest.setUri(uri), ctx);
         this.uri = uri;
         this.db = db;
+        this.contentWriterClient = contentWriterClient;
+
         this.crawlLog = DbObjectFactory.create(CrawlLog.class)
                 .withRequestedUri(uri)
                 .withSurt(UriConfigs.SURT_KEY.buildUri(uri).toString());
-        this.contentInterceptor = new ContentInterceptor();
+        this.contentInterceptor = new ContentInterceptor(db, ctx, contentWriterClient);
     }
 
     @Override
     public HttpResponse clientToProxyRequest(HttpObject httpObject) {
         if (httpObject instanceof HttpRequest) {
             HttpRequest req = (HttpRequest) httpObject;
-            System.out.println(this.hashCode() + " :: PROXY URI: " + uri);
-            System.out.println("HEADERS: ");
-            for (Iterator<Map.Entry<CharSequence, CharSequence>> it = req.headers().iteratorCharSequence(); it.hasNext();) {
-                Map.Entry<CharSequence, CharSequence> e = it.next();
-                System.out.println("   " + e.getKey() + " = " + e.getValue());
-            }
+//            System.out.println(this.hashCode() + " :: PROXY URI: " + uri);
+//            System.out.println("HEADERS: ");
+//            for (Iterator<Map.Entry<CharSequence, CharSequence>> it = req.headers().iteratorCharSequence(); it.hasNext();) {
+//                Map.Entry<CharSequence, CharSequence> e = it.next();
+//                System.out.println("   " + e.getKey() + " = " + e.getValue());
+//            }
             req.headers().set("Accept-Encoding", "identity");
             crawlLog.withFetchTimeStamp(OffsetDateTime.now().withOffsetSameInstant(ZoneOffset.UTC))
                     .withReferrer(req.headers().get("referer"))
@@ -83,31 +86,20 @@ public class RecorderFilter extends HttpFiltersAdapter {
             HttpResponse res = (HttpResponse) httpObject;
             crawlLog.withStatusCode(res.status().code())
                     .withContentType(res.headers().get("Content-Type"));
+            contentInterceptor.addHeader(res.headers());
+
+            try {
+                payloadSizeField = res.headers().getInt("Content-Length");
+            } catch (NullPointerException ex) {
+                payloadSizeField = 0L;
+            }
 
         } else if (httpObject instanceof HttpContent) {
             HttpContent res = (HttpContent) httpObject;
-            contentInterceptor.update(res.content());
+            contentInterceptor.addPayload(res.content());
 
             if (ProxyUtils.isLastChunk(httpObject)) {
-                String digest = contentInterceptor.getDigest();
-                Optional<CrawledContent> isDuplicate = db.isDuplicateContent(digest);
-
-                if (isDuplicate.isPresent()) {
-                    crawlLog.withRecordType("revisit");
-                } else {
-                    crawlLog.withRecordType("response");
-                }
-
-                crawlLog.withFetchTimeMillis(
-                        Duration.between(crawlLog.getFetchTimeStamp(), OffsetDateTime.now()).toMillis())
-                        .withDigest(digest)
-                        .withSize(contentInterceptor.getSize());
-                db.addCrawlLog(crawlLog);
-
-                if (!isDuplicate.isPresent()) {
-                    db.addCrawledContent(DbObjectFactory.create(CrawledContent.class)
-                            .withDigest(digest).withWarcId(crawlLog.getWarcId()));
-                }
+                contentInterceptor.writeData(crawlLog);
             }
         } else {
             System.out.println(this.hashCode() + " :: RESP: " + httpObject.getClass());

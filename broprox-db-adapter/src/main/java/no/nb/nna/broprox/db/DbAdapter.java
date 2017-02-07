@@ -22,10 +22,14 @@ import java.util.Optional;
  */
 public interface DbAdapter {
 
-    void addCrawledContent(CrawledContent cc);
+    CrawledContent addCrawledContent(CrawledContent cc);
 
     Optional<CrawledContent> isDuplicateContent(String digest);
 
     CrawlLog addCrawlLog(CrawlLog cl);
+
+    CrawlLog updateCrawlLog(CrawlLog cl);
+
+    ExtractedText addExtractedText(ExtractedText et);
 
 }

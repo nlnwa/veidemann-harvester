@@ -15,16 +15,17 @@
  */
 package no.nb.nna.broprox.db;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+import java.util.Map;
 
 /**
  *
  */
-@Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.TYPE)
-public @interface Key {
-    String value();
+public interface DbObject<T> {
+
+    Map<String, Object> getMap();
+
+    T setMap(Map<String, Object> src);
+
+    String toJson();
+
 }

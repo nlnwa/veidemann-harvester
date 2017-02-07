@@ -7,7 +7,7 @@
         <version>1.0.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>broprox-harvester</artifactId>
+    <artifactId>broprox-contentwriter-service</artifactId>
     <packaging>jar</packaging>
 
     <properties>
@@ -18,34 +18,6 @@
             <groupId>${project.groupId}</groupId>
             <artifactId>broprox-db-adapter</artifactId>
             <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>${project.groupId}</groupId>
-            <artifactId>broprox-chrome-client</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.netpreserve.commons</groupId>
-            <artifactId>webarchive-commons-uri</artifactId>
-            <version>2.0.0-SNAPSHOT</version>
-        </dependency>
-        <dependency>
-            <groupId>org.littleshoot</groupId>
-            <artifactId>littleproxy</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.github.ganskef</groupId>
-            <artifactId>littleproxy-mitm</artifactId>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.slf4j</groupId>
-                    <artifactId>slf4j-log4j12</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.commons</groupId>
-            <artifactId>commons-io</artifactId>
         </dependency>
         <dependency>
             <groupId>io.netty</groupId>
@@ -60,8 +32,40 @@
             <artifactId>jersey-media-multipart</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.google.code.gson</groupId>
-            <artifactId>gson</artifactId>
+            <groupId>org.glassfish.jersey.test-framework.providers</groupId>
+            <artifactId>jersey-test-framework-provider-inmemory</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- ARC/WARC libraries -->
+        <dependency>
+            <groupId>org.jwat</groupId>
+            <artifactId>jwat-common</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.jwat</groupId>
+            <artifactId>jwat-gzip</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.jwat</groupId>
+            <artifactId>jwat-warc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.jwat</groupId>
+            <artifactId>jwat-archive</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-parsers</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-langdetect</artifactId>
         </dependency>
 
         <!-- Configuration framework -->
@@ -96,8 +100,8 @@
                     <licenseHeaderFile>${basedir}/../src/main/etc/license-header.txt</licenseHeaderFile>
                     <programs>
                         <program>
-                            <mainClass>no.nb.nna.broprox.harvester.Main</mainClass>
-                            <id>broprox-harvester</id>
+                            <mainClass>no.nb.nna.broprox.contentwriter.Main</mainClass>
+                            <id>broprox-contentwriter-service</id>
                         </program>
                     </programs>
                     <binFolder>bin</binFolder>
@@ -142,7 +146,7 @@
                 <version>0.4.13</version>
                 <configuration>
                     <dockerDirectory>${basedir}/src/main/docker</dockerDirectory>
-                    <imageName>norsknettarkiv/broprox-harvester</imageName>
+                    <imageName>norsknettarkiv/broprox-contentwriter-service</imageName>
                     <imageTags>
                         <imageTag>latest</imageTag>
                         <imageTag>${project.version}</imageTag>

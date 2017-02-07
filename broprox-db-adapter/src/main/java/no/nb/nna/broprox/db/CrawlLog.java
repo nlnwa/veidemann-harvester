@@ -20,12 +20,15 @@ import java.time.OffsetDateTime;
 /**
  *
  */
-@Key("warcId")
-public interface CrawlLog {
+public interface CrawlLog extends DbObject<CrawlLog> {
 
     public String getWarcId();
 
+    public CrawlLog withWarcId(String warcId);
+
     public OffsetDateTime getTimeStamp();
+
+    public CrawlLog withTimeStamp(OffsetDateTime timeStamp);
 
     public String getSurt();
 
@@ -80,17 +83,17 @@ public interface CrawlLog {
 
     public CrawlLog withFetchTimeMillis(long duration);
 
-    public String getDigest();
+    public String getBlockDigest();
 
-    public CrawlLog withDigest(String digest);
+    public CrawlLog withBlockDigest(String digest);
 
-    public String getFileName();
+    public String getPayloadDigest();
 
-    public CrawlLog withFileName(String fileName);
+    public CrawlLog withPayloadDigest(String digest);
 
-    public long getOffset();
+    public String getStorageRef();
 
-    public CrawlLog withOffset(long offset);
+    public CrawlLog withStorageRef(String storageRef);
 
     public String getRecordType();
 

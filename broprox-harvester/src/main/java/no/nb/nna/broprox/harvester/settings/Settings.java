@@ -36,6 +36,10 @@ public class Settings {
 
     private String dbName;
 
+    private String contentWriterHost;
+
+    private int contentWriterPort;
+
     public int getProxyPort() {
         return proxyPort;
     }
@@ -98,6 +102,22 @@ public class Settings {
 
     public void setDbName(String dbName) {
         this.dbName = dbName;
+    }
+
+    public String getContentWriterHost() {
+        return contentWriterHost;
+    }
+
+    public void setContentWriterHost(String contentWriterHost) {
+        this.contentWriterHost = contentWriterHost;
+    }
+
+    public int getContentWriterPort() {
+        return contentWriterPort;
+    }
+
+    public void setContentWriterPort(int contentWriterPort) {
+        this.contentWriterPort = contentWriterPort;
     }
 
 }

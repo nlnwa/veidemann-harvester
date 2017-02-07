@@ -30,6 +30,7 @@ import org.slf4j.LoggerFactory;
  * A Recording proxy.
  */
 public class RecordingProxy {
+
     private static final Logger LOG = LoggerFactory.getLogger(RecordingProxy.class);
 
     private final HttpProxyServer server;
@@ -42,7 +43,8 @@ public class RecordingProxy {
      * @throws RootCertificateException is thrown if there where problems with the root certificate
      * @throws IOException is thrown if certificate directory could not be created
      */
-    public RecordingProxy(File workDir, int port, DbAdapter db) throws RootCertificateException, IOException {
+    public RecordingProxy(File workDir, int port, DbAdapter db, final ContentWriterClient contentWriterClient)
+            throws RootCertificateException, IOException {
         LOG.info("Starting recording proxy listening on port {}.", port);
 
         File certificateDir = new File(workDir, "certificates");
@@ -50,8 +52,9 @@ public class RecordingProxy {
         server = DefaultHttpProxyServer.bootstrap()
                 .withAllowLocalOnly(false)
                 .withPort(port)
+                .withTransparent(true)
                 .withManInTheMiddle(new CertificateSniffingMitmManager(new SelfSignedAuthority(certificateDir)))
-                .withFiltersSource(new CoalesceUriFilter(db))
+                .withFiltersSource(new CoalesceUriFilter(db, contentWriterClient))
                 .start();
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {

@@ -13,10 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package no.nb.nna.broprox.harvester;
+package no.nb.nna.broprox.contentwriter;
 
 import java.io.File;
-import java.io.IOException;
 
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigBeanFactory;
@@ -24,20 +23,18 @@ import com.typesafe.config.ConfigException;
 import com.typesafe.config.ConfigFactory;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
-import no.nb.nna.broprox.harvester.api.ApiServer;
-import no.nb.nna.broprox.harvester.proxy.ContentWriterClient;
-import no.nb.nna.broprox.harvester.proxy.RecordingProxy;
-import no.nb.nna.broprox.harvester.settings.Settings;
-import org.littleshoot.proxy.mitm.RootCertificateException;
+import no.nb.nna.broprox.contentwriter.settings.Settings;
+import no.nb.nna.broprox.contentwriter.text.TextExtracter;
+import no.nb.nna.broprox.contentwriter.warc.WarcWriterPool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Class for launching the service.
  */
-public class Harvester {
+public class ContentWriter {
 
-    private static final Logger LOG = LoggerFactory.getLogger(Harvester.class);
+    private static final Logger LOG = LoggerFactory.getLogger(ContentWriter.class);
 
     private static final Settings SETTINGS;
 
@@ -50,26 +47,25 @@ public class Harvester {
     /**
      * Create a new Broprox service.
      */
-    public Harvester() {
+    public ContentWriter() {
     }
 
     /**
      * Start the service.
-     *
+     * <p>
      * @return this instance
      */
-    public Harvester start() {
+    public ContentWriter start() {
         try {
             DbAdapter db = new RethinkDbAdapter(SETTINGS.getDbHost(), SETTINGS.getDbPort(), SETTINGS.getDbName());
-            ContentWriterClient contentWriterClient
-                    = new ContentWriterClient(SETTINGS.getContentWriterHost(), SETTINGS.getContentWriterPort());
+            WarcWriterPool warcWriterPool = new WarcWriterPool(new File(SETTINGS.getWarcDir()),
+                    SETTINGS.getWarcFileSize(), SETTINGS.isCompressWarc(), SETTINGS.getWarcWriterPoolSize());
+            TextExtracter textExtracter = new TextExtracter();
 
-            RecordingProxy proxy = new RecordingProxy(
-                    new File(SETTINGS.getWorkDir()), SETTINGS.getProxyPort(), db, contentWriterClient);
+            ApiServer apiServer = new ApiServer(db, warcWriterPool, textExtracter);
 
-            ApiServer apiServer = new ApiServer();
-
-            LOG.info("Broprox harvester (v. {}) started", Harvester.class.getPackage().getImplementationVersion());
+            LOG.info("Broprox content writer (v. {}) started",
+                    ContentWriter.class.getPackage().getImplementationVersion());
 
             try {
                 Thread.currentThread().join();
@@ -79,7 +75,7 @@ public class Harvester {
         } catch (ConfigException ex) {
             System.err.println("Configuration error: " + ex.getLocalizedMessage());
             System.exit(1);
-        } catch (RootCertificateException | IOException ex) {
+        } catch (Exception ex) {
             LOG.error("Could not start service", ex);
         }
 
@@ -88,7 +84,7 @@ public class Harvester {
 
     /**
      * Get the settings object.
-     *
+     * <p>
      * @return the settings
      */
     public static Settings getSettings() {

@@ -14,39 +14,41 @@
  * limitations under the License.
  */
 
-package no.nb.nna.broprox.db;
+package no.nb.nna.broprox.db.model;
+
+import no.nb.nna.broprox.db.DbObject;
 
 /**
  *
  */
 public interface ExtractedText extends DbObject<ExtractedText> {
 
-    public String getWarcId();
+    String getWarcId();
 
-    public ExtractedText withWarcId(String id);
+    ExtractedText withWarcId(String id);
 
-    public String getText();
+    String getText();
 
-    public ExtractedText withText(String text);
+    ExtractedText withText(String text);
 
-    public long getSentenceCount();
+    long getSentenceCount();
 
-    public ExtractedText withSentenceCount(long count);
+    ExtractedText withSentenceCount(long count);
 
-    public long getWordCount();
+    long getWordCount();
 
-    public ExtractedText withWordCount(long count);
+    ExtractedText withWordCount(long count);
 
-    public long getLongWordCount();
+    long getLongWordCount();
 
-    public ExtractedText withLongWordCount(long count);
+    ExtractedText withLongWordCount(long count);
 
-    public long getCharacterCount();
+    long getCharacterCount();
 
-    public ExtractedText withCharacterCount(long count);
+    ExtractedText withCharacterCount(long count);
 
-    public long getLix();
+    long getLix();
 
-    public ExtractedText withLix(long lix);
+    ExtractedText withLix(long lix);
 
 }

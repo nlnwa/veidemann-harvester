@@ -27,7 +27,7 @@ import java.util.GregorianCalendar;
 import java.util.TimeZone;
 import java.util.UUID;
 
-import no.nb.nna.broprox.db.CrawlLog;
+import no.nb.nna.broprox.db.model.CrawlLog;
 
 import static org.jwat.warc.WarcConstants.*;
 

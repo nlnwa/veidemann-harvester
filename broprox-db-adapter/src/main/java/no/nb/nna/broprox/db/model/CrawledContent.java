@@ -13,19 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package no.nb.nna.broprox.db;
+package no.nb.nna.broprox.db.model;
+
+import no.nb.nna.broprox.db.DbObject;
 
 /**
  *
  */
 public interface CrawledContent extends DbObject<CrawledContent> {
 
-    public String getDigest();
+    String getDigest();
 
-    public CrawledContent withDigest(String digest);
+    CrawledContent withDigest(String digest);
 
-    public String getWarcId();
+    String getWarcId();
 
-    public CrawledContent withWarcId(String id);
+    CrawledContent withWarcId(String id);
 
 }

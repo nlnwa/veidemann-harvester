@@ -17,7 +17,7 @@ package no.nb.nna.broprox.contentwriter.warc;
 
 import java.io.File;
 
-import no.nb.nna.broprox.db.CrawlLog;
+import no.nb.nna.broprox.db.model.CrawlLog;
 import no.nb.nna.broprox.db.DbObjectFactory;
 import org.junit.Ignore;
 import org.junit.Test;

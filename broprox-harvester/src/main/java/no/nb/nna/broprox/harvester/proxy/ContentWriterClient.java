@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package no.nb.nna.broprox.harvester.proxy;
 
 import java.net.URI;
@@ -27,7 +26,7 @@ import javax.ws.rs.client.Entity;
 import javax.ws.rs.client.WebTarget;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriBuilder;
-import no.nb.nna.broprox.db.CrawlLog;
+import no.nb.nna.broprox.db.model.CrawlLog;
 import org.glassfish.jersey.media.multipart.FormDataMultiPart;
 import org.glassfish.jersey.media.multipart.MultiPart;
 import org.glassfish.jersey.media.multipart.MultiPartFeature;
@@ -36,7 +35,8 @@ import org.glassfish.jersey.media.multipart.file.StreamDataBodyPart;
 /**
  *
  */
-public class ContentWriterClient {
+public class ContentWriterClient implements AutoCloseable {
+
     final static Client CLIENT = ClientBuilder.newClient()
             .register(MultiPartFeature.class);
 
@@ -65,4 +65,10 @@ public class ContentWriterClient {
 
         return storageRef.getLocation();
     }
+
+    @Override
+    public void close() {
+        CLIENT.close();
+    }
+
 }

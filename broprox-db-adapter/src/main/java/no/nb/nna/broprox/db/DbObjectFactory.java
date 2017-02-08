@@ -43,7 +43,7 @@ public final class DbObjectFactory {
                 public <T> TypeAdapter<T> create(Gson gson, TypeToken<T> type) {
                     final Class<T> rawType = (Class<T>) type.getRawType();
 
-                    if (!rawType.isInterface()) {
+                    if (!rawType.isInterface() && !DbObject.class.isAssignableFrom(rawType)) {
                         return null;
                     }
 
@@ -68,7 +68,7 @@ public final class DbObjectFactory {
                             switch (in.peek()) {
                                 case BEGIN_OBJECT:
 
-                                    DbObject result = (DbObject) DbObjectFactory.create(rawType);
+                                    DbObject result = (DbObject) DbObjectFactory.create((Class<DbObject>) rawType);
                                     in.beginObject();
                                     while (in.hasNext()) {
                                         String fieldName = in.nextName();
@@ -101,23 +101,23 @@ public final class DbObjectFactory {
 
             }).create();
 
-    public static <T> T create(Class<T> type) {
+    public static <T extends DbObject<T>> T create(Class<T> type) {
         return (T) Proxy.newProxyInstance(type.getClassLoader(),
-                new Class<?>[]{type, DbObject.class},
+                new Class<?>[]{type},
                 new DbMapInvocationHandler(type, new HashMap<>()));
     }
 
-    public static <T> Optional<T> of(Class<T> type, Map<String, Object> src) {
+    public static <T extends DbObject<T>> Optional<T> of(Class<T> type, Map<String, Object> src) {
         if (src == null) {
             return Optional.empty();
         } else {
             return Optional.of((T) Proxy.newProxyInstance(type.getClassLoader(),
-                    new Class<?>[]{type, DbObject.class},
+                    new Class<?>[]{type},
                     new DbMapInvocationHandler(type, src)));
         }
     }
 
-    public static <T> Optional<T> of(Class<T> type, String jsonString) {
+    public static <T extends DbObject<T>> Optional<T> of(Class<T> type, String jsonString) {
         if (jsonString == null) {
             return Optional.empty();
         } else {

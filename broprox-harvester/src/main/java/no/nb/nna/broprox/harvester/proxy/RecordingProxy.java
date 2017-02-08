@@ -29,7 +29,7 @@ import org.slf4j.LoggerFactory;
 /**
  * A Recording proxy.
  */
-public class RecordingProxy {
+public class RecordingProxy implements AutoCloseable {
 
     private static final Logger LOG = LoggerFactory.getLogger(RecordingProxy.class);
 
@@ -56,12 +56,12 @@ public class RecordingProxy {
                 .withManInTheMiddle(new CertificateSniffingMitmManager(new SelfSignedAuthority(certificateDir)))
                 .withFiltersSource(new CoalesceUriFilter(db, contentWriterClient))
                 .start();
+    }
 
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            LOG.info("Shutting down recording proxy.");
-            server.stop();
-        }));
-
+    @Override
+    public void close() {
+        LOG.info("Shutting down recording proxy.");
+        server.stop();
     }
 
 }

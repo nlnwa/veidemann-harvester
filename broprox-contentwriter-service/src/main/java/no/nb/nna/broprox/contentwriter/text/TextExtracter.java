@@ -8,10 +8,10 @@ package no.nb.nna.broprox.contentwriter.text;
 import java.io.IOException;
 import java.io.InputStream;
 
-import no.nb.nna.broprox.db.CrawlLog;
+import no.nb.nna.broprox.db.model.CrawlLog;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.db.DbObjectFactory;
-import no.nb.nna.broprox.db.ExtractedText;
+import no.nb.nna.broprox.db.model.ExtractedText;
 import org.apache.tika.exception.TikaException;
 import org.apache.tika.metadata.Metadata;
 import org.apache.tika.parser.AutoDetectParser;

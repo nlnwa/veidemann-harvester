@@ -15,6 +15,14 @@
  */
 package no.nb.nna.broprox.db;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.ArrayList;
+
+import no.nb.nna.broprox.db.model.CrawledContent;
+import no.nb.nna.broprox.db.model.CrawlLog;
+import no.nb.nna.broprox.db.model.ExtractedText;
+
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -23,11 +31,28 @@ import java.util.concurrent.TimeoutException;
 import com.rethinkdb.RethinkDB;
 import com.rethinkdb.gen.ast.ReqlExpr;
 import com.rethinkdb.net.Connection;
+import com.rethinkdb.net.Cursor;
+import no.nb.nna.broprox.db.model.BrowserScript;
+import no.nb.nna.broprox.db.model.QueuedUri;
+import no.nb.nna.broprox.db.model.Screenshot;
+import org.yaml.snakeyaml.Yaml;
 
 /**
  * An implementation of DbAdapter for RethinkDb.
  */
 public class RethinkDbAdapter implements DbAdapter {
+
+    private static final String TABLE_CRAWL_LOG = "crawl_log";
+
+    private static final String TABLE_CRAWLED_CONTENT = "crawled_content";
+
+    private static final String TABLE_EXTRACTED_TEXT = "extracted_text";
+
+    private static final String TABLE_BROWSER_SCRIPTS = "browser_scripts";
+
+    private static final String TABLE_URI_QUEUE = "uri_queue";
+
+    private static final String TABLE_SCREENSHOT = "screenshot";
 
     static final RethinkDB r = RethinkDB.r;
 
@@ -56,32 +81,45 @@ public class RethinkDbAdapter implements DbAdapter {
     private final void createDb() {
         if (!(boolean) r.dbList().contains(dbName).run(conn)) {
             r.dbCreate(dbName).run(conn);
-            r.tableCreate("crawl_log").optArg("primary_key", "warcId").run(conn);
-            r.table("crawl_log").indexCreate("surt_time", row -> r.array(row.g("surt"), row.g("timeStamp"))).run(conn);
-            r.tableCreate("crawled_content").optArg("primary_key", "digest").run(conn);
-            r.tableCreate("extracted_text").optArg("primary_key", "warcId").run(conn);
+            r.tableCreate(TABLE_CRAWL_LOG).optArg("primary_key", "warcId").run(conn);
+            r.table(TABLE_CRAWL_LOG).indexCreate("surt_time", row -> r.array(row.g("surt"), row.g("timeStamp")))
+                    .run(conn);
+            r.tableCreate(TABLE_CRAWLED_CONTENT).optArg("primary_key", "digest").run(conn);
+            r.tableCreate(TABLE_EXTRACTED_TEXT).optArg("primary_key", "warcId").run(conn);
+            r.tableCreate(TABLE_BROWSER_SCRIPTS).run(conn);
+            r.tableCreate(TABLE_URI_QUEUE).run(conn);
+            r.table(TABLE_CRAWL_LOG).indexCreate("earliestCrawlTimeStamp").run(conn);
+            r.tableCreate(TABLE_SCREENSHOT).run(conn);
+
+            populateDb();
+        }
+    }
+
+    private final void populateDb() {
+        Yaml yaml = new Yaml();
+        try (InputStream in = getClass().getClassLoader().getResourceAsStream("browser-scripts/extract-outlinks.yaml")) {
+            Map<String, Object> scriptDef = yaml.loadAs(in, Map.class);
+            BrowserScript script = DbObjectFactory.of(BrowserScript.class, scriptDef).get();
+            addBrowserScript(script);
+        } catch (IOException ex) {
+            throw new RuntimeException(ex);
         }
     }
 
     public Optional<CrawledContent> isDuplicateContent(String digest) {
-        return get("crawled_content", digest, CrawledContent.class);
+        return get(TABLE_CRAWLED_CONTENT, digest, CrawledContent.class);
     }
 
-//    public Optional<CrawledContent> isDuplicateContent(String digest) {
-//        Map<String, Object> response = r.table("crawled_content").get(digest).run(conn);
-//        return DbObjectFactory.of(CrawledContent.class, response);
-//    }
-//
     public void deleteCrawledContent(String digest) {
-        delete("crawled_content", digest);
+        delete(TABLE_CRAWLED_CONTENT, digest);
     }
 
     public CrawledContent addCrawledContent(CrawledContent cc) {
-        return insert("crawled_content", cc);
+        return insert(TABLE_CRAWLED_CONTENT, cc);
     }
 
     public ExtractedText addExtractedText(ExtractedText et) {
-        return insert("extracted_text", et);
+        return insert(TABLE_EXTRACTED_TEXT, et);
     }
 
     public CrawlLog addCrawlLog(CrawlLog cl) {
@@ -90,7 +128,7 @@ public class RethinkDbAdapter implements DbAdapter {
             data.put("timeStamp", r.now());
         }
 
-        return insert("crawl_log", cl);
+        return insert(TABLE_CRAWL_LOG, cl);
     }
 
     public CrawlLog updateCrawlLog(CrawlLog cl) {
@@ -99,15 +137,43 @@ public class RethinkDbAdapter implements DbAdapter {
             data.put("timeStamp", r.now());
         }
 
-        return update("crawl_log", cl.getWarcId(), cl);
+        return update(TABLE_CRAWL_LOG, cl.getWarcId(), cl);
+    }
+
+    public BrowserScript addBrowserScript(BrowserScript bbs) {
+        return insert(TABLE_BROWSER_SCRIPTS, bbs);
+    }
+
+    public List<BrowserScript> getBrowserScripts(BrowserScript.Type type) {
+        try (Cursor<Map<String, Object>> cursor = executeRequest(r.table(TABLE_BROWSER_SCRIPTS)
+                .filter(r.hashMap("type", type.name())));) {
+
+            List<BrowserScript> result = new ArrayList<>();
+
+            for (Map<String, Object> m : cursor) {
+                DbObjectFactory.of(BrowserScript.class, m).ifPresent(b -> result.add(b));
+            }
+
+            return result;
+        }
+    }
+
+    @Override
+    public QueuedUri addQueuedUri(QueuedUri qu) {
+        return insert(TABLE_URI_QUEUE, qu);
+    }
+
+    @Override
+    public QueuedUri updateQueuedUri(QueuedUri qu) {
+        return update(TABLE_URI_QUEUE, qu.getId(), qu);
+    }
+
+    @Override
+    public Screenshot addScreenshot(Screenshot s) {
+        return insert(TABLE_SCREENSHOT, s);
     }
 
     private <T extends DbObject> T insert(String table, T data) {
-//        Map response = r.table(table)
-//                .insert(data.getMap())
-//                .optArg("conflict", "error")
-//                .optArg("return_changes", "always")
-//                .run(conn);
         Map response = executeRequest(r.table(table)
                 .insert(data.getMap())
                 .optArg("conflict", "error")
@@ -117,11 +183,6 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     private <T extends DbObject> T update(String table, Object key, T data) {
-//        Map response = r.table(table)
-//                .get(key)
-//                .update(data.getMap())
-//                .optArg("return_changes", "always")
-//                .run(conn);
         Map response = executeRequest(r.table(table)
                 .get(key)
                 .update(data.getMap())
@@ -131,13 +192,11 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     private <T extends DbObject> Optional<T> get(String table, Object key, Class<T> type) {
-//        Map<String, Object> response = r.table(table).get(key).run(conn);
         Map<String, Object> response = executeRequest(r.table(table).get(key));
         return DbObjectFactory.of(type, response);
     }
 
     private void delete(String table, Object key) {
-//        r.table(table).get(key).delete().run(conn);
         executeRequest(r.table(table).get(key).delete());
     }
 
@@ -154,6 +213,11 @@ public class RethinkDbAdapter implements DbAdapter {
         }
 
         return qry.run(conn);
+    }
+
+    @Override
+    public void close() {
+        conn.close();
     }
 
 }

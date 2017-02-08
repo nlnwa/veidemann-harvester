@@ -23,7 +23,7 @@ import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
-import no.nb.nna.broprox.db.CrawlLog;
+import no.nb.nna.broprox.db.model.CrawlLog;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.db.DbObjectFactory;
 import org.littleshoot.proxy.HttpFiltersAdapter;

@@ -25,6 +25,7 @@ import com.typesafe.config.ConfigFactory;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
 import no.nb.nna.broprox.harvester.api.ApiServer;
+import no.nb.nna.broprox.harvester.browsercontroller.BrowserController;
 import no.nb.nna.broprox.harvester.proxy.ContentWriterClient;
 import no.nb.nna.broprox.harvester.proxy.RecordingProxy;
 import no.nb.nna.broprox.harvester.settings.Settings;
@@ -55,19 +56,19 @@ public class Harvester {
 
     /**
      * Start the service.
-     *
+     * <p>
      * @return this instance
      */
     public Harvester start() {
-        try {
-            DbAdapter db = new RethinkDbAdapter(SETTINGS.getDbHost(), SETTINGS.getDbPort(), SETTINGS.getDbName());
-            ContentWriterClient contentWriterClient
-                    = new ContentWriterClient(SETTINGS.getContentWriterHost(), SETTINGS.getContentWriterPort());
+        try (DbAdapter db = new RethinkDbAdapter(SETTINGS.getDbHost(), SETTINGS.getDbPort(), SETTINGS.getDbName());
+                BrowserController controller = new BrowserController(
+                        SETTINGS.getBrowserHost(), SETTINGS.getBrowserPort(), db);
+                ContentWriterClient contentWriterClient = new ContentWriterClient(
+                        SETTINGS.getContentWriterHost(), SETTINGS.getContentWriterPort());
+                RecordingProxy proxy = new RecordingProxy(
+                        new File(SETTINGS.getWorkDir()), SETTINGS.getProxyPort(), db, contentWriterClient);) {
 
-            RecordingProxy proxy = new RecordingProxy(
-                    new File(SETTINGS.getWorkDir()), SETTINGS.getProxyPort(), db, contentWriterClient);
-
-            ApiServer apiServer = new ApiServer();
+            ApiServer apiServer = new ApiServer(db, controller);
 
             LOG.info("Broprox harvester (v. {}) started", Harvester.class.getPackage().getImplementationVersion());
 
@@ -88,7 +89,7 @@ public class Harvester {
 
     /**
      * Get the settings object.
-     *
+     * <p>
      * @return the settings
      */
     public static Settings getSettings() {

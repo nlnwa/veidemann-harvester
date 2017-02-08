@@ -18,14 +18,21 @@ package no.nb.nna.broprox.harvester.browsercontroller;
 import java.io.IOException;
 import java.util.Base64;
 import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 
 import no.nb.nna.broprox.chrome.client.ChromeDebugProtocol;
 import no.nb.nna.broprox.chrome.client.PageDomain;
+import no.nb.nna.broprox.chrome.client.RuntimeDomain;
 import no.nb.nna.broprox.chrome.client.Session;
 import no.nb.nna.broprox.chrome.client.ws.CompleteMany;
+import no.nb.nna.broprox.db.DbAdapter;
+import no.nb.nna.broprox.db.DbObjectFactory;
+import no.nb.nna.broprox.db.model.BrowserScript;
+import no.nb.nna.broprox.db.model.QueuedUri;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
@@ -40,94 +47,70 @@ public class BrowserController implements AutoCloseable {
 
     private final int chromePort;
 
-    public BrowserController(String chromeHost, int chromePort) throws IOException {
+    private final DbAdapter db;
+
+    public BrowserController(String chromeHost, int chromePort, DbAdapter db) throws IOException {
         this.chromeHost = chromeHost;
         this.chromePort = chromePort;
         this.chrome = new ChromeDebugProtocol(chromeHost, chromePort);
+        this.db = db;
     }
 
-    public byte[] render(String url, int w, int h, int timeout, int sleep) throws ExecutionException, InterruptedException, IOException, TimeoutException {
+//    public byte[] render(String url, int w, int h, long timeout, int sleep) throws ExecutionException, InterruptedException, IOException, TimeoutException {
+    public byte[] render(QueuedUri queuedUri, int w, int h, long timeout, int sleep) throws ExecutionException, InterruptedException, IOException, TimeoutException {
 
-        try (Session tab = chrome.newSession(w, h)) {
+        try (Session session = chrome.newSession(w, h)) {
             new CompleteMany(
-                    tab.debugger.enable(),
-                    tab.page.enable(),
-                    tab.runtime.enable(),
-                    tab.network.enable(null, null),
-                    tab.network.setCacheDisabled(true),
-                    tab.runtime.evaluate("navigator.userAgent;", null, false, false, null, false, false, false, false)
+                    session.debugger.enable(),
+                    session.page.enable(),
+                    session.runtime.enable(),
+                    session.network.enable(null, null),
+                    session.network.setCacheDisabled(true),
+                    session.runtime
+                    .evaluate("navigator.userAgent;", null, false, false, null, false, false, false, false)
                     .thenAccept(e -> {
-                        tab.network.setUserAgentOverride(((String) e.result.value)
-                                .replace("HeadlessChrome", tab.version()));
+                        session.network.setUserAgentOverride(((String) e.result.value)
+                                .replace("HeadlessChrome", session.version()));
                     }),
-                    tab.debugger
+                    session.debugger
                     .setBreakpointByUrl(1, null, "https?://www.google-analytics.com/analytics.js", null, null),
-                    tab.debugger.setBreakpointByUrl(1, null, "https?://www.google-analytics.com/ga.js", null, null),
-                    tab.network.setExtraHTTPHeaders(Collections.singletonMap("x-ray", "foo")),
-                    tab.page.setControlNavigations(Boolean.TRUE)
+                    session.debugger.setBreakpointByUrl(1, null, "https?://www.google-analytics.com/ga.js", null, null),
+                    session.network.setExtraHTTPHeaders(Collections.singletonMap("x-ray", "foo")),
+                    session.page.setControlNavigations(Boolean.TRUE)
             ).get(timeout, MILLISECONDS);
 
-            tab.debugger.onPaused(p -> {
+            session.debugger.onPaused(p -> {
                 String scriptId = p.callFrames.get(0).location.scriptId;
                 System.out.println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>> SCRIPT BLE PAUSET: " + scriptId);
-                tab.debugger.setScriptSource(scriptId, "console.log(\"google analytics is no more!\");", null);
-                tab.debugger.resume();
+                session.debugger.setScriptSource(scriptId, "console.log(\"google analytics is no more!\");", null);
+                session.debugger.resume();
                 System.out.println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>> SCRIPT RESUMED: " + scriptId);
             });
 
-            System.out.println("=====================================");
 
-            CompletableFuture<PageDomain.LoadEventFired> loaded = tab.page.onLoadEventFired();
-
-            tab.page.onNavigationRequested(nr -> {
-                System.out.println("NAV REQUESTED " + nr);
-//                try {
-                    tab.network.setExtraHTTPHeaders(Collections.singletonMap("Discovery-Path", "E"));
-//                } catch (InterruptedException | ExecutionException ex) {
-//                    throw new RuntimeException(ex);
-//                }
-//                tab.page.setControlNavigations(Boolean.FALSE);
-                tab.page.processNavigation("Proceed", nr.navigationId);
-            });
-
-//            tab.page.onNavigationRequested(nr -> {
-//                System.out.println("NAV REQUESTED");
-//                tab.page.processNavigation(nr.url, nr.navigationId);
-//            });
-            tab.page.navigate(url).get(timeout, MILLISECONDS);
-
-            loaded.get(timeout, MILLISECONDS);
-            // disable scrollbars
-            tab.runtime.evaluate("document.getElementsByTagName('body')[0].style.overflow='hidden'",
-                    null, null, null, null, null, null, null, null)
-                    .get(timeout, MILLISECONDS);
-
-            // wait a little for any onload javascript to fire
-            Thread.sleep(sleep);
+            PageExecution pex = new PageExecution(queuedUri, session, timeout);
+            pex.navigatePage();
+            pex.saveScreenshot(db);
 
 //                System.out.println("LINKS >>>>>>");
-//                for (PageDomain.FrameResource fs : tab.page.getResourceTree().get().frameTree.resources) {
-//                    System.out.println("T: " + fs.type);
+//                for (PageDomain.FrameResource fs : session.page.getResourceTree().get().frameTree.resources) {
+//                    System.out.println("T: " + fs);
 //                    if ("Script".equals(fs.type)) {
 //                        System.out.println(">: " + fs.toString());
 //                    }
 //                }
 //                System.out.println("<<<<<<");
-            String data = tab.page.captureScreenshot().get(timeout, MILLISECONDS).data;
-            return Base64.getDecoder().decode(data);
-//                return null;
+            String script = db.getBrowserScripts(BrowserScript.Type.EXTRACT_OUTLINKS).get(0).getScript();
+            pex.extractOutlinks(db, script);
+            pex.getDocumentUrl();
+            pex.scrollToTop();
+                return null;
         }
     }
 
     @Override
-    public void close() throws Exception {
+    public void close() {
         chrome.close();
-    }
-
-    public static void main(String[] args) throws IOException, ExecutionException, InterruptedException, TimeoutException, Exception {
-        try (BrowserController ab = new BrowserController("localhost", 9222);) {
-            ab.render("https://www.nb.no", 500, 500, 10000, 1000);
-        }
     }
 
 }

@@ -31,7 +31,7 @@ import javax.ws.rs.core.Response;
 import no.nb.nna.broprox.contentwriter.text.TextExtracter;
 import no.nb.nna.broprox.contentwriter.warc.SingleWarcWriter;
 import no.nb.nna.broprox.contentwriter.warc.WarcWriterPool;
-import no.nb.nna.broprox.db.CrawlLog;
+import no.nb.nna.broprox.db.model.CrawlLog;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.db.DbObjectFactory;
 import org.glassfish.jersey.media.multipart.FormDataBodyPart;
@@ -108,6 +108,22 @@ public class FileUploadResource {
                 throw new WebApplicationException("Size doesn't match metadata", Response.Status.NOT_ACCEPTABLE);
             }
             return Response.created(ref).build();
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            throw new WebApplicationException(ex.getMessage(), ex);
+        }
+    }
+
+    @Path("snapshot")
+    @POST
+    @Consumes(MediaType.MULTIPART_FORM_DATA)
+    public Response postWarcRecord(
+            @FormDataParam("logEntry") final String logEntryJson,
+            @FormDataParam("snapshot") final FormDataBodyPart snapshot) {
+
+        try {
+            CrawlLog logEntry = DbObjectFactory.of(CrawlLog.class, logEntryJson).get();
+            return Response.created(new URI(logEntry.getWarcId())).build();
         } catch (Exception ex) {
             ex.printStackTrace();
             throw new WebApplicationException(ex.getMessage(), ex);

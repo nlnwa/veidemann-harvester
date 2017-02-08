@@ -15,6 +15,8 @@
  */
 package no.nb.nna.broprox.db;
 
+import no.nb.nna.broprox.db.model.CrawlLog;
+
 import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.Map;

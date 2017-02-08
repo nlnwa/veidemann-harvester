@@ -30,8 +30,8 @@ import io.netty.buffer.CompositeByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.util.AsciiString;
-import no.nb.nna.broprox.db.CrawlLog;
-import no.nb.nna.broprox.db.CrawledContent;
+import no.nb.nna.broprox.db.model.CrawlLog;
+import no.nb.nna.broprox.db.model.CrawledContent;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.db.DbObjectFactory;
 

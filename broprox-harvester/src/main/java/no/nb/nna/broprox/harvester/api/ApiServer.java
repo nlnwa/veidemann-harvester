@@ -19,7 +19,10 @@ import java.net.URI;
 
 import io.netty.channel.Channel;
 import javax.ws.rs.core.UriBuilder;
+import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.harvester.Harvester;
+import no.nb.nna.broprox.harvester.browsercontroller.BrowserController;
+import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.netty.httpserver.NettyHttpContainerProvider;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.slf4j.Logger;
@@ -35,12 +38,25 @@ public class ApiServer {
     /**
      * Construct a new REST API server.
      */
-    public ApiServer() {
+    public ApiServer(DbAdapter db, BrowserController controller) {
         final int port = Harvester.getSettings().getApiPort();
 
         LOG.info("Starting API server listening on port {}.", port);
         URI baseUri = UriBuilder.fromUri("http://0.0.0.0/").port(port).build();
-        ResourceConfig resourceConfig = new ResourceConfig(ApiResource.class);
+        ResourceConfig resourceConfig = new ResourceConfig()
+                .register(ApiResource.class)
+                .register(new AbstractBinder() {
+                    @Override
+                    protected void configure() {
+                        bind(db).to(DbAdapter.class);
+                    }
+                })
+                .register(new AbstractBinder() {
+                    @Override
+                    protected void configure() {
+                        bind(controller);
+                    }
+                });
         final Channel server = NettyHttpContainerProvider.createHttp2Server(baseUri, resourceConfig, null);
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {

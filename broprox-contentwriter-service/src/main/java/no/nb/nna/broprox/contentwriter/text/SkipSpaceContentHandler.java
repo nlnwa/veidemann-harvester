@@ -7,8 +7,8 @@ package no.nb.nna.broprox.contentwriter.text;
 
 import java.util.regex.Pattern;
 
-import no.nb.nna.broprox.db.CrawlLog;
-import no.nb.nna.broprox.db.ExtractedText;
+import no.nb.nna.broprox.db.model.CrawlLog;
+import no.nb.nna.broprox.db.model.ExtractedText;
 import org.apache.tika.metadata.Metadata;
 import org.apache.tika.sax.ContentHandlerDecorator;
 import org.apache.tika.sax.WriteOutContentHandler;

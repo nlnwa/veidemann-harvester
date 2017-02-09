@@ -6,7 +6,7 @@ volumes:
 
 services:
     # RethinkDB
-    rethinkdb:
+    db:
         image: rethinkdb:2.3
         ports:
             - "28015:28015"
@@ -14,17 +14,17 @@ services:
             - "8888:8080"
 
     # Chrome headless
-    chrome-headless:
+    browser:
         image: norsknettarkiv/chrome-headless
         ports:
             - "9222:9222"
         volumes:
             - harvester-workdir:/data
         environment:
-            - "CHROME_OPTS=--ignore-certificate-errors --disable-web-security --allow-running-insecure-content --proxy-server=broprox-harvester:8080"
+            - "CHROME_OPTS=--ignore-certificate-errors --disable-web-security --allow-running-insecure-content --proxy-server=harvester:8080"
 
     # Broprox harvester
-    broprox-harvester:
+    harvester:
         image: norsknettarkiv/broprox-harvester
         ports:
             - "9191:8080"
@@ -32,17 +32,17 @@ services:
         volumes:
             - harvester-workdir:/workdir
         links:
-            - "rethinkdb"
-            - "chrome-headless"
-            - "broprox-content-writer"
+            - "db"
+            - "browser"
+            - "content-writer"
         environment:
-            - "BROWSER_HOST=chrome-headless"
-            - "DB_HOST=rethinkdb"
-            - "CONTENT_WRITER_HOST=broprox-content-writer"
+            - "BROWSER_HOST=browser"
+            - "DB_HOST=db"
+            - "CONTENT_WRITER_HOST=content-writer"
             - "CONTENT_WRITER_PORT=8080"
 
     # Broprox content writer
-    broprox-content-writer:
+    content-writer:
         image: norsknettarkiv/broprox-contentwriter-service
         ports:
             - "9292:8080"
@@ -50,18 +50,19 @@ services:
             - ./work/warcs:/warcs
             - ./work/writer:/workdir
         links:
-            - "rethinkdb"
+            - "db"
         environment:
-            - "DB_HOST=rethinkdb"
+            - "DB_HOST=db"
 
     # Broprox content writer
-    broprox-frontier:
+    frontier:
         image: norsknettarkiv/broprox-frontier
         ports:
             - "7700:7700"
         volumes:
             - ./work/frontier:/workdir
         links:
-            - "rethinkdb"
+            - "db"
+            - "harvester"
         environment:
-            - "DB_HOST=rethinkdb"
+            - "DB_HOST=db"

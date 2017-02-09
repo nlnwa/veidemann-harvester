@@ -1,0 +1,67 @@
+# Requires Docker Compose 1.6.0+ and Docker Engine 1.10.0+
+version: '2'
+
+volumes:
+    harvester-workdir:
+
+services:
+    # RethinkDB
+    rethinkdb:
+        image: rethinkdb:2.3
+        ports:
+            - "28015:28015"
+            - "29015:29015"
+            - "8888:8080"
+
+    # Chrome headless
+    chrome-headless:
+        image: norsknettarkiv/chrome-headless
+        ports:
+            - "9222:9222"
+        volumes:
+            - harvester-workdir:/data
+        environment:
+            - "CHROME_OPTS=--ignore-certificate-errors --disable-web-security --allow-running-insecure-content --proxy-server=broprox-harvester:8080"
+
+    # Broprox harvester
+    broprox-harvester:
+        image: norsknettarkiv/broprox-harvester
+        ports:
+            - "9191:8080"
+            - "9090:9090"
+        volumes:
+            - harvester-workdir:/workdir
+        links:
+            - "rethinkdb"
+            - "chrome-headless"
+            - "broprox-content-writer"
+        environment:
+            - "BROWSER_HOST=chrome-headless"
+            - "DB_HOST=rethinkdb"
+            - "CONTENT_WRITER_HOST=broprox-content-writer"
+            - "CONTENT_WRITER_PORT=8080"
+
+    # Broprox content writer
+    broprox-content-writer:
+        image: norsknettarkiv/broprox-contentwriter-service
+        ports:
+            - "9292:8080"
+        volumes:
+            - ./work/warcs:/warcs
+            - ./work/writer:/workdir
+        links:
+            - "rethinkdb"
+        environment:
+            - "DB_HOST=rethinkdb"
+
+    # Broprox content writer
+    broprox-frontier:
+        image: norsknettarkiv/broprox-frontier
+        ports:
+            - "7700:7700"
+        volumes:
+            - ./work/frontier:/workdir
+        links:
+            - "rethinkdb"
+        environment:
+            - "DB_HOST=rethinkdb"

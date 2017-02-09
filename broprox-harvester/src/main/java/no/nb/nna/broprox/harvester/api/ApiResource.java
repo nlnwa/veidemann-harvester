@@ -15,15 +15,6 @@
  */
 package no.nb.nna.broprox.harvester.api;
 
-import java.awt.Graphics2D;
-import java.awt.RenderingHints;
-import java.awt.geom.AffineTransform;
-import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-
-import javax.imageio.ImageIO;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -34,7 +25,6 @@ import javax.ws.rs.core.Context;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.db.DbObjectFactory;
 import no.nb.nna.broprox.db.model.QueuedUri;
-import no.nb.nna.broprox.harvester.Harvester;
 import no.nb.nna.broprox.harvester.browsercontroller.BrowserController;
 
 /**

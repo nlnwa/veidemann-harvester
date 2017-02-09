@@ -24,6 +24,7 @@
         <module>broprox-db-adapter</module>
         <module>broprox-chrome</module>
         <module>broprox-contentwriter-service</module>
+        <module>broprox-frontier</module>
     </modules>
 
     <properties>

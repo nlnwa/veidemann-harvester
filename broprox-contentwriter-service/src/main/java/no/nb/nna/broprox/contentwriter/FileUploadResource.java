@@ -114,20 +114,4 @@ public class FileUploadResource {
         }
     }
 
-    @Path("snapshot")
-    @POST
-    @Consumes(MediaType.MULTIPART_FORM_DATA)
-    public Response postWarcRecord(
-            @FormDataParam("logEntry") final String logEntryJson,
-            @FormDataParam("snapshot") final FormDataBodyPart snapshot) {
-
-        try {
-            CrawlLog logEntry = DbObjectFactory.of(CrawlLog.class, logEntryJson).get();
-            return Response.created(new URI(logEntry.getWarcId())).build();
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            throw new WebApplicationException(ex.getMessage(), ex);
-        }
-    }
-
 }

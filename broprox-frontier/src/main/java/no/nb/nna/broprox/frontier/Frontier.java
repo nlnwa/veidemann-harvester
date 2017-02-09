@@ -13,32 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package no.nb.nna.broprox.harvester;
+package no.nb.nna.broprox.frontier;
 
-import java.io.File;
-import java.io.IOException;
-
+import no.nb.nna.broprox.frontier.api.ApiServer;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigBeanFactory;
 import com.typesafe.config.ConfigException;
 import com.typesafe.config.ConfigFactory;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
-import no.nb.nna.broprox.harvester.api.ApiServer;
-import no.nb.nna.broprox.harvester.browsercontroller.BrowserController;
-import no.nb.nna.broprox.harvester.proxy.ContentWriterClient;
-import no.nb.nna.broprox.harvester.proxy.RecordingProxy;
-import no.nb.nna.broprox.harvester.settings.Settings;
-import org.littleshoot.proxy.mitm.RootCertificateException;
+import no.nb.nna.broprox.frontier.evaluation.QueueProcessor;
+import no.nb.nna.broprox.frontier.settings.Settings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Class for launching the service.
  */
-public class Harvester {
+public class Frontier {
 
-    private static final Logger LOG = LoggerFactory.getLogger(Harvester.class);
+    private static final Logger LOG = LoggerFactory.getLogger(Frontier.class);
 
     private static final Settings SETTINGS;
 
@@ -51,7 +45,7 @@ public class Harvester {
     /**
      * Create a new Broprox service.
      */
-    public Harvester() {
+    public Frontier() {
     }
 
     /**
@@ -59,17 +53,14 @@ public class Harvester {
      * <p>
      * @return this instance
      */
-    public Harvester start() {
+    public Frontier start() {
         try (DbAdapter db = new RethinkDbAdapter(SETTINGS.getDbHost(), SETTINGS.getDbPort(), SETTINGS.getDbName());
-                BrowserController controller = new BrowserController(
-                        SETTINGS.getBrowserHost(), SETTINGS.getBrowserPort(), db);
-                ContentWriterClient contentWriterClient = new ContentWriterClient(
-                        SETTINGS.getContentWriterHost(), SETTINGS.getContentWriterPort());
-                RecordingProxy proxy = new RecordingProxy(
-                        new File(SETTINGS.getWorkDir()), SETTINGS.getProxyPort(), db, contentWriterClient);
-                ApiServer apiServer = new ApiServer(db, controller);) {
+                ApiServer apiServer = new ApiServer(db);) {
 
-            LOG.info("Broprox harvester (v. {}) started", Harvester.class.getPackage().getImplementationVersion());
+            new QueueProcessor((RethinkDbAdapter) db);
+            
+            LOG.info("Broprox Frontier (v. {}) started",
+                    Frontier.class.getPackage().getImplementationVersion());
 
             try {
                 Thread.currentThread().join();
@@ -79,7 +70,7 @@ public class Harvester {
         } catch (ConfigException ex) {
             System.err.println("Configuration error: " + ex.getLocalizedMessage());
             System.exit(1);
-        } catch (RootCertificateException | IOException ex) {
+        } catch (Exception ex) {
             LOG.error("Could not start service", ex);
         }
 

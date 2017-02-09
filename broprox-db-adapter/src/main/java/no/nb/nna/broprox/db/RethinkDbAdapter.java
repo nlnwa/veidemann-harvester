@@ -42,17 +42,17 @@ import org.yaml.snakeyaml.Yaml;
  */
 public class RethinkDbAdapter implements DbAdapter {
 
-    private static final String TABLE_CRAWL_LOG = "crawl_log";
+    public static final String TABLE_CRAWL_LOG = "crawl_log";
 
-    private static final String TABLE_CRAWLED_CONTENT = "crawled_content";
+    public static final String TABLE_CRAWLED_CONTENT = "crawled_content";
 
-    private static final String TABLE_EXTRACTED_TEXT = "extracted_text";
+    public static final String TABLE_EXTRACTED_TEXT = "extracted_text";
 
-    private static final String TABLE_BROWSER_SCRIPTS = "browser_scripts";
+    public static final String TABLE_BROWSER_SCRIPTS = "browser_scripts";
 
-    private static final String TABLE_URI_QUEUE = "uri_queue";
+    public static final String TABLE_URI_QUEUE = "uri_queue";
 
-    private static final String TABLE_SCREENSHOT = "screenshot";
+    public static final String TABLE_SCREENSHOT = "screenshot";
 
     static final RethinkDB r = RethinkDB.r;
 
@@ -200,7 +200,7 @@ public class RethinkDbAdapter implements DbAdapter {
         executeRequest(r.table(table).get(key).delete());
     }
 
-    private <T> T executeRequest(ReqlExpr qry) {
+    public <T> T executeRequest(ReqlExpr qry) {
         synchronized (this) {
             if (!conn.isOpen()) {
                 try {

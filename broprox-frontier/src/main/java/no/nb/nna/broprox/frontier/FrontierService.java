@@ -22,7 +22,8 @@ import com.typesafe.config.ConfigException;
 import com.typesafe.config.ConfigFactory;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
-import no.nb.nna.broprox.frontier.evaluation.QueueProcessor;
+import no.nb.nna.broprox.frontier.worker.HarvesterClient;
+import no.nb.nna.broprox.frontier.worker.Frontier;
 import no.nb.nna.broprox.frontier.settings.Settings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,9 +31,9 @@ import org.slf4j.LoggerFactory;
 /**
  * Class for launching the service.
  */
-public class Frontier {
+public class FrontierService {
 
-    private static final Logger LOG = LoggerFactory.getLogger(Frontier.class);
+    private static final Logger LOG = LoggerFactory.getLogger(FrontierService.class);
 
     private static final Settings SETTINGS;
 
@@ -45,7 +46,7 @@ public class Frontier {
     /**
      * Create a new Broprox service.
      */
-    public Frontier() {
+    public FrontierService() {
     }
 
     /**
@@ -53,14 +54,15 @@ public class Frontier {
      * <p>
      * @return this instance
      */
-    public Frontier start() {
+    public FrontierService start() {
         try (DbAdapter db = new RethinkDbAdapter(SETTINGS.getDbHost(), SETTINGS.getDbPort(), SETTINGS.getDbName());
-                ApiServer apiServer = new ApiServer(db);) {
+                HarvesterClient harvesterClient = new HarvesterClient(SETTINGS.getHarvesterHost(), SETTINGS
+                        .getHarvesterPort());
+                Frontier queueProcessor = new Frontier((RethinkDbAdapter) db, harvesterClient);
+                ApiServer apiServer = new ApiServer(db, queueProcessor);) {
 
-            new QueueProcessor((RethinkDbAdapter) db);
-            
             LOG.info("Broprox Frontier (v. {}) started",
-                    Frontier.class.getPackage().getImplementationVersion());
+                    FrontierService.class.getPackage().getImplementationVersion());
 
             try {
                 Thread.currentThread().join();

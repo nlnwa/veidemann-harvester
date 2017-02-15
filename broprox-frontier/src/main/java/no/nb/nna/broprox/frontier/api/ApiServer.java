@@ -20,7 +20,8 @@ import java.net.URI;
 import io.netty.channel.Channel;
 import javax.ws.rs.core.UriBuilder;
 import no.nb.nna.broprox.db.DbAdapter;
-import no.nb.nna.broprox.frontier.Frontier;
+import no.nb.nna.broprox.frontier.FrontierService;
+import no.nb.nna.broprox.frontier.worker.Frontier;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.netty.httpserver.NettyHttpContainerProvider;
 import org.glassfish.jersey.server.ResourceConfig;
@@ -39,8 +40,8 @@ public class ApiServer implements AutoCloseable {
     /**
      * Construct a new REST API server.
      */
-    public ApiServer(DbAdapter db) {
-        final int port = Frontier.getSettings().getApiPort();
+    public ApiServer(DbAdapter db, Frontier queueProcessor) {
+        final int port = FrontierService.getSettings().getApiPort();
 
         LOG.info("Starting server listening on port {}.", port);
         URI baseUri = UriBuilder.fromUri("http://0.0.0.0/").port(port).build();
@@ -50,6 +51,13 @@ public class ApiServer implements AutoCloseable {
                     @Override
                     protected void configure() {
                         bind(db).to(DbAdapter.class);
+                    }
+
+                })
+                .register(new AbstractBinder() {
+                    @Override
+                    protected void configure() {
+                        bind(queueProcessor);
                     }
 
                 });

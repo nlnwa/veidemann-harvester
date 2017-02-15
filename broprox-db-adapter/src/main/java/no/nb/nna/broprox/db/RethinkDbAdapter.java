@@ -33,6 +33,7 @@ import com.rethinkdb.gen.ast.ReqlExpr;
 import com.rethinkdb.net.Connection;
 import com.rethinkdb.net.Cursor;
 import no.nb.nna.broprox.db.model.BrowserScript;
+import no.nb.nna.broprox.db.model.CrawlExecutionStatus;
 import no.nb.nna.broprox.db.model.QueuedUri;
 import no.nb.nna.broprox.db.model.Screenshot;
 import org.yaml.snakeyaml.Yaml;
@@ -53,6 +54,8 @@ public class RethinkDbAdapter implements DbAdapter {
     public static final String TABLE_URI_QUEUE = "uri_queue";
 
     public static final String TABLE_SCREENSHOT = "screenshot";
+
+    public static final String TABLE_EXECUTIONS = "executions";
 
     static final RethinkDB r = RethinkDB.r;
 
@@ -90,6 +93,7 @@ public class RethinkDbAdapter implements DbAdapter {
             r.tableCreate(TABLE_URI_QUEUE).run(conn);
             r.table(TABLE_CRAWL_LOG).indexCreate("earliestCrawlTimeStamp").run(conn);
             r.tableCreate(TABLE_SCREENSHOT).run(conn);
+            r.tableCreate(TABLE_EXECUTIONS).run(conn);
 
             populateDb();
         }
@@ -156,6 +160,16 @@ public class RethinkDbAdapter implements DbAdapter {
 
             return result;
         }
+    }
+
+    @Override
+    public CrawlExecutionStatus addExecutionStatus(CrawlExecutionStatus status) {
+        return insert(TABLE_EXECUTIONS, status);
+    }
+
+    @Override
+    public CrawlExecutionStatus updateExecutionStatus(CrawlExecutionStatus status) {
+        return update(TABLE_EXECUTIONS, status.getId(), status);
     }
 
     @Override

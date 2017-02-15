@@ -15,13 +15,15 @@
  */
 package no.nb.nna.broprox.harvester.api;
 
-import javax.ws.rs.DefaultValue;
+import com.google.gson.reflect.TypeToken;
+import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
+import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Context;
+import javax.ws.rs.core.MediaType;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.db.DbObjectFactory;
 import no.nb.nna.broprox.db.model.QueuedUri;
@@ -30,7 +32,7 @@ import no.nb.nna.broprox.harvester.browsercontroller.BrowserController;
 /**
  *
  */
-@Path("snapshot")
+@Path("fetch")
 public class ApiResource {
 
     @Context
@@ -39,25 +41,23 @@ public class ApiResource {
     @Context
     BrowserController controller;
 
-    @GET
-    @Produces("text/plain")
-    public String harvestPage(@QueryParam("h") int height, @QueryParam("w") int width,
-            @QueryParam("scaledHeight") @DefaultValue("0") int scaledHeight, @QueryParam("url") String url) {
+    @POST
+    @Produces(MediaType.APPLICATION_JSON)
+    @Consumes(MediaType.APPLICATION_JSON)
+    public String harvestPage(String queuedUri) {
 
         long start = System.currentTimeMillis();
 
-        QueuedUri queuedUri = DbObjectFactory.create(QueuedUri.class)
-                .withUri(url)
-                .withExecutionId("id");
-
         try {
-            controller.render(queuedUri, width, height, 20000, 1000);
+            QueuedUri[] outlinks = controller.render(DbObjectFactory.of(QueuedUri.class, queuedUri).get());
+
+            return DbObjectFactory.gson.toJson(outlinks);
         } catch (Exception ex) {
             ex.printStackTrace();
             throw new WebApplicationException(ex);
         }
-
-        return "Execution time: " + (System.currentTimeMillis() - start) + "ms\n";
+//
+//        System.out.println("Execution time: " + (System.currentTimeMillis() - start) + "ms\n");
     }
 
 //    byte[] scale(byte[] in, int scaledHeight) throws IOException {

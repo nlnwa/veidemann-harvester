@@ -15,6 +15,7 @@
  */
 package no.nb.nna.broprox.db.model;
 
+import java.beans.Transient;
 import java.time.OffsetDateTime;
 
 import no.nb.nna.broprox.db.DbObject;
@@ -68,5 +69,10 @@ public interface QueuedUri extends DbObject<QueuedUri> {
     String getReferrer();
 
     QueuedUri withReferrer(String uri);
+
+    CrawlConfig getCrawlConfig();
+
+    @Transient
+    QueuedUri withCrawlConfig(CrawlConfig config);
 
 }

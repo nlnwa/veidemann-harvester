@@ -32,6 +32,7 @@ import no.nb.nna.broprox.chrome.client.ws.CompleteMany;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.db.DbObjectFactory;
 import no.nb.nna.broprox.db.model.BrowserScript;
+import no.nb.nna.broprox.db.model.CrawlConfig;
 import no.nb.nna.broprox.db.model.QueuedUri;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
@@ -49,6 +50,8 @@ public class BrowserController implements AutoCloseable {
 
     private final DbAdapter db;
 
+    private final int sleep = 1000;
+
     public BrowserController(String chromeHost, int chromePort, DbAdapter db) throws IOException {
         this.chromeHost = chromeHost;
         this.chromePort = chromePort;
@@ -56,10 +59,10 @@ public class BrowserController implements AutoCloseable {
         this.db = db;
     }
 
-//    public byte[] render(String url, int w, int h, long timeout, int sleep) throws ExecutionException, InterruptedException, IOException, TimeoutException {
-    public byte[] render(QueuedUri queuedUri, int w, int h, long timeout, int sleep) throws ExecutionException, InterruptedException, IOException, TimeoutException {
+    public QueuedUri[] render(QueuedUri queuedUri) throws ExecutionException, InterruptedException, IOException, TimeoutException {
+        CrawlConfig config = queuedUri.getCrawlConfig();
 
-        try (Session session = chrome.newSession(w, h)) {
+        try (Session session = chrome.newSession(config.getWindowWidth(), config.getWindowHeight())) {
             new CompleteMany(
                     session.debugger.enable(),
                     session.page.enable(),
@@ -77,7 +80,7 @@ public class BrowserController implements AutoCloseable {
                     session.debugger.setBreakpointByUrl(1, null, "https?://www.google-analytics.com/ga.js", null, null),
                     session.network.setExtraHTTPHeaders(Collections.singletonMap("x-ray", "foo")),
                     session.page.setControlNavigations(Boolean.TRUE)
-            ).get(timeout, MILLISECONDS);
+            ).get(config.getPageLoadTimeout(), MILLISECONDS);
 
             session.debugger.onPaused(p -> {
                 String scriptId = p.callFrames.get(0).location.scriptId;
@@ -87,8 +90,7 @@ public class BrowserController implements AutoCloseable {
                 System.out.println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>> SCRIPT RESUMED: " + scriptId);
             });
 
-
-            PageExecution pex = new PageExecution(queuedUri, session, timeout);
+            PageExecution pex = new PageExecution(queuedUri, session, config.getPageLoadTimeout());
             pex.navigatePage();
             pex.saveScreenshot(db);
 
@@ -101,10 +103,10 @@ public class BrowserController implements AutoCloseable {
 //                }
 //                System.out.println("<<<<<<");
             String script = db.getBrowserScripts(BrowserScript.Type.EXTRACT_OUTLINKS).get(0).getScript();
-            pex.extractOutlinks(db, script);
+            QueuedUri[] outlinks = pex.extractOutlinks(db, script);
             pex.getDocumentUrl();
             pex.scrollToTop();
-                return null;
+            return outlinks;
         }
     }
 

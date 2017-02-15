@@ -40,6 +40,11 @@
     <dependencyManagement>
         <dependencies>
             <dependency>
+                <groupId>org.netpreserve.commons</groupId>
+                <artifactId>webarchive-commons-uri</artifactId>
+                <version>2.0.0-SNAPSHOT</version>
+            </dependency>
+            <dependency>
                 <groupId>org.littleshoot</groupId>
                 <artifactId>littleproxy</artifactId>
                 <version>1.1.1</version>
@@ -86,6 +91,18 @@
                 <groupId>com.google.code.gson</groupId>
                 <artifactId>gson</artifactId>
                 <version>2.8.0</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.google.guava</groupId>
+                <artifactId>guava</artifactId>
+                <version>21.0</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.github.mgunlogson</groupId>
+                <artifactId>cuckoofilter4j</artifactId>
+                <version>1.0.2</version>
             </dependency>
 
             <dependency>

@@ -66,3 +66,4 @@ services:
             - "harvester"
         environment:
             - "DB_HOST=db"
+            - "HARVESTER_HOST=harvester"

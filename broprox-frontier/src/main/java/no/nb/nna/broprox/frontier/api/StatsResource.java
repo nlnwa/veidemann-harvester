@@ -30,13 +30,19 @@ import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
 import no.nb.nna.broprox.db.DbAdapter;
+import no.nb.nna.broprox.db.DbObjectFactory;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
+import no.nb.nna.broprox.db.model.CrawlConfig;
+import no.nb.nna.broprox.frontier.worker.Frontier;
+import org.netpreserve.commons.uri.UriConfigs;
+import org.netpreserve.commons.uri.UriFormat;
 
 import static io.netty.handler.codec.http.HttpConstants.CR;
 import static io.netty.handler.codec.http.HttpConstants.LF;
@@ -53,6 +59,9 @@ public class StatsResource {
 
     @Context
     DbAdapter db;
+
+    @Context
+    Frontier frontier;
 
     public StatsResource() {
     }
@@ -87,5 +96,31 @@ public class StatsResource {
         rethink.executeRequest(r.table("uri_queue").delete());
         rethink.executeRequest(r.table("crawled_content").delete());
         rethink.executeRequest(r.table("extracted_text").delete());
+    }
+
+    @Path("fetch")
+    @GET
+    public void fetchSeed(@QueryParam("url") String url) {
+        UriFormat f = UriConfigs.SURT_KEY_FORMAT;
+        System.out.println("URL: " + url);
+        CrawlConfig config = DbObjectFactory.create(CrawlConfig.class)
+                .withWindowWidth(900)
+                .withWindowHeight(900)
+                .withScope(generateScope(url))
+                .withPageLoadTimeout(30000);
+
+        try {
+            frontier.newExecution(config, url);
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new WebApplicationException(e);
+        }
+    }
+
+    String generateScope(String url) {
+        UriFormat f = UriConfigs.SURT_KEY_FORMAT.ignorePort(true).ignorePath(true).ignoreQuery(true);
+        String scope = UriConfigs.SURT_KEY.buildUri(url).toCustomString(f);
+        scope = scope.substring(0, scope.length() - 1);
+        return scope;
     }
 }

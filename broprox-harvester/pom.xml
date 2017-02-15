@@ -27,7 +27,6 @@
         <dependency>
             <groupId>org.netpreserve.commons</groupId>
             <artifactId>webarchive-commons-uri</artifactId>
-            <version>2.0.0-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>org.littleshoot</groupId>

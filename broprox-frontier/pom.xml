@@ -16,6 +16,10 @@
             <version>${project.version}</version>
         </dependency>
         <dependency>
+            <groupId>org.netpreserve.commons</groupId>
+            <artifactId>webarchive-commons-uri</artifactId>
+        </dependency>
+        <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-all</artifactId>
         </dependency>
@@ -33,7 +37,23 @@
             <groupId>com.google.code.gson</groupId>
             <artifactId>gson</artifactId>
         </dependency>
-        
+
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.github.mgunlogson</groupId>
+            <artifactId>cuckoofilter4j</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.openjdk.jol</groupId>
+            <artifactId>jol-core</artifactId>
+            <version>0.6</version>
+        </dependency>
+
         <!-- Configuration framework -->
         <dependency>
             <groupId>com.typesafe</groupId>

@@ -17,8 +17,10 @@ package no.nb.nna.broprox.db;
 
 import java.io.IOException;
 import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -31,19 +33,21 @@ import com.google.gson.TypeAdapterFactory;
 import com.google.gson.reflect.TypeToken;
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonWriter;
+import no.nb.nna.broprox.db.model.CrawlExecutionStatus;
 
 /**
  *
  */
 public final class DbObjectFactory {
 
-    private static final Gson gson = new GsonBuilder()
+    public static final Gson gson = new GsonBuilder()
             .registerTypeAdapterFactory(new TypeAdapterFactory() {
                 @Override
                 public <T> TypeAdapter<T> create(Gson gson, TypeToken<T> type) {
                     final Class<T> rawType = (Class<T>) type.getRawType();
 
-                    if (!rawType.isInterface() && !DbObject.class.isAssignableFrom(rawType)) {
+//                    if (!rawType.isInterface() || !DbObject.class.isAssignableFrom(rawType)) {
+                    if (!DbObject.class.isAssignableFrom(rawType)) {
                         return null;
                     }
 
@@ -60,7 +64,7 @@ public final class DbObjectFactory {
                             if (value == null) {
                                 out.nullValue();
                             } else {
-                                System.out.println("WRITE VAL: " + value);
+                                out.jsonValue(((DbObject) value).toJson());
                             }
                         }
 
@@ -125,6 +129,14 @@ public final class DbObjectFactory {
         }
     }
 
+    public static <T extends Collection<? extends DbObject<T>>> Optional<T> of(TypeToken<T> type, String jsonString) {
+        if (jsonString == null) {
+            return Optional.empty();
+        } else {
+            return Optional.of(gson.fromJson(jsonString, type.getType()));
+        }
+    }
+
     private static class DbMapInvocationHandler implements InvocationHandler {
 
         private final Class type;
@@ -171,10 +183,21 @@ public final class DbObjectFactory {
                 if (returnType == Integer.TYPE && (value instanceof Long)) {
                     return ((Long) value).intValue();
                 }
+                if (returnType.isEnum()) {
+                    try {
+                        return returnType.getMethod("valueOf", String.class).invoke(null, value);
+                    } catch (NoSuchMethodException | SecurityException | IllegalAccessException | IllegalArgumentException | InvocationTargetException ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
                 return value;
             }
             if (mName.startsWith("with") && args.length == 1) {
-                src.put(uncapFieldName(mName, 4), args[0]);
+                if (method.getParameterTypes()[0].isEnum()) {
+                    src.put(uncapFieldName(mName, 4), args[0].toString());
+                } else {
+                    src.put(uncapFieldName(mName, 4), args[0]);
+                }
                 return proxy;
             }
             if (mName.startsWith("is")) {
@@ -203,8 +226,7 @@ public final class DbObjectFactory {
     }
 
     private static String uncapFieldName(String methodName, int prefixLen) {
-        String name = Character.toLowerCase(methodName.charAt(prefixLen)) + methodName.substring(prefixLen + 1);
-        return name;
+        return Character.toLowerCase(methodName.charAt(prefixLen)) + methodName.substring(prefixLen + 1);
     }
 
 }

@@ -59,12 +59,10 @@ public class PageExecution {
     }
 
     public void navigatePage() throws InterruptedException, ExecutionException, TimeoutException {
-        System.out.println("=====================================");
-
         CompletableFuture<PageDomain.LoadEventFired> loaded = session.page.onLoadEventFired();
 
         session.page.onNavigationRequested(nr -> {
-            System.out.println("NAV REQUESTED " + nr);
+//            System.out.println("NAV REQUESTED " + nr);
 //                try {
             session.network.setExtraHTTPHeaders(Collections.singletonMap("Discovery-Path", discoveryPath + "E"));
 //                } catch (InterruptedException | ExecutionException ex) {
@@ -90,25 +88,33 @@ public class PageExecution {
 //            Thread.sleep(sleep);
     }
 
-    public void extractOutlinks(DbAdapter db, String script) throws InterruptedException, ExecutionException, TimeoutException {
+    public QueuedUri[] extractOutlinks(DbAdapter db, String script) throws InterruptedException, ExecutionException, TimeoutException {
         RuntimeDomain.Evaluate ev = session.runtime
                 .evaluate(script, null, null, null, null, Boolean.TRUE, null, null, null).get(timeout, MILLISECONDS);
-        String[] links = ((String) ev.result.value).split("\n");
-        String path = discoveryPath + "L";
-        for (String l : links) {
-            QueuedUri uri = DbObjectFactory.create(QueuedUri.class)
-                    .withUri(l)
-                    .withReferrer(queuedUri.getUri())
-                    .withTimeStamp(OffsetDateTime.now())
-                    .withDiscoveryPath(path);
-            db.addQueuedUri(uri);
+        if (ev.result.value != null) {
+            String resultString = ((String) ev.result.value).trim();
+            if (!resultString.isEmpty()) {
+                String[] links = resultString.split("\n+");
+                QueuedUri[] outlinks = new QueuedUri[links.length];
+                String path = discoveryPath + "L";
+                for (int i = 0; i < links.length; i++) {
+                    outlinks[i] = DbObjectFactory.create(QueuedUri.class)
+                            .withExecutionId(queuedUri.getExecutionId())
+                            .withUri(links[i])
+                            .withReferrer(queuedUri.getUri())
+                            .withTimeStamp(OffsetDateTime.now())
+                            .withDiscoveryPath(path);
+                }
+                return outlinks;
+            }
         }
+        return new QueuedUri[0];
     }
 
-    public void getDocumentUrl() throws InterruptedException, ExecutionException, TimeoutException {
+    public String getDocumentUrl() throws InterruptedException, ExecutionException, TimeoutException {
         RuntimeDomain.Evaluate ev = session.runtime
                 .evaluate("document.URL", null, null, null, null, null, null, null, null).get(timeout, MILLISECONDS);
-        System.out.println("Document URL: " + ev.result.value);
+        return (String) ev.result.value;
     }
 
     public void scrollToTop() throws InterruptedException, ExecutionException, TimeoutException {

@@ -30,6 +30,10 @@ public class Settings {
 
     private String dbName;
 
+    private String harvesterHost;
+
+    private int harvesterPort;
+
     public int getApiPort() {
         return apiPort;
     }
@@ -68,6 +72,22 @@ public class Settings {
 
     public void setDbName(String dbName) {
         this.dbName = dbName;
+    }
+
+    public String getHarvesterHost() {
+        return harvesterHost;
+    }
+
+    public void setHarvesterHost(String harvesterHost) {
+        this.harvesterHost = harvesterHost;
+    }
+
+    public int getHarvesterPort() {
+        return harvesterPort;
+    }
+
+    public void setHarvesterPort(int harvesterPort) {
+        this.harvesterPort = harvesterPort;
     }
 
 }

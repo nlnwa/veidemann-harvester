@@ -99,7 +99,7 @@ public class PageExecution {
                 String path = discoveryPath + "L";
                 for (int i = 0; i < links.length; i++) {
                     outlinks[i] = DbObjectFactory.create(QueuedUri.class)
-                            .withExecutionId(queuedUri.getExecutionId())
+                            .withExecutionIds(queuedUri.getExecutionIds())
                             .withUri(links[i])
                             .withReferrer(queuedUri.getUri())
                             .withTimeStamp(OffsetDateTime.now())
@@ -129,7 +129,7 @@ public class PageExecution {
             byte[] img = Base64.getDecoder().decode(s.data);
             db.addScreenshot(DbObjectFactory.create(Screenshot.class)
                     .withImg(img)
-                    .withExecutionId(queuedUri.getExecutionId())
+//                    .withExecutionId(queuedUri.getExecutionIds())
                     .withUri(queuedUri.getUri()));
         });
     }

@@ -16,6 +16,8 @@
 package no.nb.nna.broprox.db;
 
 import java.io.IOException;
+import java.lang.invoke.MethodHandles;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -143,6 +145,17 @@ public final class DbObjectFactory {
 
         private Map<String, Object> src;
 
+        private static final Constructor<MethodHandles.Lookup> constructor;
+
+        static {
+            try {
+                constructor = MethodHandles.Lookup.class.getDeclaredConstructor(Class.class, int.class);
+                constructor.setAccessible(true);
+            } catch (NoSuchMethodException | SecurityException ex) {
+                throw new RuntimeException(ex);
+            }
+        }
+
         public DbMapInvocationHandler(Class type, Map<String, Object> src) {
             this.type = type;
             this.src = src;
@@ -150,6 +163,14 @@ public final class DbObjectFactory {
 
         @Override
         public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+            if (method.isDefault()) {
+                final Class<?> declaringClass = method.getDeclaringClass();
+                return constructor.newInstance(declaringClass, MethodHandles.Lookup.PRIVATE)
+                        .unreflectSpecial(method, declaringClass)
+                        .bindTo(proxy)
+                        .invokeWithArguments(args);
+            }
+
             switch (method.getName()) {
                 case "getMap":
                     return src;

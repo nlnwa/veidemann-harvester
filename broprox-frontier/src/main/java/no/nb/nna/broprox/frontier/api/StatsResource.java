@@ -107,6 +107,7 @@ public class StatsResource {
                 .withWindowWidth(900)
                 .withWindowHeight(900)
                 .withScope(generateScope(url))
+                .withMinTimeBetweenPageLoadMillis(5000)
                 .withPageLoadTimeout(30000);
 
         try {

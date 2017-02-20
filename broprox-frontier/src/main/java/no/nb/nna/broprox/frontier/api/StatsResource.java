@@ -15,8 +15,6 @@
  */
 package no.nb.nna.broprox.frontier.api;
 
-import java.io.IOException;
-import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -27,6 +25,7 @@ import com.google.gson.GsonBuilder;
 import com.rethinkdb.RethinkDB;
 import com.rethinkdb.net.Cursor;
 import javax.ws.rs.DELETE;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -34,8 +33,6 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
-import javax.ws.rs.core.StreamingOutput;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.db.DbObjectFactory;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
@@ -100,15 +97,18 @@ public class StatsResource {
 
     @Path("fetch")
     @GET
-    public void fetchSeed(@QueryParam("url") String url) {
+    public void fetchSeed(@QueryParam("url") String url,
+            @QueryParam("timeout") @DefaultValue("10000") long timeout,
+            @QueryParam("waitTime") @DefaultValue("500") long waitTime) {
+        
         UriFormat f = UriConfigs.SURT_KEY_FORMAT;
         System.out.println("URL: " + url);
         CrawlConfig config = DbObjectFactory.create(CrawlConfig.class)
                 .withWindowWidth(900)
                 .withWindowHeight(900)
                 .withScope(generateScope(url))
-                .withMinTimeBetweenPageLoadMillis(5000)
-                .withPageLoadTimeout(30000);
+                .withMinTimeBetweenPageLoadMillis(waitTime)
+                .withPageLoadTimeout(timeout);
 
         try {
             frontier.newExecution(config, url);
@@ -124,4 +124,5 @@ public class StatsResource {
         scope = scope.substring(0, scope.length() - 1);
         return scope;
     }
+
 }

@@ -59,7 +59,7 @@ public class PageExecution {
     }
 
     public void navigatePage() throws InterruptedException, ExecutionException, TimeoutException {
-        CompletableFuture<PageDomain.LoadEventFired> loaded = session.page.onLoadEventFired();
+        CompletableFuture<PageDomain.FrameStoppedLoading> loaded = session.page.onFrameStoppedLoading();
 
         session.page.onNavigationRequested(nr -> {
 //            System.out.println("NAV REQUESTED " + nr);
@@ -72,10 +72,15 @@ public class PageExecution {
             session.page.processNavigation("Proceed", nr.navigationId);
         });
 
-//            tab.page.onNavigationRequested(nr -> {
-//                System.out.println("NAV REQUESTED");
-//                tab.page.processNavigation(nr.url, nr.navigationId);
-//            });
+        session.page.onJavascriptDialogOpening(js -> {
+            System.out.println("JS DIALOG: " + js.type + " :: " + js.message);
+            boolean accept = false;
+            if ("alert".equals(js.type)) {
+                accept = true;
+            }
+            session.page.handleJavaScriptDialog(accept, null);
+        });
+
         session.page.navigate(queuedUri.getUri()).get(timeout, MILLISECONDS);
 
         loaded.get(timeout, MILLISECONDS);

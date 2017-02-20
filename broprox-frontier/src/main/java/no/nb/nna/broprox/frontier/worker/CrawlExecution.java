@@ -117,9 +117,6 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker, Delayed {
 //                System.out.println(" >> " + outUri.toJson() + " ::: " + queueProcessor.alreadeyIncluded(outUri));
                 if (shouldInclude(outUri)) {
                     LOG.debug("Found new URI: {}, queueing.", outUri.getSurt());
-                    System.out.println("EIDS: " + outUri.getExecutionIds());
-                    System.out.println("EIDS: " + outUri.getExecutionIds().getClass());
-//                    List<Object[]> eIds = outUri.getExecutionIds();
                     List<QueuedUri.IdSeq> eIds = outUri.listExecutionIds();
                     for (QueuedUri.IdSeq i : eIds) {
                         System.out.println("i " + i);

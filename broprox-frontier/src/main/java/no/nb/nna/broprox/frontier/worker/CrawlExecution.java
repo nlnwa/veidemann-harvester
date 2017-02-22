@@ -105,40 +105,52 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker, Delayed {
                 return;
             }
 
-            QueuedUri.IdSeq currentIdSeq = new QueuedUri.IdSeq(getId(), 0L);
-            for (QueuedUri outUri : outlinks) {
-                try {
-                    outUri.withSurt(UriConfigs.SURT_KEY.buildUri(outUri.getUri()).toString());
-                } catch (Exception e) {
-                    System.out.println("Strange error with outlink (" + outUri + "): " + e);
-                    e.printStackTrace();
-                    return;
-                }
-//                System.out.println(" >> " + outUri.toJson() + " ::: " + queueProcessor.alreadeyIncluded(outUri));
-                if (shouldInclude(outUri)) {
-                    LOG.debug("Found new URI: {}, queueing.", outUri.getSurt());
-                    List<QueuedUri.IdSeq> eIds = outUri.listExecutionIds();
-                    for (QueuedUri.IdSeq i : eIds) {
-                        System.out.println("i " + i);
-                    }
-                    if (!eIds.contains(currentIdSeq)) {
-                        outUri.addExecutionId(new QueuedUri.IdSeq(getId(), getNextSequenceNum()));
-                    }
-                    try {
-                        frontier.getDb().addQueuedUri(outUri);
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                } else {
-                    LOG.debug("Found already included URI: {}, skipping.", outUri.getSurt());
-                }
-            }
+            queueOutlinks();
         } catch (Exception e) {
             System.out.println("Strange error fetching page (" + currentUri + "): " + e);
             e.printStackTrace();
             // TODO: should do some logging and updating here
         }
         return;
+    }
+
+    void queueOutlinks() {
+        QueuedUri.IdSeq currentId = new QueuedUri.IdSeq(getId(), 0L);
+
+        long nextSequenceNum = 0;
+        if (!config.isDepthFirst()) {
+            nextSequenceNum = getNextSequenceNum();
+        }
+
+        for (QueuedUri outUri : outlinks) {
+            try {
+                outUri.withSurt(UriConfigs.SURT_KEY.buildUri(outUri.getUri()).toString());
+            } catch (Exception e) {
+                System.out.println("Strange error with outlink (" + outUri + "): " + e);
+                e.printStackTrace();
+                return;
+            }
+
+            if (shouldInclude(outUri)) {
+                LOG.debug("Found new URI: {}, queueing.", outUri.getSurt());
+                List<QueuedUri.IdSeq> eIds = outUri.listExecutionIds();
+
+                if (!eIds.contains(currentId)) {
+                    if (config.isDepthFirst()) {
+                        nextSequenceNum = getNextSequenceNum();
+                    }
+
+                    outUri.addExecutionId(new QueuedUri.IdSeq(getId(), nextSequenceNum));
+                }
+                try {
+                    frontier.getDb().addQueuedUri(outUri);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            } else {
+                LOG.debug("Found already included URI: {}, skipping.", outUri.getSurt());
+            }
+        }
     }
 
     boolean shouldInclude(QueuedUri outlink) {

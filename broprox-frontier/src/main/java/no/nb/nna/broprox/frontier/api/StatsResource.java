@@ -100,7 +100,7 @@ public class StatsResource {
     public void fetchSeed(@QueryParam("url") String url,
             @QueryParam("timeout") @DefaultValue("10000") long timeout,
             @QueryParam("waitTime") @DefaultValue("500") long waitTime) {
-        
+
         UriFormat f = UriConfigs.SURT_KEY_FORMAT;
         System.out.println("URL: " + url);
         CrawlConfig config = DbObjectFactory.create(CrawlConfig.class)
@@ -108,7 +108,8 @@ public class StatsResource {
                 .withWindowHeight(900)
                 .withScope(generateScope(url))
                 .withMinTimeBetweenPageLoadMillis(waitTime)
-                .withPageLoadTimeout(timeout);
+                .withPageLoadTimeout(timeout)
+                .withDepthFirst(false);
 
         try {
             frontier.newExecution(config, url);

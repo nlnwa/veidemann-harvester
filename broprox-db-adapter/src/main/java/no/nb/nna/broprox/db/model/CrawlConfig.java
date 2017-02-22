@@ -42,4 +42,7 @@ public interface CrawlConfig extends DbObject<CrawlConfig> {
 
     long getMinTimeBetweenPageLoadMillis();
 
+    CrawlConfig withDepthFirst(boolean depthFirst);
+
+    boolean isDepthFirst();
 }

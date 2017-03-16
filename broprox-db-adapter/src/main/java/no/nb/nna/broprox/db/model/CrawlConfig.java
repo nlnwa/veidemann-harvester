@@ -37,4 +37,9 @@ public interface CrawlConfig extends DbObject<CrawlConfig> {
     CrawlConfig withPageLoadTimeout(long timeout);
 
     long getPageLoadTimeout();
+
+    CrawlConfig withMinTimeBetweenPageLoadMillis(long time);
+
+    long getMinTimeBetweenPageLoadMillis();
+
 }

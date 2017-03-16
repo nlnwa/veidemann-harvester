@@ -25,7 +25,9 @@ import java.util.Map;
 import java.util.Optional;
 
 import com.google.gson.reflect.TypeToken;
+import com.rethinkdb.RethinkDB;
 import no.nb.nna.broprox.db.model.CrawlExecutionStatus;
+import no.nb.nna.broprox.db.model.QueuedUri;
 import org.junit.Test;
 
 import static org.assertj.core.api.Assertions.*;
@@ -175,4 +177,17 @@ public class DbObjectFactoryTest {
         assertThat(s.getMap().get("state")).isInstanceOf(String.class).isEqualTo("DIED");
         assertThat(s.getState()).isSameAs(CrawlExecutionStatus.State.DIED);
     }
+
+//    @Test
+//    public void testArray() {
+//        QueuedUri q = DbObjectFactory.create(QueuedUri.class);
+//        q.withExecutionIds("abc", "def");
+//        assertThat(q.getMap().get("executionIds")).isEqualTo(new String[] {"abc", "def"});
+//        assertThat(q.getExecutionIds()).isEqualTo(new String[] {"abc", "def"});
+//        System.out.println("json: " + q.toJson());
+//
+//        RethinkDB r = RethinkDB.r;
+//        com.rethinkdb.gen.ast.Map o = r.map("executionIds", s -> r.array("abc", "def"));
+//        fail("X");
+//    }
 }

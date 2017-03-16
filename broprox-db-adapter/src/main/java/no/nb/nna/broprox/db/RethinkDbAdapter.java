@@ -84,16 +84,27 @@ public class RethinkDbAdapter implements DbAdapter {
     private final void createDb() {
         if (!(boolean) r.dbList().contains(dbName).run(conn)) {
             r.dbCreate(dbName).run(conn);
+
             r.tableCreate(TABLE_CRAWL_LOG).optArg("primary_key", "warcId").run(conn);
-            r.table(TABLE_CRAWL_LOG).indexCreate("surt_time", row -> r.array(row.g("surt"), row.g("timeStamp")))
+            r.table(TABLE_CRAWL_LOG)
+                    .indexCreate("surt_time", row -> r.array(row.g("surt"), row.g("timeStamp")))
                     .run(conn);
+            r.table(TABLE_CRAWL_LOG).indexWait("surt_time").run(conn);
+
             r.tableCreate(TABLE_CRAWLED_CONTENT).optArg("primary_key", "digest").run(conn);
+
             r.tableCreate(TABLE_EXTRACTED_TEXT).optArg("primary_key", "warcId").run(conn);
+
             r.tableCreate(TABLE_BROWSER_SCRIPTS).run(conn);
+
             r.tableCreate(TABLE_URI_QUEUE).run(conn);
-            r.table(TABLE_CRAWL_LOG).indexCreate("earliestCrawlTimeStamp").run(conn);
-            r.tableCreate(TABLE_SCREENSHOT).run(conn);
+            r.table(TABLE_URI_QUEUE).indexCreate("surt").run(conn);
+            r.table(TABLE_URI_QUEUE).indexCreate("executionIds").optArg("multi", true).run(conn);
+            r.table(TABLE_URI_QUEUE).indexWait("surt", "executionIds").run(conn);
+
             r.tableCreate(TABLE_EXECUTIONS).run(conn);
+
+            r.tableCreate(TABLE_SCREENSHOT).run(conn);
 
             populateDb();
         }

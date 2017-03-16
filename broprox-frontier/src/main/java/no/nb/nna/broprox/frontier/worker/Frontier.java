@@ -16,26 +16,24 @@
 package no.nb.nna.broprox.frontier.worker;
 
 import java.time.OffsetDateTime;
-import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.DelayQueue;
 import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.TimeUnit;
 
 import com.github.mgunlogson.cuckoofilter4j.CuckooFilter;
 import com.google.common.hash.Funnels;
 import com.rethinkdb.RethinkDB;
-import com.rethinkdb.net.Cursor;
 import no.nb.nna.broprox.db.DbObjectFactory;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
 import no.nb.nna.broprox.db.model.CrawlConfig;
 import no.nb.nna.broprox.db.model.CrawlExecutionStatus;
 import no.nb.nna.broprox.db.model.QueuedUri;
+import org.netpreserve.commons.uri.UriConfigs;
 
-import static no.nb.nna.broprox.db.RethinkDbAdapter.*;
 
 /**
  *
@@ -52,6 +50,8 @@ public class Frontier implements AutoCloseable {
 
     final Map<String, CrawlExecution> runningExecutions = new ConcurrentHashMap<>();
 
+    final DelayQueue<CrawlExecution> executionsQueue = new DelayQueue<>();
+
     static final ForkJoinPool EXECUTOR_SERVICE = new ForkJoinPool(32);
 
     CuckooFilter<CharSequence> alreadyIncluded;
@@ -62,28 +62,28 @@ public class Frontier implements AutoCloseable {
         this.alreadyIncluded = new CuckooFilter.Builder<>(Funnels.unencodedCharsFunnel(), EXPECTED_MAX_URIS).build();
 
         System.out.println("Starting Queue Processor");
-        ForkJoinTask proc = EXECUTOR_SERVICE.submit(new Runnable() {
-            @Override
-            public void run() {
-                try (Cursor<Map<String, Map<String, Object>>> cursor = db.executeRequest(r.table(TABLE_URI_QUEUE)
-                        .changes());) {
-                    for (Map<String, Map<String, Object>> doc : cursor) {
-                        // Remove from already included filter when deleted from queue
+//        ForkJoinTask proc = EXECUTOR_SERVICE.submit(new Runnable() {
+//            @Override
+//            public void run() {
+//                try (Cursor<Map<String, Map<String, Object>>> cursor = db.executeRequest(r.table(TABLE_URI_QUEUE)
+//                        .changes());) {
+//                    for (Map<String, Map<String, Object>> doc : cursor) {
+//                        // Remove from already included filter when deleted from queue
 //                        DbObjectFactory.of(QueuedUri.class, doc.get("old_val"))
 //                                .ifPresent(q -> alreadyIncluded.delete(q.getSurt()));
+//
+//                        // Add to already included filter when added to queue
+//                        DbObjectFactory.of(QueuedUri.class, doc.get("new_val"))
+//                                .ifPresent(q -> alreadyIncluded.put(q.getSurt()));
+//                    }
+//                } catch (Exception e) {
+//                    e.printStackTrace();
+//                }
+//            }
+//
+//        });
 
-                        // Add to already included filter when added to queue
-                        DbObjectFactory.of(QueuedUri.class, doc.get("new_val"))
-                                .ifPresent(q -> alreadyIncluded.put(q.getSurt()));
-                    }
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
-
-        });
-
-        for (int i = 0; i < 1; i++) {
+        for (int i = 0; i < 3; i++) {
             EXECUTOR_SERVICE.submit(new QueueWorker(this));
         }
     }
@@ -103,8 +103,19 @@ public class Frontier implements AutoCloseable {
 
         for (String s : seed) {
             try {
-                exe.setCurrentUri(s);
+                QueuedUri qUri = DbObjectFactory.create(QueuedUri.class)
+                        .addExecutionId(new QueuedUri.IdSeq(executionId, exe.getNextSequenceNum()))
+                        .withUri(s)
+                        .withSurt(UriConfigs.SURT_KEY.buildUri(s).toString())
+                        .withDiscoveryPath("");
+                exe.setCurrentUri(qUri);
                 EXECUTOR_SERVICE.managedBlock(exe);
+                exe.calculateDelay();
+                System.out.println("End of Seed crawl");
+                System.out.println("Threads: " + EXECUTOR_SERVICE.getQueuedTaskCount());
+                System.out.println("Threads: " + EXECUTOR_SERVICE.getRunningThreadCount());
+                System.out.println("Threads: " + EXECUTOR_SERVICE.getActiveThreadCount());
+                executionsQueue.add(exe);
             } catch (InterruptedException ex) {
                 throw new RuntimeException(ex);
             }

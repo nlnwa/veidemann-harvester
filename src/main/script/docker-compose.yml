@@ -3,6 +3,7 @@ version: '2'
 
 volumes:
     harvester-workdir:
+    rethink-data:
 
 services:
     # RethinkDB
@@ -12,6 +13,8 @@ services:
             - "28015:28015"
             - "29015:29015"
             - "8888:8080"
+        volumes:
+            - rethink-data:/data
 
     # Chrome headless
     browser:
@@ -30,7 +33,7 @@ services:
             - "9191:8080"
             - "9090:9090"
         volumes:
-            - harvester-workdir:/workdir
+             - harvester-workdir:/workdir
         links:
             - "db"
             - "browser"

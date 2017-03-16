@@ -4,6 +4,7 @@ MAINTAINER National Library of Norway
 
 WORKDIR /
 
+RUN mkdir /workdir
 VOLUME /workdir
 ENV WORK_DIR=/workdir
 

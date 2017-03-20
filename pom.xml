@@ -38,6 +38,20 @@
         <org.apache.tika.version>1.14</org.apache.tika.version>
         <cache2k-version>1.0.0.CR2</cache2k-version>
     </properties>
+    
+    <repositories>
+        <repository>
+            <id>oss.sonatype.org</id>
+            <name>OSS Sonatype</name>
+            <releases>
+                <enabled>false</enabled>
+            </releases>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+            <url>https://oss.sonatype.org/content/repositories/snapshots/</url>
+        </repository>    
+    </repositories>
 
     <dependencyManagement>
         <dependencies>

@@ -48,12 +48,15 @@ public class ContentWriterClient implements AutoCloseable {
 
     public URI writeRecord(CrawlLog logEntry, ByteBuf headers, ByteBuf payload) {
         final StreamDataBodyPart headersPart = new StreamDataBodyPart("headers", new ByteBufInputStream(headers));
-        final StreamDataBodyPart payloadPart = new StreamDataBodyPart("payload", new ByteBufInputStream(payload));
 
         final MultiPart multipart = new FormDataMultiPart()
                 .field("logEntry", logEntry.toJson())
-                .bodyPart(headersPart)
-                .bodyPart(payloadPart);
+                .bodyPart(headersPart);
+
+        if (payload != null) {
+            final StreamDataBodyPart payloadPart = new StreamDataBodyPart("payload", new ByteBufInputStream(payload));
+            multipart.bodyPart(payloadPart);
+        }
 
         Response storageRef = contentWriterTarget.path("warcrecord")
                 .request()

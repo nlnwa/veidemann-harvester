@@ -35,6 +35,8 @@ public class RecordingProxy implements AutoCloseable {
 
     private final HttpProxyServer server;
 
+    private final AlreadyCrawledCache cache;
+
     /**
      * Construct a new Recording Proxy.
      * <p>
@@ -49,12 +51,14 @@ public class RecordingProxy implements AutoCloseable {
 
         File certificateDir = new File(workDir, "certificates");
 
+        cache = new AlreadyCrawledCache();
+
         server = DefaultHttpProxyServer.bootstrap()
                 .withAllowLocalOnly(false)
                 .withPort(port)
                 .withTransparent(true)
                 .withManInTheMiddle(new CertificateSniffingMitmManager(new SelfSignedAuthority(certificateDir)))
-                .withFiltersSource(new CoalesceUriFilter(db, contentWriterClient))
+                .withFiltersSource(new CoalesceUriFilter(db, contentWriterClient, cache))
                 .start();
     }
 
@@ -64,4 +68,7 @@ public class RecordingProxy implements AutoCloseable {
         server.stop();
     }
 
+    public void cleanCache(String executionId) {
+        cache.cleanExecution(executionId);
+    }
 }

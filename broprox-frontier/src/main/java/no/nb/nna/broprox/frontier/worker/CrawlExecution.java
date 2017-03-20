@@ -88,7 +88,7 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker, Delayed {
 
         try {
             try {
-                outlinks = frontier.getHarvesterClient().fetchPage(currentUri);
+                outlinks = frontier.getHarvesterClient().fetchPage(status.getId(), currentUri);
 
                 status.withState(CrawlExecutionStatus.State.RUNNING)
                         .withDocumentsCrawled(status.getDocumentsCrawled() + 1);

@@ -17,11 +17,13 @@ package no.nb.nna.broprox.harvester.browsercontroller;
 
 import java.time.OffsetDateTime;
 import java.util.Base64;
-import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 
+import com.google.gson.Gson;
 import no.nb.nna.broprox.chrome.client.PageDomain;
 import no.nb.nna.broprox.chrome.client.RuntimeDomain;
 import no.nb.nna.broprox.chrome.client.Session;
@@ -29,13 +31,17 @@ import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.db.DbObjectFactory;
 import no.nb.nna.broprox.db.model.QueuedUri;
 import no.nb.nna.broprox.db.model.Screenshot;
+import no.nb.nna.broprox.harvester.BroproxHeaderConstants;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static no.nb.nna.broprox.harvester.BroproxHeaderConstants.ALL_EXECUTION_IDS;
+import static no.nb.nna.broprox.harvester.BroproxHeaderConstants.DISCOVERY_PATH;
+import static no.nb.nna.broprox.harvester.BroproxHeaderConstants.EXECUTION_ID;
 
 /**
  *
  */
-public class PageExecution {
+public class PageExecution implements BroproxHeaderConstants {
 
     private final QueuedUri queuedUri;
 
@@ -43,33 +49,33 @@ public class PageExecution {
 
     private final long timeout;
 
-    private final String discoveryPath;
+    private final Map<String, Object> extraHeaders = new HashMap<>();
 
-    public PageExecution(QueuedUri queuedUri, Session session, long timeout) {
+    private final Gson gson = new Gson();
+
+    private String discoveryPath;
+
+    public PageExecution(String executionId, QueuedUri queuedUri, Session session, long timeout) {
         this.queuedUri = queuedUri;
         this.session = session;
         this.timeout = timeout;
 
-        String dp = queuedUri.getDiscoveryPath();
-        if (dp == null) {
+        discoveryPath = queuedUri.getDiscoveryPath();
+        if (discoveryPath == null) {
             discoveryPath = "";
-        } else {
-            discoveryPath = dp;
         }
+        extraHeaders.put(EXECUTION_ID, executionId);
+        extraHeaders.put(ALL_EXECUTION_IDS, gson.toJson(queuedUri.getExecutionIds()));
+        extraHeaders.put(DISCOVERY_PATH, discoveryPath);
     }
 
     public void navigatePage() throws InterruptedException, ExecutionException, TimeoutException {
         CompletableFuture<PageDomain.FrameStoppedLoading> loaded = session.page.onFrameStoppedLoading();
 
         session.page.onNavigationRequested(nr -> {
-//            System.out.println("NAV REQUESTED " + nr);
-//                try {
-            session.network.setExtraHTTPHeaders(Collections.singletonMap("Discovery-Path", discoveryPath + "E"));
-//                } catch (InterruptedException | ExecutionException ex) {
-//                    throw new RuntimeException(ex);
-//                }
-//                tab.page.setControlNavigations(Boolean.FALSE);
-            session.page.processNavigation("Proceed", nr.navigationId);
+                extraHeaders.put(DISCOVERY_PATH, discoveryPath + "E");
+                session.network.setExtraHTTPHeaders(extraHeaders);
+                session.page.processNavigation("Proceed", nr.navigationId);
         });
 
         session.page.onJavascriptDialogOpening(js -> {
@@ -81,6 +87,7 @@ public class PageExecution {
             session.page.handleJavaScriptDialog(accept, null);
         });
 
+        session.network.setExtraHTTPHeaders(extraHeaders).get(timeout, MILLISECONDS);
         session.page.navigate(queuedUri.getUri()).get(timeout, MILLISECONDS);
 
         loaded.get(timeout, MILLISECONDS);
@@ -134,9 +141,9 @@ public class PageExecution {
             byte[] img = Base64.getDecoder().decode(s.data);
             db.addScreenshot(DbObjectFactory.create(Screenshot.class)
                     .withImg(img)
-//                    .withExecutionId(queuedUri.getExecutionIds())
+                    //                    .withExecutionId(queuedUri.getExecutionIds())
                     .withUri(queuedUri.getUri()));
-        });
+        }).get(timeout, MILLISECONDS);
     }
 
     public void runBehaviour() throws InterruptedException, ExecutionException, TimeoutException {

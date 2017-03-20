@@ -62,6 +62,9 @@ public class SingleWarcWriter implements AutoCloseable {
             }
 
             WarcWriter writer = warcFileWriter.getWriter();
+
+            // TODO: Remove this as soon as revisits are fixed
+            writer.setExceptionOnContentLengthMismatch(false);
             WarcRecord record = WarcRecord.createRecord(writer);
 
             record.header.addHeader(FN_WARC_TYPE, logEntry.getRecordType());
@@ -116,8 +119,10 @@ public class SingleWarcWriter implements AutoCloseable {
     public void closeRecord() {
         try {
             warcFileWriter.getWriter().closeRecord();
-        } catch (IOException ex) {
-            throw new UncheckedIOException(ex);
+        } catch (IOException | IllegalStateException ex) {
+            // TODO: Fix this
+            System.out.println("FIX REVISIT SIZE");
+//            throw new UncheckedIOException(ex);
         }
     }
 

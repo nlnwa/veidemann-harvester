@@ -105,7 +105,8 @@ public class FileUploadResource {
             }
             warcWriter.closeRecord();
             if (logEntry.getSize() != size) {
-                throw new WebApplicationException("Size doesn't match metadata", Response.Status.NOT_ACCEPTABLE);
+                // TODO: Reenable this as soon as revisits are fixed
+                //throw new WebApplicationException("Size doesn't match metadata", Response.Status.NOT_ACCEPTABLE);
             }
             return Response.created(ref).build();
         } catch (Exception ex) {

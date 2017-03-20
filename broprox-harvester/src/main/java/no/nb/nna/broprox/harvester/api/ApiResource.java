@@ -15,24 +15,26 @@
  */
 package no.nb.nna.broprox.harvester.api;
 
-import com.google.gson.reflect.TypeToken;
 import javax.ws.rs.Consumes;
-import javax.ws.rs.GET;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.db.DbObjectFactory;
 import no.nb.nna.broprox.db.model.QueuedUri;
+import no.nb.nna.broprox.harvester.BroproxHeaderConstants;
 import no.nb.nna.broprox.harvester.browsercontroller.BrowserController;
+import no.nb.nna.broprox.harvester.proxy.RecordingProxy;
 
 /**
  *
  */
-@Path("fetch")
+@Path("/")
 public class ApiResource {
 
     @Context
@@ -41,23 +43,36 @@ public class ApiResource {
     @Context
     BrowserController controller;
 
+    @Context
+    RecordingProxy proxy;
+
     @POST
+    @Path("fetch")
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public String harvestPage(String queuedUri) {
+    public String harvestPage(
+            @QueryParam("executionId") @DefaultValue(BroproxHeaderConstants.MANUAL_EXID) final String executionId,
+            final String queuedUri) {
 
         long start = System.currentTimeMillis();
 
         try {
-            QueuedUri[] outlinks = controller.render(DbObjectFactory.of(QueuedUri.class, queuedUri).get());
+            QueuedUri fetchUri = DbObjectFactory.of(QueuedUri.class, queuedUri).get();
+            QueuedUri[] outlinks = controller.render(executionId, fetchUri);
+
+            System.out.println("Execution time: " + (System.currentTimeMillis() - start) + "ms\n");
 
             return DbObjectFactory.gson.toJson(outlinks);
         } catch (Exception ex) {
             ex.printStackTrace();
             throw new WebApplicationException(ex);
         }
-//
-//        System.out.println("Execution time: " + (System.currentTimeMillis() - start) + "ms\n");
+    }
+
+    @POST
+    @Path("cache/clean")
+    public void clean(@QueryParam("executionId") String executionId) {
+        proxy.cleanCache(executionId);
     }
 
 //    byte[] scale(byte[] in, int scaledHeight) throws IOException {

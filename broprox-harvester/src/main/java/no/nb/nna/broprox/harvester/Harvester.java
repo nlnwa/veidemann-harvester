@@ -67,7 +67,7 @@ public class Harvester {
                         SETTINGS.getContentWriterHost(), SETTINGS.getContentWriterPort());
                 RecordingProxy proxy = new RecordingProxy(
                         new File(SETTINGS.getWorkDir()), SETTINGS.getProxyPort(), db, contentWriterClient);
-                ApiServer apiServer = new ApiServer(db, controller);) {
+                ApiServer apiServer = new ApiServer(db, controller, proxy);) {
 
             LOG.info("Broprox harvester (v. {}) started", Harvester.class.getPackage().getImplementationVersion());
 

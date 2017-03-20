@@ -20,6 +20,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
@@ -133,7 +134,7 @@ public class ContentInterceptor {
         String payloadDigestString = getPayloadDigest();
         logEntry
                 .withFetchTimeMillis(
-                        Duration.between(logEntry.getFetchTimeStamp(), OffsetDateTime.now()).toMillis())
+                        Duration.between(logEntry.getFetchTimeStamp(), OffsetDateTime.now(ZoneOffset.UTC)).toMillis())
                 .withBlockDigest(getBlockDigest())
                 .withPayloadDigest(payloadDigestString)
                 .withSize(getBlockSize());
@@ -142,21 +143,34 @@ public class ContentInterceptor {
 
         if (isDuplicate.isPresent()) {
             logEntry.withRecordType("revisit");
+            db.addCrawlLog(logEntry);
+            contentWriterClient.writeRecord(logEntry, headerBuf, null);
         } else {
             logEntry.withRecordType("response");
+            db.addCrawlLog(logEntry);
+            contentWriterClient.writeRecord(logEntry, headerBuf, payloadBuf);
         }
 
-        db.addCrawlLog(logEntry);
-
-        contentWriterClient.writeRecord(logEntry, headerBuf, payloadBuf);
-
-        headerBuf.release();
-        payloadBuf.release();
+//        headerBuf.release();
+//        payloadBuf.release();
 
         if (!isDuplicate.isPresent()) {
             db.addCrawledContent(DbObjectFactory.create(CrawledContent.class)
                     .withDigest(payloadDigestString).withWarcId(logEntry.getWarcId()));
         }
+    }
+
+    public void release() {
+        headerBuf.release();
+        payloadBuf.release();
+    }
+
+    public ByteBuf getHeaderBuf() {
+        return headerBuf;
+    }
+
+    public CompositeByteBuf getPayloadBuf() {
+        return payloadBuf;
     }
 
     private static void encoderHeader(CharSequence name, CharSequence value, ByteBuf buf) {

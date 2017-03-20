@@ -46,11 +46,12 @@ public class HarvesterClient implements AutoCloseable {
         System.out.println("Target: " + harvesterTarget);
     }
 
-    public QueuedUri[] fetchPage(QueuedUri qUri) {
+    public QueuedUri[] fetchPage(String executionId, QueuedUri qUri) {
         try {
             String request = qUri.toJson();
 
             Response outlinkResponse = harvesterTarget.path("fetch")
+                    .queryParam("executionId", executionId)
                     .request()
                     .accept(MediaType.APPLICATION_JSON)
                     .post(Entity.entity(request, MediaType.APPLICATION_JSON), Response.class);

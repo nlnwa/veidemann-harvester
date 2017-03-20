@@ -22,6 +22,7 @@ import javax.ws.rs.core.UriBuilder;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.harvester.Harvester;
 import no.nb.nna.broprox.harvester.browsercontroller.BrowserController;
+import no.nb.nna.broprox.harvester.proxy.RecordingProxy;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.netty.httpserver.NettyHttpContainerProvider;
 import org.glassfish.jersey.server.ResourceConfig;
@@ -40,7 +41,7 @@ public class ApiServer implements AutoCloseable {
     /**
      * Construct a new REST API server.
      */
-    public ApiServer(DbAdapter db, BrowserController controller) {
+    public ApiServer(DbAdapter db, BrowserController controller, RecordingProxy proxy) {
         final int port = Harvester.getSettings().getApiPort();
 
         LOG.info("Starting API server listening on port {}.", port);
@@ -58,6 +59,13 @@ public class ApiServer implements AutoCloseable {
                     @Override
                     protected void configure() {
                         bind(controller);
+                    }
+
+                })
+                .register(new AbstractBinder() {
+                    @Override
+                    protected void configure() {
+                        bind(proxy);
                     }
 
                 });

@@ -38,7 +38,7 @@
         <org.apache.tika.version>1.14</org.apache.tika.version>
         <cache2k-version>1.0.0.CR2</cache2k-version>
     </properties>
-    
+
     <repositories>
         <repository>
             <id>oss.sonatype.org</id>
@@ -50,7 +50,7 @@
                 <enabled>true</enabled>
             </snapshots>
             <url>https://oss.sonatype.org/content/repositories/snapshots/</url>
-        </repository>    
+        </repository>
     </repositories>
 
     <dependencyManagement>
@@ -63,7 +63,7 @@
             <dependency>
                 <groupId>org.littleshoot</groupId>
                 <artifactId>littleproxy</artifactId>
-                <version>1.1.1</version>
+                <version>1.1.2</version>
             </dependency>
             <dependency>
                 <groupId>com.github.ganskef</groupId>

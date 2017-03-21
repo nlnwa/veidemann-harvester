@@ -25,9 +25,10 @@ import org.littleshoot.proxy.HttpFiltersAdapter;
 import org.littleshoot.proxy.HttpFiltersSourceAdapter;
 
 /**
- * Filter which extracts the uri from the request independently of http or https style.
+ * Filters source which extracts the uri from the request independently of http or https style before creating the
+ * recorder filter.
  */
-public class CoalesceUriFilter extends HttpFiltersSourceAdapter {
+public class RecorderFilterSourceAdapter extends HttpFiltersSourceAdapter {
 
     private static final AttributeKey<String> CONNECTED_URL = AttributeKey.valueOf("connected_url");
 
@@ -37,7 +38,8 @@ public class CoalesceUriFilter extends HttpFiltersSourceAdapter {
 
     private final AlreadyCrawledCache cache;
 
-    public CoalesceUriFilter(final DbAdapter db, final ContentWriterClient contentWriterClient, final AlreadyCrawledCache cache) {
+    public RecorderFilterSourceAdapter(
+            final DbAdapter db, final ContentWriterClient contentWriterClient, final AlreadyCrawledCache cache) {
         this.db = db;
         this.contentWriterClient = contentWriterClient;
         this.cache = cache;

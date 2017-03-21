@@ -76,8 +76,7 @@ public class SingleWarcWriter implements AutoCloseable {
                 record.header.addHeader(FN_WARC_REFERS_TO, "<urn:uuid:" + logEntry.getWarcRefersTo() + ">");
             }
 
-//        record.header
-//                .addHeader(FN_WARC_IP_ADDRESS, arcRecord.header.inetAddress, arcRecord.header.ipAddressStr);
+            record.header.addHeader(FN_WARC_IP_ADDRESS, logEntry.getIpAddress());
 //        record.header.addHeader(FN_WARC_WARCINFO_ID, "<urn:uuid:" + warcinfoUuid + ">");
             if (logEntry.getBlockDigest() != null) {
                 record.header.addHeader(FN_WARC_BLOCK_DIGEST, logEntry.getBlockDigest());

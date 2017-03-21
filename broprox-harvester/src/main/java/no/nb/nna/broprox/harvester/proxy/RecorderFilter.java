@@ -15,6 +15,7 @@
  */
 package no.nb.nna.broprox.harvester.proxy;
 
+import java.net.InetSocketAddress;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 
@@ -163,6 +164,11 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
         }
 
         return httpObject;
+    }
+
+    @Override
+    public void proxyToServerResolutionSucceeded(String serverHostAndPort, InetSocketAddress resolvedRemoteAddress) {
+        crawlLog.withIpAddress(resolvedRemoteAddress.getAddress().getHostAddress());
     }
 
 }

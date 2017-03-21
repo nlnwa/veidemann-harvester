@@ -104,4 +104,8 @@ public interface CrawlLog extends DbObject<CrawlLog> {
     CrawlLog withWarcRefersTo(String warcId);
 
     String getWarcRefersTo();
+
+    CrawlLog withIpAddress(String ip);
+
+    String getIpAddress();
 }

@@ -80,8 +80,8 @@ public class FileUploadResource {
 
             if (headers != null) {
                 size += warcWriter.addPayload(headers);
-                size += warcWriter.addPayload(CRLF);
             }
+
             if (payload != null) {
                 ForkJoinTask<Long> writeWarcJob = ForkJoinPool.commonPool().submit(new Callable<Long>() {
                     @Override
@@ -98,6 +98,7 @@ public class FileUploadResource {
                     }
 
                 });
+                size += warcWriter.addPayload(CRLF);
                 size += writeWarcJob.get();
                 extractTextJob.get();
 //                size += warcWriter.addPayload(payload.getValueAs(InputStream.class));
@@ -105,8 +106,7 @@ public class FileUploadResource {
             }
             warcWriter.closeRecord();
             if (logEntry.getSize() != size) {
-                // TODO: Reenable this as soon as revisits are fixed
-                //throw new WebApplicationException("Size doesn't match metadata", Response.Status.NOT_ACCEPTABLE);
+                throw new WebApplicationException("Size doesn't match metadata", Response.Status.NOT_ACCEPTABLE);
             }
             return Response.created(ref).build();
         } catch (Exception ex) {

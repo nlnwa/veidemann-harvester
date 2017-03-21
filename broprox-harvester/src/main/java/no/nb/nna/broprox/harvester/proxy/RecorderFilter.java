@@ -33,11 +33,15 @@ import no.nb.nna.broprox.harvester.BroproxHeaderConstants;
 import org.littleshoot.proxy.HttpFiltersAdapter;
 import org.littleshoot.proxy.impl.ProxyUtils;
 import org.netpreserve.commons.uri.UriConfigs;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  *
  */
 public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderConstants {
+
+    private static final Logger LOG = LoggerFactory.getLogger(RecorderFilter.class);
 
     private final String uri;
 
@@ -82,12 +86,17 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
             HttpRequest req = (HttpRequest) httpObject;
 
             executionId = req.headers().get(EXECUTION_ID);
-            System.out.println("ABOUT TO REQUEST " + executionId + " :: " + uri);
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Proxy got request for {} from execution {}", uri, executionId);
+            }
 
             if (req.headers().get(DISCOVERY_PATH).endsWith("E")) {
-                FullHttpResponse cachedResponse = cache.get(uri, req.headers().get(EXECUTION_ID), req.headers().get(ALL_EXECUTION_IDS));
+                FullHttpResponse cachedResponse = cache.get(uri, req.headers().get(EXECUTION_ID), req.headers()
+                        .get(ALL_EXECUTION_IDS));
                 if (cachedResponse != null) {
-                    System.out.println("Cache hit: " + uri);
+                    if (LOG.isTraceEnabled()) {
+                        LOG.trace("Found {} in cache", uri);
+                    }
                     cachedResponse.headers().add("Connection", "close");
                     return cachedResponse;
                 } else {

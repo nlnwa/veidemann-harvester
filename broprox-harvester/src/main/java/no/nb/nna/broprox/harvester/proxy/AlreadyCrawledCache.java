@@ -58,9 +58,9 @@ public class AlreadyCrawledCache {
                     @Override
                     public long calculateExpiryTime(CacheKey key, FullHttpResponse value,
                             long loadTime, CacheEntry<CacheKey, FullHttpResponse> oldEntry) {
-                        if (value == null || value.content().readableBytes() > 64 * 1024) {
-                            if (LOG.isTraceEnabled()) {
-                                LOG.trace("Won't cache {} content too big", key);
+                        if (value == null || value.content().readableBytes() > 256 * 1024) {
+                            if (LOG.isDebugEnabled()) {
+                                LOG.debug("Won't cache {} content too big", key);
                             }
                             return NO_CACHE;
                         }

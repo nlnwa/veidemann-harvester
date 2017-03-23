@@ -45,8 +45,9 @@ public class RecordingProxy implements AutoCloseable {
      * @throws RootCertificateException is thrown if there where problems with the root certificate
      * @throws IOException is thrown if certificate directory could not be created
      */
-    public RecordingProxy(File workDir, int port, DbAdapter db, final ContentWriterClient contentWriterClient)
-            throws RootCertificateException, IOException {
+    public RecordingProxy(File workDir, int port, DbAdapter db, final ContentWriterClient contentWriterClient,
+            final String[] dnsServers) throws RootCertificateException, IOException {
+
         LOG.info("Starting recording proxy listening on port {}.", port);
 
         File certificateDir = new File(workDir, "certificates");
@@ -57,7 +58,7 @@ public class RecordingProxy implements AutoCloseable {
                 .withAllowLocalOnly(false)
                 .withPort(port)
                 .withTransparent(true)
-                .withServerResolver(new DnsLookup(db, contentWriterClient, null))
+                .withServerResolver(new DnsLookup(db, contentWriterClient, dnsServers))
                 .withManInTheMiddle(new CertificateSniffingMitmManager(new SelfSignedAuthority(certificateDir)))
                 .withFiltersSource(new RecorderFilterSourceAdapter(db, contentWriterClient, cache))
                 .start();
@@ -72,4 +73,5 @@ public class RecordingProxy implements AutoCloseable {
     public void cleanCache(String executionId) {
         cache.cleanExecution(executionId);
     }
+
 }

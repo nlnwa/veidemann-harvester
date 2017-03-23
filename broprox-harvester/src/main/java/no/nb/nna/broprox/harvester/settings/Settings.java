@@ -40,6 +40,8 @@ public class Settings {
 
     private int contentWriterPort;
 
+    private String[] dnsServers;
+
     public int getProxyPort() {
         return proxyPort;
     }
@@ -118,6 +120,14 @@ public class Settings {
 
     public void setContentWriterPort(int contentWriterPort) {
         this.contentWriterPort = contentWriterPort;
+    }
+
+    public String[] getDnsServers() {
+        return dnsServers;
+    }
+
+    public void setDnsServer(String... dnsServers) {
+        this.dnsServers = dnsServers;
     }
 
 }

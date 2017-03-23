@@ -47,11 +47,13 @@ public class ContentWriterClient implements AutoCloseable {
     }
 
     public URI writeRecord(CrawlLog logEntry, ByteBuf headers, ByteBuf payload) {
-        final StreamDataBodyPart headersPart = new StreamDataBodyPart("headers", new ByteBufInputStream(headers));
-
         final MultiPart multipart = new FormDataMultiPart()
-                .field("logEntry", logEntry.toJson())
-                .bodyPart(headersPart);
+                .field("logEntry", logEntry.toJson());
+
+        if (headers != null) {
+            final StreamDataBodyPart headersPart = new StreamDataBodyPart("headers", new ByteBufInputStream(headers));
+            multipart.bodyPart(headersPart);
+        }
 
         if (payload != null) {
             final StreamDataBodyPart payloadPart = new StreamDataBodyPart("payload", new ByteBufInputStream(payload));

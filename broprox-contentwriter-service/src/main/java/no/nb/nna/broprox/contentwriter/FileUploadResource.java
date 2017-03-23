@@ -15,6 +15,7 @@
  */
 package no.nb.nna.broprox.contentwriter;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.util.concurrent.Callable;
@@ -98,16 +99,28 @@ public class FileUploadResource {
                     }
 
                 });
-                size += warcWriter.addPayload(CRLF);
+
+                // If both headers and payload are present, add separator
+                if (headers != null) {
+                    size += warcWriter.addPayload(CRLF);
+                }
+
                 size += writeWarcJob.get();
                 extractTextJob.get();
-//                size += warcWriter.addPayload(payload.getValueAs(InputStream.class));
-//                textExtracter.analyze(payload.getValueAs(InputStream.class), logEntry, db);
             }
-            warcWriter.closeRecord();
-            if (logEntry.getSize() != size) {
-                throw new WebApplicationException("Size doesn't match metadata", Response.Status.NOT_ACCEPTABLE);
+
+            try {
+                warcWriter.closeRecord();
+            } catch (IOException ex) {
+                if (logEntry.getSize() != size) {
+                    throw new WebApplicationException("Size doesn't match metadata. Expected " + logEntry.getSize()
+                            + ", but was " + size, Response.Status.NOT_ACCEPTABLE);
+                } else {
+                    ex.printStackTrace();
+                    throw new WebApplicationException(ex, Response.Status.NOT_ACCEPTABLE);
+                }
             }
+
             return Response.created(ref).build();
         } catch (Exception ex) {
             ex.printStackTrace();

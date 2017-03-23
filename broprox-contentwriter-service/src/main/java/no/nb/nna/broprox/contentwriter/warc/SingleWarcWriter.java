@@ -118,12 +118,8 @@ public class SingleWarcWriter implements AutoCloseable {
         }
     }
 
-    public void closeRecord() {
-        try {
-            warcFileWriter.getWriter().closeRecord();
-        } catch (IOException ex) {
-            throw new UncheckedIOException(ex);
-        }
+    public void closeRecord() throws IOException {
+        warcFileWriter.getWriter().closeRecord();
     }
 
     @Override

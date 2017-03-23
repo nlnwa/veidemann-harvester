@@ -16,6 +16,7 @@
 package no.nb.nna.broprox.contentwriter.warc;
 
 import java.io.File;
+import java.io.IOException;
 
 import no.nb.nna.broprox.db.model.CrawlLog;
 import no.nb.nna.broprox.db.DbObjectFactory;
@@ -69,7 +70,11 @@ public class SingleWarcWriterTest {
                         .ifPresent(l -> {
                             System.out.println("REF: " + instance.writeHeader(l));
                             instance.addPayload(data.getBytes());
-                            instance.closeRecord();
+                    try {
+                        instance.closeRecord();
+                    } catch (IOException ex) {
+                        throw new RuntimeException(ex);
+                    }
                         });
 
             }

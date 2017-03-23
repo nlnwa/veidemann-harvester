@@ -17,6 +17,7 @@ package no.nb.nna.broprox.harvester.proxy;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
 
 import no.nb.nna.broprox.db.DbAdapter;
 import org.littleshoot.proxy.HttpProxyServer;
@@ -46,7 +47,7 @@ public class RecordingProxy implements AutoCloseable {
      * @throws IOException is thrown if certificate directory could not be created
      */
     public RecordingProxy(File workDir, int port, DbAdapter db, final ContentWriterClient contentWriterClient,
-            final String[] dnsServers) throws RootCertificateException, IOException {
+            final List<String> dnsServers) throws RootCertificateException, IOException {
 
         LOG.info("Starting recording proxy listening on port {}.", port);
 

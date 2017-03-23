@@ -28,6 +28,7 @@ import java.security.NoSuchAlgorithmException;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
@@ -91,7 +92,7 @@ public class DnsLookup implements HostResolver {
 
     private final SimpleResolver[] resolvers;
 
-    public DnsLookup(final DbAdapter db, final ContentWriterClient contentWriterClient, String... dnsServers) {
+    public DnsLookup(final DbAdapter db, final ContentWriterClient contentWriterClient, List<String> dnsServers) {
         this.db = db;
         this.contentWriterClient = contentWriterClient;
         cache = new Cache(DCLASS);
@@ -100,12 +101,14 @@ public class DnsLookup implements HostResolver {
         cache.setMaxEntries(500000);
 
         try {
-            if (dnsServers == null || dnsServers.length == 0) {
-                dnsServers = ResolverConfig.getCurrentConfig().servers();
+            if (dnsServers == null || dnsServers.isEmpty()) {
+                dnsServers = Arrays.asList(ResolverConfig.getCurrentConfig().servers());
+                LOG.info("No DNS server configured.");
             }
-            resolvers = new SimpleResolver[dnsServers.length];
-            for (int i = 0; i < dnsServers.length; i++) {
-                resolvers[i] = new SimpleResolver(dnsServers[i]);
+            resolvers = new SimpleResolver[dnsServers.size()];
+            for (int i = 0; i < dnsServers.size(); i++) {
+                LOG.info("Initializing DNS server: " + dnsServers.get(i));
+                resolvers[i] = new SimpleResolver(dnsServers.get(i));
             }
         } catch (UnknownHostException ex) {
             throw new RuntimeException(ex);

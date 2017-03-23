@@ -15,6 +15,8 @@
  */
 package no.nb.nna.broprox.harvester.settings;
 
+import java.util.List;
+
 /**
  * Configuration settings for Broprox.
  */
@@ -40,7 +42,7 @@ public class Settings {
 
     private int contentWriterPort;
 
-    private String[] dnsServers;
+    private List<String> dnsServers;
 
     public int getProxyPort() {
         return proxyPort;
@@ -122,11 +124,11 @@ public class Settings {
         this.contentWriterPort = contentWriterPort;
     }
 
-    public String[] getDnsServers() {
+    public List<String> getDnsServers() {
         return dnsServers;
     }
 
-    public void setDnsServer(String... dnsServers) {
+    public void setDnsServers(List<String> dnsServers) {
         this.dnsServers = dnsServers;
     }
 

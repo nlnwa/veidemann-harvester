@@ -57,6 +57,7 @@ public class RecordingProxy implements AutoCloseable {
                 .withAllowLocalOnly(false)
                 .withPort(port)
                 .withTransparent(true)
+                .withServerResolver(new DnsLookup(db, contentWriterClient, null))
                 .withManInTheMiddle(new CertificateSniffingMitmManager(new SelfSignedAuthority(certificateDir)))
                 .withFiltersSource(new RecorderFilterSourceAdapter(db, contentWriterClient, cache))
                 .start();

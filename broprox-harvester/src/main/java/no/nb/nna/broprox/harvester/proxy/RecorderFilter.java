@@ -171,4 +171,9 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
         crawlLog.withIpAddress(resolvedRemoteAddress.getAddress().getHostAddress());
     }
 
+    @Override
+    public void proxyToServerResolutionFailed(String hostAndPort) {
+        System.out.println("DNS lookup failed for " + hostAndPort);
+    }
+
 }

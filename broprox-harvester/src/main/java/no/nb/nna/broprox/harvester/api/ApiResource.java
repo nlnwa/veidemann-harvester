@@ -15,6 +15,12 @@
  */
 package no.nb.nna.broprox.harvester.api;
 
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
+import java.nio.charset.StandardCharsets;
+
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.POST;
@@ -24,6 +30,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.StreamingOutput;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.db.DbObjectFactory;
 import no.nb.nna.broprox.db.model.QueuedUri;
@@ -50,23 +57,31 @@ public class ApiResource {
     @Path("fetch")
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public String harvestPage(
+    public StreamingOutput harvestPage(
             @QueryParam("executionId") @DefaultValue(BroproxHeaderConstants.MANUAL_EXID) final String executionId,
             final String queuedUri) {
 
-        long start = System.currentTimeMillis();
+        return new StreamingOutput() {
+            @Override
+            public void write(OutputStream output) throws IOException, WebApplicationException {
+                long start = System.currentTimeMillis();
 
-        try {
-            QueuedUri fetchUri = DbObjectFactory.of(QueuedUri.class, queuedUri).get();
-            QueuedUri[] outlinks = controller.render(executionId, fetchUri);
+                try {
+                    QueuedUri fetchUri = DbObjectFactory.of(QueuedUri.class, queuedUri).get();
+                    QueuedUri[] outlinks = controller.render(executionId, fetchUri);
 
-            System.out.println("Execution time: " + (System.currentTimeMillis() - start) + "ms\n");
+                    System.out.println("Execution time: " + (System.currentTimeMillis() - start) + "ms\n");
 
-            return DbObjectFactory.gson.toJson(outlinks);
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            throw new WebApplicationException(ex);
-        }
+                    Writer writer = new OutputStreamWriter(output, StandardCharsets.UTF_8);
+                    DbObjectFactory.gson.toJson(outlinks, writer);
+                    writer.flush();
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                    throw new WebApplicationException(ex);
+                }
+            }
+
+        };
     }
 
     @POST

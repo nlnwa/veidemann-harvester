@@ -54,25 +54,36 @@ public class QueueWorker extends RecursiveAction {
                 System.out.println("Crawler thread stopped");
                 return;
             }
-            QueuedUri qUri = getNextToFetch(exe.getId());
-            if (qUri == null) {
-                // No more uris, we are done.
-                System.out.println("Reached end of crawl");
-                exe.getStatus().withState(CrawlExecutionStatus.State.FINISHED)
-                        .withEndTime(OffsetDateTime.now(ZoneOffset.UTC));
-                frontier.getDb().updateExecutionStatus(exe.getStatus());
-                frontier.runningExecutions.remove(exe.getId());
-                return;
-            }
-            frontier.getDb().executeRequest(r.table(TABLE_URI_QUEUE).get(qUri.getId()).delete());
-            exe.setCurrentUri(qUri);
-            try {
-                getPool().managedBlock(exe);
-                exe.calculateDelay();
-                frontier.executionsQueue.add(exe);
-                System.out.println("End of Link crawl");
-            } catch (InterruptedException ex) {
-                throw new RuntimeException(ex);
+            if (!exe.isSeedResolved()) {
+                try {
+                    getPool().managedBlock(exe);
+                    exe.calculateDelay();
+                    frontier.executionsQueue.add(exe);
+                    System.out.println("End of Seed crawl");
+                } catch (InterruptedException ex) {
+                    throw new RuntimeException(ex);
+                }
+            } else {
+                QueuedUri qUri = getNextToFetch(exe.getId());
+                if (qUri == null) {
+                    // No more uris, we are done.
+                    System.out.println("Reached end of crawl");
+                    exe.getStatus().withState(CrawlExecutionStatus.State.FINISHED)
+                            .withEndTime(OffsetDateTime.now(ZoneOffset.UTC));
+                    frontier.getDb().updateExecutionStatus(exe.getStatus());
+                    frontier.runningExecutions.remove(exe.getId());
+                } else {
+                    frontier.getDb().executeRequest(r.table(TABLE_URI_QUEUE).get(qUri.getId()).delete());
+                    exe.setCurrentUri(qUri);
+                    try {
+                        getPool().managedBlock(exe);
+                        exe.calculateDelay();
+                        frontier.executionsQueue.add(exe);
+                        System.out.println("End of Link crawl");
+                    } catch (InterruptedException ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
             }
         }
     }

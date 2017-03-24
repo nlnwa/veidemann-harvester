@@ -34,7 +34,6 @@ import no.nb.nna.broprox.db.model.CrawlExecutionStatus;
 import no.nb.nna.broprox.db.model.QueuedUri;
 import org.netpreserve.commons.uri.UriConfigs;
 
-
 /**
  *
  */
@@ -83,7 +82,7 @@ public class Frontier implements AutoCloseable {
 //
 //        });
 
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < 20; i++) {
             EXECUTOR_SERVICE.submit(new QueueWorker(this));
         }
     }
@@ -102,23 +101,13 @@ public class Frontier implements AutoCloseable {
         db.updateExecutionStatus(status);
 
         for (String s : seed) {
-            try {
-                QueuedUri qUri = DbObjectFactory.create(QueuedUri.class)
-                        .addExecutionId(new QueuedUri.IdSeq(executionId, exe.getNextSequenceNum()))
-                        .withUri(s)
-                        .withSurt(UriConfigs.SURT_KEY.buildUri(s).toString())
-                        .withDiscoveryPath("");
-                exe.setCurrentUri(qUri);
-                EXECUTOR_SERVICE.managedBlock(exe);
-                exe.calculateDelay();
-                System.out.println("End of Seed crawl");
-                System.out.println("Threads: " + EXECUTOR_SERVICE.getQueuedTaskCount());
-                System.out.println("Threads: " + EXECUTOR_SERVICE.getRunningThreadCount());
-                System.out.println("Threads: " + EXECUTOR_SERVICE.getActiveThreadCount());
-                executionsQueue.add(exe);
-            } catch (InterruptedException ex) {
-                throw new RuntimeException(ex);
-            }
+            QueuedUri qUri = DbObjectFactory.create(QueuedUri.class)
+                    .addExecutionId(new QueuedUri.IdSeq(executionId, exe.getNextSequenceNum()))
+                    .withUri(s)
+                    .withSurt(UriConfigs.SURT_KEY.buildUri(s).toString())
+                    .withDiscoveryPath("");
+            exe.setCurrentUri(qUri);
+            executionsQueue.add(exe);
         }
     }
 

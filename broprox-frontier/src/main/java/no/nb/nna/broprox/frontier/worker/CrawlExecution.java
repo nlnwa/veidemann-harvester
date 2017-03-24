@@ -52,6 +52,8 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker, Delayed {
 
     private final AtomicLong nextSeqNum = new AtomicLong(0L);
 
+    private boolean seedResolved = false;
+
     public CrawlExecution(Frontier frontier, CrawlExecutionStatus status, CrawlConfig config) {
         System.out.println("NEW CRAWL EXECUTION: " + status.getId());
         this.frontier = frontier;
@@ -89,6 +91,7 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker, Delayed {
         try {
             try {
                 outlinks = frontier.getHarvesterClient().fetchPage(status.getId(), currentUri);
+                seedResolved = true;
 
                 status.withState(CrawlExecutionStatus.State.RUNNING)
                         .withDocumentsCrawled(status.getDocumentsCrawled() + 1);
@@ -195,6 +198,10 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker, Delayed {
 
     public boolean isDone() {
         return outlinks.length == 0;
+    }
+
+    public boolean isSeedResolved() {
+        return seedResolved;
     }
 
     public long getNextSequenceNum() {

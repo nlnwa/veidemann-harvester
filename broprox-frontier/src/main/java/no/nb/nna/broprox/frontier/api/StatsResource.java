@@ -120,10 +120,15 @@ public class StatsResource {
     }
 
     String generateScope(String url) {
-        UriFormat f = UriConfigs.SURT_KEY_FORMAT.ignorePort(true).ignorePath(true).ignoreQuery(true);
-        String scope = UriConfigs.SURT_KEY.buildUri(url).toCustomString(f);
-        scope = scope.substring(0, scope.length() - 1);
-        return scope;
+        try {
+            UriFormat f = UriConfigs.SURT_KEY_FORMAT.ignorePort(true).ignorePath(true).ignoreQuery(true);
+            String scope = UriConfigs.SURT_KEY.buildUri(url).toCustomString(f);
+            scope = scope.substring(0, scope.length() - 1);
+            return scope;
+        } catch (Throwable e) {
+            e.printStackTrace();
+            throw new RuntimeException(e);
+        }
     }
 
 }

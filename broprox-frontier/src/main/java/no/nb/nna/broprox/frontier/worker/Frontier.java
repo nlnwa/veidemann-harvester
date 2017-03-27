@@ -82,7 +82,7 @@ public class Frontier implements AutoCloseable {
 //
 //        });
 
-        for (int i = 0; i < 20; i++) {
+        for (int i = 0; i < 30; i++) {
             EXECUTOR_SERVICE.submit(new QueueWorker(this));
         }
     }

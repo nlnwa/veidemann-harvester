@@ -93,6 +93,7 @@ public class StatsResource {
         rethink.executeRequest(r.table("uri_queue").delete());
         rethink.executeRequest(r.table("crawled_content").delete());
         rethink.executeRequest(r.table("extracted_text").delete());
+        rethink.executeRequest(r.table("executions").delete());
     }
 
     @Path("fetch")

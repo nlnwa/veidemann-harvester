@@ -17,13 +17,13 @@ package no.nb.nna.broprox.frontier.api;
 
 import java.net.URI;
 
-import io.netty.channel.Channel;
 import javax.ws.rs.core.UriBuilder;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.frontier.FrontierService;
 import no.nb.nna.broprox.frontier.worker.Frontier;
+import org.glassfish.grizzly.http.server.HttpServer;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
-import org.glassfish.jersey.netty.httpserver.NettyHttpContainerProvider;
+import org.glassfish.jersey.grizzly2.httpserver.GrizzlyHttpServerFactory;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,7 +35,7 @@ public class ApiServer implements AutoCloseable {
 
     private static final Logger LOG = LoggerFactory.getLogger(ApiServer.class);
 
-    final Channel server;
+    final HttpServer server;
 
     /**
      * Construct a new REST API server.
@@ -62,13 +62,13 @@ public class ApiServer implements AutoCloseable {
 
                 });
 
-        server = NettyHttpContainerProvider.createHttp2Server(baseUri, resourceConfig, null);
+        server = GrizzlyHttpServerFactory.createHttpServer(baseUri, resourceConfig);
     }
 
     @Override
     public void close() {
         LOG.info("Shutting down API server.");
-        server.close();
+        server.shutdown();
     }
 
 }

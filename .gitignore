@@ -8,3 +8,4 @@ dependency-reduced-pom.xml
 buildNumber.properties
 .mvn/timing.properties
 /broprox-harvester/nbactions.xml
+/src/main/script/work/

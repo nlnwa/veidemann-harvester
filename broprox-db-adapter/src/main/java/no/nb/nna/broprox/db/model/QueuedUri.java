@@ -15,8 +15,13 @@
  */
 package no.nb.nna.broprox.db.model;
 
+import java.beans.Transient;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
 
+import com.google.common.collect.ImmutableList;
 import no.nb.nna.broprox.db.DbObject;
 
 /**
@@ -24,21 +29,70 @@ import no.nb.nna.broprox.db.DbObject;
  */
 public interface QueuedUri extends DbObject<QueuedUri> {
 
+    class IdSeq {
+
+        public final String id;
+
+        public final long seq;
+
+        public IdSeq(String id, long seq) {
+            this.id = id;
+            this.seq = seq;
+        }
+
+        @Override
+        public int hashCode() {
+            int hash = 7;
+            hash = 41 * hash + Objects.hashCode(this.id);
+            return hash;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (obj == null) {
+                return false;
+            }
+            if (getClass() != obj.getClass()) {
+                return false;
+            }
+            final IdSeq other = (IdSeq) obj;
+            if (!Objects.equals(this.id, other.id)) {
+                return false;
+            }
+            return true;
+        }
+
+    }
+
     QueuedUri withId(String id);
 
     String getId();
 
-    String getExecutionId();
+    List<List<Object>> getExecutionIds();
 
-    QueuedUri withExecutionId(String id);
+    QueuedUri withExecutionIds(List<List<Object>> id);
+
+    default List<IdSeq> listExecutionIds() {
+        List<IdSeq> result = new ArrayList<>();
+        for (List<Object> o : getExecutionIds()) {
+            result.add(new IdSeq((String) o.get(0), ((Double) o.get(1)).longValue()));
+        }
+        return result;
+    }
+
+    default QueuedUri addExecutionId(IdSeq eId) {
+        List<List<Object>> eIds = getExecutionIds();
+        if (eIds == null) {
+            eIds = new ArrayList<>();
+        }
+        eIds.add(ImmutableList.of(eId.id, eId.seq));
+        withExecutionIds(eIds);
+        return this;
+    }
 
     OffsetDateTime getTimeStamp();
 
     QueuedUri withTimeStamp(OffsetDateTime timeStamp);
-
-    OffsetDateTime getEarliestCrawlTimeStamp();
-
-    QueuedUri withEarliestCrawlTimeStamp(OffsetDateTime timeStamp);
 
     String getSurt();
 
@@ -68,5 +122,10 @@ public interface QueuedUri extends DbObject<QueuedUri> {
     String getReferrer();
 
     QueuedUri withReferrer(String uri);
+
+    CrawlConfig getCrawlConfig();
+
+    @Transient
+    QueuedUri withCrawlConfig(CrawlConfig config);
 
 }

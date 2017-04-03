@@ -33,6 +33,7 @@ import com.rethinkdb.gen.ast.ReqlExpr;
 import com.rethinkdb.net.Connection;
 import com.rethinkdb.net.Cursor;
 import no.nb.nna.broprox.db.model.BrowserScript;
+import no.nb.nna.broprox.db.model.CrawlExecutionStatus;
 import no.nb.nna.broprox.db.model.QueuedUri;
 import no.nb.nna.broprox.db.model.Screenshot;
 import org.yaml.snakeyaml.Yaml;
@@ -42,17 +43,19 @@ import org.yaml.snakeyaml.Yaml;
  */
 public class RethinkDbAdapter implements DbAdapter {
 
-    private static final String TABLE_CRAWL_LOG = "crawl_log";
+    public static final String TABLE_CRAWL_LOG = "crawl_log";
 
-    private static final String TABLE_CRAWLED_CONTENT = "crawled_content";
+    public static final String TABLE_CRAWLED_CONTENT = "crawled_content";
 
-    private static final String TABLE_EXTRACTED_TEXT = "extracted_text";
+    public static final String TABLE_EXTRACTED_TEXT = "extracted_text";
 
-    private static final String TABLE_BROWSER_SCRIPTS = "browser_scripts";
+    public static final String TABLE_BROWSER_SCRIPTS = "browser_scripts";
 
-    private static final String TABLE_URI_QUEUE = "uri_queue";
+    public static final String TABLE_URI_QUEUE = "uri_queue";
 
-    private static final String TABLE_SCREENSHOT = "screenshot";
+    public static final String TABLE_SCREENSHOT = "screenshot";
+
+    public static final String TABLE_EXECUTIONS = "executions";
 
     static final RethinkDB r = RethinkDB.r;
 
@@ -81,14 +84,26 @@ public class RethinkDbAdapter implements DbAdapter {
     private final void createDb() {
         if (!(boolean) r.dbList().contains(dbName).run(conn)) {
             r.dbCreate(dbName).run(conn);
+
             r.tableCreate(TABLE_CRAWL_LOG).optArg("primary_key", "warcId").run(conn);
-            r.table(TABLE_CRAWL_LOG).indexCreate("surt_time", row -> r.array(row.g("surt"), row.g("timeStamp")))
+            r.table(TABLE_CRAWL_LOG)
+                    .indexCreate("surt_time", row -> r.array(row.g("surt"), row.g("timeStamp")))
                     .run(conn);
+            r.table(TABLE_CRAWL_LOG).indexWait("surt_time").run(conn);
+
             r.tableCreate(TABLE_CRAWLED_CONTENT).optArg("primary_key", "digest").run(conn);
+
             r.tableCreate(TABLE_EXTRACTED_TEXT).optArg("primary_key", "warcId").run(conn);
+
             r.tableCreate(TABLE_BROWSER_SCRIPTS).run(conn);
+
             r.tableCreate(TABLE_URI_QUEUE).run(conn);
-            r.table(TABLE_CRAWL_LOG).indexCreate("earliestCrawlTimeStamp").run(conn);
+            r.table(TABLE_URI_QUEUE).indexCreate("surt").run(conn);
+            r.table(TABLE_URI_QUEUE).indexCreate("executionIds").optArg("multi", true).run(conn);
+            r.table(TABLE_URI_QUEUE).indexWait("surt", "executionIds").run(conn);
+
+            r.tableCreate(TABLE_EXECUTIONS).run(conn);
+
             r.tableCreate(TABLE_SCREENSHOT).run(conn);
 
             populateDb();
@@ -159,6 +174,16 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
+    public CrawlExecutionStatus addExecutionStatus(CrawlExecutionStatus status) {
+        return insert(TABLE_EXECUTIONS, status);
+    }
+
+    @Override
+    public CrawlExecutionStatus updateExecutionStatus(CrawlExecutionStatus status) {
+        return update(TABLE_EXECUTIONS, status.getId(), status);
+    }
+
+    @Override
     public QueuedUri addQueuedUri(QueuedUri qu) {
         return insert(TABLE_URI_QUEUE, qu);
     }
@@ -200,7 +225,7 @@ public class RethinkDbAdapter implements DbAdapter {
         executeRequest(r.table(table).get(key).delete());
     }
 
-    private <T> T executeRequest(ReqlExpr qry) {
+    public <T> T executeRequest(ReqlExpr qry) {
         synchronized (this) {
             if (!conn.isOpen()) {
                 try {

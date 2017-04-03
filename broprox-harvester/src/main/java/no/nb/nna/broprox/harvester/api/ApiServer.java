@@ -17,13 +17,14 @@ package no.nb.nna.broprox.harvester.api;
 
 import java.net.URI;
 
-import io.netty.channel.Channel;
 import javax.ws.rs.core.UriBuilder;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.harvester.Harvester;
 import no.nb.nna.broprox.harvester.browsercontroller.BrowserController;
+import no.nb.nna.broprox.harvester.proxy.RecordingProxy;
+import org.glassfish.grizzly.http.server.HttpServer;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
-import org.glassfish.jersey.netty.httpserver.NettyHttpContainerProvider;
+import org.glassfish.jersey.grizzly2.httpserver.GrizzlyHttpServerFactory;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,14 +32,16 @@ import org.slf4j.LoggerFactory;
 /**
  * The external service REST API.
  */
-public class ApiServer {
+public class ApiServer implements AutoCloseable {
 
     private static final Logger LOG = LoggerFactory.getLogger(ApiServer.class);
+
+    final HttpServer server;
 
     /**
      * Construct a new REST API server.
      */
-    public ApiServer(DbAdapter db, BrowserController controller) {
+    public ApiServer(DbAdapter db, BrowserController controller, RecordingProxy proxy) {
         final int port = Harvester.getSettings().getApiPort();
 
         LOG.info("Starting API server listening on port {}.", port);
@@ -50,19 +53,29 @@ public class ApiServer {
                     protected void configure() {
                         bind(db).to(DbAdapter.class);
                     }
+
                 })
                 .register(new AbstractBinder() {
                     @Override
                     protected void configure() {
                         bind(controller);
                     }
-                });
-        final Channel server = NettyHttpContainerProvider.createHttp2Server(baseUri, resourceConfig, null);
 
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            LOG.info("Shutting down API server.");
-            server.close();
-        }));
+                })
+                .register(new AbstractBinder() {
+                    @Override
+                    protected void configure() {
+                        bind(proxy);
+                    }
+
+                });
+        server = GrizzlyHttpServerFactory.createHttpServer(baseUri, resourceConfig);
+    }
+
+    @Override
+    public void close() {
+        LOG.info("Shutting down API server.");
+        server.shutdown();
     }
 
 }

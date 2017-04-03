@@ -62,6 +62,7 @@ public class SingleWarcWriter implements AutoCloseable {
             }
 
             WarcWriter writer = warcFileWriter.getWriter();
+
             WarcRecord record = WarcRecord.createRecord(writer);
 
             record.header.addHeader(FN_WARC_TYPE, logEntry.getRecordType());
@@ -70,8 +71,12 @@ public class SingleWarcWriter implements AutoCloseable {
             record.header.addHeader(FN_WARC_DATE, warcDate, null);
             record.header.addHeader(FN_WARC_RECORD_ID, "<urn:uuid:" + logEntry.getWarcId() + ">");
 
-//        record.header
-//                .addHeader(FN_WARC_IP_ADDRESS, arcRecord.header.inetAddress, arcRecord.header.ipAddressStr);
+            if (RT_REVISIT.equals(logEntry.getRecordType())) {
+                record.header.addHeader(FN_WARC_PROFILE, PROFILE_IDENTICAL_PAYLOAD_DIGEST);
+                record.header.addHeader(FN_WARC_REFERS_TO, "<urn:uuid:" + logEntry.getWarcRefersTo() + ">");
+            }
+
+            record.header.addHeader(FN_WARC_IP_ADDRESS, logEntry.getIpAddress());
 //        record.header.addHeader(FN_WARC_WARCINFO_ID, "<urn:uuid:" + warcinfoUuid + ">");
             if (logEntry.getBlockDigest() != null) {
                 record.header.addHeader(FN_WARC_BLOCK_DIGEST, logEntry.getBlockDigest());
@@ -113,12 +118,8 @@ public class SingleWarcWriter implements AutoCloseable {
         }
     }
 
-    public void closeRecord() {
-        try {
-            warcFileWriter.getWriter().closeRecord();
-        } catch (IOException ex) {
-            throw new UncheckedIOException(ex);
-        }
+    public void closeRecord() throws IOException {
+        warcFileWriter.getWriter().closeRecord();
     }
 
     @Override

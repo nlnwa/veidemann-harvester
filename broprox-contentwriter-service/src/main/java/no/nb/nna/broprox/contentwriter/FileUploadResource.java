@@ -15,6 +15,7 @@
  */
 package no.nb.nna.broprox.contentwriter;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.util.concurrent.Callable;
@@ -80,8 +81,8 @@ public class FileUploadResource {
 
             if (headers != null) {
                 size += warcWriter.addPayload(headers);
-                size += warcWriter.addPayload(CRLF);
             }
+
             if (payload != null) {
                 ForkJoinTask<Long> writeWarcJob = ForkJoinPool.commonPool().submit(new Callable<Long>() {
                     @Override
@@ -98,32 +99,29 @@ public class FileUploadResource {
                     }
 
                 });
+
+                // If both headers and payload are present, add separator
+                if (headers != null) {
+                    size += warcWriter.addPayload(CRLF);
+                }
+
                 size += writeWarcJob.get();
                 extractTextJob.get();
-//                size += warcWriter.addPayload(payload.getValueAs(InputStream.class));
-//                textExtracter.analyze(payload.getValueAs(InputStream.class), logEntry, db);
             }
-            warcWriter.closeRecord();
-            if (logEntry.getSize() != size) {
-                throw new WebApplicationException("Size doesn't match metadata", Response.Status.NOT_ACCEPTABLE);
+
+            try {
+                warcWriter.closeRecord();
+            } catch (IOException ex) {
+                if (logEntry.getSize() != size) {
+                    throw new WebApplicationException("Size doesn't match metadata. Expected " + logEntry.getSize()
+                            + ", but was " + size, Response.Status.NOT_ACCEPTABLE);
+                } else {
+                    ex.printStackTrace();
+                    throw new WebApplicationException(ex, Response.Status.NOT_ACCEPTABLE);
+                }
             }
+
             return Response.created(ref).build();
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            throw new WebApplicationException(ex.getMessage(), ex);
-        }
-    }
-
-    @Path("snapshot")
-    @POST
-    @Consumes(MediaType.MULTIPART_FORM_DATA)
-    public Response postWarcRecord(
-            @FormDataParam("logEntry") final String logEntryJson,
-            @FormDataParam("snapshot") final FormDataBodyPart snapshot) {
-
-        try {
-            CrawlLog logEntry = DbObjectFactory.of(CrawlLog.class, logEntryJson).get();
-            return Response.created(new URI(logEntry.getWarcId())).build();
         } catch (Exception ex) {
             ex.printStackTrace();
             throw new WebApplicationException(ex.getMessage(), ex);

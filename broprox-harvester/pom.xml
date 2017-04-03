@@ -27,7 +27,10 @@
         <dependency>
             <groupId>org.netpreserve.commons</groupId>
             <artifactId>webarchive-commons-uri</artifactId>
-            <version>2.0.0-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>org.netpreserve.commons</groupId>
+            <artifactId>webarchive-commons-util</artifactId>
         </dependency>
         <dependency>
             <groupId>org.littleshoot</groupId>
@@ -53,7 +56,7 @@
         </dependency>
         <dependency>
             <groupId>org.glassfish.jersey.containers</groupId>
-            <artifactId>jersey-container-netty-http</artifactId>
+            <artifactId>jersey-container-grizzly2-http</artifactId>
         </dependency>
         <dependency>
             <groupId>org.glassfish.jersey.media</groupId>
@@ -62,6 +65,23 @@
         <dependency>
             <groupId>com.google.code.gson</groupId>
             <artifactId>gson</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.cache2k</groupId>
+            <artifactId>cache2k-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.cache2k</groupId>
+            <artifactId>cache2k-all</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>dnsjava</groupId>
+            <artifactId>dnsjava</artifactId>
+            <version>2.1.8</version>
         </dependency>
 
         <!-- Configuration framework -->

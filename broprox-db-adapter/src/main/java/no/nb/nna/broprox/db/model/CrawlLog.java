@@ -100,4 +100,12 @@ public interface CrawlLog extends DbObject<CrawlLog> {
     String getRecordType();
 
     CrawlLog withRecordType(String type);
+
+    CrawlLog withWarcRefersTo(String warcId);
+
+    String getWarcRefersTo();
+
+    CrawlLog withIpAddress(String ip);
+
+    String getIpAddress();
 }

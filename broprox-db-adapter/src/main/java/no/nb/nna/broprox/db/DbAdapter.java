@@ -15,7 +15,6 @@
  */
 package no.nb.nna.broprox.db;
 
-import java.io.Closeable;
 import java.util.List;
 
 import no.nb.nna.broprox.db.model.CrawledContent;
@@ -25,8 +24,10 @@ import no.nb.nna.broprox.db.model.ExtractedText;
 import java.util.Optional;
 
 import no.nb.nna.broprox.db.model.BrowserScript;
+import no.nb.nna.broprox.db.model.CrawlExecutionStatus;
 import no.nb.nna.broprox.db.model.QueuedUri;
 import no.nb.nna.broprox.db.model.Screenshot;
+
 
 /**
  * Adapter for Broprox's database.
@@ -44,6 +45,10 @@ public interface DbAdapter extends AutoCloseable {
     ExtractedText addExtractedText(ExtractedText et);
 
     List<BrowserScript> getBrowserScripts(BrowserScript.Type type);
+
+    public CrawlExecutionStatus addExecutionStatus(CrawlExecutionStatus status);
+
+    public CrawlExecutionStatus updateExecutionStatus(CrawlExecutionStatus status);
 
     QueuedUri addQueuedUri(QueuedUri qu);
 

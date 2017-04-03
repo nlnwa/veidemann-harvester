@@ -24,6 +24,8 @@
         <module>broprox-db-adapter</module>
         <module>broprox-chrome</module>
         <module>broprox-contentwriter-service</module>
+        <module>broprox-frontier</module>
+        <module>broprox-integrationtests</module>
     </modules>
 
     <properties>
@@ -34,14 +36,39 @@
         <org.jwat.version>1.0.4</org.jwat.version>
         <org.glassfish.jersey.version>2.25.1</org.glassfish.jersey.version>
         <org.apache.tika.version>1.14</org.apache.tika.version>
+        <cache2k-version>1.0.0.CR2</cache2k-version>
     </properties>
+
+    <repositories>
+        <repository>
+            <id>oss.sonatype.org</id>
+            <name>OSS Sonatype</name>
+            <releases>
+                <enabled>false</enabled>
+            </releases>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+            <url>https://oss.sonatype.org/content/repositories/snapshots/</url>
+        </repository>
+    </repositories>
 
     <dependencyManagement>
         <dependencies>
             <dependency>
+                <groupId>org.netpreserve.commons</groupId>
+                <artifactId>webarchive-commons-uri</artifactId>
+                <version>2.0.0-SNAPSHOT</version>
+            </dependency>
+            <dependency>
+                <groupId>org.netpreserve.commons</groupId>
+                <artifactId>webarchive-commons-util</artifactId>
+                <version>2.0.0-SNAPSHOT</version>
+            </dependency>
+            <dependency>
                 <groupId>org.littleshoot</groupId>
                 <artifactId>littleproxy</artifactId>
-                <version>1.1.1</version>
+                <version>1.1.2</version>
             </dependency>
             <dependency>
                 <groupId>com.github.ganskef</groupId>
@@ -70,6 +97,11 @@
                 <version>${org.glassfish.jersey.version}</version>
             </dependency>
             <dependency>
+                <groupId>org.glassfish.jersey.containers</groupId>
+                <artifactId>jersey-container-grizzly2-http</artifactId>
+                <version>${org.glassfish.jersey.version}</version>
+            </dependency>
+            <dependency>
                 <groupId>org.glassfish.jersey.media</groupId>
                 <artifactId>jersey-media-multipart</artifactId>
                 <version>${org.glassfish.jersey.version}</version>
@@ -85,6 +117,18 @@
                 <groupId>com.google.code.gson</groupId>
                 <artifactId>gson</artifactId>
                 <version>2.8.0</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.google.guava</groupId>
+                <artifactId>guava</artifactId>
+                <version>21.0</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.github.mgunlogson</groupId>
+                <artifactId>cuckoofilter4j</artifactId>
+                <version>1.0.2</version>
             </dependency>
 
             <dependency>
@@ -160,6 +204,19 @@
                 <artifactId>hystrix-core</artifactId>
                 <version>1.5.8</version>
             </dependency>
+
+            <dependency>
+                <groupId>org.cache2k</groupId>
+                <artifactId>cache2k-api</artifactId>
+                <version>${cache2k-version}</version>
+                <scope>provided</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.cache2k</groupId>
+                <artifactId>cache2k-all</artifactId>
+                <version>${cache2k-version}</version>
+                <scope>runtime</scope>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
@@ -206,4 +263,23 @@
         </dependency>
     </dependencies>
 
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-failsafe-plugin</artifactId>
+                    <version>2.19.1</version>
+                    <executions>
+                        <execution>
+                            <goals>
+                                <goal>integration-test</goal>
+                                <goal>verify</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
 </project>

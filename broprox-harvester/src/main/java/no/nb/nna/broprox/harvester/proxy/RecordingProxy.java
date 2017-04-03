@@ -17,6 +17,7 @@ package no.nb.nna.broprox.harvester.proxy;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
 
 import no.nb.nna.broprox.db.DbAdapter;
 import org.littleshoot.proxy.HttpProxyServer;
@@ -35,6 +36,8 @@ public class RecordingProxy implements AutoCloseable {
 
     private final HttpProxyServer server;
 
+    private final AlreadyCrawledCache cache;
+
     /**
      * Construct a new Recording Proxy.
      * <p>
@@ -43,18 +46,22 @@ public class RecordingProxy implements AutoCloseable {
      * @throws RootCertificateException is thrown if there where problems with the root certificate
      * @throws IOException is thrown if certificate directory could not be created
      */
-    public RecordingProxy(File workDir, int port, DbAdapter db, final ContentWriterClient contentWriterClient)
-            throws RootCertificateException, IOException {
+    public RecordingProxy(File workDir, int port, DbAdapter db, final ContentWriterClient contentWriterClient,
+            final List<String> dnsServers) throws RootCertificateException, IOException {
+
         LOG.info("Starting recording proxy listening on port {}.", port);
 
         File certificateDir = new File(workDir, "certificates");
+
+        cache = new AlreadyCrawledCache();
 
         server = DefaultHttpProxyServer.bootstrap()
                 .withAllowLocalOnly(false)
                 .withPort(port)
                 .withTransparent(true)
+                .withServerResolver(new DnsLookup(db, contentWriterClient, dnsServers))
                 .withManInTheMiddle(new CertificateSniffingMitmManager(new SelfSignedAuthority(certificateDir)))
-                .withFiltersSource(new CoalesceUriFilter(db, contentWriterClient))
+                .withFiltersSource(new RecorderFilterSourceAdapter(db, contentWriterClient, cache))
                 .start();
     }
 
@@ -62,6 +69,10 @@ public class RecordingProxy implements AutoCloseable {
     public void close() {
         LOG.info("Shutting down recording proxy.");
         server.stop();
+    }
+
+    public void cleanCache(String executionId) {
+        cache.cleanExecution(executionId);
     }
 
 }

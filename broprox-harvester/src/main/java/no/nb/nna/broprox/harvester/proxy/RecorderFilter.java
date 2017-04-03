@@ -15,29 +15,40 @@
  */
 package no.nb.nna.broprox.harvester.proxy;
 
+import java.net.InetSocketAddress;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
+import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.handler.codec.http.HttpVersion;
 import no.nb.nna.broprox.db.model.CrawlLog;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.db.DbObjectFactory;
+import no.nb.nna.broprox.harvester.BroproxHeaderConstants;
 import org.littleshoot.proxy.HttpFiltersAdapter;
 import org.littleshoot.proxy.impl.ProxyUtils;
 import org.netpreserve.commons.uri.UriConfigs;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  *
  */
-public class RecorderFilter extends HttpFiltersAdapter {
+public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderConstants {
+
+    private static final Logger LOG = LoggerFactory.getLogger(RecorderFilter.class);
 
     private final String uri;
 
     private final DbAdapter db;
+
+    private final AlreadyCrawledCache cache;
 
     private final CrawlLog crawlLog;
 
@@ -47,8 +58,16 @@ public class RecorderFilter extends HttpFiltersAdapter {
 
     private long payloadSizeField;
 
+    private String executionId;
+
+    private boolean toBeCached = false;
+
+    private HttpResponseStatus responseStatus;
+
+    private HttpVersion httpVersion;
+
     public RecorderFilter(final String uri, final HttpRequest originalRequest, final ChannelHandlerContext ctx,
-            final DbAdapter db, final ContentWriterClient contentWriterClient) {
+            final DbAdapter db, final ContentWriterClient contentWriterClient, final AlreadyCrawledCache cache) {
 
         super(originalRequest.setUri(uri), ctx);
         this.uri = uri;
@@ -59,22 +78,49 @@ public class RecorderFilter extends HttpFiltersAdapter {
                 .withRequestedUri(uri)
                 .withSurt(UriConfigs.SURT_KEY.buildUri(uri).toString());
         this.contentInterceptor = new ContentInterceptor(db, ctx, contentWriterClient);
+        this.cache = cache;
     }
 
     @Override
     public HttpResponse clientToProxyRequest(HttpObject httpObject) {
         if (httpObject instanceof HttpRequest) {
             HttpRequest req = (HttpRequest) httpObject;
+
+            executionId = req.headers().get(EXECUTION_ID);
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Proxy got request for {} from execution {}", uri, executionId);
+            }
+
+            if (req.headers().get(DISCOVERY_PATH).endsWith("E")) {
+                FullHttpResponse cachedResponse = cache.get(uri, req.headers().get(EXECUTION_ID), req.headers()
+                        .get(ALL_EXECUTION_IDS));
+                if (cachedResponse != null) {
+                    if (LOG.isTraceEnabled()) {
+                        LOG.trace("Found {} in cache", uri);
+                    }
+                    cachedResponse.headers().add("Connection", "close");
+                    return cachedResponse;
+                } else {
+                    toBeCached = true;
+                }
+            }
 //            System.out.println(this.hashCode() + " :: PROXY URI: " + uri);
 //            System.out.println("HEADERS: ");
 //            for (Iterator<Map.Entry<CharSequence, CharSequence>> it = req.headers().iteratorCharSequence(); it.hasNext();) {
 //                Map.Entry<CharSequence, CharSequence> e = it.next();
 //                System.out.println("   " + e.getKey() + " = " + e.getValue());
 //            }
+
+            // Fix headers before sending to final destination
             req.headers().set("Accept-Encoding", "identity");
-            crawlLog.withFetchTimeStamp(OffsetDateTime.now().withOffsetSameInstant(ZoneOffset.UTC))
+            crawlLog.withFetchTimeStamp(OffsetDateTime.now(ZoneOffset.UTC))
                     .withReferrer(req.headers().get("referer"))
-                    .withDiscoveryPath(req.headers().get("Discovery-Path"));
+                    .withDiscoveryPath(req.headers().get(DISCOVERY_PATH));
+
+            req.headers()
+                    .remove(DISCOVERY_PATH)
+                    .remove(EXECUTION_ID)
+                    .remove(ALL_EXECUTION_IDS);
         }
 
         return null;
@@ -84,7 +130,10 @@ public class RecorderFilter extends HttpFiltersAdapter {
     public HttpObject serverToProxyResponse(HttpObject httpObject) {
         if (httpObject instanceof HttpResponse) {
             HttpResponse res = (HttpResponse) httpObject;
-            crawlLog.withStatusCode(res.status().code())
+            responseStatus = res.status();
+            httpVersion = res.protocolVersion();
+
+            crawlLog.withStatusCode(responseStatus.code())
                     .withContentType(res.headers().get("Content-Type"));
             contentInterceptor.addHeader(res.headers());
 
@@ -99,13 +148,32 @@ public class RecorderFilter extends HttpFiltersAdapter {
             contentInterceptor.addPayload(res.content());
 
             if (ProxyUtils.isLastChunk(httpObject)) {
+                if (toBeCached) {
+                    cache.put(httpVersion,
+                            responseStatus,
+                            uri,
+                            executionId,
+                            contentInterceptor.getHeaderBuf(),
+                            contentInterceptor.getPayloadBuf());
+                }
                 contentInterceptor.writeData(crawlLog);
+                contentInterceptor.release();
             }
         } else {
             System.out.println(this.hashCode() + " :: RESP: " + httpObject.getClass());
         }
 
         return httpObject;
+    }
+
+    @Override
+    public void proxyToServerResolutionSucceeded(String serverHostAndPort, InetSocketAddress resolvedRemoteAddress) {
+        crawlLog.withIpAddress(resolvedRemoteAddress.getAddress().getHostAddress());
+    }
+
+    @Override
+    public void proxyToServerResolutionFailed(String hostAndPort) {
+        System.out.println("DNS lookup failed for " + hostAndPort);
     }
 
 }

@@ -16,30 +16,24 @@
 package no.nb.nna.broprox.harvester.browsercontroller;
 
 import java.io.IOException;
-import java.util.Base64;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 
 import no.nb.nna.broprox.chrome.client.ChromeDebugProtocol;
-import no.nb.nna.broprox.chrome.client.PageDomain;
-import no.nb.nna.broprox.chrome.client.RuntimeDomain;
 import no.nb.nna.broprox.chrome.client.Session;
 import no.nb.nna.broprox.chrome.client.ws.CompleteMany;
 import no.nb.nna.broprox.db.DbAdapter;
-import no.nb.nna.broprox.db.DbObjectFactory;
 import no.nb.nna.broprox.db.model.BrowserScript;
+import no.nb.nna.broprox.db.model.CrawlConfig;
 import no.nb.nna.broprox.db.model.QueuedUri;
+import no.nb.nna.broprox.harvester.BroproxHeaderConstants;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 /**
  *
  */
-public class BrowserController implements AutoCloseable {
+public class BrowserController implements AutoCloseable, BroproxHeaderConstants {
 
     private final ChromeDebugProtocol chrome;
 
@@ -49,6 +43,8 @@ public class BrowserController implements AutoCloseable {
 
     private final DbAdapter db;
 
+    private final int sleep = 1000;
+
     public BrowserController(String chromeHost, int chromePort, DbAdapter db) throws IOException {
         this.chromeHost = chromeHost;
         this.chromePort = chromePort;
@@ -56,10 +52,11 @@ public class BrowserController implements AutoCloseable {
         this.db = db;
     }
 
-//    public byte[] render(String url, int w, int h, long timeout, int sleep) throws ExecutionException, InterruptedException, IOException, TimeoutException {
-    public byte[] render(QueuedUri queuedUri, int w, int h, long timeout, int sleep) throws ExecutionException, InterruptedException, IOException, TimeoutException {
+    public QueuedUri[] render(String executionId, QueuedUri queuedUri) throws ExecutionException, InterruptedException, IOException, TimeoutException {
+        System.out.println("RENDER " + executionId + " :: " + queuedUri.getUri());
+        CrawlConfig config = queuedUri.getCrawlConfig();
 
-        try (Session session = chrome.newSession(w, h)) {
+        try (Session session = chrome.newSession(config.getWindowWidth(), config.getWindowHeight())) {
             new CompleteMany(
                     session.debugger.enable(),
                     session.page.enable(),
@@ -75,9 +72,9 @@ public class BrowserController implements AutoCloseable {
                     session.debugger
                     .setBreakpointByUrl(1, null, "https?://www.google-analytics.com/analytics.js", null, null),
                     session.debugger.setBreakpointByUrl(1, null, "https?://www.google-analytics.com/ga.js", null, null),
-                    session.network.setExtraHTTPHeaders(Collections.singletonMap("x-ray", "foo")),
+//                    session.network.setExtraHTTPHeaders(extraHeaders),
                     session.page.setControlNavigations(Boolean.TRUE)
-            ).get(timeout, MILLISECONDS);
+            ).get(config.getPageLoadTimeout(), MILLISECONDS);
 
             session.debugger.onPaused(p -> {
                 String scriptId = p.callFrames.get(0).location.scriptId;
@@ -87,8 +84,7 @@ public class BrowserController implements AutoCloseable {
                 System.out.println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>> SCRIPT RESUMED: " + scriptId);
             });
 
-
-            PageExecution pex = new PageExecution(queuedUri, session, timeout);
+            PageExecution pex = new PageExecution(executionId, queuedUri, session, config.getPageLoadTimeout());
             pex.navigatePage();
             pex.saveScreenshot(db);
 
@@ -101,10 +97,10 @@ public class BrowserController implements AutoCloseable {
 //                }
 //                System.out.println("<<<<<<");
             String script = db.getBrowserScripts(BrowserScript.Type.EXTRACT_OUTLINKS).get(0).getScript();
-            pex.extractOutlinks(db, script);
+            QueuedUri[] outlinks = pex.extractOutlinks(db, script);
             pex.getDocumentUrl();
             pex.scrollToTop();
-                return null;
+            return outlinks;
         }
     }
 

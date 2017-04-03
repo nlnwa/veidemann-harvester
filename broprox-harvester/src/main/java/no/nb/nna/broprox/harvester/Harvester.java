@@ -61,14 +61,18 @@ public class Harvester {
      */
     public Harvester start() {
         try (DbAdapter db = new RethinkDbAdapter(SETTINGS.getDbHost(), SETTINGS.getDbPort(), SETTINGS.getDbName());
+
                 BrowserController controller = new BrowserController(
                         SETTINGS.getBrowserHost(), SETTINGS.getBrowserPort(), db);
+
                 ContentWriterClient contentWriterClient = new ContentWriterClient(
                         SETTINGS.getContentWriterHost(), SETTINGS.getContentWriterPort());
-                RecordingProxy proxy = new RecordingProxy(
-                        new File(SETTINGS.getWorkDir()), SETTINGS.getProxyPort(), db, contentWriterClient);) {
 
-            ApiServer apiServer = new ApiServer(db, controller);
+                RecordingProxy proxy = new RecordingProxy(
+                        new File(SETTINGS.getWorkDir()),
+                        SETTINGS.getProxyPort(), db, contentWriterClient, SETTINGS.getDnsServers());
+
+                ApiServer apiServer = new ApiServer(db, controller, proxy);) {
 
             LOG.info("Broprox harvester (v. {}) started", Harvester.class.getPackage().getImplementationVersion());
 

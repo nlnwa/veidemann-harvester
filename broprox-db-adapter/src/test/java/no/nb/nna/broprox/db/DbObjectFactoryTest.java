@@ -15,13 +15,19 @@
  */
 package no.nb.nna.broprox.db;
 
+
 import no.nb.nna.broprox.db.model.CrawlLog;
 
 import java.time.OffsetDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import com.google.gson.reflect.TypeToken;
+import com.rethinkdb.RethinkDB;
+import no.nb.nna.broprox.db.model.CrawlExecutionStatus;
+import no.nb.nna.broprox.db.model.QueuedUri;
 import org.junit.Test;
 
 import static org.assertj.core.api.Assertions.*;
@@ -89,13 +95,14 @@ public class DbObjectFactoryTest {
                         + "\"time\":{\"hour\":9,\"minute\":32,\"second\":57,\"nano\":515000000}},"
                         + "\"offset\":{\"totalSeconds\":3600}}}");
 
+        assertThat(result.get()).isInstanceOf(DbObject.class);
+
         assertThat(result.get().getContentType()).isEqualTo("foo");
         assertThat(result.get().getSize()).isEqualTo(123);
         assertThat(result.get().getStatusCode()).isEqualTo(200);
         assertThat(result.get().getFetchTimeMillis()).isEqualTo(0);
         assertThat(result.get().getBlockDigest()).isEqualTo(null);
 
-        assertThat(result.get()).isInstanceOf(DbObject.class);
         Map<String, Object> expected = new HashMap<String, Object>();
         expected.put("contentType", "foo");
         expected.put("size", 123L);
@@ -105,4 +112,82 @@ public class DbObjectFactoryTest {
                 .isEqualTo(expected);
     }
 
+    /**
+     * Test of of method, of class DbObjectFactory.
+     */
+    @Test
+    public void testOf_TypeToken_String() {
+        TypeToken type = new TypeToken<List<CrawlLog>>(){};
+        Optional<List<CrawlLog>> result = DbObjectFactory
+                .of(type, "[{\"contentType\": \"foo\", \"size\": 123, \"statusCode\": 200, "
+                        + "\"fetchTimeStamp\":{\"dateTime\":{\"date\":{\"year\":2017,\"month\":2,\"day\":2},"
+                        + "\"time\":{\"hour\":9,\"minute\":32,\"second\":57,\"nano\":515000000}},"
+                        + "\"offset\":{\"totalSeconds\":3600}}}]");
+
+        assertThat(result.get()).isInstanceOf(List.class);
+
+        assertThat(result.get().get(0).getContentType()).isEqualTo("foo");
+        assertThat(result.get().get(0).getSize()).isEqualTo(123);
+        assertThat(result.get().get(0).getStatusCode()).isEqualTo(200);
+        assertThat(result.get().get(0).getFetchTimeMillis()).isEqualTo(0);
+        assertThat(result.get().get(0).getBlockDigest()).isEqualTo(null);
+
+        Map<String, Object> expected = new HashMap<String, Object>();
+        expected.put("contentType", "foo");
+        expected.put("size", 123L);
+        expected.put("statusCode", 200);
+        expected.put("fetchTimeStamp", OffsetDateTime.parse("2017-02-02T09:32:57.515+01:00"));
+        assertThat(((DbObject) result.get().get(0)).getMap())
+                .isEqualTo(expected);
+    }
+
+    /**
+     * Test of of method, of class DbObjectFactory.
+     */
+    @Test
+    public void testOf_Type_String() {
+        TypeToken type = new TypeToken<CrawlLog[]>(){};
+        Optional<CrawlLog[]> result = DbObjectFactory
+                .of(type, "[{\"contentType\": \"foo\", \"size\": 123, \"statusCode\": 200, "
+                        + "\"fetchTimeStamp\":{\"dateTime\":{\"date\":{\"year\":2017,\"month\":2,\"day\":2},"
+                        + "\"time\":{\"hour\":9,\"minute\":32,\"second\":57,\"nano\":515000000}},"
+                        + "\"offset\":{\"totalSeconds\":3600}}}]");
+
+        assertThat(result.get().getClass().isArray()).isTrue();
+
+        assertThat(result.get()[0].getContentType()).isEqualTo("foo");
+        assertThat(result.get()[0].getSize()).isEqualTo(123);
+        assertThat(result.get()[0].getStatusCode()).isEqualTo(200);
+        assertThat(result.get()[0].getFetchTimeMillis()).isEqualTo(0);
+        assertThat(result.get()[0].getBlockDigest()).isEqualTo(null);
+
+        Map<String, Object> expected = new HashMap<String, Object>();
+        expected.put("contentType", "foo");
+        expected.put("size", 123L);
+        expected.put("statusCode", 200);
+        expected.put("fetchTimeStamp", OffsetDateTime.parse("2017-02-02T09:32:57.515+01:00"));
+        assertThat(((DbObject) result.get()[0]).getMap())
+                .isEqualTo(expected);
+    }
+
+    @Test
+    public void testEnum() {
+        CrawlExecutionStatus s = DbObjectFactory.create(CrawlExecutionStatus.class);
+        s.withState(CrawlExecutionStatus.State.DIED);
+        assertThat(s.getMap().get("state")).isInstanceOf(String.class).isEqualTo("DIED");
+        assertThat(s.getState()).isSameAs(CrawlExecutionStatus.State.DIED);
+    }
+
+//    @Test
+//    public void testArray() {
+//        QueuedUri q = DbObjectFactory.create(QueuedUri.class);
+//        q.withExecutionIds("abc", "def");
+//        assertThat(q.getMap().get("executionIds")).isEqualTo(new String[] {"abc", "def"});
+//        assertThat(q.getExecutionIds()).isEqualTo(new String[] {"abc", "def"});
+//        System.out.println("json: " + q.toJson());
+//
+//        RethinkDB r = RethinkDB.r;
+//        com.rethinkdb.gen.ast.Map o = r.map("executionIds", s -> r.array("abc", "def"));
+//        fail("X");
+//    }
 }

@@ -20,6 +20,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
@@ -34,7 +35,11 @@ import no.nb.nna.broprox.db.model.CrawlLog;
 import no.nb.nna.broprox.db.model.CrawledContent;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.db.DbObjectFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import static io.netty.handler.codec.http.HttpConstants.CR;
+import static io.netty.handler.codec.http.HttpConstants.LF;
 import static io.netty.util.AsciiString.c2b;
 
 /**
@@ -42,11 +47,17 @@ import static io.netty.util.AsciiString.c2b;
  */
 public class ContentInterceptor {
 
+    private static final Logger LOG = LoggerFactory.getLogger(ContentInterceptor.class);
+
+    static final byte[] CRLF = {CR, LF};
+
     private final MessageDigest blockDigest;
 
     private final MessageDigest payloadDigest;
 
-    private long blockSize = 0L;
+    private MessageDigest headerDigest;
+
+    private long headerSize = 0L;
 
     private long payloadSize = 0L;
 
@@ -81,17 +92,24 @@ public class ContentInterceptor {
             Map.Entry<CharSequence, CharSequence> header = iter.next();
             encoderHeader(header.getKey(), header.getValue(), headerBuf);
         }
-        blockSize += headerBuf.readableBytes();
-        blockSize += 2;
+        headerSize = headerBuf.readableBytes();
         updateDigest(headerBuf, blockDigest);
+
+        // Get the partial result after creating a digest of the headers
+        try {
+            headerDigest = (MessageDigest) blockDigest.clone();
+        } catch (CloneNotSupportedException cnse) {
+            throw new RuntimeException("Couldn't make digest of partial content");
+        }
     }
 
     public void addPayload(ByteBuf payload) {
         if (payloadBuf == null) {
             payloadBuf = ctx.alloc().compositeBuffer();
+            // Add the payload separator to the digest
+            blockDigest.update(CRLF);
         }
 
-        blockSize += payload.readableBytes();
         payloadSize += payload.readableBytes();
 
         payloadBuf.addComponent(true, payload.slice().retain());
@@ -121,42 +139,66 @@ public class ContentInterceptor {
         return "sha1:" + new BigInteger(1, payloadDigest.digest()).toString(16);
     }
 
-    public long getBlockSize() {
-        return blockSize;
+    public String getHeaderDigest() {
+        return "sha1:" + new BigInteger(1, headerDigest.digest()).toString(16);
     }
 
     public long getPayloadSize() {
         return payloadSize;
     }
 
+    public long getHeaderSize() {
+        return headerSize;
+    }
+
     public void writeData(CrawlLog logEntry) {
         String payloadDigestString = getPayloadDigest();
-        logEntry
-                .withFetchTimeMillis(
-                        Duration.between(logEntry.getFetchTimeStamp(), OffsetDateTime.now()).toMillis())
-                .withBlockDigest(getBlockDigest())
-                .withPayloadDigest(payloadDigestString)
-                .withSize(getBlockSize());
+        logEntry.withFetchTimeMillis(
+                Duration.between(logEntry.getFetchTimeStamp(), OffsetDateTime.now(ZoneOffset.UTC)).toMillis());
 
         Optional<CrawledContent> isDuplicate = db.isDuplicateContent(payloadDigestString);
 
         if (isDuplicate.isPresent()) {
-            logEntry.withRecordType("revisit");
+            logEntry.withRecordType("revisit")
+                    .withBlockDigest(getHeaderDigest())
+                    .withSize(headerSize)
+                    .withWarcRefersTo(isDuplicate.get().getWarcId());
+            db.addCrawlLog(logEntry);
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Writing {} as a revisit of {}", logEntry.getRequestedUri(), logEntry.getWarcRefersTo());
+            }
+            contentWriterClient.writeRecord(logEntry, headerBuf, null);
         } else {
-            logEntry.withRecordType("response");
+            logEntry.withRecordType("response")
+                    .withBlockDigest(getBlockDigest())
+                    .withPayloadDigest(payloadDigestString)
+                    .withSize(headerSize + 2 + payloadSize);
+            db.addCrawlLog(logEntry);
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Writing {}", logEntry.getRequestedUri());
+            }
+            contentWriterClient.writeRecord(logEntry, headerBuf, payloadBuf);
         }
 
-        db.addCrawlLog(logEntry);
-
-        contentWriterClient.writeRecord(logEntry, headerBuf, payloadBuf);
-
-        headerBuf.release();
-        payloadBuf.release();
-
+//        headerBuf.release();
+//        payloadBuf.release();
         if (!isDuplicate.isPresent()) {
             db.addCrawledContent(DbObjectFactory.create(CrawledContent.class)
                     .withDigest(payloadDigestString).withWarcId(logEntry.getWarcId()));
         }
+    }
+
+    public void release() {
+        headerBuf.release();
+        payloadBuf.release();
+    }
+
+    public ByteBuf getHeaderBuf() {
+        return headerBuf;
+    }
+
+    public CompositeByteBuf getPayloadBuf() {
+        return payloadBuf;
     }
 
     private static void encoderHeader(CharSequence name, CharSequence value, ByteBuf buf) {

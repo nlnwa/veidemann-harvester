@@ -25,9 +25,10 @@ import org.littleshoot.proxy.HttpFiltersAdapter;
 import org.littleshoot.proxy.HttpFiltersSourceAdapter;
 
 /**
- * Filter which extracts the uri from the request independently of http or https style.
+ * Filters source which extracts the uri from the request independently of http or https style before creating the
+ * recorder filter.
  */
-public class CoalesceUriFilter extends HttpFiltersSourceAdapter {
+public class RecorderFilterSourceAdapter extends HttpFiltersSourceAdapter {
 
     private static final AttributeKey<String> CONNECTED_URL = AttributeKey.valueOf("connected_url");
 
@@ -35,9 +36,13 @@ public class CoalesceUriFilter extends HttpFiltersSourceAdapter {
 
     private final ContentWriterClient contentWriterClient;
 
-    public CoalesceUriFilter(final DbAdapter db, final ContentWriterClient contentWriterClient) {
+    private final AlreadyCrawledCache cache;
+
+    public RecorderFilterSourceAdapter(
+            final DbAdapter db, final ContentWriterClient contentWriterClient, final AlreadyCrawledCache cache) {
         this.db = db;
         this.contentWriterClient = contentWriterClient;
+        this.cache = cache;
     }
 
     @Override
@@ -52,10 +57,10 @@ public class CoalesceUriFilter extends HttpFiltersSourceAdapter {
         }
         String connectedUrl = clientCtx.channel().attr(CONNECTED_URL).get();
         if (connectedUrl == null) {
-            return new RecorderFilter(uri, originalRequest, clientCtx, db, contentWriterClient);
+            return new RecorderFilter(uri, originalRequest, clientCtx, db, contentWriterClient, cache);
         }
         originalRequest.setUri(uri);
-        return new RecorderFilter(connectedUrl + uri, originalRequest, clientCtx, db, contentWriterClient);
+        return new RecorderFilter(connectedUrl + uri, originalRequest, clientCtx, db, contentWriterClient, cache);
     }
 
 }

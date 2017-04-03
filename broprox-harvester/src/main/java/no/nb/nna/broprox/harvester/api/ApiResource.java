@@ -15,32 +15,33 @@
  */
 package no.nb.nna.broprox.harvester.api;
 
-import java.awt.Graphics2D;
-import java.awt.RenderingHints;
-import java.awt.geom.AffineTransform;
-import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
+import java.nio.charset.StandardCharsets;
 
-import javax.imageio.ImageIO;
+import javax.ws.rs.Consumes;
 import javax.ws.rs.DefaultValue;
-import javax.ws.rs.GET;
+import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Context;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.StreamingOutput;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.db.DbObjectFactory;
 import no.nb.nna.broprox.db.model.QueuedUri;
-import no.nb.nna.broprox.harvester.Harvester;
+import no.nb.nna.broprox.harvester.BroproxHeaderConstants;
 import no.nb.nna.broprox.harvester.browsercontroller.BrowserController;
+import no.nb.nna.broprox.harvester.proxy.RecordingProxy;
 
 /**
  *
  */
-@Path("snapshot")
+@Path("/")
 public class ApiResource {
 
     @Context
@@ -49,25 +50,44 @@ public class ApiResource {
     @Context
     BrowserController controller;
 
-    @GET
-    @Produces("text/plain")
-    public String harvestPage(@QueryParam("h") int height, @QueryParam("w") int width,
-            @QueryParam("scaledHeight") @DefaultValue("0") int scaledHeight, @QueryParam("url") String url) {
+    @Context
+    RecordingProxy proxy;
 
-        long start = System.currentTimeMillis();
+    @POST
+    @Path("fetch")
+    @Produces(MediaType.APPLICATION_JSON)
+    @Consumes(MediaType.APPLICATION_JSON)
+    public StreamingOutput harvestPage(
+            @QueryParam("executionId") @DefaultValue(BroproxHeaderConstants.MANUAL_EXID) final String executionId,
+            final String queuedUri) {
 
-        QueuedUri queuedUri = DbObjectFactory.create(QueuedUri.class)
-                .withUri(url)
-                .withExecutionId("id");
+        return new StreamingOutput() {
+            @Override
+            public void write(OutputStream output) throws IOException, WebApplicationException {
+                long start = System.currentTimeMillis();
 
-        try {
-            controller.render(queuedUri, width, height, 20000, 1000);
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            throw new WebApplicationException(ex);
-        }
+                try {
+                    QueuedUri fetchUri = DbObjectFactory.of(QueuedUri.class, queuedUri).get();
+                    QueuedUri[] outlinks = controller.render(executionId, fetchUri);
 
-        return "Execution time: " + (System.currentTimeMillis() - start) + "ms\n";
+                    System.out.println("Execution time: " + (System.currentTimeMillis() - start) + "ms\n");
+
+                    Writer writer = new OutputStreamWriter(output, StandardCharsets.UTF_8);
+                    DbObjectFactory.gson.toJson(outlinks, writer);
+                    writer.flush();
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                    throw new WebApplicationException(ex);
+                }
+            }
+
+        };
+    }
+
+    @POST
+    @Path("cache/clean")
+    public void clean(@QueryParam("executionId") String executionId) {
+        proxy.cleanCache(executionId);
     }
 
 //    byte[] scale(byte[] in, int scaledHeight) throws IOException {

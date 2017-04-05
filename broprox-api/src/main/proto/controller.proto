@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package broprox;
+option java_package = "no.nb.nna.broprox.model";
+//option java_multiple_files = true;
+option java_outer_classname = "ControllerProto";
+
+import "google/protobuf/timestamp.proto";
+
+// Service for communicating with controller.
+service Controller {
+    // List a set of entities
+    rpc ListCrawlEntities (CrawlEntityListRequest) returns (CrawlEntityListReply) {}
+    rpc SaveEntity (CrawlEntity) returns (CrawlEntity) {}
+}
+
+// Specification of wich entities to get.
+message CrawlEntityListRequest {
+    string id = 1;
+}
+
+// A list of entities
+message CrawlEntityListReply {
+    repeated CrawlEntity entity = 1;
+}
+
+// An entity
+message CrawlEntity {
+    string id = 1;
+    string name = 2;
+    string description = 16;
+    repeated string label = 3;
+    google.protobuf.Timestamp created = 4;
+}

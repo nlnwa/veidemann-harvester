@@ -26,6 +26,8 @@
         <module>broprox-contentwriter-service</module>
         <module>broprox-frontier</module>
         <module>broprox-integrationtests</module>
+        <module>broprox-controller</module>
+        <module>broprox-api</module>
     </modules>
 
     <properties>

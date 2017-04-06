@@ -16,18 +16,18 @@
 package no.nb.nna.broprox.db;
 
 import java.util.List;
-
-import no.nb.nna.broprox.db.model.CrawledContent;
-import no.nb.nna.broprox.db.model.CrawlLog;
-import no.nb.nna.broprox.db.model.ExtractedText;
-
 import java.util.Optional;
 
 import no.nb.nna.broprox.db.model.BrowserScript;
 import no.nb.nna.broprox.db.model.CrawlExecutionStatus;
+import no.nb.nna.broprox.db.model.CrawlLog;
+import no.nb.nna.broprox.db.model.CrawledContent;
+import no.nb.nna.broprox.db.model.ExtractedText;
 import no.nb.nna.broprox.db.model.QueuedUri;
 import no.nb.nna.broprox.db.model.Screenshot;
-
+import no.nb.nna.broprox.model.ControllerProto.CrawlEntity;
+import no.nb.nna.broprox.model.ControllerProto.CrawlEntityListReply;
+import no.nb.nna.broprox.model.ControllerProto.CrawlEntityListRequest;
 
 /**
  * Adapter for Broprox's database.
@@ -46,15 +46,19 @@ public interface DbAdapter extends AutoCloseable {
 
     List<BrowserScript> getBrowserScripts(BrowserScript.Type type);
 
-    public CrawlExecutionStatus addExecutionStatus(CrawlExecutionStatus status);
+    CrawlExecutionStatus addExecutionStatus(CrawlExecutionStatus status);
 
-    public CrawlExecutionStatus updateExecutionStatus(CrawlExecutionStatus status);
+    CrawlExecutionStatus updateExecutionStatus(CrawlExecutionStatus status);
 
     QueuedUri addQueuedUri(QueuedUri qu);
 
     QueuedUri updateQueuedUri(QueuedUri qu);
 
     Screenshot addScreenshot(Screenshot s);
+
+    CrawlEntity saveCrawlEntity(CrawlEntity entity);
+
+    CrawlEntityListReply listCrawlEntities(CrawlEntityListRequest request);
 
     @Override
     public void close();

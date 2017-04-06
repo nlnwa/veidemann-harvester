@@ -30,12 +30,14 @@ import java.util.concurrent.TimeoutException;
 
 import com.rethinkdb.RethinkDB;
 import com.rethinkdb.gen.ast.ReqlExpr;
+import com.rethinkdb.gen.ast.Table;
 import com.rethinkdb.net.Connection;
 import com.rethinkdb.net.Cursor;
 import no.nb.nna.broprox.db.model.BrowserScript;
 import no.nb.nna.broprox.db.model.CrawlExecutionStatus;
 import no.nb.nna.broprox.db.model.QueuedUri;
 import no.nb.nna.broprox.db.model.Screenshot;
+import no.nb.nna.broprox.model.ControllerProto;
 import org.yaml.snakeyaml.Yaml;
 
 /**
@@ -56,6 +58,8 @@ public class RethinkDbAdapter implements DbAdapter {
     public static final String TABLE_SCREENSHOT = "screenshot";
 
     public static final String TABLE_EXECUTIONS = "executions";
+
+    public static final String TABLE_CRAWL_ENTITIES = "crawl_entities";
 
     static final RethinkDB r = RethinkDB.r;
 
@@ -105,6 +109,8 @@ public class RethinkDbAdapter implements DbAdapter {
             r.tableCreate(TABLE_EXECUTIONS).run(conn);
 
             r.tableCreate(TABLE_SCREENSHOT).run(conn);
+
+            r.tableCreate(TABLE_CRAWL_ENTITIES).run(conn);
 
             populateDb();
         }
@@ -196,6 +202,42 @@ public class RethinkDbAdapter implements DbAdapter {
     @Override
     public Screenshot addScreenshot(Screenshot s) {
         return insert(TABLE_SCREENSHOT, s);
+    }
+
+    @Override
+    public ControllerProto.CrawlEntity saveCrawlEntity(ControllerProto.CrawlEntity entity) {
+        Map rMap = ProtoUtils.protoToRethink(entity);
+
+        Map<String, Object> response = executeRequest(r.table(TABLE_CRAWL_ENTITIES)
+                .insert(rMap)
+                .optArg("conflict", "replace"));
+
+        String key = ((List<String>) response.get("generated_keys")).get(0);
+
+        return entity.toBuilder().setId(key).build();
+    }
+
+    @Override
+    public ControllerProto.CrawlEntityListReply listCrawlEntities(ControllerProto.CrawlEntityListRequest request) {
+        ReqlExpr qry = r.table(TABLE_CRAWL_ENTITIES);
+        if (request != null) {
+            if (!request.getId().isEmpty()) {
+                qry = ((Table) qry).get(request.getId());
+            }
+        }
+        Object res = executeRequest(qry);
+
+        ControllerProto.CrawlEntityListReply.Builder reply = ControllerProto.CrawlEntityListReply.newBuilder();
+        if (res instanceof Cursor) {
+            Cursor<Map<String, Object>> cursor = (Cursor) res;
+            for (Map<String, Object> entity : cursor) {
+                reply.addEntity(ProtoUtils.rethinkToProto(entity, ControllerProto.CrawlEntity.class));
+            }
+        } else {
+            reply.addEntity(ProtoUtils.rethinkToProto((Map<String, Object>) res, ControllerProto.CrawlEntity.class));
+        }
+
+        return reply.build();
     }
 
     private <T extends DbObject> T insert(String table, T data) {

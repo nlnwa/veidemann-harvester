@@ -15,8 +15,26 @@
             <artifactId>broprox-api</artifactId>
             <version>${project.version}</version>
         </dependency>
+
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>broprox-db-adapter</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- Configuration framework -->
+        <dependency>
+            <groupId>com.typesafe</groupId>
+            <artifactId>config</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
-    
+
     <build>
         <plugins>
             <!-- Make version number available for application -->
@@ -42,7 +60,7 @@
                     <licenseHeaderFile>${basedir}/../src/main/etc/license-header.txt</licenseHeaderFile>
                     <programs>
                         <program>
-                            <mainClass>no.nb.nna.broprox.controller.ControllerApiServer</mainClass>
+                            <mainClass>no.nb.nna.broprox.controller.Main</mainClass>
                             <id>${project.artifactId}</id>
                         </program>
                     </programs>

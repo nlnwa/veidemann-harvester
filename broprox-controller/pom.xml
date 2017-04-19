@@ -22,6 +22,27 @@
             <version>${project.version}</version>
         </dependency>
 
+        <dependency>
+            <groupId>org.hawkular.apm</groupId>
+            <artifactId>hawkular-apm-client-opentracing</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.hawkular.apm</groupId>
+            <artifactId>hawkular-apm-trace-publisher-rest-client</artifactId>
+        </dependency>
+<!--        <dependency>
+            <groupId>com.uber.jaeger</groupId>
+            <artifactId>jaeger-core</artifactId>
+        </dependency>-->
+        <dependency>
+            <groupId>io.opentracing.contrib</groupId>
+            <artifactId>grpc-opentracing</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.opentracing</groupId>
+            <artifactId>opentracing-util</artifactId>
+        </dependency>
+
         <!-- Configuration framework -->
         <dependency>
             <groupId>com.typesafe</groupId>
@@ -41,7 +62,6 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
-                <version>3.0.2</version>
                 <configuration>
                     <archive>
                         <manifest>
@@ -55,7 +75,6 @@
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>appassembler-maven-plugin</artifactId>
-                <version>2.0.0</version>
                 <configuration>
                     <licenseHeaderFile>${basedir}/../src/main/etc/license-header.txt</licenseHeaderFile>
                     <programs>
@@ -86,7 +105,6 @@
             <plugin>
                 <groupId>io.fabric8</groupId>
                 <artifactId>docker-maven-plugin</artifactId>
-                <version>0.19.0</version>
                 <executions>
                     <execution>
                         <id>docker-build</id>

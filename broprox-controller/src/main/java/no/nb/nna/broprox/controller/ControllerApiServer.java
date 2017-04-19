@@ -23,9 +23,12 @@ import com.typesafe.config.ConfigBeanFactory;
 import com.typesafe.config.ConfigFactory;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
+import io.opentracing.contrib.ServerTracingInterceptor;
+import io.opentracing.util.GlobalTracer;
 import no.nb.nna.broprox.controller.settings.Settings;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
+import org.hawkular.apm.client.opentracing.APMTracer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,28 +39,37 @@ public class ControllerApiServer implements AutoCloseable {
 
     private static final Logger LOG = LoggerFactory.getLogger(ControllerApiServer.class);
 
-    private final Server server;
-
     private static final Settings SETTINGS;
 
     static {
         Config config = ConfigFactory.load();
         config.checkValid(ConfigFactory.defaultReference());
         SETTINGS = ConfigBeanFactory.create(config, Settings.class);
+        GlobalTracer.register(new APMTracer());
     }
+
+    private final Server server;
+
+    private final DbAdapter db;
 
     public ControllerApiServer() {
         this(SETTINGS.getApiPort());
     }
 
     public ControllerApiServer(int port) {
-        try (DbAdapter db = new RethinkDbAdapter(SETTINGS.getDbHost(), SETTINGS.getDbPort(), SETTINGS.getDbName());) {
-            server = ServerBuilder.forPort(port).addService(new ControllerService(db)).build();
-        }
+        this(ServerBuilder.forPort(port),
+                new RethinkDbAdapter(SETTINGS.getDbHost(), SETTINGS.getDbPort(), SETTINGS.getDbName()));
     }
 
     public ControllerApiServer(ServerBuilder<?> serverBuilder, DbAdapter db) {
-        server = serverBuilder.addService(new ControllerService(db)).build();
+        this.db = db;
+
+        ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor.Builder(GlobalTracer.get())
+                .withTracedAttributes(ServerTracingInterceptor.ServerRequestAttribute.CALL_ATTRIBUTES,
+                        ServerTracingInterceptor.ServerRequestAttribute.METHOD_TYPE)
+                .build();
+
+        server = serverBuilder.addService(tracingInterceptor.intercept(new ControllerService(db))).build();
     }
 
     public ControllerApiServer start() {
@@ -89,8 +101,11 @@ public class ControllerApiServer implements AutoCloseable {
     public void close() {
         if (server != null) {
             server.shutdown();
-            System.err.println("*** server shut down");
         }
+        if (db != null) {
+            db.close();
+        }
+        System.err.println("*** server shut down");
     }
 
     /**

@@ -59,7 +59,7 @@ services:
         environment:
             - "DB_HOST=db"
 
-    # Broprox content writer
+    # Broprox frontier
     frontier:
         image: norsknettarkiv/broprox-frontier
         ports:
@@ -78,3 +78,23 @@ services:
 #        ports:
 #            - "80:80"
 #            - "53:53"
+
+    # Broprox controller
+    controller:
+        image: norsknettarkiv/broprox-controller
+        ports:
+            - "50051:50051"
+        links:
+            - "db"
+            - "apm"
+        environment:
+            - "DB_HOST=db"
+            - "HAWKULAR_APM_URI=http://apm:8080"
+            - "HAWKULAR_APM_USERNAME=jdoe"
+            - "HAWKULAR_APM_PASSWORD=password"
+
+    # Hawkular APM
+    apm:
+        image: jboss/hawkular-apm-server-dev
+        ports:
+            - "9411:8080"

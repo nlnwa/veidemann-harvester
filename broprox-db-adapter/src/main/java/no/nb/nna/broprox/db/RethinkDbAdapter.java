@@ -33,6 +33,11 @@ import com.rethinkdb.gen.ast.ReqlExpr;
 import com.rethinkdb.gen.ast.Table;
 import com.rethinkdb.net.Connection;
 import com.rethinkdb.net.Cursor;
+import io.opentracing.Span;
+import io.opentracing.Tracer;
+import io.opentracing.contrib.OpenTracingContextKey;
+import io.opentracing.tag.Tags;
+import io.opentracing.util.GlobalTracer;
 import no.nb.nna.broprox.db.model.BrowserScript;
 import no.nb.nna.broprox.db.model.CrawlExecutionStatus;
 import no.nb.nna.broprox.db.model.QueuedUri;
@@ -206,6 +211,8 @@ public class RethinkDbAdapter implements DbAdapter {
 
     @Override
     public ControllerProto.CrawlEntity saveCrawlEntity(ControllerProto.CrawlEntity entity) {
+        Span span = createSpan("db-saveCrawlEntity");
+
         Map rMap = ProtoUtils.protoToRethink(entity);
 
         Map<String, Object> response = executeRequest(r.table(TABLE_CRAWL_ENTITIES)
@@ -214,11 +221,14 @@ public class RethinkDbAdapter implements DbAdapter {
 
         String key = ((List<String>) response.get("generated_keys")).get(0);
 
+        span.finish();
         return entity.toBuilder().setId(key).build();
     }
 
     @Override
     public ControllerProto.CrawlEntityListReply listCrawlEntities(ControllerProto.CrawlEntityListRequest request) {
+        Span span = createSpan("db-listCrawlEntities");
+
         ReqlExpr qry = r.table(TABLE_CRAWL_ENTITIES);
         if (request != null) {
             if (!request.getId().isEmpty()) {
@@ -237,7 +247,25 @@ public class RethinkDbAdapter implements DbAdapter {
             reply.addEntity(ProtoUtils.rethinkToProto((Map<String, Object>) res, ControllerProto.CrawlEntity.class));
         }
 
+        span.finish();
         return reply.build();
+    }
+
+    /**
+     * Create a new OpenTracing span.
+     *
+     * @param operationName
+     * @return the created span
+     */
+    private Span createSpan(String operationName) {
+        Span parentSpan = OpenTracingContextKey.activeSpan();
+        Tracer.SpanBuilder spanBuilder = GlobalTracer.get()
+                .buildSpan(operationName)
+                .withTag(Tags.DB_TYPE.getKey(), "rethinkdb");
+        if (parentSpan != null) {
+            spanBuilder.asChildOf(parentSpan);
+        }
+        return spanBuilder.start();
     }
 
     private <T extends DbObject> T insert(String table, T data) {

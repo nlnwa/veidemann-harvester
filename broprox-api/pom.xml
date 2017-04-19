@@ -6,8 +6,10 @@
         <artifactId>broprox</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
+
     <artifactId>broprox-api</artifactId>
     <packaging>jar</packaging>
+    <name>broprox-api</name>
 
     <dependencies>
         <dependency>
@@ -21,10 +23,6 @@
         <dependency>
             <groupId>io.grpc</groupId>
             <artifactId>grpc-stub</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.opentracing</groupId>
-            <artifactId>opentracing-api</artifactId>
         </dependency>
     </dependencies>
     <build>
@@ -56,5 +54,4 @@
             </plugin>
         </plugins>
     </build>
-    <name>broprox-api</name>
 </project>

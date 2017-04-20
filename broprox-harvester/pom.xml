@@ -68,6 +68,23 @@
         </dependency>
 
         <dependency>
+            <groupId>io.opentracing.contrib</groupId>
+            <artifactId>grpc-opentracing</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.opentracing</groupId>
+            <artifactId>opentracing-util</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.hawkular.apm</groupId>
+            <artifactId>hawkular-apm-client-opentracing</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.hawkular.apm</groupId>
+            <artifactId>hawkular-apm-trace-publisher-rest-client</artifactId>
+        </dependency>
+
+        <dependency>
             <groupId>org.cache2k</groupId>
             <artifactId>cache2k-api</artifactId>
             <scope>provided</scope>
@@ -106,96 +123,131 @@
                     </archive>
                 </configuration>
             </plugin>
-
-            <!-- Create assembly with startup scripts and dependencies -->
-            <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>appassembler-maven-plugin</artifactId>
-                <version>2.0.0</version>
-                <configuration>
-                    <licenseHeaderFile>${basedir}/../src/main/etc/license-header.txt</licenseHeaderFile>
-                    <programs>
-                        <program>
-                            <mainClass>no.nb.nna.broprox.harvester.Main</mainClass>
-                            <id>broprox-harvester</id>
-                        </program>
-                    </programs>
-                    <binFolder>bin</binFolder>
-                    <repositoryName>lib</repositoryName>
-                    <repositoryLayout>flat</repositoryLayout>
-                    <configurationDirectory>config</configurationDirectory>
-                    <endorsedDir>plugins</endorsedDir>
-                    <preAssembleDirectory>src/main/distfiles</preAssembleDirectory>
-                    <extraJvmArguments>-Dconfig.file=@BASEDIR@/config/application.conf</extraJvmArguments>
-                </configuration>
-                <executions>
-                    <execution>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>assemble</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-
-            <!-- Create a distributable gzip archive -->
-            <plugin>
-                <artifactId>maven-assembly-plugin</artifactId>
-                <configuration>
-                    <descriptor>src/main/etc/assembly.xml</descriptor>
-                    <finalName>${project.artifactId}</finalName>
-                </configuration>
-                <executions>
-                    <execution>
-                        <id>make-assembly</id>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>single</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-
-            <plugin>
-                <groupId>com.spotify</groupId>
-                <artifactId>docker-maven-plugin</artifactId>
-                <version>0.4.13</version>
-                <configuration>
-                    <dockerDirectory>${basedir}/src/main/docker</dockerDirectory>
-                    <imageName>norsknettarkiv/broprox-harvester</imageName>
-                    <imageTags>
-                        <imageTag>latest</imageTag>
-                        <imageTag>${project.version}</imageTag>
-                    </imageTags>
-                    <forceTags>true</forceTags>
-                    <resources>
-                        <resource>
-                            <targetPath>/</targetPath>
-                            <directory>${project.build.directory}</directory>
-                            <include>${project.artifactId}-dist.tar.gz</include>
-                        </resource>
-                    </resources>
-                </configuration>
-            </plugin>
         </plugins>
     </build>
 
     <profiles>
         <profile>
-            <id>docker</id>
+            <id>docker-build</id>
             <build>
                 <plugins>
+                    <!-- Create assembly with startup scripts and dependencies -->
                     <plugin>
-                        <groupId>com.spotify</groupId>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>appassembler-maven-plugin</artifactId>
+                        <version>2.0.0</version>
+                        <configuration>
+                            <licenseHeaderFile>${basedir}/../src/main/etc/license-header.txt</licenseHeaderFile>
+                            <programs>
+                                <program>
+                                    <mainClass>no.nb.nna.broprox.harvester.Main</mainClass>
+                                    <id>${project.artifactId}</id>
+                                </program>
+                            </programs>
+                            <binFolder>bin</binFolder>
+                            <repositoryName>lib</repositoryName>
+                            <repositoryLayout>flat</repositoryLayout>
+                            <configurationDirectory>config</configurationDirectory>
+                            <endorsedDir>plugins</endorsedDir>
+                            <preAssembleDirectory>src/main/distfiles</preAssembleDirectory>
+                            <extraJvmArguments>-Dconfig.file=@BASEDIR@/config/application.conf</extraJvmArguments>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>assemble</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+
+                    <!-- Build Docker image -->
+                    <plugin>
+                        <groupId>io.fabric8</groupId>
                         <artifactId>docker-maven-plugin</artifactId>
                         <executions>
                             <execution>
+                                <id>docker-build</id>
                                 <phase>package</phase>
                                 <goals>
                                     <goal>build</goal>
                                 </goals>
                             </execution>
                         </executions>
+                        <configuration>
+                            <images>
+                                <image>
+                                    <name>norsknettarkiv/${project.artifactId}</name>
+                                    <alias>harvester</alias>
+                                    <build>
+                                        <from>java:8</from>
+                                        <maintainer>National Library of Norway</maintainer>
+                                        <tags>
+                                            <tag>latest</tag>
+                                            <tag>${project.version}</tag>
+                                        </tags>
+                                        <runCmds>
+                                            <run>mkdir /workdir</run>
+                                        </runCmds>
+                                        <volumes>
+                                            <volume>/workdir</volume>
+                                        </volumes>
+                                        <env>
+                                            <WORK_DIR>/workdir</WORK_DIR>
+                                        </env>
+                                        <ports>
+                                            <port>8080</port>
+                                            <port>9090</port>
+                                        </ports>
+                                        <cmd>
+                                            <exec>
+                                                <arg>/${project.artifactId}/bin/${project.artifactId}</arg>
+                                            </exec>
+                                        </cmd>
+                                        <assembly>
+                                            <targetDir>/${project.artifactId}</targetDir>
+
+                                            <inline>
+                                                <includeBaseDirectory>true</includeBaseDirectory>
+                                                <fileSets>
+                                                    <fileSet>
+                                                        <directory>target/appassembler/bin</directory>
+                                                        <outputDirectory>bin</outputDirectory>
+                                                        <includes>
+                                                            <include>${project.artifactId}</include>
+                                                        </includes>
+                                                        <fileMode>0755</fileMode>
+                                                    </fileSet>
+                                                    <fileSet>
+                                                        <directory>target/appassembler/bin</directory>
+                                                        <outputDirectory>bin</outputDirectory>
+                                                        <excludes>
+                                                            <exclude>${project.artifactId}</exclude>
+                                                        </excludes>
+                                                        <fileMode>0644</fileMode>
+                                                    </fileSet>
+                                                    <fileSet>
+                                                        <directory>target/appassembler</directory>
+                                                        <outputDirectory>/</outputDirectory>
+                                                        <excludes>
+                                                            <exclude>bin</exclude>
+                                                        </excludes>
+                                                    </fileSet>
+                                                </fileSets>
+                                                <files>
+                                                    <file>
+                                                        <source>../LICENSE</source>
+                                                        <outputDirectory></outputDirectory>
+                                                        <fileMode>0644</fileMode>
+                                                    </file>
+                                                </files>
+                                            </inline>
+                                        </assembly>
+                                    </build>
+                                </image>
+                            </images>
+                        </configuration>
                     </plugin>
                 </plugins>
             </build>

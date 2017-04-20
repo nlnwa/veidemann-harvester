@@ -9,100 +9,6 @@
     <artifactId>broprox-integrationtests</artifactId>
     <packaging>jar</packaging>
 
-    <build>
-        <plugins>
-            <!-- Set the hostname of this host in a property -->
-            <plugin>
-                <groupId>org.codehaus.groovy.maven</groupId>
-                <artifactId>gmaven-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <phase>generate-resources</phase>
-                        <goals>
-                            <goal>execute</goal>
-                        </goals>
-                        <configuration>
-                            <source>
-                                project.properties["hostname"] = InetAddress.getLocalHost().getHostName()
-                            </source>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-
-            <plugin>
-                <groupId>io.fabric8</groupId>
-                <artifactId>docker-maven-plugin</artifactId>
-                <version>0.19.0</version>
-                <executions>
-                    <execution>
-                        <id>prepare-proxy-tests</id>
-                        <phase>pre-integration-test</phase>
-                        <goals>
-                            <goal>start</goal>
-                        </goals>
-                        <configuration>
-                            <images>
-                                <image>
-                                    <name>norsknettarkiv/chrome-headless</name>
-                                    <alias>browser</alias>
-                                    <run>
-                                        <extraHosts>
-                                            <host>this:${hostname}</host>
-                                        </extraHosts>
-                                        <ports>
-                                            <port>+chrome-debug.host:chrome-debug.port:9222</port>
-                                        </ports>
-                                        <env>
-                                            <CHROME_OPTS>--ignore-certificate-errors --disable-web-security --allow-running-insecure-content --proxy-server=this:9211</CHROME_OPTS>
-                                        </env>
-                                        <log>
-                                            <enabled>true</enabled>
-                                        </log>
-                                        <wait>
-                                            <tcp>
-                                                <ports>
-                                                    <port>9222</port>
-                                                </ports>
-                                            </tcp>
-                                            <time>20000</time>
-                                        </wait>
-                                    </run>
-                                </image>
-                            </images>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>remove-proxy-tests</id>
-                        <phase>post-integration-test</phase>
-                        <goals>
-                            <goal>stop</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-failsafe-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>integration-test</goal>
-                            <goal>verify</goal>
-                        </goals>
-                    </execution>
-                </executions>
-                <configuration>
-                    <systemPropertyVariables>
-                        <chrome-debug.host>${chrome-debug.host}</chrome-debug.host>
-                        <chrome-debug.port>${chrome-debug.port}</chrome-debug.port>
-                        <this.host>${hostname}</this.host>
-                    </systemPropertyVariables>
-                </configuration>
-            </plugin>
-        </plugins>
-    </build>
-
     <dependencies>
         <dependency>
             <groupId>${project.groupId}</groupId>
@@ -142,4 +48,102 @@
             <version>${project.version}</version>
         </dependency>
     </dependencies>
+
+    <profiles>
+        <profile>
+            <id>integration-tests</id>
+            <build>
+                <plugins>
+                    <!-- Set the hostname of this host in a property -->
+                    <plugin>
+                        <groupId>org.codehaus.groovy.maven</groupId>
+                        <artifactId>gmaven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <phase>generate-resources</phase>
+                                <goals>
+                                    <goal>execute</goal>
+                                </goals>
+                                <configuration>
+                                    <source>
+                                        project.properties["hostname"] = InetAddress.getLocalHost().getHostName()
+                                    </source>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+
+                    <plugin>
+                        <groupId>io.fabric8</groupId>
+                        <artifactId>docker-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>prepare-proxy-tests</id>
+                                <phase>pre-integration-test</phase>
+                                <goals>
+                                    <goal>start</goal>
+                                </goals>
+                                <configuration>
+                                    <images>
+                                        <image>
+                                            <name>norsknettarkiv/chrome-headless</name>
+                                            <alias>browser</alias>
+                                            <run>
+                                                <extraHosts>
+                                                    <host>this:${hostname}</host>
+                                                </extraHosts>
+                                                <ports>
+                                                    <port>+chrome-debug.host:chrome-debug.port:9222</port>
+                                                </ports>
+                                                <env>
+                                                    <CHROME_OPTS>--ignore-certificate-errors --disable-web-security --allow-running-insecure-content --proxy-server=this:9211</CHROME_OPTS>
+                                                </env>
+                                                <log>
+                                                    <enabled>true</enabled>
+                                                </log>
+                                                <wait>
+                                                    <tcp>
+                                                        <ports>
+                                                            <port>9222</port>
+                                                        </ports>
+                                                    </tcp>
+                                                    <time>20000</time>
+                                                </wait>
+                                            </run>
+                                        </image>
+                                    </images>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>remove-proxy-tests</id>
+                                <phase>post-integration-test</phase>
+                                <goals>
+                                    <goal>stop</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-failsafe-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <goals>
+                                    <goal>integration-test</goal>
+                                    <goal>verify</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                        <configuration>
+                            <systemPropertyVariables>
+                                <chrome-debug.host>${chrome-debug.host}</chrome-debug.host>
+                                <chrome-debug.port>${chrome-debug.port}</chrome-debug.port>
+                                <this.host>${hostname}</this.host>
+                            </systemPropertyVariables>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

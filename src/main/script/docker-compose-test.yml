@@ -45,6 +45,9 @@ services:
             - "CONTENT_WRITER_HOST=content-writer"
             - "CONTENT_WRITER_PORT=8080"
             - "DNS_SERVER=testsites"
+            - "HAWKULAR_APM_URI=http://apm:8080"
+            - "HAWKULAR_APM_USERNAME=jdoe"
+            - "HAWKULAR_APM_PASSWORD=password"
 
     # Broprox content writer
     content-writer:
@@ -58,6 +61,9 @@ services:
             - "db"
         environment:
             - "DB_HOST=db"
+            - "HAWKULAR_APM_URI=http://apm:8080"
+            - "HAWKULAR_APM_USERNAME=jdoe"
+            - "HAWKULAR_APM_PASSWORD=password"
 
     # Broprox frontier
     frontier:
@@ -72,6 +78,9 @@ services:
         environment:
             - "DB_HOST=db"
             - "HARVESTER_HOST=harvester"
+            - "HAWKULAR_APM_URI=http://apm:8080"
+            - "HAWKULAR_APM_USERNAME=jdoe"
+            - "HAWKULAR_APM_PASSWORD=password"
 
     testsites:
         image: testsites

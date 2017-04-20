@@ -261,7 +261,9 @@ public class RethinkDbAdapter implements DbAdapter {
         Span parentSpan = OpenTracingContextKey.activeSpan();
         Tracer.SpanBuilder spanBuilder = GlobalTracer.get()
                 .buildSpan(operationName)
-                .withTag(Tags.DB_TYPE.getKey(), "rethinkdb");
+                .withTag(Tags.DB_TYPE.getKey(), "rethinkdb")
+                .withTag(Tags.COMPONENT.getKey(), "dbAdapter")
+                .withTag(Tags.SPAN_KIND.getKey(), Tags.SPAN_KIND_CONSUMER);
         if (parentSpan != null) {
             spanBuilder.asChildOf(parentSpan);
         }
@@ -269,30 +271,38 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     private <T extends DbObject> T insert(String table, T data) {
+        Span span = createSpan("db-insert-" + table);
         Map response = executeRequest(r.table(table)
                 .insert(data.getMap())
                 .optArg("conflict", "error")
                 .optArg("return_changes", "always"));
         data.setMap(((List<Map<String, Map<String, Object>>>) response.get("changes")).get(0).get("new_val"));
+        span.finish();
         return data;
     }
 
     private <T extends DbObject> T update(String table, Object key, T data) {
+        Span span = createSpan("db-update-" + table);
         Map response = executeRequest(r.table(table)
                 .get(key)
                 .update(data.getMap())
                 .optArg("return_changes", "always"));
         data.setMap(((List<Map<String, Map<String, Object>>>) response.get("changes")).get(0).get("new_val"));
+        span.finish();
         return data;
     }
 
     private <T extends DbObject> Optional<T> get(String table, Object key, Class<T> type) {
+        Span span = createSpan("db-get-" + table);
         Map<String, Object> response = executeRequest(r.table(table).get(key));
+        span.finish();
         return DbObjectFactory.of(type, response);
     }
 
     private void delete(String table, Object key) {
+        Span span = createSpan("db-delete-" + table);
         executeRequest(r.table(table).get(key).delete());
+        span.finish();
     }
 
     public <T> T executeRequest(ReqlExpr qry) {

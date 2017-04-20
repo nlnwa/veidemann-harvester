@@ -39,15 +39,14 @@ services:
             - "browser"
             - "content-writer"
             - "testsites"
+            - "tracer"
         environment:
             - "BROWSER_HOST=browser"
             - "DB_HOST=db"
             - "CONTENT_WRITER_HOST=content-writer"
             - "CONTENT_WRITER_PORT=8080"
             - "DNS_SERVER=testsites"
-            - "HAWKULAR_APM_URI=http://apm:8080"
-            - "HAWKULAR_APM_USERNAME=jdoe"
-            - "HAWKULAR_APM_PASSWORD=password"
+            - "TRACER_URI=http://tracer:9411/api/v1/spans"
 
     # Broprox content writer
     content-writer:
@@ -59,11 +58,10 @@ services:
             - ./work/writer:/workdir
         links:
             - "db"
+            - "tracer"
         environment:
             - "DB_HOST=db"
-            - "HAWKULAR_APM_URI=http://apm:8080"
-            - "HAWKULAR_APM_USERNAME=jdoe"
-            - "HAWKULAR_APM_PASSWORD=password"
+            - "TRACER_URI=http://tracer:9411/api/v1/spans"
 
     # Broprox frontier
     frontier:
@@ -75,12 +73,11 @@ services:
         links:
             - "db"
             - "harvester"
+            - "tracer"
         environment:
             - "DB_HOST=db"
             - "HARVESTER_HOST=harvester"
-            - "HAWKULAR_APM_URI=http://apm:8080"
-            - "HAWKULAR_APM_USERNAME=jdoe"
-            - "HAWKULAR_APM_PASSWORD=password"
+            - "TRACER_URI=http://tracer:9411/api/v1/spans"
 
     testsites:
         image: testsites
@@ -95,15 +92,13 @@ services:
             - "50051:50051"
         links:
             - "db"
-            - "apm"
+            - "tracer"
         environment:
             - "DB_HOST=db"
-            - "HAWKULAR_APM_URI=http://apm:8080"
-            - "HAWKULAR_APM_USERNAME=jdoe"
-            - "HAWKULAR_APM_PASSWORD=password"
+            - "TRACER_URI=http://tracer:9411/api/v1/spans"
 
-    # Hawkular APM
-    apm:
-        image: jboss/hawkular-apm-server-dev
+    # Zipkin
+    tracer:
+        image: openzipkin/zipkin
         ports:
-            - "9411:8080"
+            - "9411:9411"

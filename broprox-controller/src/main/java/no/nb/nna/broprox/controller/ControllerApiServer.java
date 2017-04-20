@@ -25,10 +25,10 @@ import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.opentracing.contrib.ServerTracingInterceptor;
 import io.opentracing.util.GlobalTracer;
+import no.nb.nna.broprox.commons.TracerFactory;
 import no.nb.nna.broprox.controller.settings.Settings;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
-import org.hawkular.apm.client.opentracing.APMTracer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,7 +45,8 @@ public class ControllerApiServer implements AutoCloseable {
         Config config = ConfigFactory.load();
         config.checkValid(ConfigFactory.defaultReference());
         SETTINGS = ConfigBeanFactory.create(config, Settings.class);
-        GlobalTracer.register(new APMTracer());
+
+        TracerFactory.init("Controller", SETTINGS.getTracerUri());
     }
 
     private final Server server;

@@ -17,10 +17,12 @@ package no.nb.nna.broprox.harvester.settings;
 
 import java.util.List;
 
+import no.nb.nna.broprox.commons.settings.CommonSettings;
+
 /**
  * Configuration settings for Broprox.
  */
-public class Settings {
+public class Settings extends CommonSettings {
 
     private int proxyPort;
 
@@ -31,12 +33,6 @@ public class Settings {
     private int browserPort;
 
     private String workDir;
-
-    private String dbHost;
-
-    private int dbPort;
-
-    private String dbName;
 
     private String contentWriterHost;
 
@@ -82,30 +78,6 @@ public class Settings {
 
     public void setBrowserPort(int browserPort) {
         this.browserPort = browserPort;
-    }
-
-    public String getDbHost() {
-        return dbHost;
-    }
-
-    public void setDbHost(String dbHost) {
-        this.dbHost = dbHost;
-    }
-
-    public int getDbPort() {
-        return dbPort;
-    }
-
-    public void setDbPort(int dbPort) {
-        this.dbPort = dbPort;
-    }
-
-    public String getDbName() {
-        return dbName;
-    }
-
-    public void setDbName(String dbName) {
-        this.dbName = dbName;
     }
 
     public String getContentWriterHost() {

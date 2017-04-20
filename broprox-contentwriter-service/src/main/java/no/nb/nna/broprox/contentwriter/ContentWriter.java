@@ -21,13 +21,12 @@ import com.typesafe.config.Config;
 import com.typesafe.config.ConfigBeanFactory;
 import com.typesafe.config.ConfigException;
 import com.typesafe.config.ConfigFactory;
-import io.opentracing.util.GlobalTracer;
+import no.nb.nna.broprox.commons.TracerFactory;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
 import no.nb.nna.broprox.contentwriter.settings.Settings;
 import no.nb.nna.broprox.contentwriter.text.TextExtracter;
 import no.nb.nna.broprox.contentwriter.warc.WarcWriterPool;
-import org.hawkular.apm.client.opentracing.APMTracer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,7 +43,8 @@ public class ContentWriter {
         Config config = ConfigFactory.load();
         config.checkValid(ConfigFactory.defaultReference());
         SETTINGS = ConfigBeanFactory.create(config, Settings.class);
-        GlobalTracer.register(new APMTracer());
+
+        TracerFactory.init("Frontier", SETTINGS.getTracerUri());
     }
 
     /**

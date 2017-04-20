@@ -15,18 +15,14 @@
  */
 package no.nb.nna.broprox.controller.settings;
 
+import no.nb.nna.broprox.commons.settings.CommonSettings;
+
 /**
  * Configuration settings for Broprox.
  */
-public class Settings {
+public class Settings extends CommonSettings {
 
     private int apiPort;
-
-    private String dbHost;
-
-    private int dbPort;
-
-    private String dbName;
 
     public int getApiPort() {
         return apiPort;
@@ -34,30 +30,6 @@ public class Settings {
 
     public void setApiPort(int apiPort) {
         this.apiPort = apiPort;
-    }
-
-    public String getDbHost() {
-        return dbHost;
-    }
-
-    public void setDbHost(String dbHost) {
-        this.dbHost = dbHost;
-    }
-
-    public int getDbPort() {
-        return dbPort;
-    }
-
-    public void setDbPort(int dbPort) {
-        this.dbPort = dbPort;
-    }
-
-    public String getDbName() {
-        return dbName;
-    }
-
-    public void setDbName(String dbName) {
-        this.dbName = dbName;
     }
 
 }

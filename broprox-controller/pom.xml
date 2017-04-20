@@ -23,24 +23,9 @@
         </dependency>
 
         <dependency>
-            <groupId>org.hawkular.apm</groupId>
-            <artifactId>hawkular-apm-client-opentracing</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.hawkular.apm</groupId>
-            <artifactId>hawkular-apm-trace-publisher-rest-client</artifactId>
-        </dependency>
-        <!--        <dependency>
-            <groupId>com.uber.jaeger</groupId>
-            <artifactId>jaeger-core</artifactId>
-        </dependency>-->
-        <dependency>
-            <groupId>io.opentracing.contrib</groupId>
-            <artifactId>grpc-opentracing</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.opentracing</groupId>
-            <artifactId>opentracing-util</artifactId>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>broprox-commons</artifactId>
+            <version>${project.version}</version>
         </dependency>
 
         <!-- Configuration framework -->

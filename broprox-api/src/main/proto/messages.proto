@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package broprox;
+option java_package = "no.nb.nna.broprox.model";
+//option java_multiple_files = true;
+option java_outer_classname = "MessagesProto";
+
+import "google/protobuf/timestamp.proto";
+
+// Message containing a javascript to be run in a browser
+message BrowserScript {
+    string id = 1;
+
+    enum Type {
+        BEHAVIOR = 0;
+        EXTRACT_OUTLINKS = 1;
+        LOGIN = 2;
+    }
+
+    Type type = 2;
+
+    string name = 3;
+
+    string script = 4;
+
+    string url_regexp = 5;
+
+    map<string, string> parameters = 6;
+
+}

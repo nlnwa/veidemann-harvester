@@ -18,7 +18,6 @@ package no.nb.nna.broprox.db;
 import java.util.List;
 import java.util.Optional;
 
-import no.nb.nna.broprox.db.model.BrowserScript;
 import no.nb.nna.broprox.db.model.CrawlExecutionStatus;
 import no.nb.nna.broprox.db.model.CrawlLog;
 import no.nb.nna.broprox.db.model.CrawledContent;
@@ -28,6 +27,7 @@ import no.nb.nna.broprox.db.model.Screenshot;
 import no.nb.nna.broprox.model.ControllerProto.CrawlEntity;
 import no.nb.nna.broprox.model.ControllerProto.CrawlEntityListReply;
 import no.nb.nna.broprox.model.ControllerProto.CrawlEntityListRequest;
+import no.nb.nna.broprox.model.MessagesProto.BrowserScript;
 
 /**
  * Adapter for Broprox's database.
@@ -43,6 +43,8 @@ public interface DbAdapter extends AutoCloseable {
     CrawlLog updateCrawlLog(CrawlLog cl);
 
     ExtractedText addExtractedText(ExtractedText et);
+
+    BrowserScript saveBrowserScript(BrowserScript script);
 
     List<BrowserScript> getBrowserScripts(BrowserScript.Type type);
 

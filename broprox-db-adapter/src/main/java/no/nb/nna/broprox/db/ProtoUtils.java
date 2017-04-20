@@ -22,7 +22,9 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.protobuf.Descriptors;
+import com.google.protobuf.MapEntry;
 import com.google.protobuf.Message;
 import com.google.protobuf.MessageOrBuilder;
 import com.google.protobuf.Timestamp;
@@ -47,16 +49,27 @@ public class ProtoUtils {
      * @param msg the ProtoBuf Message
      * @return a map suitable for RethinkDb
      */
-    public static Map<String, Object> protoToRethink(MessageOrBuilder msg) {
+    public static Map protoToRethink(MessageOrBuilder msg) {
         Map rMap = r.hashMap();
         msg.getAllFields().forEach((f, v) -> {
             if (f.isRepeated()) {
                 List l = r.array();
-                ((List) v).forEach((value) -> {
-                    if (f.getType() == Descriptors.FieldDescriptor.Type.MESSAGE) {
-                        l.add(protoToRethink((MessageOrBuilder) value));
+                ((List) v).forEach((entry) -> {
+                    if (f.isMapField()) {
+                        Object mapKey = ((MapEntry) entry).getKey();
+                        Object mapValue = ((MapEntry) entry).getValue();
+
+                        if (f.getMessageType().findFieldByName("value").getType()
+                                == Descriptors.FieldDescriptor.Type.MESSAGE) {
+                            mapValue = protoToRethink((MessageOrBuilder) mapValue);
+                        }
+
+                        Map map = r.hashMap(mapKey, mapValue);
+                        l.add(map);
+                    } else if (f.getType() == Descriptors.FieldDescriptor.Type.MESSAGE) {
+                        l.add(protoToRethink((MessageOrBuilder) entry));
                     } else {
-                        l.add(value);
+                        l.add(entry);
                     }
                 });
                 rMap.put(f.getJsonName(), l);
@@ -68,9 +81,12 @@ public class ProtoUtils {
                                 rMap.put(f.getJsonName(), tsToOdt((Timestamp) v));
                                 break;
                             default:
-                                rMap.put(f.getJavaType(), protoToRethink((MessageOrBuilder) v));
+                                rMap.put(f.getJsonName(), protoToRethink((MessageOrBuilder) v));
                                 break;
                         }
+                        break;
+                    case ENUM:
+                        rMap.put(f.getJsonName(), v.toString());
                         break;
                     default:
                         rMap.put(f.getJsonName(), v);
@@ -89,11 +105,12 @@ public class ProtoUtils {
      * @param type The Class of the ProtoBuf message type
      * @return the generated ProtoBuf Message
      */
-    public static <T extends Message> T rethinkToProto(Map<String, Object> msg, Class<T> type) {
+    public static <T extends Message> T rethinkToProto(Map msg, Class<T> type) {
         try {
             Message.Builder protoBuilder = (Message.Builder) type.getMethod("newBuilder").invoke(null);
             return rethinkToProto(msg, protoBuilder);
-        } catch (NoSuchMethodException | SecurityException | IllegalAccessException | IllegalArgumentException | InvocationTargetException ex) {
+        } catch (NoSuchMethodException | SecurityException | IllegalAccessException
+                | IllegalArgumentException | InvocationTargetException ex) {
             throw new RuntimeException(ex);
         }
     }
@@ -106,14 +123,21 @@ public class ProtoUtils {
      * @param protoBuilder a builder for the ProtoBuf Message type
      * @return the generated ProtoBuf Message
      */
-    public static <T extends Message> T rethinkToProto(Map<String, Object> msg, Message.Builder protoBuilder) {
+    public static <T extends Message> T rethinkToProto(Map msg, Message.Builder protoBuilder) {
         protoBuilder.getDescriptorForType().getFields().forEach(fd -> {
             Object value = msg.get(fd.getJsonName());
             if (value != null) {
                 if (fd.isRepeated()) {
                     ((List) value).forEach((v) -> {
                         if (fd.getType() == Descriptors.FieldDescriptor.Type.MESSAGE) {
-                            protoBuilder.addRepeatedField(fd, rethinkToProto((Map<String, Object>) v, protoBuilder
+                            Map valueMap = (Map) v;
+
+                            if (fd.isMapField()) {
+                                Object key = valueMap.keySet().iterator().next();
+                                valueMap = ImmutableMap.of("key", key, "value", valueMap.get(key));
+                            }
+
+                            protoBuilder.addRepeatedField(fd, rethinkToProto(valueMap, protoBuilder
                                     .newBuilderForField(fd)));
                         } else {
                             protoBuilder.addRepeatedField(fd, v);
@@ -127,10 +151,13 @@ public class ProtoUtils {
                                     protoBuilder.setField(fd, odtToTs((OffsetDateTime) value));
                                     break;
                                 default:
-                                    protoBuilder.setField(fd, rethinkToProto((Map<String, Object>) value, protoBuilder
+                                    protoBuilder.setField(fd, rethinkToProto((Map) value, protoBuilder
                                             .newBuilderForField(fd)));
                                     break;
                             }
+                            break;
+                        case ENUM:
+                            protoBuilder.setField(fd, fd.getEnumType().findValueByName((String) value));
                             break;
                         default:
                             protoBuilder.setField(fd, value);

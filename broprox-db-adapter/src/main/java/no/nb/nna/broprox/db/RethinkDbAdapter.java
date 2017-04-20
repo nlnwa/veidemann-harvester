@@ -18,11 +18,6 @@ package no.nb.nna.broprox.db;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
-
-import no.nb.nna.broprox.db.model.CrawledContent;
-import no.nb.nna.broprox.db.model.CrawlLog;
-import no.nb.nna.broprox.db.model.ExtractedText;
-
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -38,11 +33,15 @@ import io.opentracing.Tracer;
 import io.opentracing.contrib.OpenTracingContextKey;
 import io.opentracing.tag.Tags;
 import io.opentracing.util.GlobalTracer;
-import no.nb.nna.broprox.db.model.BrowserScript;
 import no.nb.nna.broprox.db.model.CrawlExecutionStatus;
+import no.nb.nna.broprox.db.model.CrawlLog;
+import no.nb.nna.broprox.db.model.CrawledContent;
+import no.nb.nna.broprox.db.model.ExtractedText;
 import no.nb.nna.broprox.db.model.QueuedUri;
 import no.nb.nna.broprox.db.model.Screenshot;
 import no.nb.nna.broprox.model.ControllerProto;
+import no.nb.nna.broprox.model.ControllerProto.CrawlEntityListReply;
+import no.nb.nna.broprox.model.MessagesProto.BrowserScript;
 import org.yaml.snakeyaml.Yaml;
 
 /**
@@ -125,8 +124,8 @@ public class RethinkDbAdapter implements DbAdapter {
         Yaml yaml = new Yaml();
         try (InputStream in = getClass().getClassLoader().getResourceAsStream("browser-scripts/extract-outlinks.yaml")) {
             Map<String, Object> scriptDef = yaml.loadAs(in, Map.class);
-            BrowserScript script = DbObjectFactory.of(BrowserScript.class, scriptDef).get();
-            addBrowserScript(script);
+            BrowserScript script = ProtoUtils.rethinkToProto(scriptDef, BrowserScript.class);
+            saveBrowserScript(script);
         } catch (IOException ex) {
             throw new RuntimeException(ex);
         }
@@ -166,20 +165,38 @@ public class RethinkDbAdapter implements DbAdapter {
         return update(TABLE_CRAWL_LOG, cl.getWarcId(), cl);
     }
 
-    public BrowserScript addBrowserScript(BrowserScript bbs) {
-        return insert(TABLE_BROWSER_SCRIPTS, bbs);
+    @Override
+    public BrowserScript saveBrowserScript(BrowserScript script) {
+        Span span = createSpan("db-addBrowserScript");
+
+        Map rMap = ProtoUtils.protoToRethink(script);
+
+        Map<String, Object> response = executeRequest(r.table(TABLE_BROWSER_SCRIPTS)
+                .insert(rMap)
+                .optArg("conflict", "replace"));
+
+        String key = ((List<String>) response.get("generated_keys")).get(0);
+        script = script.toBuilder().setId(key).build();
+
+        span.finish();
+        return script;
     }
 
+    @Override
     public List<BrowserScript> getBrowserScripts(BrowserScript.Type type) {
+        Span span = createSpan("db-getBrowserScripts");
+        span.setTag(Tags.DB_STATEMENT.getKey(), "type=" + type);
+
         try (Cursor<Map<String, Object>> cursor = executeRequest(r.table(TABLE_BROWSER_SCRIPTS)
                 .filter(r.hashMap("type", type.name())));) {
 
             List<BrowserScript> result = new ArrayList<>();
 
             for (Map<String, Object> m : cursor) {
-                DbObjectFactory.of(BrowserScript.class, m).ifPresent(b -> result.add(b));
+                result.add(ProtoUtils.rethinkToProto(m, BrowserScript.class));
             }
 
+            span.finish();
             return result;
         }
     }
@@ -237,7 +254,7 @@ public class RethinkDbAdapter implements DbAdapter {
         }
         Object res = executeRequest(qry);
 
-        ControllerProto.CrawlEntityListReply.Builder reply = ControllerProto.CrawlEntityListReply.newBuilder();
+        CrawlEntityListReply.Builder reply = CrawlEntityListReply.newBuilder();
         if (res instanceof Cursor) {
             Cursor<Map<String, Object>> cursor = (Cursor) res;
             for (Map<String, Object> entity : cursor) {

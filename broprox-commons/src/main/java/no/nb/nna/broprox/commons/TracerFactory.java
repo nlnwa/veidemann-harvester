@@ -21,7 +21,6 @@ import brave.Tracer;
 import brave.opentracing.BraveTracer;
 import io.opentracing.util.GlobalTracer;
 import zipkin.reporter.AsyncReporter;
-import zipkin.reporter.Reporter;
 import zipkin.reporter.Sender;
 import zipkin.reporter.okhttp3.OkHttpSender;
 

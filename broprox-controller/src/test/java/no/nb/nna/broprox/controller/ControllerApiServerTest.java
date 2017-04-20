@@ -24,12 +24,11 @@ import io.grpc.ManagedChannel;
 import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
 import io.grpc.stub.StreamObserver;
+import no.nb.nna.broprox.api.ControllerGrpc;
+import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;
+import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListRequest;
 import no.nb.nna.broprox.db.DbAdapter;
-import no.nb.nna.broprox.model.ControllerGrpc;
-import no.nb.nna.broprox.model.ControllerProto;
-import no.nb.nna.broprox.model.ControllerProto.CrawlEntity;
-import no.nb.nna.broprox.model.ControllerProto.CrawlEntityListReply;
-import no.nb.nna.broprox.model.ControllerProto.CrawlEntityListRequest;
+import no.nb.nna.broprox.model.MessagesProto.CrawlEntity;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -73,12 +72,12 @@ public class ControllerApiServerTest {
         DbAdapter dbMock = mock(DbAdapter.class);
         inProcessServer = new ControllerApiServer(inProcessServerBuilder, dbMock).start();
 
-        ControllerProto.CrawlEntity request = ControllerProto.CrawlEntity.newBuilder()
+        CrawlEntity request = CrawlEntity.newBuilder()
                 .setName("Nasjonalbiblioteket")
                 .setCreated(Timestamps.fromMillis(System.currentTimeMillis()))
                 .build();
 
-        ControllerProto.CrawlEntity reply = ControllerProto.CrawlEntity.newBuilder()
+        CrawlEntity reply = CrawlEntity.newBuilder()
                 .setId("Random UID")
                 .setName("Nasjonalbiblioteket")
                 .setCreated(Timestamps.fromMillis(System.currentTimeMillis()))

@@ -33,15 +33,16 @@ import io.opentracing.Tracer;
 import io.opentracing.contrib.OpenTracingContextKey;
 import io.opentracing.tag.Tags;
 import io.opentracing.util.GlobalTracer;
+import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;
+import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListRequest;
 import no.nb.nna.broprox.db.model.CrawlExecutionStatus;
 import no.nb.nna.broprox.db.model.CrawlLog;
 import no.nb.nna.broprox.db.model.CrawledContent;
 import no.nb.nna.broprox.db.model.ExtractedText;
 import no.nb.nna.broprox.db.model.QueuedUri;
 import no.nb.nna.broprox.db.model.Screenshot;
-import no.nb.nna.broprox.model.ControllerProto;
-import no.nb.nna.broprox.model.ControllerProto.CrawlEntityListReply;
 import no.nb.nna.broprox.model.MessagesProto.BrowserScript;
+import no.nb.nna.broprox.model.MessagesProto.CrawlEntity;
 import org.yaml.snakeyaml.Yaml;
 
 /**
@@ -227,7 +228,7 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
-    public ControllerProto.CrawlEntity saveCrawlEntity(ControllerProto.CrawlEntity entity) {
+    public CrawlEntity saveCrawlEntity(CrawlEntity entity) {
         Span span = createSpan("db-saveCrawlEntity");
 
         Map rMap = ProtoUtils.protoToRethink(entity);
@@ -243,7 +244,7 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
-    public ControllerProto.CrawlEntityListReply listCrawlEntities(ControllerProto.CrawlEntityListRequest request) {
+    public CrawlEntityListReply listCrawlEntities(CrawlEntityListRequest request) {
         Span span = createSpan("db-listCrawlEntities");
 
         ReqlExpr qry = r.table(TABLE_CRAWL_ENTITIES);
@@ -258,10 +259,10 @@ public class RethinkDbAdapter implements DbAdapter {
         if (res instanceof Cursor) {
             Cursor<Map<String, Object>> cursor = (Cursor) res;
             for (Map<String, Object> entity : cursor) {
-                reply.addEntity(ProtoUtils.rethinkToProto(entity, ControllerProto.CrawlEntity.class));
+                reply.addEntity(ProtoUtils.rethinkToProto(entity, CrawlEntity.class));
             }
         } else {
-            reply.addEntity(ProtoUtils.rethinkToProto((Map<String, Object>) res, ControllerProto.CrawlEntity.class));
+            reply.addEntity(ProtoUtils.rethinkToProto((Map<String, Object>) res, CrawlEntity.class));
         }
 
         span.finish();

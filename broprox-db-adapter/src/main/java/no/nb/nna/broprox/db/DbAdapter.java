@@ -24,9 +24,9 @@ import no.nb.nna.broprox.db.model.CrawledContent;
 import no.nb.nna.broprox.db.model.ExtractedText;
 import no.nb.nna.broprox.db.model.QueuedUri;
 import no.nb.nna.broprox.db.model.Screenshot;
-import no.nb.nna.broprox.model.ControllerProto.CrawlEntity;
-import no.nb.nna.broprox.model.ControllerProto.CrawlEntityListReply;
-import no.nb.nna.broprox.model.ControllerProto.CrawlEntityListRequest;
+import no.nb.nna.broprox.model.MessagesProto.CrawlEntity;
+import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;
+import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListRequest;
 import no.nb.nna.broprox.model.MessagesProto.BrowserScript;
 
 /**

@@ -9,22 +9,25 @@ import "google/protobuf/timestamp.proto";
 
 // Message containing a javascript to be run in a browser
 message BrowserScript {
-    string id = 1;
-
     enum Type {
         BEHAVIOR = 0;
         EXTRACT_OUTLINKS = 1;
         LOGIN = 2;
     }
 
+    string id = 1;
     Type type = 2;
-
     string name = 3;
-
     string script = 4;
-
     string url_regexp = 5;
-
     map<string, string> parameters = 6;
+}
 
+// A crawl entity (might be an organisation with one or more seeds)
+message CrawlEntity {
+    string id = 1;
+    string name = 2;
+    string description = 16;
+    repeated string label = 3;
+    google.protobuf.Timestamp created = 4;
 }

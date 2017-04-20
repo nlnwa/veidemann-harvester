@@ -17,10 +17,10 @@ package no.nb.nna.broprox.controller;
 
 import io.grpc.stub.StreamObserver;
 import no.nb.nna.broprox.db.DbAdapter;
-import no.nb.nna.broprox.model.ControllerGrpc;
-import no.nb.nna.broprox.model.ControllerProto.CrawlEntity;
-import no.nb.nna.broprox.model.ControllerProto.CrawlEntityListReply;
-import no.nb.nna.broprox.model.ControllerProto.CrawlEntityListRequest;
+import no.nb.nna.broprox.api.ControllerGrpc;
+import no.nb.nna.broprox.model.MessagesProto.CrawlEntity;
+import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;
+import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListRequest;
 
 /**
  *

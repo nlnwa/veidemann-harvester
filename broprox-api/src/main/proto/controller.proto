@@ -1,10 +1,11 @@
 syntax = "proto3";
 
 package broprox;
-option java_package = "no.nb.nna.broprox.model";
+option java_package = "no.nb.nna.broprox.api";
 //option java_multiple_files = true;
 option java_outer_classname = "ControllerProto";
 
+import "messages.proto";
 import "google/protobuf/timestamp.proto";
 
 // Service for communicating with controller.
@@ -22,13 +23,4 @@ message CrawlEntityListRequest {
 // A list of entities
 message CrawlEntityListReply {
     repeated CrawlEntity entity = 1;
-}
-
-// An entity
-message CrawlEntity {
-    string id = 1;
-    string name = 2;
-    string description = 16;
-    repeated string label = 3;
-    google.protobuf.Timestamp created = 4;
 }

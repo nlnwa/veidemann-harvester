@@ -17,7 +17,8 @@ package no.nb.nna.broprox.db;
 
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.Timestamps;
-import no.nb.nna.broprox.model.ControllerProto;
+import no.nb.nna.broprox.api.ControllerProto;
+import no.nb.nna.broprox.model.MessagesProto.CrawlEntity;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -56,16 +57,16 @@ public class RethinkDbAdapterIT {
     @Test
     public void testSaveCrawlEntity() throws InvalidProtocolBufferException {
         System.out.println("saveCrawlEntity");
-        ControllerProto.CrawlEntity entity = ControllerProto.CrawlEntity.newBuilder()
+        CrawlEntity entity = CrawlEntity.newBuilder()
                 .setName("Nasjonalbiblioteket")
                 .setCreated(Timestamps.fromMillis(System.currentTimeMillis()))
                 .addLabel("Daily")
                 .addLabel("Government")
                 .build();
 
-        ControllerProto.CrawlEntity expResult = null;
+        CrawlEntity expResult = null;
 
-        ControllerProto.CrawlEntity result = db.saveCrawlEntity(entity);
+        CrawlEntity result = db.saveCrawlEntity(entity);
 
         assertThat(result.getId()).isNotEmpty();
         assertThat(result).isEqualTo(entity.toBuilder().setId(result.getId()).build());
@@ -76,7 +77,7 @@ public class RethinkDbAdapterIT {
      */
     @Test
     public void testListCrawlEntities() throws InvalidProtocolBufferException {
-        ControllerProto.CrawlEntity entity1 = ControllerProto.CrawlEntity.newBuilder()
+        CrawlEntity entity1 = CrawlEntity.newBuilder()
                 .setName("Nasjonalbiblioteket")
                 .setCreated(Timestamps.fromMillis(System.currentTimeMillis()))
                 .addLabel("Daily")
@@ -84,7 +85,7 @@ public class RethinkDbAdapterIT {
                 .build();
         entity1 = db.saveCrawlEntity(entity1);
 
-        ControllerProto.CrawlEntity entity2 = ControllerProto.CrawlEntity.newBuilder()
+        CrawlEntity entity2 = CrawlEntity.newBuilder()
                 .setName("VG")
                 .setCreated(Timestamps.fromMillis(System.currentTimeMillis()))
                 .addLabel("Hourly")

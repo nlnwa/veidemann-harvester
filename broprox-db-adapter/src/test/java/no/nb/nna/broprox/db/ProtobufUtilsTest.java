@@ -23,8 +23,8 @@ import java.util.Map;
 import com.google.protobuf.Message;
 import com.google.protobuf.Timestamp;
 import com.google.protobuf.util.Timestamps;
-import no.nb.nna.broprox.model.ControllerProto.CrawlEntity;
-import no.nb.nna.broprox.model.ControllerProto.CrawlEntityListReply;
+import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;
+import no.nb.nna.broprox.model.MessagesProto.CrawlEntity;
 import org.junit.Test;
 
 import static no.nb.nna.broprox.db.RethinkDbAdapter.r;

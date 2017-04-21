@@ -15,10 +15,12 @@
  */
 package no.nb.nna.broprox.contentwriter.settings;
 
+import no.nb.nna.broprox.commons.settings.CommonSettings;
+
 /**
  * Configuration settings for Broprox.
  */
-public class Settings {
+public class Settings extends CommonSettings {
 
     private int apiPort;
 
@@ -31,12 +33,6 @@ public class Settings {
     private boolean compressWarc;
 
     private String workDir;
-
-    private String dbHost;
-
-    private int dbPort;
-
-    private String dbName;
 
     public int getApiPort() {
         return apiPort;
@@ -84,30 +80,6 @@ public class Settings {
 
     public void setWorkDir(String workDir) {
         this.workDir = workDir;
-    }
-
-    public String getDbHost() {
-        return dbHost;
-    }
-
-    public void setDbHost(String dbHost) {
-        this.dbHost = dbHost;
-    }
-
-    public int getDbPort() {
-        return dbPort;
-    }
-
-    public void setDbPort(int dbPort) {
-        this.dbPort = dbPort;
-    }
-
-    public String getDbName() {
-        return dbName;
-    }
-
-    public void setDbName(String dbName) {
-        this.dbName = dbName;
     }
 
 }

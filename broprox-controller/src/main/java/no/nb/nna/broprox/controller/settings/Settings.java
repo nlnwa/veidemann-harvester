@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package no.nb.nna.broprox.frontier.settings;
+package no.nb.nna.broprox.controller.settings;
 
 import no.nb.nna.broprox.commons.settings.CommonSettings;
 
@@ -24,42 +24,12 @@ public class Settings extends CommonSettings {
 
     private int apiPort;
 
-    private String workDir;
-
-    private String harvesterHost;
-
-    private int harvesterPort;
-
     public int getApiPort() {
         return apiPort;
     }
 
     public void setApiPort(int apiPort) {
         this.apiPort = apiPort;
-    }
-
-    public String getWorkDir() {
-        return workDir;
-    }
-
-    public void setWorkDir(String workDir) {
-        this.workDir = workDir;
-    }
-
-    public String getHarvesterHost() {
-        return harvesterHost;
-    }
-
-    public void setHarvesterHost(String harvesterHost) {
-        this.harvesterHost = harvesterHost;
-    }
-
-    public int getHarvesterPort() {
-        return harvesterPort;
-    }
-
-    public void setHarvesterPort(int harvesterPort) {
-        this.harvesterPort = harvesterPort;
     }
 
 }

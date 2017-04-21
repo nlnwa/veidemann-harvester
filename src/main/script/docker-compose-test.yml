@@ -39,12 +39,14 @@ services:
             - "browser"
             - "content-writer"
             - "testsites"
+            - "tracer"
         environment:
             - "BROWSER_HOST=browser"
             - "DB_HOST=db"
             - "CONTENT_WRITER_HOST=content-writer"
             - "CONTENT_WRITER_PORT=8080"
             - "DNS_SERVER=testsites"
+            - "TRACER_URI=http://tracer:9411/api/v1/spans"
 
     # Broprox content writer
     content-writer:
@@ -56,10 +58,12 @@ services:
             - ./work/writer:/workdir
         links:
             - "db"
+            - "tracer"
         environment:
             - "DB_HOST=db"
+            - "TRACER_URI=http://tracer:9411/api/v1/spans"
 
-    # Broprox content writer
+    # Broprox frontier
     frontier:
         image: norsknettarkiv/broprox-frontier
         ports:
@@ -69,12 +73,32 @@ services:
         links:
             - "db"
             - "harvester"
+            - "tracer"
         environment:
             - "DB_HOST=db"
             - "HARVESTER_HOST=harvester"
+            - "TRACER_URI=http://tracer:9411/api/v1/spans"
 
     testsites:
         image: testsites
 #        ports:
 #            - "80:80"
 #            - "53:53"
+
+    # Broprox controller
+    controller:
+        image: norsknettarkiv/broprox-controller
+        ports:
+            - "50051:50051"
+        links:
+            - "db"
+            - "tracer"
+        environment:
+            - "DB_HOST=db"
+            - "TRACER_URI=http://tracer:9411/api/v1/spans"
+
+    # Zipkin
+    tracer:
+        image: openzipkin/zipkin
+        ports:
+            - "9411:9411"

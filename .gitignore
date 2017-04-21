@@ -9,3 +9,5 @@ buildNumber.properties
 .mvn/timing.properties
 /broprox-harvester/nbactions.xml
 /src/main/script/work/
+/broprox-controller/nbproject/
+/broprox-db-adapter/nbproject/

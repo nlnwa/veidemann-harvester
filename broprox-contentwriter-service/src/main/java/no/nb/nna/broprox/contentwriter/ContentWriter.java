@@ -21,6 +21,7 @@ import com.typesafe.config.Config;
 import com.typesafe.config.ConfigBeanFactory;
 import com.typesafe.config.ConfigException;
 import com.typesafe.config.ConfigFactory;
+import no.nb.nna.broprox.commons.TracerFactory;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
 import no.nb.nna.broprox.contentwriter.settings.Settings;
@@ -42,6 +43,8 @@ public class ContentWriter {
         Config config = ConfigFactory.load();
         config.checkValid(ConfigFactory.defaultReference());
         SETTINGS = ConfigBeanFactory.create(config, Settings.class);
+
+        TracerFactory.init("Frontier", SETTINGS.getTracerUri());
     }
 
     /**

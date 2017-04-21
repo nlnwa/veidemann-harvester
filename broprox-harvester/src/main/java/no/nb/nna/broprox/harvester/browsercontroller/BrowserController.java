@@ -23,10 +23,10 @@ import no.nb.nna.broprox.chrome.client.ChromeDebugProtocol;
 import no.nb.nna.broprox.chrome.client.Session;
 import no.nb.nna.broprox.chrome.client.ws.CompleteMany;
 import no.nb.nna.broprox.db.DbAdapter;
-import no.nb.nna.broprox.db.model.BrowserScript;
 import no.nb.nna.broprox.db.model.CrawlConfig;
 import no.nb.nna.broprox.db.model.QueuedUri;
 import no.nb.nna.broprox.harvester.BroproxHeaderConstants;
+import no.nb.nna.broprox.model.MessagesProto;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
@@ -96,7 +96,7 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
 //                    }
 //                }
 //                System.out.println("<<<<<<");
-            String script = db.getBrowserScripts(BrowserScript.Type.EXTRACT_OUTLINKS).get(0).getScript();
+            String script = db.getBrowserScripts(MessagesProto.BrowserScript.Type.EXTRACT_OUTLINKS).get(0).getScript();
             QueuedUri[] outlinks = pex.extractOutlinks(db, script);
             pex.getDocumentUrl();
             pex.scrollToTop();

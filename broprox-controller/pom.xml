@@ -6,93 +6,38 @@
         <artifactId>broprox</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
-
-    <artifactId>broprox-harvester</artifactId>
+    <artifactId>broprox-controller</artifactId>
     <packaging>jar</packaging>
 
-    <properties>
-    </properties>
-
     <dependencies>
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>broprox-api</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <dependency>
             <groupId>${project.groupId}</groupId>
             <artifactId>broprox-db-adapter</artifactId>
             <version>${project.version}</version>
         </dependency>
-        <dependency>
-            <groupId>${project.groupId}</groupId>
-            <artifactId>broprox-chrome-client</artifactId>
-            <version>${project.version}</version>
-        </dependency>
+
         <dependency>
             <groupId>${project.groupId}</groupId>
             <artifactId>broprox-commons</artifactId>
             <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.netpreserve.commons</groupId>
-            <artifactId>webarchive-commons-uri</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.netpreserve.commons</groupId>
-            <artifactId>webarchive-commons-util</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.littleshoot</groupId>
-            <artifactId>littleproxy</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.github.ganskef</groupId>
-            <artifactId>littleproxy-mitm</artifactId>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.slf4j</groupId>
-                    <artifactId>slf4j-log4j12</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.commons</groupId>
-            <artifactId>commons-io</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-all</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.glassfish.jersey.containers</groupId>
-            <artifactId>jersey-container-grizzly2-http</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.glassfish.jersey.media</groupId>
-            <artifactId>jersey-media-multipart</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.google.code.gson</groupId>
-            <artifactId>gson</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>org.cache2k</groupId>
-            <artifactId>cache2k-api</artifactId>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.cache2k</groupId>
-            <artifactId>cache2k-all</artifactId>
-            <scope>runtime</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>dnsjava</groupId>
-            <artifactId>dnsjava</artifactId>
-            <version>2.1.8</version>
         </dependency>
 
         <!-- Configuration framework -->
         <dependency>
             <groupId>com.typesafe</groupId>
             <artifactId>config</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 
@@ -102,7 +47,6 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
-                <version>3.0.2</version>
                 <configuration>
                     <archive>
                         <manifest>
@@ -123,12 +67,19 @@
                     <plugin>
                         <groupId>org.codehaus.mojo</groupId>
                         <artifactId>appassembler-maven-plugin</artifactId>
-                        <version>2.0.0</version>
+                        <executions>
+                            <execution>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>assemble</goal>
+                                </goals>
+                            </execution>
+                        </executions>
                         <configuration>
                             <licenseHeaderFile>${basedir}/../src/main/etc/license-header.txt</licenseHeaderFile>
                             <programs>
                                 <program>
-                                    <mainClass>no.nb.nna.broprox.harvester.Main</mainClass>
+                                    <mainClass>no.nb.nna.broprox.controller.Main</mainClass>
                                     <id>${project.artifactId}</id>
                                 </program>
                             </programs>
@@ -140,14 +91,6 @@
                             <preAssembleDirectory>src/main/distfiles</preAssembleDirectory>
                             <extraJvmArguments>-Dconfig.file=@BASEDIR@/config/application.conf</extraJvmArguments>
                         </configuration>
-                        <executions>
-                            <execution>
-                                <phase>package</phase>
-                                <goals>
-                                    <goal>assemble</goal>
-                                </goals>
-                            </execution>
-                        </executions>
                     </plugin>
 
                     <!-- Build Docker image -->
@@ -167,7 +110,7 @@
                             <images>
                                 <image>
                                     <name>norsknettarkiv/${project.artifactId}</name>
-                                    <alias>harvester</alias>
+                                    <alias>controller</alias>
                                     <build>
                                         <from>java:8</from>
                                         <maintainer>National Library of Norway</maintainer>
@@ -175,18 +118,8 @@
                                             <tag>latest</tag>
                                             <tag>${project.version}</tag>
                                         </tags>
-                                        <runCmds>
-                                            <run>mkdir /workdir</run>
-                                        </runCmds>
-                                        <volumes>
-                                            <volume>/workdir</volume>
-                                        </volumes>
-                                        <env>
-                                            <WORK_DIR>/workdir</WORK_DIR>
-                                        </env>
                                         <ports>
-                                            <port>8080</port>
-                                            <port>9090</port>
+                                            <port>50051</port>
                                         </ports>
                                         <cmd>
                                             <exec>

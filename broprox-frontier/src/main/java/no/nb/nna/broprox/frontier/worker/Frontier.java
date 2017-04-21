@@ -27,11 +27,11 @@ import java.util.concurrent.TimeUnit;
 import com.github.mgunlogson.cuckoofilter4j.CuckooFilter;
 import com.google.common.hash.Funnels;
 import com.rethinkdb.RethinkDB;
-import no.nb.nna.broprox.db.DbObjectFactory;
+import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
-import no.nb.nna.broprox.db.model.CrawlConfig;
-import no.nb.nna.broprox.db.model.CrawlExecutionStatus;
-import no.nb.nna.broprox.db.model.QueuedUri;
+import no.nb.nna.broprox.model.MessagesProto.CrawlConfig;
+import no.nb.nna.broprox.model.MessagesProto.CrawlExecutionStatus;
+import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
 import org.netpreserve.commons.uri.UriConfigs;
 
 /**
@@ -88,24 +88,26 @@ public class Frontier implements AutoCloseable {
     }
 
     public void newExecution(CrawlConfig config, String... seed) {
-        String executionId = UUID.randomUUID().toString();
-        CrawlExecutionStatus status = DbObjectFactory.create(CrawlExecutionStatus.class)
-                .withId(executionId)
-                .withState(CrawlExecutionStatus.State.CREATED);
-        CrawlExecution exe = new CrawlExecution(this, status, config);
-        runningExecutions.put(executionId, exe);
-        db.addExecutionStatus(status);
+        CrawlExecutionStatus status = CrawlExecutionStatus.newBuilder()
+                .setState(CrawlExecutionStatus.State.CREATED)
+                .build();
 
-        status.withState(CrawlExecutionStatus.State.RUNNING)
-                .withStartTime(OffsetDateTime.now(ZoneOffset.UTC));
+        status = db.addExecutionStatus(status);
+        CrawlExecution exe = new CrawlExecution(this, status, config);
+        runningExecutions.put(status.getId(), exe);
+
+        status = status.toBuilder().setState(CrawlExecutionStatus.State.RUNNING)
+                .setStartTime(ProtoUtils.getNowTs())
+                .build();
         db.updateExecutionStatus(status);
 
         for (String s : seed) {
-            QueuedUri qUri = DbObjectFactory.create(QueuedUri.class)
-                    .addExecutionId(new QueuedUri.IdSeq(executionId, exe.getNextSequenceNum()))
-                    .withUri(s)
-                    .withSurt(UriConfigs.SURT_KEY.buildUri(s).toString())
-                    .withDiscoveryPath("");
+            QueuedUri qUri = QueuedUri.newBuilder()
+                    .addExecutionIds(QueuedUri.IdSeq.newBuilder().setId(status.getId()).setSeq(exe.getNextSequenceNum()))
+                    .setUri(s)
+                    .setSurt(UriConfigs.SURT_KEY.buildUri(s).toString())
+                    .setDiscoveryPath("")
+                    .build();
             exe.setCurrentUri(qUri);
             executionsQueue.add(exe);
         }

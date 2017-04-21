@@ -24,6 +24,7 @@ import com.google.protobuf.Message;
 import com.google.protobuf.Timestamp;
 import com.google.protobuf.util.Timestamps;
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;
+import no.nb.nna.broprox.model.MessagesProto;
 import no.nb.nna.broprox.model.MessagesProto.CrawlEntity;
 import org.junit.Test;
 
@@ -33,14 +34,13 @@ import static org.assertj.core.api.Assertions.*;
 /**
  *
  */
-public class ProtobufUtilsTest {
+public class ProtoUtilsTest {
 
     /**
      * Test of protoToRethink method, of class ProtobufUtils.
      */
     @Test
     public void testProtoToRethink() {
-        System.out.println("protoToRethink");
         CrawlEntityListReply msg = CrawlEntityListReply.newBuilder()
                 .addEntity(CrawlEntity.newBuilder()
                         .setId("UUID")

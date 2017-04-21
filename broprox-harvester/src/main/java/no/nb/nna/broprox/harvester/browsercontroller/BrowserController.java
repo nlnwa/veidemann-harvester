@@ -16,6 +16,7 @@
 package no.nb.nna.broprox.harvester.browsercontroller;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 
@@ -23,8 +24,9 @@ import no.nb.nna.broprox.chrome.client.ChromeDebugProtocol;
 import no.nb.nna.broprox.chrome.client.Session;
 import no.nb.nna.broprox.chrome.client.ws.CompleteMany;
 import no.nb.nna.broprox.db.DbAdapter;
-import no.nb.nna.broprox.db.model.CrawlConfig;
-import no.nb.nna.broprox.db.model.QueuedUri;
+import no.nb.nna.broprox.model.MessagesProto.BrowserScript;
+import no.nb.nna.broprox.model.MessagesProto.CrawlConfig;
+import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
 import no.nb.nna.broprox.harvester.BroproxHeaderConstants;
 import no.nb.nna.broprox.model.MessagesProto;
 
@@ -52,7 +54,7 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
         this.db = db;
     }
 
-    public QueuedUri[] render(String executionId, QueuedUri queuedUri) throws ExecutionException, InterruptedException, IOException, TimeoutException {
+    public List<QueuedUri> render(String executionId, QueuedUri queuedUri) throws ExecutionException, InterruptedException, IOException, TimeoutException {
         System.out.println("RENDER " + executionId + " :: " + queuedUri.getUri());
         CrawlConfig config = queuedUri.getCrawlConfig();
 
@@ -96,8 +98,8 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
 //                    }
 //                }
 //                System.out.println("<<<<<<");
-            String script = db.getBrowserScripts(MessagesProto.BrowserScript.Type.EXTRACT_OUTLINKS).get(0).getScript();
-            QueuedUri[] outlinks = pex.extractOutlinks(db, script);
+            String script = db.getBrowserScripts(BrowserScript.Type.EXTRACT_OUTLINKS).get(0).getScript();
+            List<QueuedUri> outlinks = pex.extractOutlinks(db, script);
             pex.getDocumentUrl();
             pex.scrollToTop();
             return outlinks;

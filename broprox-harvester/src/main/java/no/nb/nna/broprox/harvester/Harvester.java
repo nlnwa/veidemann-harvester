@@ -25,7 +25,7 @@ import com.typesafe.config.ConfigFactory;
 import no.nb.nna.broprox.commons.TracerFactory;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
-import no.nb.nna.broprox.harvester.api.ApiServer;
+import no.nb.nna.broprox.harvester.api.HarvesterApiServer;
 import no.nb.nna.broprox.harvester.browsercontroller.BrowserController;
 import no.nb.nna.broprox.harvester.proxy.ContentWriterClient;
 import no.nb.nna.broprox.harvester.proxy.RecordingProxy;
@@ -75,7 +75,7 @@ public class Harvester {
                         new File(SETTINGS.getWorkDir()),
                         SETTINGS.getProxyPort(), db, contentWriterClient, SETTINGS.getDnsServers());
 
-                ApiServer apiServer = new ApiServer(db, controller, proxy);) {
+                HarvesterApiServer apiServer = new HarvesterApiServer(db, controller, proxy).start();) {
 
             LOG.info("Broprox harvester (v. {}) started", Harvester.class.getPackage().getImplementationVersion());
 

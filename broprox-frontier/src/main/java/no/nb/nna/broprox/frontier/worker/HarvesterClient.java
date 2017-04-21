@@ -15,63 +15,60 @@
  */
 package no.nb.nna.broprox.frontier.worker;
 
-import java.util.Optional;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
 
-import com.google.gson.reflect.TypeToken;
-import javax.ws.rs.WebApplicationException;
-import javax.ws.rs.client.Client;
-import javax.ws.rs.client.ClientBuilder;
-import javax.ws.rs.client.Entity;
-import javax.ws.rs.client.WebTarget;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
-import javax.ws.rs.core.UriBuilder;
-import no.nb.nna.broprox.db.DbObjectFactory;
-import no.nb.nna.broprox.db.model.QueuedUri;
+import io.grpc.ManagedChannel;
+import io.grpc.ManagedChannelBuilder;
+import no.nb.nna.broprox.api.HarvesterGrpc;
+import no.nb.nna.broprox.api.HarvesterGrpc.HarvesterBlockingStub;
+import no.nb.nna.broprox.api.HarvesterGrpc.HarvesterStub;
+import no.nb.nna.broprox.api.HarvesterProto.HarvestPageReply;
+import no.nb.nna.broprox.api.HarvesterProto.HarvestPageRequest;
+import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  *
  */
 public class HarvesterClient implements AutoCloseable {
+    private static final Logger LOG = LoggerFactory.getLogger(HarvesterClient.class);
 
-    final static Client CLIENT = ClientBuilder.newClient();
+    private final ManagedChannel channel;
 
-    final WebTarget harvesterTarget;
+    private final HarvesterBlockingStub blockingStub;
 
-    private static final TypeToken URI_ARRAY_TYPE = new TypeToken<QueuedUri[]>() {
-    };
+    private final HarvesterStub asyncStub;
 
     public HarvesterClient(final String host, final int port) {
-        harvesterTarget = CLIENT.target(UriBuilder.fromPath("/").host(host).port(port).scheme("http").build());
-        System.out.println("Target: " + harvesterTarget);
+        this(ManagedChannelBuilder.forAddress(host, port).usePlaintext(true));
+        LOG.info("Harvester client pointing to " + host + ":" + port);
     }
 
-    public QueuedUri[] fetchPage(String executionId, QueuedUri qUri) {
-        try {
-            String request = qUri.toJson();
+    public HarvesterClient(ManagedChannelBuilder<?> channelBuilder) {
+        LOG.info("Setting up harvester client");
+        channel = channelBuilder.build();
+        blockingStub = HarvesterGrpc.newBlockingStub(channel);
+        asyncStub = HarvesterGrpc.newStub(channel);
+    }
 
-            Response outlinkResponse = harvesterTarget.path("fetch")
-                    .queryParam("executionId", executionId)
-                    .request()
-                    .accept(MediaType.APPLICATION_JSON)
-                    .post(Entity.entity(request, MediaType.APPLICATION_JSON), Response.class);
-
-            if (outlinkResponse.getStatusInfo().getFamily() != Response.Status.Family.SUCCESSFUL) {
-                throw new WebApplicationException(outlinkResponse);
-            }
-
-            String json = outlinkResponse.readEntity(String.class);
-            Optional<QueuedUri[]> outlinks = DbObjectFactory.of(URI_ARRAY_TYPE, json);
-            return outlinks.get();
-        } catch (Exception e) {
-            e.printStackTrace();
-            throw new RuntimeException(e);
-        }
+    public List<QueuedUri> fetchPage(String executionId, QueuedUri qUri) {
+        HarvestPageRequest request = HarvestPageRequest.newBuilder()
+                .setExecutionId(executionId)
+                .setQueuedUri(qUri)
+                .build();
+        HarvestPageReply reply = blockingStub.harvestPage(request);
+        return reply.getOutlinksList();
     }
 
     @Override
     public void close() {
-        CLIENT.close();
+        try {
+            channel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
+        } catch (InterruptedException ex) {
+            throw new RuntimeException(ex);
+        }
     }
 
 }

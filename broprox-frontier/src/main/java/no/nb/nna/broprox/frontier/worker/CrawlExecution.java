@@ -15,6 +15,7 @@
  */
 package no.nb.nna.broprox.frontier.worker;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Delayed;
 import java.util.concurrent.ForkJoinPool;
@@ -22,10 +23,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.rethinkdb.RethinkDB;
+import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
-import no.nb.nna.broprox.db.model.CrawlConfig;
-import no.nb.nna.broprox.db.model.CrawlExecutionStatus;
-import no.nb.nna.broprox.db.model.QueuedUri;
+import no.nb.nna.broprox.model.MessagesProto;
+import no.nb.nna.broprox.model.MessagesProto.CrawlConfig;
+import no.nb.nna.broprox.model.MessagesProto.CrawlExecutionStatus;
+import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
 import org.netpreserve.commons.uri.UriConfigs;
 import org.openjdk.jol.info.GraphLayout;
 import org.slf4j.Logger;
@@ -38,7 +41,7 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker, Delayed {
 
     private static final Logger LOG = LoggerFactory.getLogger(CrawlExecution.class);
 
-    private final CrawlExecutionStatus status;
+    private CrawlExecutionStatus status;
 
     private final Frontier frontier;
 
@@ -46,11 +49,11 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker, Delayed {
 
     private QueuedUri currentUri;
 
-    private volatile QueuedUri[] outlinks;
+    private volatile List<QueuedUri> outlinks;
 
     private long nextExecTimestamp = 0L;
 
-    private final AtomicLong nextSeqNum = new AtomicLong(0L);
+    private final AtomicLong nextSeqNum = new AtomicLong(1L);
 
     private boolean seedResolved = false;
 
@@ -73,38 +76,51 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker, Delayed {
         return status;
     }
 
+    public void setStatus(CrawlExecutionStatus status) {
+        this.status = status;
+    }
+
     public QueuedUri getCurrentUri() {
         return currentUri;
     }
 
     public void setCurrentUri(QueuedUri currentUri) {
         this.currentUri = currentUri;
-        this.outlinks = null;
+        this.outlinks = Collections.EMPTY_LIST;
     }
 
     public void fetch() {
         System.out.println("Fetching " + currentUri.getUri());
-        currentUri
-                .withCrawlConfig(config)
-                .withSurt(UriConfigs.SURT_KEY.buildUri(currentUri.getUri()).toString());
+        currentUri = currentUri.toBuilder()
+                .setCrawlConfig(config)
+                .setSurt(UriConfigs.SURT_KEY.buildUri(currentUri.getUri()).toString())
+                .build();
 
         try {
             try {
                 outlinks = frontier.getHarvesterClient().fetchPage(status.getId(), currentUri);
                 seedResolved = true;
 
-                status.withState(CrawlExecutionStatus.State.RUNNING)
-                        .withDocumentsCrawled(status.getDocumentsCrawled() + 1);
+                status = status.toBuilder()
+                        .setState(CrawlExecutionStatus.State.RUNNING)
+                        .setDocumentsCrawled(status.getDocumentsCrawled() + 1)
+                        .build();
                 frontier.getDb().updateExecutionStatus(status);
 
             } catch (Exception e) {
                 System.out.println("Error fetching page (" + currentUri + "): " + e);
                 // should do some logging and updating here
+                status = status.toBuilder()
+                        .setState(CrawlExecutionStatus.State.FAILED)
+                        .build();
+                frontier.getDb().updateExecutionStatus(status);
+                seedResolved = true;
+                System.out.println("Nothing more to do since Harvester is dead.");
+                return;
             }
 
-            if (outlinks == null || outlinks.length == 0) {
+            if (outlinks.isEmpty()) {
                 LOG.debug("No outlinks from {}", currentUri.getSurt());
-                outlinks = new QueuedUri[0];
                 return;
             }
 
@@ -118,56 +134,93 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker, Delayed {
     }
 
     void queueOutlinks() {
-        QueuedUri.IdSeq currentId = new QueuedUri.IdSeq(getId(), 0L);
+        QueuedUri.IdSeq currentId = QueuedUri.IdSeq.newBuilder()
+                .setId(getId())
+                .setSeq(1L)
+                .build();
 
-        long nextSequenceNum = 0;
-        if (!config.isDepthFirst()) {
+        long nextSequenceNum = 1;
+        if (!config.getDepthFirst()) {
             nextSequenceNum = getNextSequenceNum();
         }
 
+//        outlinks.stream().map(uri -> {
+//            return uri.toBuilder();
+//        }).forEach(outUriBuilder -> {
+//            try {
+//                outUriBuilder.setSurt(UriConfigs.SURT_KEY.buildUri(outUriBuilder.getUri()).toString());
+//            } catch (Exception e) {
+//                System.out.println("Strange error with outlink (" + outUriBuilder + "): " + e);
+//                e.printStackTrace();
+//                return;
+//            }
+//
+//            if (shouldInclude(outUriBuilder)) {
+//                LOG.debug("Found new URI: {}, queueing.", outUriBuilder.getSurt());
+//                List<QueuedUri.IdSeq> eIds = outUriBuilder.getExecutionIdsList();
+//
+//                if (!eIds.contains(currentId)) {
+//                    if (config.getDepthFirst()) {
+//                        nextSequenceNum = getNextSequenceNum();
+//                    }
+//
+//                    outUriBuilder.addExecutionIds(currentId.toBuilder().setSeq(nextSequenceNum).build());
+//                }
+//                try {
+//                    frontier.getDb().addQueuedUri(outUriBuilder.build());
+//                } catch (Exception e) {
+//                    e.printStackTrace();
+//                }
+//            } else {
+//                LOG.debug("Found already included URI: {}, skipping.", outUriBuilder.getSurt());
+//            }
+//        });
+
         for (QueuedUri outUri : outlinks) {
+            QueuedUri.Builder outUriBuilder = outUri.toBuilder();
             try {
-                outUri.withSurt(UriConfigs.SURT_KEY.buildUri(outUri.getUri()).toString());
+                outUriBuilder.setSurt(UriConfigs.SURT_KEY.buildUri(outUriBuilder.getUri()).toString());
             } catch (Exception e) {
-                System.out.println("Strange error with outlink (" + outUri + "): " + e);
+                System.out.println("Strange error with outlink (" + outUriBuilder + "): " + e);
                 e.printStackTrace();
                 return;
             }
 
-            if (shouldInclude(outUri)) {
-                LOG.debug("Found new URI: {}, queueing.", outUri.getSurt());
-                List<QueuedUri.IdSeq> eIds = outUri.listExecutionIds();
+            if (shouldInclude(outUriBuilder)) {
+                LOG.debug("Found new URI: {}, queueing.", outUriBuilder.getSurt());
+                List<QueuedUri.IdSeq> eIds = outUriBuilder.getExecutionIdsList();
 
                 if (!eIds.contains(currentId)) {
-                    if (config.isDepthFirst()) {
+                    if (config.getDepthFirst()) {
                         nextSequenceNum = getNextSequenceNum();
                     }
 
-                    outUri.addExecutionId(new QueuedUri.IdSeq(getId(), nextSequenceNum));
+                    outUriBuilder.addExecutionIds(currentId.toBuilder().setSeq(nextSequenceNum).build());
                 }
                 try {
-                    frontier.getDb().addQueuedUri(outUri);
+                    frontier.getDb().addQueuedUri(outUriBuilder.build());
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
             } else {
-                LOG.debug("Found already included URI: {}, skipping.", outUri.getSurt());
+                LOG.debug("Found already included URI: {}, skipping.", outUriBuilder.getSurt());
             }
         }
     }
 
-    boolean shouldInclude(QueuedUri outlink) {
+    boolean shouldInclude(MessagesProto.QueuedUriOrBuilder outlink) {
         RethinkDB r = RethinkDB.r;
         boolean notSeen = frontier.getDb().executeRequest(
                 r.table(RethinkDbAdapter.TABLE_CRAWL_LOG)
-                .between(
-                        r.array(outlink.getSurt(), status.getStartTime()),
-                        r.array(outlink.getSurt(), r.maxval()))
-                .optArg("index", "surt_time").filter(row -> row.g("statusCode").lt(500)).limit(1)
-                .union(
-                        r.table(RethinkDbAdapter.TABLE_URI_QUEUE).getAll(outlink.getSurt()).optArg("index", "surt")
-                        .limit(1)
-                ).isEmpty());
+                        .between(
+                                r.array(outlink.getSurt(), ProtoUtils.tsToOdt(status.getStartTime())),
+                                r.array(outlink.getSurt(), r.maxval()))
+                        .optArg("index", "surt_time").filter(row -> row.g("statusCode").lt(500)).limit(1)
+                        .union(
+                                r.table(RethinkDbAdapter.TABLE_URI_QUEUE).getAll(outlink.getSurt())
+                                        .optArg("index", "surt")
+                                        .limit(1)
+                        ).isEmpty());
 
         if (notSeen && outlink.getSurt().startsWith(config.getScope())) {
             return true;
@@ -185,7 +238,7 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker, Delayed {
 
     @Override
     public boolean block() throws InterruptedException {
-        if (outlinks == null) {
+        if (outlinks.isEmpty()) {
             fetch();
         }
         return true;
@@ -193,11 +246,11 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker, Delayed {
 
     @Override
     public boolean isReleasable() {
-        return outlinks != null;
+        return !outlinks.isEmpty();
     }
 
     public boolean isDone() {
-        return outlinks.length == 0;
+        return outlinks.isEmpty();
     }
 
     public boolean isSeedResolved() {

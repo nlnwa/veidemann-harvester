@@ -36,7 +36,7 @@ import javax.ws.rs.core.MediaType;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.db.DbObjectFactory;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
-import no.nb.nna.broprox.db.model.CrawlConfig;
+import no.nb.nna.broprox.model.MessagesProto.CrawlConfig;
 import no.nb.nna.broprox.frontier.worker.Frontier;
 import org.netpreserve.commons.uri.UriConfigs;
 import org.netpreserve.commons.uri.UriFormat;
@@ -104,13 +104,14 @@ public class StatsResource {
 
         UriFormat f = UriConfigs.SURT_KEY_FORMAT;
         System.out.println("URL: " + url);
-        CrawlConfig config = DbObjectFactory.create(CrawlConfig.class)
-                .withWindowWidth(900)
-                .withWindowHeight(900)
-                .withScope(generateScope(url))
-                .withMinTimeBetweenPageLoadMillis(waitTime)
-                .withPageLoadTimeout(timeout)
-                .withDepthFirst(false);
+        CrawlConfig config = CrawlConfig.newBuilder()
+                .setWindowWidth(900)
+                .setWindowHeight(900)
+                .setScope(generateScope(url))
+                .setMinTimeBetweenPageLoadMillis(waitTime)
+                .setPageLoadTimeout(timeout)
+                .setDepthFirst(false)
+                .build();
 
         try {
             frontier.newExecution(config, url);

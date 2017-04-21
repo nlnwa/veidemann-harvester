@@ -189,4 +189,11 @@ public class ProtoUtils {
         return Timestamps.fromMillis(timestamp.toInstant().toEpochMilli());
     }
 
+    public static Timestamp getNowTs() {
+        return Timestamps.fromMillis(System.currentTimeMillis());
+    }
+
+    public static OffsetDateTime getNowOdt() {
+        return OffsetDateTime.now(ZoneOffset.UTC);
+    }
 }

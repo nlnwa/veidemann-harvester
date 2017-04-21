@@ -16,8 +16,11 @@
 package no.nb.nna.broprox.harvester.browsercontroller;
 
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -29,7 +32,8 @@ import no.nb.nna.broprox.chrome.client.RuntimeDomain;
 import no.nb.nna.broprox.chrome.client.Session;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.db.DbObjectFactory;
-import no.nb.nna.broprox.db.model.QueuedUri;
+import no.nb.nna.broprox.db.ProtoUtils;
+import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
 import no.nb.nna.broprox.db.model.Screenshot;
 import no.nb.nna.broprox.harvester.BroproxHeaderConstants;
 
@@ -65,7 +69,7 @@ public class PageExecution implements BroproxHeaderConstants {
             discoveryPath = "";
         }
         extraHeaders.put(EXECUTION_ID, executionId);
-        extraHeaders.put(ALL_EXECUTION_IDS, gson.toJson(queuedUri.getExecutionIds()));
+        extraHeaders.put(ALL_EXECUTION_IDS, gson.toJson(queuedUri.getExecutionIdsList()));
         extraHeaders.put(DISCOVERY_PATH, discoveryPath);
     }
 
@@ -73,9 +77,9 @@ public class PageExecution implements BroproxHeaderConstants {
         CompletableFuture<PageDomain.FrameStoppedLoading> loaded = session.page.onFrameStoppedLoading();
 
         session.page.onNavigationRequested(nr -> {
-                extraHeaders.put(DISCOVERY_PATH, discoveryPath + "E");
-                session.network.setExtraHTTPHeaders(extraHeaders);
-                session.page.processNavigation("Proceed", nr.navigationId);
+            extraHeaders.put(DISCOVERY_PATH, discoveryPath + "E");
+            session.network.setExtraHTTPHeaders(extraHeaders);
+            session.page.processNavigation("Proceed", nr.navigationId);
         });
 
         session.page.onJavascriptDialogOpening(js -> {
@@ -100,27 +104,28 @@ public class PageExecution implements BroproxHeaderConstants {
 //            Thread.sleep(sleep);
     }
 
-    public QueuedUri[] extractOutlinks(DbAdapter db, String script) throws InterruptedException, ExecutionException, TimeoutException {
+    public List<QueuedUri> extractOutlinks(DbAdapter db, String script) throws InterruptedException, ExecutionException, TimeoutException {
+        List<QueuedUri> outlinks = Collections.EMPTY_LIST;
         RuntimeDomain.Evaluate ev = session.runtime
                 .evaluate(script, null, null, null, null, Boolean.TRUE, null, null, null).get(timeout, MILLISECONDS);
         if (ev.result.value != null) {
             String resultString = ((String) ev.result.value).trim();
             if (!resultString.isEmpty()) {
+                outlinks = new ArrayList<>();
                 String[] links = resultString.split("\n+");
-                QueuedUri[] outlinks = new QueuedUri[links.length];
                 String path = discoveryPath + "L";
                 for (int i = 0; i < links.length; i++) {
-                    outlinks[i] = DbObjectFactory.create(QueuedUri.class)
-                            .withExecutionIds(queuedUri.getExecutionIds())
-                            .withUri(links[i])
-                            .withReferrer(queuedUri.getUri())
-                            .withTimeStamp(OffsetDateTime.now())
-                            .withDiscoveryPath(path);
+                    outlinks.add(QueuedUri.newBuilder()
+                            .addAllExecutionIds(queuedUri.getExecutionIdsList())
+                            .setUri(links[i])
+                            .setReferrer(queuedUri.getUri())
+                            .setTimeStamp(ProtoUtils.odtToTs(OffsetDateTime.now()))
+                            .setDiscoveryPath(path)
+                            .build());
                 }
-                return outlinks;
             }
         }
-        return new QueuedUri[0];
+        return outlinks;
     }
 
     public String getDocumentUrl() throws InterruptedException, ExecutionException, TimeoutException {

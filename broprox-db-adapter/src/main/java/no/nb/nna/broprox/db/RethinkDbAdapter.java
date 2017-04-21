@@ -35,14 +35,14 @@ import io.opentracing.tag.Tags;
 import io.opentracing.util.GlobalTracer;
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListRequest;
-import no.nb.nna.broprox.db.model.CrawlExecutionStatus;
 import no.nb.nna.broprox.db.model.CrawlLog;
 import no.nb.nna.broprox.db.model.CrawledContent;
 import no.nb.nna.broprox.db.model.ExtractedText;
-import no.nb.nna.broprox.db.model.QueuedUri;
 import no.nb.nna.broprox.db.model.Screenshot;
 import no.nb.nna.broprox.model.MessagesProto.BrowserScript;
 import no.nb.nna.broprox.model.MessagesProto.CrawlEntity;
+import no.nb.nna.broprox.model.MessagesProto.CrawlExecutionStatus;
+import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
 import org.yaml.snakeyaml.Yaml;
 
 /**
@@ -108,7 +108,10 @@ public class RethinkDbAdapter implements DbAdapter {
 
             r.tableCreate(TABLE_URI_QUEUE).run(conn);
             r.table(TABLE_URI_QUEUE).indexCreate("surt").run(conn);
-            r.table(TABLE_URI_QUEUE).indexCreate("executionIds").optArg("multi", true).run(conn);
+            r.table(TABLE_URI_QUEUE).indexCreate("executionIds", uri -> uri.g("executionIds")
+                    .map(eid -> r.array(eid.g("id"), eid.g("seq")))
+            ).optArg("multi", true).run(conn);
+
             r.table(TABLE_URI_QUEUE).indexWait("surt", "executionIds").run(conn);
 
             r.tableCreate(TABLE_EXECUTIONS).run(conn);
@@ -204,22 +207,62 @@ public class RethinkDbAdapter implements DbAdapter {
 
     @Override
     public CrawlExecutionStatus addExecutionStatus(CrawlExecutionStatus status) {
-        return insert(TABLE_EXECUTIONS, status);
+        Span span = createSpan("db-addExecutionStatus");
+
+        Map rMap = ProtoUtils.protoToRethink(status);
+
+        Map<String, Object> response = executeRequest(r.table(TABLE_EXECUTIONS)
+                .insert(rMap)
+                .optArg("conflict", "error"));
+
+        String key = ((List<String>) response.get("generated_keys")).get(0);
+
+        span.finish();
+        return status.toBuilder().setId(key).build();
     }
 
     @Override
     public CrawlExecutionStatus updateExecutionStatus(CrawlExecutionStatus status) {
-        return update(TABLE_EXECUTIONS, status.getId(), status);
+        Span span = createSpan("db-updateQueuedUri");
+
+        Map rMap = ProtoUtils.protoToRethink(status);
+
+        Map<String, Object> response = executeRequest(r.table(TABLE_EXECUTIONS)
+                .get(status.getId())
+                .update(rMap));
+
+        span.finish();
+        return status;
     }
 
     @Override
     public QueuedUri addQueuedUri(QueuedUri qu) {
-        return insert(TABLE_URI_QUEUE, qu);
+        Span span = createSpan("db-addQueuedUri");
+
+        Map rMap = ProtoUtils.protoToRethink(qu);
+
+        Map<String, Object> response = executeRequest(r.table(TABLE_URI_QUEUE)
+                .insert(rMap)
+                .optArg("conflict", "error"));
+
+        String key = ((List<String>) response.get("generated_keys")).get(0);
+
+        span.finish();
+        return qu.toBuilder().setId(key).build();
     }
 
     @Override
     public QueuedUri updateQueuedUri(QueuedUri qu) {
-        return update(TABLE_URI_QUEUE, qu.getId(), qu);
+        Span span = createSpan("db-updateQueuedUri");
+
+        Map rMap = ProtoUtils.protoToRethink(qu);
+
+        Map<String, Object> response = executeRequest(r.table(TABLE_URI_QUEUE)
+                .get(qu.getId())
+                .update(rMap));
+
+        span.finish();
+        return qu;
     }
 
     @Override

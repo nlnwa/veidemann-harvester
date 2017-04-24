@@ -16,8 +16,6 @@
 package no.nb.nna.broprox.harvester.proxy;
 
 import java.net.InetSocketAddress;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.FullHttpResponse;
@@ -27,10 +25,10 @@ import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
-import no.nb.nna.broprox.db.model.CrawlLog;
 import no.nb.nna.broprox.db.DbAdapter;
-import no.nb.nna.broprox.db.DbObjectFactory;
+import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.harvester.BroproxHeaderConstants;
+import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
 import org.littleshoot.proxy.HttpFiltersAdapter;
 import org.littleshoot.proxy.impl.ProxyUtils;
 import org.netpreserve.commons.uri.UriConfigs;
@@ -46,11 +44,9 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
 
     private final String uri;
 
-    private final DbAdapter db;
-
     private final AlreadyCrawledCache cache;
 
-    private final CrawlLog crawlLog;
+    private final CrawlLog.Builder crawlLog;
 
     private final ContentInterceptor contentInterceptor;
 
@@ -71,12 +67,11 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
 
         super(originalRequest.setUri(uri), ctx);
         this.uri = uri;
-        this.db = db;
         this.contentWriterClient = contentWriterClient;
 
-        this.crawlLog = DbObjectFactory.create(CrawlLog.class)
-                .withRequestedUri(uri)
-                .withSurt(UriConfigs.SURT_KEY.buildUri(uri).toString());
+        this.crawlLog = CrawlLog.newBuilder()
+                .setRequestedUri(uri)
+                .setSurt(UriConfigs.SURT_KEY.buildUri(uri).toString());
         this.contentInterceptor = new ContentInterceptor(db, ctx, contentWriterClient);
         this.cache = cache;
     }
@@ -113,9 +108,9 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
 
             // Fix headers before sending to final destination
             req.headers().set("Accept-Encoding", "identity");
-            crawlLog.withFetchTimeStamp(OffsetDateTime.now(ZoneOffset.UTC))
-                    .withReferrer(req.headers().get("referer"))
-                    .withDiscoveryPath(req.headers().get(DISCOVERY_PATH));
+            crawlLog.setFetchTimeStamp(ProtoUtils.getNowTs())
+                    .setReferrer(req.headers().get("referer", ""))
+                    .setDiscoveryPath(req.headers().get(DISCOVERY_PATH, ""));
 
             req.headers()
                     .remove(DISCOVERY_PATH)
@@ -133,8 +128,8 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
             responseStatus = res.status();
             httpVersion = res.protocolVersion();
 
-            crawlLog.withStatusCode(responseStatus.code())
-                    .withContentType(res.headers().get("Content-Type"));
+            crawlLog.setStatusCode(responseStatus.code())
+                    .setContentType(res.headers().get("Content-Type"));
             contentInterceptor.addHeader(res.headers());
 
             try {
@@ -168,7 +163,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
 
     @Override
     public void proxyToServerResolutionSucceeded(String serverHostAndPort, InetSocketAddress resolvedRemoteAddress) {
-        crawlLog.withIpAddress(resolvedRemoteAddress.getAddress().getHostAddress());
+        crawlLog.setIpAddress(resolvedRemoteAddress.getAddress().getHostAddress());
     }
 
     @Override

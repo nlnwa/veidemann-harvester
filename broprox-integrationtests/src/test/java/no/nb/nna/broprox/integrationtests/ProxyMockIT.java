@@ -28,8 +28,8 @@ import no.nb.nna.broprox.chrome.client.ChromeDebugProtocol;
 import no.nb.nna.broprox.chrome.client.PageDomain;
 import no.nb.nna.broprox.chrome.client.Session;
 import no.nb.nna.broprox.chrome.client.ws.CompleteMany;
-import no.nb.nna.broprox.db.DbObjectFactory;
-import no.nb.nna.broprox.db.model.QueuedUri;
+import no.nb.nna.broprox.db.ProtoUtils;
+import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
 import no.nb.nna.broprox.harvester.BroproxHeaderConstants;
 import no.nb.nna.broprox.harvester.browsercontroller.PageExecution;
 import org.junit.Ignore;
@@ -57,9 +57,10 @@ public class ProxyMockIT implements BroproxHeaderConstants {
         System.out.println("Chrome port: " + chromePort);
         ChromeDebugProtocol chrome = new ChromeDebugProtocol(chromeHost, chromePort);
 
-        QueuedUri qUri = DbObjectFactory.create(QueuedUri.class)
-                .addExecutionId(new QueuedUri.IdSeq("foo", 1))
-                .addExecutionId(new QueuedUri.IdSeq("bar", 2));
+        QueuedUri qUri = QueuedUri.newBuilder()
+                .addExecutionIds(QueuedUri.IdSeq.newBuilder().setId("foo").setSeq(1))
+                .addExecutionIds(QueuedUri.IdSeq.newBuilder().setId("bar").setSeq(2))
+                .build();
 
 //        List<String> l = new ArrayList<>();
 //        l.add("foo");
@@ -73,16 +74,16 @@ public class ProxyMockIT implements BroproxHeaderConstants {
                     session.network.enable(null, null),
                     session.network.setCacheDisabled(true),
                     session.runtime
-                    .evaluate("navigator.userAgent;", null, false, false, null, false, false, false, false)
-                    .thenAccept(e -> {
-                        session.network.setUserAgentOverride(((String) e.result.value)
-                                .replace("HeadlessChrome", session.version()));
-                    }),
+                            .evaluate("navigator.userAgent;", null, false, false, null, false, false, false, false)
+                            .thenAccept(e -> {
+                                session.network.setUserAgentOverride(((String) e.result.value)
+                                        .replace("HeadlessChrome", session.version()));
+                            }),
                     session.debugger
-                    .setBreakpointByUrl(1, null, "https?://www.google-analytics.com/analytics.js", null, null),
+                            .setBreakpointByUrl(1, null, "https?://www.google-analytics.com/analytics.js", null, null),
                     session.debugger.setBreakpointByUrl(1, null, "https?://www.google-analytics.com/ga.js", null, null),
-                    session.network.setExtraHTTPHeaders(Collections.singletonMap(ALL_EXECUTION_IDS, gson.toJson(qUri
-                                            .getExecutionIds()))),
+                    session.network.setExtraHTTPHeaders(Collections.singletonMap(ALL_EXECUTION_IDS,
+                            ProtoUtils.protoListToJson(qUri.getExecutionIdsList()))),
                     session.page.setControlNavigations(Boolean.TRUE)
             ).get(timeout, MILLISECONDS);
 

@@ -36,8 +36,8 @@ import com.google.common.net.InetAddresses;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import no.nb.nna.broprox.db.DbAdapter;
-import no.nb.nna.broprox.db.DbObjectFactory;
-import no.nb.nna.broprox.db.model.CrawlLog;
+import no.nb.nna.broprox.db.ProtoUtils;
+import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
 import org.littleshoot.proxy.HostResolver;
 import org.netpreserve.commons.util.datetime.DateFormat;
 import org.netpreserve.commons.util.datetime.Granularity;
@@ -210,27 +210,25 @@ public class DnsLookup implements HostResolver {
         byte[] buf = new byte[payload.readableBytes()];
         payload.getBytes(payload.readerIndex(), buf);
 
-        CrawlLog crawlLog = DbObjectFactory.create(CrawlLog.class)
-                .withRecordType("response")
-                .withRequestedUri("dns:" + host)
-                .withFetchTimeStamp(state.fetchStart)
-                .withIpAddress(state.dnsIp)
-                .withContentType("text/dns")
-                .withSize(payload.readableBytes());
+        CrawlLog.Builder crawlLogBuilder = CrawlLog.newBuilder()
+                .setRecordType("response")
+                .setRequestedUri("dns:" + host)
+                .setFetchTimeStamp(ProtoUtils.odtToTs(state.fetchStart))
+                .setIpAddress(state.dnsIp)
+                .setContentType("text/dns")
+                .setSize(payload.readableBytes());
 
         // Shall we get a digest on the content downloaded?
         if (digestContent) {
             MessageDigest digest = MessageDigest.getInstance(getDigestAlgorithm());
 
             String digestString = "sha1:" + new BigInteger(1, digest.digest(buf)).toString(16);
-            crawlLog.withBlockDigest(digestString);
+            crawlLogBuilder.setBlockDigest(digestString);
         }
 
-//        System.out.println("META:\n" + crawlLog.toJson());
-//        System.out.println("DATA:\n" + payload.toString(StandardCharsets.UTF_8));
-
+        CrawlLog crawlLog = crawlLogBuilder.build();
         if (db != null) {
-            db.addCrawlLog(crawlLog);
+            crawlLog = db.addCrawlLog(crawlLog);
         }
         if (contentWriterClient != null) {
             URI uri = contentWriterClient.writeRecord(crawlLog, payload, null);

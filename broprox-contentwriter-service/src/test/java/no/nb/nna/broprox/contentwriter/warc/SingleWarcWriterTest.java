@@ -18,8 +18,8 @@ package no.nb.nna.broprox.contentwriter.warc;
 import java.io.File;
 import java.io.IOException;
 
-import no.nb.nna.broprox.db.model.CrawlLog;
-import no.nb.nna.broprox.db.DbObjectFactory;
+//import no.nb.nna.broprox.db.model.CrawlLog;
+//import no.nb.nna.broprox.db.DbObjectFactory;
 import org.junit.Ignore;
 import org.junit.Test;
 
@@ -50,32 +50,32 @@ public class SingleWarcWriterTest {
 
         try (SingleWarcWriter instance = new SingleWarcWriter(targetDir, maxFileSize, compress, 1);) {
             for (int i = 0; i < 10; i++) {
-                DbObjectFactory.of(CrawlLog.class, "{\n"
-                        + "\"contentType\":  \"image/gif\" ,\n"
-                        + "\"digest\":  \"sha1:dc1cdfa814046ea64609c438e1777f55ff3aa86c\" ,\n"
-                        + "\"discoveryPath\":  \"E\" ,\n"
-                        + "\"fetchTimeMillis\": 16,\n"
-                        + "\"fetchTimeStamp\": {\"dateTime\":{\"date\":{\"year\":2017,\"month\":2,\"day\":2},\"time\":{"
-                        + "\"hour\":9,\"minute\":32,\"second\":57,\"nano\":515000000}},\"offset\":{\"totalSeconds\":3600}},\n"
-                        + "\"warcId\":  \"dff5cbea-84b3-4faf-ab62-e047feef5636\" ,\n"
-                        + "\"recordType\":  \"revisit\" ,\n"
-                        + "\"referrer\": \"http://johnh.nb.no/\",\n"
-                        + "\"requestedUri\": \"http://johnh.nb.no/icons/unknown.gif\",\n"
-                        + "\"size\": 9,\n"
-                        + "\"statusCode\": 200,\n"
-                        + "\"surt\":  \"(no,nb,johnh,)/icons/unknown.gif\" ,\n"
-                        + "\"timeStamp\": {\"dateTime\":{\"date\":{\"year\":2017,\"month\":2,\"day\":2},\"time\":{\"hour\":"
-                        + "9,\"minute\":32,\"second\":57,\"nano\":515000000}},\"offset\":{\"totalSeconds\":3600}}\n"
-                        + "}")
-                        .ifPresent(l -> {
-                            System.out.println("REF: " + instance.writeHeader(l));
-                            instance.addPayload(data.getBytes());
-                    try {
-                        instance.closeRecord();
-                    } catch (IOException ex) {
-                        throw new RuntimeException(ex);
-                    }
-                        });
+//                DbObjectFactory.of(CrawlLog.class, "{\n"
+//                        + "\"contentType\":  \"image/gif\" ,\n"
+//                        + "\"digest\":  \"sha1:dc1cdfa814046ea64609c438e1777f55ff3aa86c\" ,\n"
+//                        + "\"discoveryPath\":  \"E\" ,\n"
+//                        + "\"fetchTimeMillis\": 16,\n"
+//                        + "\"fetchTimeStamp\": {\"dateTime\":{\"date\":{\"year\":2017,\"month\":2,\"day\":2},\"time\":{"
+//                        + "\"hour\":9,\"minute\":32,\"second\":57,\"nano\":515000000}},\"offset\":{\"totalSeconds\":3600}},\n"
+//                        + "\"warcId\":  \"dff5cbea-84b3-4faf-ab62-e047feef5636\" ,\n"
+//                        + "\"recordType\":  \"revisit\" ,\n"
+//                        + "\"referrer\": \"http://johnh.nb.no/\",\n"
+//                        + "\"requestedUri\": \"http://johnh.nb.no/icons/unknown.gif\",\n"
+//                        + "\"size\": 9,\n"
+//                        + "\"statusCode\": 200,\n"
+//                        + "\"surt\":  \"(no,nb,johnh,)/icons/unknown.gif\" ,\n"
+//                        + "\"timeStamp\": {\"dateTime\":{\"date\":{\"year\":2017,\"month\":2,\"day\":2},\"time\":{\"hour\":"
+//                        + "9,\"minute\":32,\"second\":57,\"nano\":515000000}},\"offset\":{\"totalSeconds\":3600}}\n"
+//                        + "}")
+//                        .ifPresent(l -> {
+//                            System.out.println("REF: " + instance.writeHeader(l));
+//                            instance.addPayload(data.getBytes());
+//                    try {
+//                        instance.closeRecord();
+//                    } catch (IOException ex) {
+//                        throw new RuntimeException(ex);
+//                    }
+//                        });
 
             }
         }

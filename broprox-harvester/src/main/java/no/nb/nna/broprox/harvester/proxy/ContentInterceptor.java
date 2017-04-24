@@ -31,10 +31,10 @@ import io.netty.buffer.CompositeByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.util.AsciiString;
-import no.nb.nna.broprox.db.model.CrawlLog;
-import no.nb.nna.broprox.db.model.CrawledContent;
 import no.nb.nna.broprox.db.DbAdapter;
-import no.nb.nna.broprox.db.DbObjectFactory;
+import no.nb.nna.broprox.db.ProtoUtils;
+import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
+import no.nb.nna.broprox.model.MessagesProto.CrawledContent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -151,40 +151,44 @@ public class ContentInterceptor {
         return headerSize;
     }
 
-    public void writeData(CrawlLog logEntry) {
+    public void writeData(CrawlLog.Builder logEntry) {
         String payloadDigestString = getPayloadDigest();
-        logEntry.withFetchTimeMillis(
-                Duration.between(logEntry.getFetchTimeStamp(), OffsetDateTime.now(ZoneOffset.UTC)).toMillis());
+        logEntry.setFetchTimeMillis(Duration.between(ProtoUtils.tsToOdt(
+                logEntry.getFetchTimeStamp()), OffsetDateTime.now(ZoneOffset.UTC)).toMillis());
 
         Optional<CrawledContent> isDuplicate = db.isDuplicateContent(payloadDigestString);
 
         if (isDuplicate.isPresent()) {
-            logEntry.withRecordType("revisit")
-                    .withBlockDigest(getHeaderDigest())
-                    .withSize(headerSize)
-                    .withWarcRefersTo(isDuplicate.get().getWarcId());
-            db.addCrawlLog(logEntry);
+            logEntry.setRecordType("revisit")
+                    .setBlockDigest(getHeaderDigest())
+                    .setSize(headerSize)
+                    .setWarcRefersTo(isDuplicate.get().getWarcId());
+
+            CrawlLog crawlLog = db.addCrawlLog(logEntry.build());
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Writing {} as a revisit of {}", logEntry.getRequestedUri(), logEntry.getWarcRefersTo());
             }
-            contentWriterClient.writeRecord(logEntry, headerBuf, null);
+            contentWriterClient.writeRecord(crawlLog, headerBuf, null);
         } else {
-            logEntry.withRecordType("response")
-                    .withBlockDigest(getBlockDigest())
-                    .withPayloadDigest(payloadDigestString)
-                    .withSize(headerSize + 2 + payloadSize);
-            db.addCrawlLog(logEntry);
+            logEntry.setRecordType("response")
+                    .setBlockDigest(getBlockDigest())
+                    .setPayloadDigest(payloadDigestString)
+                    .setSize(headerSize + 2 + payloadSize);
+
+            CrawlLog crawlLog = db.addCrawlLog(logEntry.build());
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Writing {}", logEntry.getRequestedUri());
             }
-            contentWriterClient.writeRecord(logEntry, headerBuf, payloadBuf);
+            contentWriterClient.writeRecord(crawlLog, headerBuf, payloadBuf);
         }
 
 //        headerBuf.release();
 //        payloadBuf.release();
         if (!isDuplicate.isPresent()) {
-            db.addCrawledContent(DbObjectFactory.create(CrawledContent.class)
-                    .withDigest(payloadDigestString).withWarcId(logEntry.getWarcId()));
+            db.addCrawledContent(CrawledContent.newBuilder()
+                    .setDigest(payloadDigestString)
+                    .setWarcId(logEntry.getWarcId())
+                    .build());
         }
     }
 

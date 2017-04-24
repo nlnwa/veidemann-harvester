@@ -32,8 +32,8 @@ import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.util.AttributeKey;
-import no.nb.nna.broprox.db.DbObjectFactory;
-import no.nb.nna.broprox.db.model.QueuedUri;
+import no.nb.nna.broprox.db.ProtoUtils;
+import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
 import no.nb.nna.broprox.harvester.BroproxHeaderConstants;
 import org.littleshoot.proxy.HttpFilters;
 import org.littleshoot.proxy.HttpFiltersAdapter;
@@ -92,9 +92,8 @@ public class LoggingProxyFilter extends HttpFiltersAdapter {
                 System.out.println("   " + e.getKey() + " = " + e.getValue());
                 if (ALL_EXECUTION_IDS.equals(e.getKey().toString())) {
                     System.out.println("YYY");
-                    Type EID_TYPE = new TypeToken<List<List>>() {}.getType();
-                    List<List> eIds = DbObjectFactory.gson.fromJson(e.getValue().toString(), EID_TYPE);
-                    System.out.println("XXXX " + eIds);
+                    List<QueuedUri.IdSeq> allExId = ProtoUtils.jsonListToProto(e.getValue().toString(), QueuedUri.IdSeq.class);
+                    System.out.println("XXXX " + allExId);
                 }
             }
 //            req.headers().set("Accept-Encoding", "identity");

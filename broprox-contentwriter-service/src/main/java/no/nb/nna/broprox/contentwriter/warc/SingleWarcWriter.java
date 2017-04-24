@@ -27,16 +27,16 @@ import java.util.GregorianCalendar;
 import java.util.TimeZone;
 import java.util.UUID;
 
-import no.nb.nna.broprox.db.model.CrawlLog;
-
-import static org.jwat.warc.WarcConstants.*;
-
+import no.nb.nna.broprox.db.ProtoUtils;
+import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
 import org.jwat.warc.WarcFileNaming;
 import org.jwat.warc.WarcFileNamingDefault;
 import org.jwat.warc.WarcFileWriter;
 import org.jwat.warc.WarcFileWriterConfig;
 import org.jwat.warc.WarcRecord;
 import org.jwat.warc.WarcWriter;
+
+import static org.jwat.warc.WarcConstants.*;
 
 /**
  *
@@ -67,7 +67,7 @@ public class SingleWarcWriter implements AutoCloseable {
 
             record.header.addHeader(FN_WARC_TYPE, logEntry.getRecordType());
             record.header.addHeader(FN_WARC_TARGET_URI, logEntry.getRequestedUri());
-            Date warcDate = Date.from(logEntry.getFetchTimeStamp().toInstant());
+            Date warcDate = Date.from(ProtoUtils.tsToOdt(logEntry.getFetchTimeStamp()).toInstant());
             record.header.addHeader(FN_WARC_DATE, warcDate, null);
             record.header.addHeader(FN_WARC_RECORD_ID, "<urn:uuid:" + logEntry.getWarcId() + ">");
 

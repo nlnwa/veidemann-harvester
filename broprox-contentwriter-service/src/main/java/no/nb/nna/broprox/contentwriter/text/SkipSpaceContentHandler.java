@@ -7,12 +7,10 @@ package no.nb.nna.broprox.contentwriter.text;
 
 import java.util.regex.Pattern;
 
-import no.nb.nna.broprox.db.model.CrawlLog;
-import no.nb.nna.broprox.db.model.ExtractedText;
+import no.nb.nna.broprox.model.MessagesProto.ExtractedText;
 import org.apache.tika.metadata.Metadata;
 import org.apache.tika.sax.ContentHandlerDecorator;
 import org.apache.tika.sax.WriteOutContentHandler;
-import org.xml.sax.ContentHandler;
 import org.xml.sax.SAXException;
 
 /**
@@ -21,16 +19,16 @@ import org.xml.sax.SAXException;
 public class SkipSpaceContentHandler extends ContentHandlerDecorator {
 
     // Horizontal and vertical whitespace characters
-    private static final Pattern skipSpacePattern = Pattern.compile("[\\h\\v]+");
+    private static final Pattern SKIP_SPACE_PATTERN = Pattern.compile("[\\h\\v]+");
 
-    private static final Pattern sentencePattern = Pattern.compile("[.:!?]+");
+    private static final Pattern SENTENCE_PATTERN = Pattern.compile("[.:!?]+");
 
-    private static final Pattern wordPattern = Pattern.compile("[^\\p{IsLatin}]+");
+    private static final Pattern WORD_PATTERN = Pattern.compile("[^\\p{IsLatin}]+");
 
 //    private static final LanguageDetect langDetector = new LanguageDetect();
     private final Metadata metadata;
 
-    private final ExtractedText extractedText;
+    private ExtractedText extractedText;
 
     private StringBuilder stringBuilder;
 
@@ -44,24 +42,11 @@ public class SkipSpaceContentHandler extends ContentHandlerDecorator {
 
     private long characterCount = 0;
 
-//    public SkipSpaceContentHandler(ContentHandler handler, Metadata metadata) {
-//        super(new WriteOutContentHandler(handler, -1));
-//        this.metadata = metadata;
-//        this.stringBuilder = new StringBuilder();
-//    }
-
-    public SkipSpaceContentHandler(final ExtractedText extractedText, final Metadata metadata) {
+    public SkipSpaceContentHandler(final Metadata metadata) {
         super(new WriteOutContentHandler(-1));
-        this.extractedText = extractedText;
         this.metadata = metadata;
         this.stringBuilder = new StringBuilder();
     }
-
-//    public SkipSpaceContentHandler() {
-//        super(new WriteOutContentHandler(-1));
-//        this.metadata = new Metadata();
-//        this.stringBuilder = new StringBuilder();
-//    }
 
     @Override
     public void endElement(String uri, String localName, String name) throws SAXException {
@@ -83,15 +68,15 @@ public class SkipSpaceContentHandler extends ContentHandlerDecorator {
     public void endDocument() throws SAXException {
         super.endDocument();
 
-        text = skipSpacePattern.matcher(stringBuilder).replaceAll(" ").trim();
+        text = SKIP_SPACE_PATTERN.matcher(stringBuilder).replaceAll(" ").trim();
         stringBuilder = null;
         if (!text.isEmpty()) {
 //            String language = langDetector.detect(text).or("n/a");
 //            metadata.add("Language", language);
 
-            sentencePattern.splitAsStream(text).forEach(s -> {
+            SENTENCE_PATTERN.splitAsStream(text).forEach(s -> {
                 sentenceCount++;
-                wordPattern.splitAsStream(s).forEach(w -> {
+                WORD_PATTERN.splitAsStream(s).forEach(w -> {
                     wordCount++;
                     characterCount += w.length();
                     if (w.length() > 6) {
@@ -99,35 +84,20 @@ public class SkipSpaceContentHandler extends ContentHandlerDecorator {
                     }
                 });
             });
-            extractedText
-                    .withText(text)
-                    .withSentenceCount(sentenceCount)
-                    .withWordCount(wordCount)
-                    .withLongWordCount(longWordCount)
-                    .withCharacterCount(characterCount)
-                    .withLix(calculateLix());
+            extractedText = ExtractedText.newBuilder()
+                    .setText(text)
+                    .setSentenceCount(sentenceCount)
+                    .setWordCount(wordCount)
+                    .setLongWordCount(longWordCount)
+                    .setCharacterCount(characterCount)
+                    .setLix(calculateLix())
+                    .build();
         }
     }
 
-//    public String getText() {
-//        return text;
-//    }
-//
-//    public long getSentenceCount() {
-//        return sentenceCount;
-//    }
-//
-//    public long getWordCount() {
-//        return wordCount;
-//    }
-//
-//    public long getLongWordCount() {
-//        return longWordCount;
-//    }
-//
-//    public long getCharacterCount() {
-//        return characterCount;
-//    }
+    public ExtractedText getExtractedText() {
+        return extractedText;
+    }
 
     public long calculateLix() {
         if (sentenceCount <= 0 || wordCount <= 0) {

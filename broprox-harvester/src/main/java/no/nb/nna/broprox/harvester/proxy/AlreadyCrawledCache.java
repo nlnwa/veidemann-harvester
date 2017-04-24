@@ -26,8 +26,9 @@ import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
-import no.nb.nna.broprox.db.DbObjectFactory;
+import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.harvester.BroproxHeaderConstants;
+import no.nb.nna.broprox.model.MessagesProto.QueuedUri.IdSeq;
 import org.cache2k.Cache;
 import org.cache2k.Cache2kBuilder;
 import org.cache2k.CacheEntry;
@@ -83,10 +84,10 @@ public class AlreadyCrawledCache {
         FullHttpResponse cacheValue = cache.peek(key);
 
         if (cacheValue == null) {
-            List<List> allExId = DbObjectFactory.gson.fromJson(allExIdHeader, EID_TYPE);
-            for (List eId : allExId) {
-                if (!exIdHeader.equals(eId.get(0))) {
-                    CacheKey altKey = new CacheKey(uri, (String) eId.get(0));
+            List<IdSeq> allExId = ProtoUtils.jsonListToProto(allExIdHeader, IdSeq.class);
+            for (IdSeq eId : allExId) {
+                if (!exIdHeader.equals(eId.getId())) {
+                    CacheKey altKey = new CacheKey(uri, (String) eId.getId());
                     cacheValue = cache.peek(altKey);
                     if (cacheValue != null) {
                         cache.put(key, cacheValue);

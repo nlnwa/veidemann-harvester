@@ -8,10 +8,8 @@ package no.nb.nna.broprox.contentwriter.text;
 import java.io.IOException;
 import java.io.InputStream;
 
-import no.nb.nna.broprox.db.model.CrawlLog;
 import no.nb.nna.broprox.db.DbAdapter;
-import no.nb.nna.broprox.db.DbObjectFactory;
-import no.nb.nna.broprox.db.model.ExtractedText;
+import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
 import org.apache.tika.exception.TikaException;
 import org.apache.tika.metadata.Metadata;
 import org.apache.tika.parser.AutoDetectParser;
@@ -27,9 +25,8 @@ public class TextExtracter {
     public void analyze(InputStream in, CrawlLog logEntry, DbAdapter db) throws IOException {
         if (shouldParse(logEntry)) {
             AutoDetectParser parser = new AutoDetectParser();
-            ExtractedText extractedText = DbObjectFactory.create(ExtractedText.class);
             Metadata metadata = new Metadata();
-            SkipSpaceContentHandler innerHandler = new SkipSpaceContentHandler(extractedText, metadata);
+            SkipSpaceContentHandler innerHandler = new SkipSpaceContentHandler(metadata);
             ContentHandler handler = new BodyContentHandler(innerHandler);
             try {
                 parser.parse(in, handler, metadata);
@@ -39,8 +36,8 @@ public class TextExtracter {
 //                    stats.log(logEntry.getRequestedUri(), metadata, innerHandler.getText());
                 }
                 System.out.println("META: " + metadata);
-                if (extractedText.getCharacterCount() > 50) {
-                    db.addExtractedText(extractedText);
+                if (innerHandler.getExtractedText().getCharacterCount() > 50) {
+                    db.addExtractedText(innerHandler.getExtractedText());
                 }
             } catch (SAXException | TikaException ex) {
                 System.out.println("Failed reading content from " + logEntry.getRequestedUri() + " ("

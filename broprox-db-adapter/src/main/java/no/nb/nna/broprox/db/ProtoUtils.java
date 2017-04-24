@@ -19,15 +19,21 @@ import java.lang.reflect.InvocationTargetException;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.protobuf.ByteString;
 import com.google.protobuf.Descriptors;
+import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.MapEntry;
 import com.google.protobuf.Message;
 import com.google.protobuf.MessageOrBuilder;
 import com.google.protobuf.Timestamp;
+import com.google.protobuf.util.JsonFormat;
 import com.google.protobuf.util.Timestamps;
 
 import static no.nb.nna.broprox.db.RethinkDbAdapter.r;
@@ -36,6 +42,10 @@ import static no.nb.nna.broprox.db.RethinkDbAdapter.r;
  * Static methods for converting between Protobuf messages and RethinkDB objects.
  */
 public class ProtoUtils {
+
+    private static final JsonFormat.Parser JSON_PARSER = JsonFormat.parser();
+
+    private static final JsonFormat.Printer JSON_PRINTER = JsonFormat.printer().omittingInsignificantWhitespace();
 
     /**
      * Utility class should not be instanciated.
@@ -50,6 +60,8 @@ public class ProtoUtils {
      * @return a map suitable for RethinkDb
      */
     public static Map protoToRethink(MessageOrBuilder msg) {
+        Objects.requireNonNull(msg, "The msg cannot be null");
+
         Map rMap = r.hashMap();
         msg.getAllFields().forEach((f, v) -> {
             if (f.isRepeated()) {
@@ -88,6 +100,10 @@ public class ProtoUtils {
                     case ENUM:
                         rMap.put(f.getJsonName(), v.toString());
                         break;
+                    case BYTES:
+                        v = r.binary(((ByteString) v).toByteArray());
+                        rMap.put(f.getJsonName(), v);
+                        break;
                     default:
                         rMap.put(f.getJsonName(), v);
                         break;
@@ -109,8 +125,7 @@ public class ProtoUtils {
         try {
             Message.Builder protoBuilder = (Message.Builder) type.getMethod("newBuilder").invoke(null);
             return rethinkToProto(msg, protoBuilder);
-        } catch (NoSuchMethodException | SecurityException | IllegalAccessException
-                | IllegalArgumentException | InvocationTargetException ex) {
+        } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException ex) {
             throw new RuntimeException(ex);
         }
     }
@@ -124,6 +139,8 @@ public class ProtoUtils {
      * @return the generated ProtoBuf Message
      */
     public static <T extends Message> T rethinkToProto(Map msg, Message.Builder protoBuilder) {
+        Objects.requireNonNull(msg, "The msg cannot be null");
+
         protoBuilder.getDescriptorForType().getFields().forEach(fd -> {
             Object value = msg.get(fd.getJsonName());
             if (value != null) {
@@ -159,6 +176,16 @@ public class ProtoUtils {
                         case ENUM:
                             protoBuilder.setField(fd, fd.getEnumType().findValueByName((String) value));
                             break;
+                        case INT32:
+                            if (value instanceof Long) {
+                                protoBuilder.setField(fd, ((Long) value).intValue());
+                            } else {
+                                protoBuilder.setField(fd, (int) value);
+                            }
+                            break;
+                        case BYTES:
+                            protoBuilder.setField(fd, ByteString.copyFrom((byte[]) value));
+                            break;
                         default:
                             protoBuilder.setField(fd, value);
                             break;
@@ -167,6 +194,46 @@ public class ProtoUtils {
             }
         });
         return (T) protoBuilder.build();
+    }
+
+    public static String protoToJson(MessageOrBuilder msg) {
+        try {
+            return JSON_PRINTER.print(msg);
+        } catch (InvalidProtocolBufferException ex) {
+            throw new RuntimeException(ex);
+        }
+    }
+
+    public static String protoListToJson(List<? extends MessageOrBuilder> msgs) {
+        return msgs.stream()
+                .map(msg -> protoToJson(msg))
+                .collect(Collectors.joining(",", "[", "]"));
+    }
+
+    public static <T extends Message> T jsonToProto(String msg, Class<T> type) {
+        try {
+            T.Builder protoBuilder = (T.Builder) type.getMethod("newBuilder").invoke(null);
+            try {
+                JSON_PARSER.merge(msg, protoBuilder);
+            } catch (InvalidProtocolBufferException ex) {
+                throw new RuntimeException(ex);
+            }
+            return (T) protoBuilder.build();
+        } catch (NoSuchMethodException | SecurityException | IllegalAccessException
+                | IllegalArgumentException | InvocationTargetException ex) {
+            throw new RuntimeException(ex);
+        }
+    }
+
+    public static <T extends Message> List<T> jsonListToProto(String msg, Class<T> type) {
+        if (msg.startsWith("[") && msg.endsWith("]")) {
+            String[] msgs = msg.substring(1, msg.length() - 1).split(",");
+            return Arrays.stream(msgs)
+                    .map(s -> jsonToProto(s, type))
+                    .collect(Collectors.toList());
+        } else {
+            throw new IllegalArgumentException("Input is not an JSON array: " + msg);
+        }
     }
 
     /**
@@ -196,4 +263,5 @@ public class ProtoUtils {
     public static OffsetDateTime getNowOdt() {
         return OffsetDateTime.now(ZoneOffset.UTC);
     }
+
 }

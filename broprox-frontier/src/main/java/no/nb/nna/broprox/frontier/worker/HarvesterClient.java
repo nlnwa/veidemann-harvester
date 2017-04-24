@@ -20,6 +20,7 @@ import java.util.concurrent.TimeUnit;
 
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import io.grpc.StatusRuntimeException;
 import no.nb.nna.broprox.api.HarvesterGrpc;
 import no.nb.nna.broprox.api.HarvesterGrpc.HarvesterBlockingStub;
 import no.nb.nna.broprox.api.HarvesterGrpc.HarvesterStub;
@@ -33,6 +34,7 @@ import org.slf4j.LoggerFactory;
  *
  */
 public class HarvesterClient implements AutoCloseable {
+
     private static final Logger LOG = LoggerFactory.getLogger(HarvesterClient.class);
 
     private final ManagedChannel channel;
@@ -54,12 +56,17 @@ public class HarvesterClient implements AutoCloseable {
     }
 
     public List<QueuedUri> fetchPage(String executionId, QueuedUri qUri) {
-        HarvestPageRequest request = HarvestPageRequest.newBuilder()
-                .setExecutionId(executionId)
-                .setQueuedUri(qUri)
-                .build();
-        HarvestPageReply reply = blockingStub.harvestPage(request);
-        return reply.getOutlinksList();
+        try {
+            HarvestPageRequest request = HarvestPageRequest.newBuilder()
+                    .setExecutionId(executionId)
+                    .setQueuedUri(qUri)
+                    .build();
+            HarvestPageReply reply = blockingStub.harvestPage(request);
+            return reply.getOutlinksList();
+        } catch (StatusRuntimeException ex) {
+            LOG.error("RPC failed: " + ex.getStatus(), ex);
+            throw ex;
+        }
     }
 
     @Override

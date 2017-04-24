@@ -17,6 +17,8 @@ package no.nb.nna.broprox.harvester.proxy;
 
 import java.net.URI;
 
+import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.util.JsonFormat;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
 import javax.ws.rs.WebApplicationException;
@@ -26,7 +28,7 @@ import javax.ws.rs.client.Entity;
 import javax.ws.rs.client.WebTarget;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriBuilder;
-import no.nb.nna.broprox.db.model.CrawlLog;
+import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
 import org.glassfish.jersey.media.multipart.FormDataMultiPart;
 import org.glassfish.jersey.media.multipart.MultiPart;
 import org.glassfish.jersey.media.multipart.MultiPartFeature;
@@ -47,8 +49,13 @@ public class ContentWriterClient implements AutoCloseable {
     }
 
     public URI writeRecord(CrawlLog logEntry, ByteBuf headers, ByteBuf payload) {
-        final MultiPart multipart = new FormDataMultiPart()
-                .field("logEntry", logEntry.toJson());
+        final MultiPart multipart;
+        try {
+            multipart = new FormDataMultiPart()
+                    .field("logEntry", JsonFormat.printer().print(logEntry));
+        } catch (InvalidProtocolBufferException ex) {
+            throw new RuntimeException(ex);
+        }
 
         if (headers != null) {
             final StreamDataBodyPart headersPart = new StreamDataBodyPart("headers", new ByteBufInputStream(headers));

@@ -22,6 +22,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinTask;
 
+import com.google.protobuf.util.JsonFormat;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
@@ -32,9 +33,8 @@ import javax.ws.rs.core.Response;
 import no.nb.nna.broprox.contentwriter.text.TextExtracter;
 import no.nb.nna.broprox.contentwriter.warc.SingleWarcWriter;
 import no.nb.nna.broprox.contentwriter.warc.WarcWriterPool;
-import no.nb.nna.broprox.db.model.CrawlLog;
 import no.nb.nna.broprox.db.DbAdapter;
-import no.nb.nna.broprox.db.DbObjectFactory;
+import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
 import org.glassfish.jersey.media.multipart.FormDataBodyPart;
 import org.glassfish.jersey.media.multipart.FormDataParam;
 
@@ -72,12 +72,15 @@ public class FileUploadResource {
         long size = 0L;
 
         try (WarcWriterPool.PooledWarcWriter pooledWarcWriter = warcWriterPool.borrow()) {
-            CrawlLog logEntry = DbObjectFactory.of(CrawlLog.class, logEntryJson).get();
+            CrawlLog.Builder logEntryBuilder = CrawlLog.newBuilder();
+            JsonFormat.parser().merge(logEntryJson, logEntryBuilder);
+
             SingleWarcWriter warcWriter = pooledWarcWriter.getWarcWriter();
 
-            URI ref = warcWriter.writeHeader(logEntry);
-            logEntry.withStorageRef(ref.toString());
-            db.updateCrawlLog(logEntry);
+            URI ref = warcWriter.writeHeader(logEntryBuilder.build());
+            logEntryBuilder.setStorageRef(ref.toString());
+
+            CrawlLog logEntry = db.updateCrawlLog(logEntryBuilder.build());
 
             if (headers != null) {
                 size += warcWriter.addPayload(headers);

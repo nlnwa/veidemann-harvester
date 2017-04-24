@@ -20,14 +20,14 @@ import java.util.Optional;
 
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListRequest;
-import no.nb.nna.broprox.db.model.CrawlLog;
-import no.nb.nna.broprox.db.model.CrawledContent;
-import no.nb.nna.broprox.db.model.ExtractedText;
-import no.nb.nna.broprox.db.model.Screenshot;
 import no.nb.nna.broprox.model.MessagesProto.BrowserScript;
-import no.nb.nna.broprox.model.MessagesProto.CrawlExecutionStatus;
 import no.nb.nna.broprox.model.MessagesProto.CrawlEntity;
+import no.nb.nna.broprox.model.MessagesProto.CrawlExecutionStatus;
+import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
+import no.nb.nna.broprox.model.MessagesProto.CrawledContent;
+import no.nb.nna.broprox.model.MessagesProto.ExtractedText;
 import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
+import no.nb.nna.broprox.model.MessagesProto.Screenshot;
 
 /**
  * Adapter for Broprox's database.

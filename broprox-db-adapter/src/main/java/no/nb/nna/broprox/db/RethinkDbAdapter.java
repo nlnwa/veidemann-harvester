@@ -35,14 +35,14 @@ import io.opentracing.tag.Tags;
 import io.opentracing.util.GlobalTracer;
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListRequest;
-import no.nb.nna.broprox.db.model.CrawlLog;
-import no.nb.nna.broprox.db.model.CrawledContent;
-import no.nb.nna.broprox.db.model.ExtractedText;
-import no.nb.nna.broprox.db.model.Screenshot;
 import no.nb.nna.broprox.model.MessagesProto.BrowserScript;
 import no.nb.nna.broprox.model.MessagesProto.CrawlEntity;
 import no.nb.nna.broprox.model.MessagesProto.CrawlExecutionStatus;
+import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
+import no.nb.nna.broprox.model.MessagesProto.CrawledContent;
+import no.nb.nna.broprox.model.MessagesProto.ExtractedText;
 import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
+import no.nb.nna.broprox.model.MessagesProto.Screenshot;
 import org.yaml.snakeyaml.Yaml;
 
 /**
@@ -135,38 +135,93 @@ public class RethinkDbAdapter implements DbAdapter {
         }
     }
 
+    @Override
     public Optional<CrawledContent> isDuplicateContent(String digest) {
-        return get(TABLE_CRAWLED_CONTENT, digest, CrawledContent.class);
+        Span span = createSpan("db-isDuplicateContent");
+        Map<String, Object> response = executeRequest(r.table(TABLE_CRAWLED_CONTENT).get(digest));
+        span.finish();
+        if (response == null) {
+            return Optional.empty();
+        } else {
+            return Optional.of(ProtoUtils.rethinkToProto(response, CrawledContent.class));
+        }
     }
 
     public void deleteCrawledContent(String digest) {
         delete(TABLE_CRAWLED_CONTENT, digest);
     }
 
+    @Override
     public CrawledContent addCrawledContent(CrawledContent cc) {
-        return insert(TABLE_CRAWLED_CONTENT, cc);
+        Span span = createSpan("db-addCrawledContent");
+
+        Map rMap = ProtoUtils.protoToRethink(cc);
+
+        Map<String, Object> response = executeRequest(r.table(TABLE_CRAWLED_CONTENT)
+                .insert(rMap)
+                .optArg("conflict", "error"));
+
+        String key = ((List<String>) response.get("generated_keys")).get(0);
+
+        span.finish();
+        return cc.toBuilder().setDigest(key).build();
     }
 
+    @Override
     public ExtractedText addExtractedText(ExtractedText et) {
-        return insert(TABLE_EXTRACTED_TEXT, et);
+        Span span = createSpan("db-addExtractedText");
+
+        Map rMap = ProtoUtils.protoToRethink(et);
+
+        Map<String, Object> response = executeRequest(r.table(TABLE_EXTRACTED_TEXT)
+                .insert(rMap)
+                .optArg("conflict", "error"));
+
+        String key = ((List<String>) response.get("generated_keys")).get(0);
+
+        span.finish();
+        return et.toBuilder().setWarcId(key).build();
     }
 
+    @Override
     public CrawlLog addCrawlLog(CrawlLog cl) {
-        Map<String, Object> data = ((DbObject) cl).getMap();
-        if (!data.containsKey("timeStamp")) {
-            data.put("timeStamp", r.now());
+        Span span = createSpan("db-addCrawlLog");
+
+        Map rMap = ProtoUtils.protoToRethink(cl);
+        if (!rMap.containsKey("timeStamp")) {
+            rMap.put("timeStamp", r.now());
         }
 
-        return insert(TABLE_CRAWL_LOG, cl);
+        Map<String, Object> response = executeRequest(r.table(TABLE_CRAWL_LOG)
+                .insert(rMap)
+                .optArg("conflict", "error"));
+
+        String key = ((List<String>) response.get("generated_keys")).get(0);
+
+        cl = cl.toBuilder().setWarcId(key).build();
+
+        span.finish();
+        return cl;
     }
 
+    @Override
     public CrawlLog updateCrawlLog(CrawlLog cl) {
-        Map<String, Object> data = ((DbObject) cl).getMap();
-        if (!data.containsKey("timeStamp")) {
-            data.put("timeStamp", r.now());
+        Span span = createSpan("db-updateCrawlLog");
+
+        Map rMap = ProtoUtils.protoToRethink(cl);
+        if (!rMap.containsKey("timeStamp")) {
+            rMap.put("timeStamp", r.now());
         }
 
-        return update(TABLE_CRAWL_LOG, cl.getWarcId(), cl);
+        Map<String, Object> response = executeRequest(r.table(TABLE_CRAWL_LOG)
+                .get(cl.getWarcId())
+                .update(rMap)
+                .optArg("return_changes", "always"));
+        cl = ProtoUtils.rethinkToProto(
+                ((List<Map<String, Map>>) response.get("changes")).get(0).get("new_val"), CrawlLog.class);
+
+        span.finish();
+        return cl;
     }
 
     @Override
@@ -267,7 +322,18 @@ public class RethinkDbAdapter implements DbAdapter {
 
     @Override
     public Screenshot addScreenshot(Screenshot s) {
-        return insert(TABLE_SCREENSHOT, s);
+        Span span = createSpan("db-addQueuedUri");
+
+        Map rMap = ProtoUtils.protoToRethink(s);
+
+        Map<String, Object> response = executeRequest(r.table(TABLE_SCREENSHOT)
+                .insert(rMap)
+                .optArg("conflict", "error"));
+
+        String key = ((List<String>) response.get("generated_keys")).get(0);
+
+        span.finish();
+        return s.toBuilder().setId(key).build();
     }
 
     @Override
@@ -331,34 +397,34 @@ public class RethinkDbAdapter implements DbAdapter {
         return spanBuilder.start();
     }
 
-    private <T extends DbObject> T insert(String table, T data) {
-        Span span = createSpan("db-insert-" + table);
-        Map response = executeRequest(r.table(table)
-                .insert(data.getMap())
-                .optArg("conflict", "error")
-                .optArg("return_changes", "always"));
-        data.setMap(((List<Map<String, Map<String, Object>>>) response.get("changes")).get(0).get("new_val"));
-        span.finish();
-        return data;
-    }
-
-    private <T extends DbObject> T update(String table, Object key, T data) {
-        Span span = createSpan("db-update-" + table);
-        Map response = executeRequest(r.table(table)
-                .get(key)
-                .update(data.getMap())
-                .optArg("return_changes", "always"));
-        data.setMap(((List<Map<String, Map<String, Object>>>) response.get("changes")).get(0).get("new_val"));
-        span.finish();
-        return data;
-    }
-
-    private <T extends DbObject> Optional<T> get(String table, Object key, Class<T> type) {
-        Span span = createSpan("db-get-" + table);
-        Map<String, Object> response = executeRequest(r.table(table).get(key));
-        span.finish();
-        return DbObjectFactory.of(type, response);
-    }
+//    private <T extends DbObject> T insert(String table, T data) {
+//        Span span = createSpan("db-insert-" + table);
+//        Map response = executeRequest(r.table(table)
+//                .insert(data.getMap())
+//                .optArg("conflict", "error")
+//                .optArg("return_changes", "always"));
+//        data.setMap(((List<Map<String, Map<String, Object>>>) response.get("changes")).get(0).get("new_val"));
+//        span.finish();
+//        return data;
+//    }
+//
+//    private <T extends DbObject> T update(String table, Object key, T data) {
+//        Span span = createSpan("db-update-" + table);
+//        Map response = executeRequest(r.table(table)
+//                .get(key)
+//                .update(data.getMap())
+//                .optArg("return_changes", "always"));
+//        data.setMap(((List<Map<String, Map<String, Object>>>) response.get("changes")).get(0).get("new_val"));
+//        span.finish();
+//        return data;
+//    }
+//
+//    private <T extends DbObject> Optional<T> get(String table, Object key, Class<T> type) {
+//        Span span = createSpan("db-get-" + table);
+//        Map<String, Object> response = executeRequest(r.table(table).get(key));
+//        span.finish();
+//        return DbObjectFactory.of(type, response);
+//    }
 
     private void delete(String table, Object key) {
         Span span = createSpan("db-delete-" + table);

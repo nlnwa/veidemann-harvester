@@ -27,14 +27,14 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 
 import com.google.gson.Gson;
+import com.google.protobuf.ByteString;
 import no.nb.nna.broprox.chrome.client.PageDomain;
 import no.nb.nna.broprox.chrome.client.RuntimeDomain;
 import no.nb.nna.broprox.chrome.client.Session;
 import no.nb.nna.broprox.db.DbAdapter;
-import no.nb.nna.broprox.db.DbObjectFactory;
 import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
-import no.nb.nna.broprox.db.model.Screenshot;
+import no.nb.nna.broprox.model.MessagesProto.Screenshot;
 import no.nb.nna.broprox.harvester.BroproxHeaderConstants;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
@@ -46,6 +46,7 @@ import static no.nb.nna.broprox.harvester.BroproxHeaderConstants.EXECUTION_ID;
  *
  */
 public class PageExecution implements BroproxHeaderConstants {
+    private final String executionId;
 
     private final QueuedUri queuedUri;
 
@@ -55,11 +56,12 @@ public class PageExecution implements BroproxHeaderConstants {
 
     private final Map<String, Object> extraHeaders = new HashMap<>();
 
-    private final Gson gson = new Gson();
+//    private final Gson gson = new Gson();
 
     private String discoveryPath;
 
     public PageExecution(String executionId, QueuedUri queuedUri, Session session, long timeout) {
+        this.executionId = executionId;
         this.queuedUri = queuedUri;
         this.session = session;
         this.timeout = timeout;
@@ -69,7 +71,7 @@ public class PageExecution implements BroproxHeaderConstants {
             discoveryPath = "";
         }
         extraHeaders.put(EXECUTION_ID, executionId);
-        extraHeaders.put(ALL_EXECUTION_IDS, gson.toJson(queuedUri.getExecutionIdsList()));
+        extraHeaders.put(ALL_EXECUTION_IDS, ProtoUtils.protoListToJson(queuedUri.getExecutionIdsList()));
         extraHeaders.put(DISCOVERY_PATH, discoveryPath);
     }
 
@@ -144,10 +146,12 @@ public class PageExecution implements BroproxHeaderConstants {
     public void saveScreenshot(DbAdapter db) throws InterruptedException, ExecutionException, TimeoutException {
         session.page.captureScreenshot().thenAccept(s -> {
             byte[] img = Base64.getDecoder().decode(s.data);
-            db.addScreenshot(DbObjectFactory.create(Screenshot.class)
-                    .withImg(img)
-                    //                    .withExecutionId(queuedUri.getExecutionIds())
-                    .withUri(queuedUri.getUri()));
+
+            db.addScreenshot(Screenshot.newBuilder()
+                    .setImg(ByteString.copyFrom(img))
+                    .setExecutionId(executionId)
+                    .setUri(queuedUri.getUri())
+                    .build());
         }).get(timeout, MILLISECONDS);
     }
 

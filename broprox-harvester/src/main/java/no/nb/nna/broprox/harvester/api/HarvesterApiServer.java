@@ -57,32 +57,6 @@ public class HarvesterApiServer implements AutoCloseable {
                 .build();
 
         server = ServerBuilder.forPort(port).addService(tracingInterceptor.intercept(new HarvesterService(db, controller, proxy))).build();
-
-//        URI baseUri = UriBuilder.fromUri("http://0.0.0.0/").port(port).build();
-//        ResourceConfig resourceConfig = new ResourceConfig()
-//                .register(ApiResource.class)
-//                .register(new AbstractBinder() {
-//                    @Override
-//                    protected void configure() {
-//                        bind(db).to(DbAdapter.class);
-//                    }
-//
-//                })
-//                .register(new AbstractBinder() {
-//                    @Override
-//                    protected void configure() {
-//                        bind(controller);
-//                    }
-//
-//                })
-//                .register(new AbstractBinder() {
-//                    @Override
-//                    protected void configure() {
-//                        bind(proxy);
-//                    }
-//
-//                });
-//        server = GrizzlyHttpServerFactory.createHttpServer(baseUri, resourceConfig);
     }
 
     @Override
@@ -96,10 +70,6 @@ public class HarvesterApiServer implements AutoCloseable {
     public HarvesterApiServer start() {
         try {
             server.start();
-
-            LOG.info("Broprox Harvester (v. {}) started",
-                    HarvesterApiServer.class.getPackage().getImplementationVersion());
-            LOG.info("Listening on {}", server.getPort());
 
             Runtime.getRuntime().addShutdownHook(new Thread() {
                 @Override

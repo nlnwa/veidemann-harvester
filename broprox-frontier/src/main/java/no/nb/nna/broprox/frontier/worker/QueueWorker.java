@@ -20,6 +20,12 @@ import java.util.concurrent.RecursiveAction;
 
 import com.rethinkdb.RethinkDB;
 import com.rethinkdb.net.Cursor;
+import io.grpc.Context;
+import io.opentracing.References;
+import io.opentracing.Span;
+import io.opentracing.contrib.OpenTracingContextKey;
+import io.opentracing.tag.Tags;
+import io.opentracing.util.GlobalTracer;
 import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.model.MessagesProto.CrawlExecutionStatus;
 import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
@@ -52,6 +58,13 @@ public class QueueWorker extends RecursiveAction {
                 System.out.println("Crawler thread stopped");
                 return;
             }
+            Span fetchSpan = GlobalTracer.get()
+                    .buildSpan("runNextFetch")
+                    .addReference(References.FOLLOWS_FROM, exe.getParentSpan().context())
+                    .start();
+
+            Context prev = Context.current().withValue(OpenTracingContextKey.getKey(), fetchSpan).attach();
+
             if (!exe.isSeedResolved()) {
                 try {
                     getPool().managedBlock(exe);
@@ -75,6 +88,7 @@ public class QueueWorker extends RecursiveAction {
                             .setEndTime(ProtoUtils.getNowTs())
                             .build());
                     frontier.getDb().updateExecutionStatus(exe.getStatus());
+                    frontier.getHarvesterClient().cleanupExecution(exe.getId());
                     frontier.runningExecutions.remove(exe.getId());
                 } else {
                     frontier.getDb().executeRequest(r.table(TABLE_URI_QUEUE).get(qUri.getId()).delete());
@@ -89,6 +103,9 @@ public class QueueWorker extends RecursiveAction {
                     }
                 }
             }
+
+            Context.current().detach(prev);
+            fetchSpan.finish();
         }
     }
 

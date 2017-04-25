@@ -23,6 +23,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.rethinkdb.RethinkDB;
+import io.grpc.Context;
+import io.opentracing.References;
+import io.opentracing.Span;
+import io.opentracing.contrib.OpenTracingContextKey;
+import io.opentracing.tag.Tags;
+import io.opentracing.util.GlobalTracer;
 import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
 import no.nb.nna.broprox.model.MessagesProto;
@@ -57,11 +63,14 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker, Delayed {
 
     private boolean seedResolved = false;
 
-    public CrawlExecution(Frontier frontier, CrawlExecutionStatus status, CrawlConfig config) {
+    private final Span parentSpan;
+
+    public CrawlExecution(Span span, Frontier frontier, CrawlExecutionStatus status, CrawlConfig config) {
         System.out.println("NEW CRAWL EXECUTION: " + status.getId());
         this.frontier = frontier;
         this.status = status;
         this.config = config;
+        this.parentSpan = span;
     }
 
     public String getId() {
@@ -110,10 +119,9 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker, Delayed {
             } catch (Exception e) {
                 System.out.println("Error fetching page (" + currentUri + "): " + e);
                 // should do some logging and updating here
-                status = status.toBuilder()
+                status = frontier.getDb().updateExecutionStatus(status.toBuilder()
                         .setState(CrawlExecutionStatus.State.FAILED)
-                        .build();
-                frontier.getDb().updateExecutionStatus(status);
+                        .build());
                 seedResolved = true;
                 System.out.println("Nothing more to do since Harvester is dead.");
                 return;
@@ -175,7 +183,6 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker, Delayed {
 //                LOG.debug("Found already included URI: {}, skipping.", outUriBuilder.getSurt());
 //            }
 //        });
-
         for (QueuedUri outUri : outlinks) {
             QueuedUri.Builder outUriBuilder = outUri.toBuilder();
             try {
@@ -239,7 +246,16 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker, Delayed {
     @Override
     public boolean block() throws InterruptedException {
         if (outlinks.isEmpty()) {
+            Span fetchSpan = GlobalTracer.get()
+                    .buildSpan("fetch")
+                    .asChildOf(OpenTracingContextKey.activeSpan())
+                    .withTag(Tags.HTTP_URL.getKey(), currentUri.getUri())
+                    .start();
+
+            Context prev = Context.current().withValue(OpenTracingContextKey.getKey(), fetchSpan).attach();
             fetch();
+            Context.current().detach(prev);
+            fetchSpan.finish();
         }
         return true;
     }
@@ -277,6 +293,10 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker, Delayed {
             return (int) (((CrawlExecution) o).nextExecTimestamp - nextExecTimestamp);
         }
         throw new IllegalArgumentException("Can only compare CrawlExecution");
+    }
+
+    public Span getParentSpan() {
+        return parentSpan;
     }
 
 }

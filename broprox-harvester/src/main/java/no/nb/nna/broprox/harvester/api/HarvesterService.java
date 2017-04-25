@@ -18,6 +18,8 @@ package no.nb.nna.broprox.harvester.api;
 import java.util.List;
 
 import io.grpc.stub.StreamObserver;
+import io.opentracing.Span;
+import io.opentracing.contrib.OpenTracingContextKey;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.api.HarvesterGrpc;
 import no.nb.nna.broprox.api.HarvesterProto.CleanupExecutionRequest;
@@ -25,6 +27,7 @@ import no.nb.nna.broprox.api.HarvesterProto.HarvestPageReply;
 import no.nb.nna.broprox.api.HarvesterProto.HarvestPageRequest;
 import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
 import no.nb.nna.broprox.harvester.BroproxHeaderConstants;
+import no.nb.nna.broprox.harvester.OpenTracingSpans;
 import no.nb.nna.broprox.harvester.browsercontroller.BrowserController;
 import no.nb.nna.broprox.harvester.proxy.RecordingProxy;
 import no.nb.nna.broprox.model.MessagesProto;
@@ -53,6 +56,9 @@ public class HarvesterService extends HarvesterGrpc.HarvesterImplBase {
             if (executionId.isEmpty()) {
                 executionId = BroproxHeaderConstants.MANUAL_EXID;
             }
+
+            OpenTracingSpans.register(executionId, OpenTracingContextKey.activeSpan());
+
             QueuedUri fetchUri = request.getQueuedUri();
             List<QueuedUri> outlinks = controller.render(executionId, fetchUri);
             HarvestPageReply reply = HarvestPageReply.newBuilder().addAllOutlinks(outlinks).build();
@@ -67,6 +73,7 @@ public class HarvesterService extends HarvesterGrpc.HarvesterImplBase {
     @Override
     public void cleanupExecution(CleanupExecutionRequest request, StreamObserver<MessagesProto.Void> responseObserver) {
         proxy.cleanCache(request.getExecutionId());
+        OpenTracingSpans.remove(request.getExecutionId());
     }
 
 }

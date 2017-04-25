@@ -31,16 +31,16 @@ import org.slf4j.LoggerFactory;
 /**
  *
  */
-public class ApiServer implements AutoCloseable {
+public class FrontierApiServer implements AutoCloseable {
 
-    private static final Logger LOG = LoggerFactory.getLogger(ApiServer.class);
+    private static final Logger LOG = LoggerFactory.getLogger(FrontierApiServer.class);
 
     final HttpServer server;
 
     /**
      * Construct a new REST API server.
      */
-    public ApiServer(DbAdapter db, Frontier queueProcessor) {
+    public FrontierApiServer(DbAdapter db, Frontier queueProcessor) {
         final int port = FrontierService.getSettings().getApiPort();
 
         LOG.info("Starting server listening on port {}.", port);

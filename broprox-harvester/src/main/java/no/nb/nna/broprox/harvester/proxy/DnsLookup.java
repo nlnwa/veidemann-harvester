@@ -33,8 +33,13 @@ import java.util.Iterator;
 import java.util.List;
 
 import com.google.common.net.InetAddresses;
+import io.grpc.Context;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
+import io.opentracing.Span;
+import io.opentracing.contrib.OpenTracingContextKey;
+import io.opentracing.tag.Tags;
+import io.opentracing.util.GlobalTracer;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
@@ -117,6 +122,13 @@ public class DnsLookup implements HostResolver {
 
     @Override
     public InetSocketAddress resolve(String host, int port) throws UnknownHostException {
+        Span span = GlobalTracer.get().buildSpan("dnsResolver")
+                .withTag("lookup", host + ':' + port)
+                .withTag(Tags.COMPONENT.getKey(), "dnsLookup")
+                .start();
+        Context prevContext = Context.current().withValue(OpenTracingContextKey.getKey(), span).attach();
+
+        try {
         // Check if host is already an ip address
         if (InetAddresses.isInetAddress(host)) {
             return new InetSocketAddress(InetAddresses.forString(host), port);
@@ -157,6 +169,10 @@ public class DnsLookup implements HostResolver {
         }
 
         throw new UnknownHostException(host);
+        } finally {
+            Context.current().detach(prevContext);
+            span.finish();
+        }
     }
 
     /**

@@ -27,6 +27,10 @@ import java.util.concurrent.TimeUnit;
 import com.github.mgunlogson.cuckoofilter4j.CuckooFilter;
 import com.google.common.hash.Funnels;
 import com.rethinkdb.RethinkDB;
+import io.grpc.Context;
+import io.opentracing.Span;
+import io.opentracing.contrib.OpenTracingContextKey;
+import io.opentracing.util.GlobalTracer;
 import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
 import no.nb.nna.broprox.model.MessagesProto.CrawlConfig;
@@ -87,13 +91,16 @@ public class Frontier implements AutoCloseable {
         }
     }
 
-    public void newExecution(CrawlConfig config, String... seed) {
+    public void newExecution(Span span, CrawlConfig config, String... seed) {
+        Span scheduleSeedsSpan = GlobalTracer.get().buildSpan("scheduleSeeds").asChildOf(span).start();
+        Context prev = Context.current().withValue(OpenTracingContextKey.getKey(), scheduleSeedsSpan).attach();
+
         CrawlExecutionStatus status = CrawlExecutionStatus.newBuilder()
                 .setState(CrawlExecutionStatus.State.CREATED)
                 .build();
 
         status = db.addExecutionStatus(status);
-        CrawlExecution exe = new CrawlExecution(this, status, config);
+        CrawlExecution exe = new CrawlExecution(span, this, status, config);
         runningExecutions.put(status.getId(), exe);
 
         status = status.toBuilder().setState(CrawlExecutionStatus.State.RUNNING)
@@ -111,6 +118,8 @@ public class Frontier implements AutoCloseable {
             exe.setCurrentUri(qUri);
             executionsQueue.add(exe);
         }
+        Context.current().detach(prev);
+        scheduleSeedsSpan.finish();
     }
 
     boolean alreadeyIncluded(QueuedUri qUri) {

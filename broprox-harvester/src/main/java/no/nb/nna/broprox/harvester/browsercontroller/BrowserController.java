@@ -28,7 +28,6 @@ import no.nb.nna.broprox.model.MessagesProto.BrowserScript;
 import no.nb.nna.broprox.model.MessagesProto.CrawlConfig;
 import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
 import no.nb.nna.broprox.harvester.BroproxHeaderConstants;
-import no.nb.nna.broprox.model.MessagesProto;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
@@ -74,7 +73,6 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
                     session.debugger
                     .setBreakpointByUrl(1, null, "https?://www.google-analytics.com/analytics.js", null, null),
                     session.debugger.setBreakpointByUrl(1, null, "https?://www.google-analytics.com/ga.js", null, null),
-//                    session.network.setExtraHTTPHeaders(extraHeaders),
                     session.page.setControlNavigations(Boolean.TRUE)
             ).get(config.getPageLoadTimeout(), MILLISECONDS);
 

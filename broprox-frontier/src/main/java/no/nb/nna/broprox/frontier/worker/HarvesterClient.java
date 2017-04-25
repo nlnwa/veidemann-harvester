@@ -21,9 +21,12 @@ import java.util.concurrent.TimeUnit;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.StatusRuntimeException;
+import io.opentracing.contrib.ClientTracingInterceptor;
+import io.opentracing.util.GlobalTracer;
 import no.nb.nna.broprox.api.HarvesterGrpc;
 import no.nb.nna.broprox.api.HarvesterGrpc.HarvesterBlockingStub;
 import no.nb.nna.broprox.api.HarvesterGrpc.HarvesterStub;
+import no.nb.nna.broprox.api.HarvesterProto.CleanupExecutionRequest;
 import no.nb.nna.broprox.api.HarvesterProto.HarvestPageReply;
 import no.nb.nna.broprox.api.HarvesterProto.HarvestPageRequest;
 import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
@@ -50,7 +53,8 @@ public class HarvesterClient implements AutoCloseable {
 
     public HarvesterClient(ManagedChannelBuilder<?> channelBuilder) {
         LOG.info("Setting up harvester client");
-        channel = channelBuilder.build();
+        ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor.Builder(GlobalTracer.get()).build();
+        channel = channelBuilder.intercept(tracingInterceptor).build();
         blockingStub = HarvesterGrpc.newBlockingStub(channel);
         asyncStub = HarvesterGrpc.newStub(channel);
     }
@@ -63,6 +67,18 @@ public class HarvesterClient implements AutoCloseable {
                     .build();
             HarvestPageReply reply = blockingStub.harvestPage(request);
             return reply.getOutlinksList();
+        } catch (StatusRuntimeException ex) {
+            LOG.error("RPC failed: " + ex.getStatus(), ex);
+            throw ex;
+        }
+    }
+
+    public void cleanupExecution(String executionId) {
+        try {
+            CleanupExecutionRequest request = CleanupExecutionRequest.newBuilder()
+                    .setExecutionId(executionId)
+                    .build();
+            blockingStub.cleanupExecution(request);
         } catch (StatusRuntimeException ex) {
             LOG.error("RPC failed: " + ex.getStatus(), ex);
             throw ex;

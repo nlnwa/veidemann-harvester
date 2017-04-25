@@ -15,7 +15,7 @@
  */
 package no.nb.nna.broprox.frontier;
 
-import no.nb.nna.broprox.frontier.api.ApiServer;
+import no.nb.nna.broprox.frontier.api.FrontierApiServer;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigBeanFactory;
 import com.typesafe.config.ConfigException;
@@ -62,7 +62,7 @@ public class FrontierService {
                 HarvesterClient harvesterClient = new HarvesterClient(SETTINGS.getHarvesterHost(), SETTINGS
                         .getHarvesterPort());
                 Frontier queueProcessor = new Frontier((RethinkDbAdapter) db, harvesterClient);
-                ApiServer apiServer = new ApiServer(db, queueProcessor);) {
+                FrontierApiServer apiServer = new FrontierApiServer(db, queueProcessor);) {
 
             LOG.info("Broprox Frontier (v. {}) started",
                     FrontierService.class.getPackage().getImplementationVersion());

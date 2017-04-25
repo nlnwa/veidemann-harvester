@@ -17,21 +17,15 @@ package no.nb.nna.broprox.harvester.api;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.net.URI;
 
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.opentracing.contrib.ServerTracingInterceptor;
 import io.opentracing.util.GlobalTracer;
-import javax.ws.rs.core.UriBuilder;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.harvester.Harvester;
 import no.nb.nna.broprox.harvester.browsercontroller.BrowserController;
 import no.nb.nna.broprox.harvester.proxy.RecordingProxy;
-import org.glassfish.grizzly.http.server.HttpServer;
-import org.glassfish.hk2.utilities.binding.AbstractBinder;
-import org.glassfish.jersey.grizzly2.httpserver.GrizzlyHttpServerFactory;
-import org.glassfish.jersey.server.ResourceConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,7 +50,8 @@ public class HarvesterApiServer implements AutoCloseable {
                         ServerTracingInterceptor.ServerRequestAttribute.METHOD_TYPE)
                 .build();
 
-        server = ServerBuilder.forPort(port).addService(tracingInterceptor.intercept(new HarvesterService(db, controller, proxy))).build();
+        server = ServerBuilder.forPort(port).addService(
+                tracingInterceptor.intercept(new HarvesterService(db, controller, proxy))).build();
     }
 
     @Override

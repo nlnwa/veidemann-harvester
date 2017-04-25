@@ -16,16 +16,29 @@
 package no.nb.nna.broprox.harvester.proxy;
 
 import java.net.URI;
+import java.util.AbstractMap;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.concurrent.Callable;
 
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
+import io.grpc.Context;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
+import io.opentracing.Span;
+import io.opentracing.contrib.OpenTracingContextKey;
+import io.opentracing.propagation.Format;
+import io.opentracing.propagation.TextMap;
+import io.opentracing.tag.Tags;
+import io.opentracing.util.GlobalTracer;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.client.Client;
 import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.client.WebTarget;
+import javax.ws.rs.core.MultivaluedHashMap;
+import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriBuilder;
 import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
@@ -49,33 +62,20 @@ public class ContentWriterClient implements AutoCloseable {
     }
 
     public URI writeRecord(CrawlLog logEntry, ByteBuf headers, ByteBuf payload) {
-        final MultiPart multipart;
+        Span writeSpan = GlobalTracer.get()
+                .buildSpan("writeWarcRecord")
+                .asChildOf(OpenTracingContextKey.activeSpan())
+                .withTag(Tags.SPAN_KIND.getKey(), Tags.SPAN_KIND_CLIENT)
+                .start();
+
+        Context writeContext = Context.current().withValue(OpenTracingContextKey.getKey(), writeSpan);
         try {
-            multipart = new FormDataMultiPart()
-                    .field("logEntry", JsonFormat.printer().print(logEntry));
-        } catch (InvalidProtocolBufferException ex) {
+            return writeContext.call(new WriteRecordTask(logEntry, headers, payload));
+        } catch (Exception ex) {
             throw new RuntimeException(ex);
+        } finally {
+            writeSpan.finish();
         }
-
-        if (headers != null) {
-            final StreamDataBodyPart headersPart = new StreamDataBodyPart("headers", new ByteBufInputStream(headers));
-            multipart.bodyPart(headersPart);
-        }
-
-        if (payload != null) {
-            final StreamDataBodyPart payloadPart = new StreamDataBodyPart("payload", new ByteBufInputStream(payload));
-            multipart.bodyPart(payloadPart);
-        }
-
-        Response storageRef = contentWriterTarget.path("warcrecord")
-                .request()
-                .post(Entity.entity(multipart, multipart.getMediaType()), Response.class);
-
-        if (storageRef.getStatusInfo().getFamily() != Response.Status.Family.SUCCESSFUL) {
-            throw new WebApplicationException(storageRef);
-        }
-
-        return storageRef.getLocation();
     }
 
     @Override
@@ -83,4 +83,85 @@ public class ContentWriterClient implements AutoCloseable {
         CLIENT.close();
     }
 
+    private class WriteRecordTask implements Callable<URI> {
+
+        final CrawlLog logEntry;
+
+        final ByteBuf headers;
+
+        final ByteBuf payload;
+
+        public WriteRecordTask(CrawlLog logEntry, ByteBuf headers, ByteBuf payload) {
+            this.logEntry = logEntry;
+            this.headers = headers;
+            this.payload = payload;
+        }
+
+        @Override
+        public URI call() throws Exception {
+            final MultiPart multipart;
+            try {
+                multipart = new FormDataMultiPart()
+                        .field("logEntry", JsonFormat.printer().print(logEntry));
+            } catch (InvalidProtocolBufferException ex) {
+                throw new RuntimeException(ex);
+            }
+
+            if (headers != null) {
+                final StreamDataBodyPart headersPart = new StreamDataBodyPart("headers", new ByteBufInputStream(headers));
+                multipart.bodyPart(headersPart);
+            }
+
+            if (payload != null) {
+                final StreamDataBodyPart payloadPart = new StreamDataBodyPart("payload", new ByteBufInputStream(payload));
+                multipart.bodyPart(payloadPart);
+            }
+
+            MultivaluedMap<String, Object> httpHeaders = new MultivaluedHashMap<>();
+            injectSpanHeaders(httpHeaders);
+
+            Response storageRef = contentWriterTarget.path("warcrecord")
+                    .request()
+                    .headers(httpHeaders)
+                    .post(Entity.entity(multipart, multipart.getMediaType()), Response.class);
+
+            if (storageRef.getStatusInfo().getFamily() != Response.Status.Family.SUCCESSFUL) {
+                throw new WebApplicationException(storageRef);
+            }
+
+            return storageRef.getLocation();
+        }
+
+        private MultivaluedMap<String, Object> injectSpanHeaders(final MultivaluedMap<String, Object> httpHeaders) {
+            TextMap traceCarrier = new TextMap() {
+                @Override
+                public Iterator<Map.Entry<String, String>> iterator() {
+                    return new Iterator<Map.Entry<String, String>>() {
+                        Iterator<String> internal = httpHeaders.keySet().iterator();
+
+                        @Override
+                        public boolean hasNext() {
+                            return internal.hasNext();
+                        }
+
+                        @Override
+                        public Map.Entry<String, String> next() {
+                            String key = internal.next();
+                            return new AbstractMap.SimpleImmutableEntry(key, httpHeaders.getFirst(key));
+                        }
+                    };
+                }
+
+                @Override
+                public void put(String key, String value) {
+                    httpHeaders.putSingle(key, value);
+                }
+
+            };
+            GlobalTracer.get()
+                    .inject(OpenTracingContextKey.activeSpan().context(), Format.Builtin.HTTP_HEADERS, traceCarrier);
+            return httpHeaders;
+        }
+
+    }
 }

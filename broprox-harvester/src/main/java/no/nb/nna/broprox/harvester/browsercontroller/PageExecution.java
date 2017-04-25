@@ -26,8 +26,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 
-import com.google.gson.Gson;
 import com.google.protobuf.ByteString;
+import io.netty.handler.codec.http.HttpHeaderNames;
 import no.nb.nna.broprox.chrome.client.PageDomain;
 import no.nb.nna.broprox.chrome.client.RuntimeDomain;
 import no.nb.nna.broprox.chrome.client.Session;
@@ -56,8 +56,6 @@ public class PageExecution implements BroproxHeaderConstants {
 
     private final Map<String, Object> extraHeaders = new HashMap<>();
 
-//    private final Gson gson = new Gson();
-
     private String discoveryPath;
 
     public PageExecution(String executionId, QueuedUri queuedUri, Session session, long timeout) {
@@ -67,12 +65,11 @@ public class PageExecution implements BroproxHeaderConstants {
         this.timeout = timeout;
 
         discoveryPath = queuedUri.getDiscoveryPath();
-        if (discoveryPath == null) {
-            discoveryPath = "";
-        }
+
         extraHeaders.put(EXECUTION_ID, executionId);
         extraHeaders.put(ALL_EXECUTION_IDS, ProtoUtils.protoListToJson(queuedUri.getExecutionIdsList()));
         extraHeaders.put(DISCOVERY_PATH, discoveryPath);
+        extraHeaders.put(HttpHeaderNames.REFERER.toString(), queuedUri.getReferrer());
     }
 
     public void navigatePage() throws InterruptedException, ExecutionException, TimeoutException {

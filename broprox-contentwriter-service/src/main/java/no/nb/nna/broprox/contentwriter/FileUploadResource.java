@@ -22,19 +22,24 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinTask;
 
+import com.google.protobuf.util.JsonFormat;
+import io.opentracing.SpanContext;
+import io.opentracing.tag.Tags;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Context;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import no.nb.nna.broprox.commons.OpenTracingJersey;
+import no.nb.nna.broprox.commons.OpenTracingWrapper;
 import no.nb.nna.broprox.contentwriter.text.TextExtracter;
 import no.nb.nna.broprox.contentwriter.warc.SingleWarcWriter;
 import no.nb.nna.broprox.contentwriter.warc.WarcWriterPool;
-import no.nb.nna.broprox.db.model.CrawlLog;
 import no.nb.nna.broprox.db.DbAdapter;
-import no.nb.nna.broprox.db.DbObjectFactory;
+import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
 import org.glassfish.jersey.media.multipart.FormDataBodyPart;
 import org.glassfish.jersey.media.multipart.FormDataParam;
 
@@ -58,6 +63,9 @@ public class FileUploadResource {
     @Context
     TextExtracter textExtracter;
 
+    @Context
+    HttpHeaders httpHeaders;
+
     public FileUploadResource() {
     }
 
@@ -69,59 +77,73 @@ public class FileUploadResource {
             @FormDataParam("headers") final InputStream headers,
             @FormDataParam("payload") final FormDataBodyPart payload) {
 
-        long size = 0L;
+        SpanContext parentSpan = OpenTracingJersey.extractSpanHeaders(httpHeaders.getRequestHeaders());
+        OpenTracingWrapper otw = new OpenTracingWrapper("FileUploadResource", Tags.SPAN_KIND_SERVER)
+                .setParentSpan(parentSpan);
 
         try (WarcWriterPool.PooledWarcWriter pooledWarcWriter = warcWriterPool.borrow()) {
-            CrawlLog logEntry = DbObjectFactory.of(CrawlLog.class, logEntryJson).get();
-            SingleWarcWriter warcWriter = pooledWarcWriter.getWarcWriter();
+            return otw.call("postWarcRecord", new Callable<Response>() {
+                @Override
+                public Response call() throws Exception {
+                    long size = 0L;
 
-            URI ref = warcWriter.writeHeader(logEntry);
-            logEntry.withStorageRef(ref.toString());
-            db.updateCrawlLog(logEntry);
+                    CrawlLog.Builder logEntryBuilder = CrawlLog.newBuilder();
+                    JsonFormat.parser().merge(logEntryJson, logEntryBuilder);
 
-            if (headers != null) {
-                size += warcWriter.addPayload(headers);
-            }
+                    SingleWarcWriter warcWriter = pooledWarcWriter.getWarcWriter();
 
-            if (payload != null) {
-                ForkJoinTask<Long> writeWarcJob = ForkJoinPool.commonPool().submit(new Callable<Long>() {
-                    @Override
-                    public Long call() throws Exception {
-                        return warcWriter.addPayload(payload.getValueAs(InputStream.class));
+                    URI ref = warcWriter.writeHeader(logEntryBuilder.build());
+                    logEntryBuilder.setStorageRef(ref.toString());
+
+                    CrawlLog logEntry = db.updateCrawlLog(logEntryBuilder.build());
+
+                    if (headers != null) {
+                        size += warcWriter.addPayload(headers);
                     }
 
-                });
-                ForkJoinTask<Void> extractTextJob = ForkJoinPool.commonPool().submit(new Callable<Void>() {
-                    @Override
-                    public Void call() throws Exception {
-                        textExtracter.analyze(payload.getValueAs(InputStream.class), logEntry, db);
-                        return null;
+                    if (payload != null) {
+                        ForkJoinTask<Long> writeWarcJob = ForkJoinPool.commonPool().submit(new Callable<Long>() {
+                            @Override
+                            public Long call() throws Exception {
+                                return warcWriter.addPayload(payload.getValueAs(InputStream.class));
+                            }
+
+                        });
+                        ForkJoinTask<Void> extractTextJob = ForkJoinPool.commonPool().submit(new Callable<Void>() {
+                            @Override
+                            public Void call() throws Exception {
+                                textExtracter.analyze(payload.getValueAs(InputStream.class), logEntry, db);
+                                return null;
+                            }
+
+                        });
+
+                        // If both headers and payload are present, add separator
+                        if (headers != null) {
+                            size += warcWriter.addPayload(CRLF);
+                        }
+
+                        size += writeWarcJob.get();
+                        extractTextJob.get();
                     }
 
-                });
+                    try {
+                        warcWriter.closeRecord();
+                    } catch (IOException ex) {
+                        if (logEntry.getSize() != size) {
+                            throw new WebApplicationException("Size doesn't match metadata. Expected " + logEntry
+                                    .getSize()
+                                    + ", but was " + size, Response.Status.NOT_ACCEPTABLE);
+                        } else {
+                            ex.printStackTrace();
+                            throw new WebApplicationException(ex, Response.Status.NOT_ACCEPTABLE);
+                        }
+                    }
 
-                // If both headers and payload are present, add separator
-                if (headers != null) {
-                    size += warcWriter.addPayload(CRLF);
+                    return Response.created(ref).build();
                 }
 
-                size += writeWarcJob.get();
-                extractTextJob.get();
-            }
-
-            try {
-                warcWriter.closeRecord();
-            } catch (IOException ex) {
-                if (logEntry.getSize() != size) {
-                    throw new WebApplicationException("Size doesn't match metadata. Expected " + logEntry.getSize()
-                            + ", but was " + size, Response.Status.NOT_ACCEPTABLE);
-                } else {
-                    ex.printStackTrace();
-                    throw new WebApplicationException(ex, Response.Status.NOT_ACCEPTABLE);
-                }
-            }
-
-            return Response.created(ref).build();
+            });
         } catch (Exception ex) {
             ex.printStackTrace();
             throw new WebApplicationException(ex.getMessage(), ex);

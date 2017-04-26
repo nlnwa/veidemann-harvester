@@ -18,7 +18,10 @@ package no.nb.nna.broprox.controller;
 import io.grpc.stub.StreamObserver;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.api.ControllerGrpc;
+import no.nb.nna.broprox.model.MessagesProto.BrowserScript;
 import no.nb.nna.broprox.model.MessagesProto.CrawlEntity;
+import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListReply;
+import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListRequest;
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListRequest;
 
@@ -42,6 +45,20 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     @Override
     public void listCrawlEntities(CrawlEntityListRequest request, StreamObserver<CrawlEntityListReply> respObserver) {
         respObserver.onNext(db.listCrawlEntities(request));
+        respObserver.onCompleted();
+    }
+
+    @Override
+    public void saveBrowserScript(BrowserScript request, StreamObserver<BrowserScript> respObserver) {
+        respObserver.onNext(db.saveBrowserScript(request));
+        respObserver.onCompleted();
+    }
+
+    @Override
+    public void listBrowserScripts(BrowserScriptListRequest request, StreamObserver<BrowserScriptListReply> respObserver) {
+        BrowserScriptListReply.Builder builder = BrowserScriptListReply.newBuilder();
+        db.getBrowserScripts(request.getType()).forEach(bs -> builder.addScript(bs));
+        respObserver.onNext(builder.build());
         respObserver.onCompleted();
     }
 

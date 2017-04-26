@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package broprox;
+option java_package = "no.nb.nna.broprox.api";
+//option java_multiple_files = true;
+option java_outer_classname = "HarvesterProto";
+
+import "messages.proto";
+
+// Service for communicating with harvester.
+service Harvester {
+    // harvest a page
+    rpc HarvestPage (HarvestPageRequest) returns (HarvestPageReply) {}
+    rpc CleanupExecution (CleanupExecutionRequest) returns (Void) {}
+}
+
+// A request telling which page to harves.
+message HarvestPageRequest {
+    string execution_id = 1;
+    QueuedUri queued_uri = 2;
+}
+
+message HarvestPageReply {
+    // The outlinks found in the harvested page
+    repeated QueuedUri outlinks = 1;
+}
+
+message CleanupExecutionRequest {
+    string execution_id = 1;
+}

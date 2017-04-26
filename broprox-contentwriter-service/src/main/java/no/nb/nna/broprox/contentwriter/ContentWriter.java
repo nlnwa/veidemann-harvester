@@ -44,7 +44,7 @@ public class ContentWriter {
         config.checkValid(ConfigFactory.defaultReference());
         SETTINGS = ConfigBeanFactory.create(config, Settings.class);
 
-        TracerFactory.init("Frontier", SETTINGS.getTracerUri());
+        TracerFactory.init("ContentWriter", SETTINGS.getTracerUri());
     }
 
     /**

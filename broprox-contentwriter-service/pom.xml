@@ -16,6 +16,11 @@
     <dependencies>
         <dependency>
             <groupId>${project.groupId}</groupId>
+            <artifactId>broprox-api</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>${project.groupId}</groupId>
             <artifactId>broprox-db-adapter</artifactId>
             <version>${project.version}</version>
         </dependency>

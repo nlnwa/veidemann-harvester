@@ -100,6 +100,11 @@
                 <version>4.1.8.Final</version>
             </dependency>
             <dependency>
+                <groupId>org.glassfish.jersey.core</groupId>
+                <artifactId>jersey-common</artifactId>
+                <version>${org.glassfish.jersey.version}</version>
+            </dependency>
+            <dependency>
                 <groupId>org.glassfish.jersey.containers</groupId>
                 <artifactId>jersey-container-netty-http</artifactId>
                 <version>${org.glassfish.jersey.version}</version>

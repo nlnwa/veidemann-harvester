@@ -16,8 +16,6 @@
 package no.nb.nna.broprox.harvester.proxy;
 
 import java.net.InetSocketAddress;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.FullHttpResponse;
@@ -27,10 +25,12 @@ import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
-import no.nb.nna.broprox.db.model.CrawlLog;
+import no.nb.nna.broprox.commons.OpenTracingWrapper;
 import no.nb.nna.broprox.db.DbAdapter;
-import no.nb.nna.broprox.db.DbObjectFactory;
+import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.harvester.BroproxHeaderConstants;
+import no.nb.nna.broprox.harvester.OpenTracingSpans;
+import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
 import org.littleshoot.proxy.HttpFiltersAdapter;
 import org.littleshoot.proxy.impl.ProxyUtils;
 import org.netpreserve.commons.uri.UriConfigs;
@@ -46,11 +46,9 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
 
     private final String uri;
 
-    private final DbAdapter db;
-
     private final AlreadyCrawledCache cache;
 
-    private final CrawlLog crawlLog;
+    private final CrawlLog.Builder crawlLog;
 
     private final ContentInterceptor contentInterceptor;
 
@@ -71,12 +69,11 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
 
         super(originalRequest.setUri(uri), ctx);
         this.uri = uri;
-        this.db = db;
         this.contentWriterClient = contentWriterClient;
 
-        this.crawlLog = DbObjectFactory.create(CrawlLog.class)
-                .withRequestedUri(uri)
-                .withSurt(UriConfigs.SURT_KEY.buildUri(uri).toString());
+        this.crawlLog = CrawlLog.newBuilder()
+                .setRequestedUri(uri)
+                .setSurt(UriConfigs.SURT_KEY.buildUri(uri).toString());
         this.contentInterceptor = new ContentInterceptor(db, ctx, contentWriterClient);
         this.cache = cache;
     }
@@ -84,26 +81,31 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
     @Override
     public HttpResponse clientToProxyRequest(HttpObject httpObject) {
         if (httpObject instanceof HttpRequest) {
-            HttpRequest req = (HttpRequest) httpObject;
+            HttpRequest request = (HttpRequest) httpObject;
 
-            executionId = req.headers().get(EXECUTION_ID);
+            executionId = request.headers().get(EXECUTION_ID);
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Proxy got request for {} from execution {}", uri, executionId);
             }
 
-            if (req.headers().get(DISCOVERY_PATH).endsWith("E")) {
-                FullHttpResponse cachedResponse = cache.get(uri, req.headers().get(EXECUTION_ID), req.headers()
-                        .get(ALL_EXECUTION_IDS));
-                if (cachedResponse != null) {
-                    if (LOG.isTraceEnabled()) {
-                        LOG.trace("Found {} in cache", uri);
+            OpenTracingWrapper otw = new OpenTracingWrapper("RecorderFilter").setParentSpan(OpenTracingSpans
+                    .get(executionId));
+
+            return otw.map("clientToProxyRequest", req -> {
+
+                if (req.headers().get(DISCOVERY_PATH).endsWith("E")) {
+                    FullHttpResponse cachedResponse = cache.get(uri, req.headers().get(EXECUTION_ID), req.headers()
+                            .get(ALL_EXECUTION_IDS));
+                    if (cachedResponse != null) {
+                        if (LOG.isTraceEnabled()) {
+                            LOG.trace("Found {} in cache", uri);
+                        }
+                        cachedResponse.headers().add("Connection", "close");
+                        return cachedResponse;
+                    } else {
+                        toBeCached = true;
                     }
-                    cachedResponse.headers().add("Connection", "close");
-                    return cachedResponse;
-                } else {
-                    toBeCached = true;
                 }
-            }
 //            System.out.println(this.hashCode() + " :: PROXY URI: " + uri);
 //            System.out.println("HEADERS: ");
 //            for (Iterator<Map.Entry<CharSequence, CharSequence>> it = req.headers().iteratorCharSequence(); it.hasNext();) {
@@ -111,16 +113,19 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
 //                System.out.println("   " + e.getKey() + " = " + e.getValue());
 //            }
 
-            // Fix headers before sending to final destination
-            req.headers().set("Accept-Encoding", "identity");
-            crawlLog.withFetchTimeStamp(OffsetDateTime.now(ZoneOffset.UTC))
-                    .withReferrer(req.headers().get("referer"))
-                    .withDiscoveryPath(req.headers().get(DISCOVERY_PATH));
+                // Fix headers before sending to final destination
+                req.headers().set("Accept-Encoding", "identity");
+                crawlLog.setFetchTimeStamp(ProtoUtils.getNowTs())
+                        .setReferrer(req.headers().get("referer", ""))
+                        .setDiscoveryPath(req.headers().get(DISCOVERY_PATH, ""));
 
-            req.headers()
-                    .remove(DISCOVERY_PATH)
-                    .remove(EXECUTION_ID)
-                    .remove(ALL_EXECUTION_IDS);
+                req.headers()
+                        .remove(DISCOVERY_PATH)
+                        .remove(EXECUTION_ID)
+                        .remove(ALL_EXECUTION_IDS);
+
+                return null;
+            }, request);
         }
 
         return null;
@@ -128,47 +133,53 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
 
     @Override
     public HttpObject serverToProxyResponse(HttpObject httpObject) {
-        if (httpObject instanceof HttpResponse) {
-            HttpResponse res = (HttpResponse) httpObject;
-            responseStatus = res.status();
-            httpVersion = res.protocolVersion();
+            OpenTracingWrapper otw = new OpenTracingWrapper("RecorderFilter").setParentSpan(OpenTracingSpans
+                    .get(executionId));
 
-            crawlLog.withStatusCode(responseStatus.code())
-                    .withContentType(res.headers().get("Content-Type"));
-            contentInterceptor.addHeader(res.headers());
+            return otw.map("serverToProxyResponse", response -> {
 
-            try {
-                payloadSizeField = res.headers().getInt("Content-Length");
-            } catch (NullPointerException ex) {
-                payloadSizeField = 0L;
-            }
+            if (response instanceof HttpResponse) {
+                HttpResponse res = (HttpResponse) response;
+                responseStatus = res.status();
+                httpVersion = res.protocolVersion();
 
-        } else if (httpObject instanceof HttpContent) {
-            HttpContent res = (HttpContent) httpObject;
-            contentInterceptor.addPayload(res.content());
+                crawlLog.setStatusCode(responseStatus.code())
+                        .setContentType(res.headers().get("Content-Type"));
+                contentInterceptor.addHeader(res.headers());
 
-            if (ProxyUtils.isLastChunk(httpObject)) {
-                if (toBeCached) {
-                    cache.put(httpVersion,
-                            responseStatus,
-                            uri,
-                            executionId,
-                            contentInterceptor.getHeaderBuf(),
-                            contentInterceptor.getPayloadBuf());
+                try {
+                    payloadSizeField = res.headers().getInt("Content-Length");
+                } catch (NullPointerException ex) {
+                    payloadSizeField = 0L;
                 }
-                contentInterceptor.writeData(crawlLog);
-                contentInterceptor.release();
-            }
-        } else {
-            System.out.println(this.hashCode() + " :: RESP: " + httpObject.getClass());
-        }
 
-        return httpObject;
+            } else if (response instanceof HttpContent) {
+                HttpContent res = (HttpContent) response;
+                contentInterceptor.addPayload(res.content());
+
+                if (ProxyUtils.isLastChunk(response)) {
+                    if (toBeCached) {
+                        cache.put(httpVersion,
+                                responseStatus,
+                                uri,
+                                executionId,
+                                contentInterceptor.getHeaderBuf(),
+                                contentInterceptor.getPayloadBuf());
+                    }
+                    contentInterceptor.writeData(crawlLog);
+                    contentInterceptor.release();
+                }
+            } else {
+                System.out.println(this.hashCode() + " :: RESP: " + response.getClass());
+            }
+
+            return response;
+        }, httpObject);
     }
 
     @Override
     public void proxyToServerResolutionSucceeded(String serverHostAndPort, InetSocketAddress resolvedRemoteAddress) {
-        crawlLog.withIpAddress(resolvedRemoteAddress.getAddress().getHostAddress());
+        crawlLog.setIpAddress(resolvedRemoteAddress.getAddress().getHostAddress());
     }
 
     @Override

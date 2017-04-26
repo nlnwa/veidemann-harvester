@@ -24,6 +24,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.rethinkdb.RethinkDB;
 import com.rethinkdb.net.Cursor;
+import io.opentracing.tag.Tags;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
@@ -33,11 +34,11 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
+import no.nb.nna.broprox.commons.OpenTracingWrapper;
 import no.nb.nna.broprox.db.DbAdapter;
-import no.nb.nna.broprox.db.DbObjectFactory;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
-import no.nb.nna.broprox.db.model.CrawlConfig;
 import no.nb.nna.broprox.frontier.worker.Frontier;
+import no.nb.nna.broprox.model.MessagesProto.CrawlConfig;
 import org.netpreserve.commons.uri.UriConfigs;
 import org.netpreserve.commons.uri.UriFormat;
 
@@ -104,16 +105,19 @@ public class StatsResource {
 
         UriFormat f = UriConfigs.SURT_KEY_FORMAT;
         System.out.println("URL: " + url);
-        CrawlConfig config = DbObjectFactory.create(CrawlConfig.class)
-                .withWindowWidth(900)
-                .withWindowHeight(900)
-                .withScope(generateScope(url))
-                .withMinTimeBetweenPageLoadMillis(waitTime)
-                .withPageLoadTimeout(timeout)
-                .withDepthFirst(false);
+        CrawlConfig config = CrawlConfig.newBuilder()
+                .setWindowWidth(900)
+                .setWindowHeight(900)
+                .setScope(generateScope(url))
+                .setMinTimeBetweenPageLoadMillis(waitTime)
+                .setPageLoadTimeout(timeout)
+                .setDepthFirst(false)
+                .build();
 
         try {
-            frontier.newExecution(config, url);
+            OpenTracingWrapper otw = new OpenTracingWrapper("Frontier_API", Tags.SPAN_KIND_SERVER)
+                    .addTag(Tags.HTTP_URL.getKey(), url);
+            otw.run("fetchSeed", frontier::newExecution, config, url);
         } catch (Exception e) {
             e.printStackTrace();
             throw new WebApplicationException(e);

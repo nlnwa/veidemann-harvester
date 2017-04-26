@@ -15,10 +15,7 @@
  */
 package no.nb.nna.broprox.frontier.worker;
 
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.DelayQueue;
 import java.util.concurrent.ForkJoinPool;
@@ -27,11 +24,13 @@ import java.util.concurrent.TimeUnit;
 import com.github.mgunlogson.cuckoofilter4j.CuckooFilter;
 import com.google.common.hash.Funnels;
 import com.rethinkdb.RethinkDB;
-import no.nb.nna.broprox.db.DbObjectFactory;
+import no.nb.nna.broprox.commons.OpenTracingParentContextKey;
+import no.nb.nna.broprox.commons.OpenTracingWrapper;
+import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
-import no.nb.nna.broprox.db.model.CrawlConfig;
-import no.nb.nna.broprox.db.model.CrawlExecutionStatus;
-import no.nb.nna.broprox.db.model.QueuedUri;
+import no.nb.nna.broprox.model.MessagesProto.CrawlConfig;
+import no.nb.nna.broprox.model.MessagesProto.CrawlExecutionStatus;
+import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
 import org.netpreserve.commons.uri.UriConfigs;
 
 /**
@@ -63,7 +62,7 @@ public class Frontier implements AutoCloseable {
         System.out.println("Starting Queue Processor");
 //        ForkJoinTask proc = EXECUTOR_SERVICE.submit(new Runnable() {
 //            @Override
-//            public void run() {
+//            public void map() {
 //                try (Cursor<Map<String, Map<String, Object>>> cursor = db.executeRequest(r.table(TABLE_URI_QUEUE)
 //                        .changes());) {
 //                    for (Map<String, Map<String, Object>> doc : cursor) {
@@ -87,28 +86,32 @@ public class Frontier implements AutoCloseable {
         }
     }
 
-    public void newExecution(CrawlConfig config, String... seed) {
-        String executionId = UUID.randomUUID().toString();
-        CrawlExecutionStatus status = DbObjectFactory.create(CrawlExecutionStatus.class)
-                .withId(executionId)
-                .withState(CrawlExecutionStatus.State.CREATED);
-        CrawlExecution exe = new CrawlExecution(this, status, config);
-        runningExecutions.put(executionId, exe);
-        db.addExecutionStatus(status);
+    public void newExecution(final CrawlConfig config, final String seed) {
+        OpenTracingWrapper otw = new OpenTracingWrapper("Frontier");
+        otw.run("scheduleSeed", this::scheduleSeed, config, seed);
+    }
 
-        status.withState(CrawlExecutionStatus.State.RUNNING)
-                .withStartTime(OffsetDateTime.now(ZoneOffset.UTC));
+    public void scheduleSeed(final CrawlConfig config, final String seed) {
+        CrawlExecutionStatus status = CrawlExecutionStatus.newBuilder()
+                .setState(CrawlExecutionStatus.State.CREATED)
+                .build();
+
+        status = db.addExecutionStatus(status);
+        CrawlExecution exe = new CrawlExecution(OpenTracingParentContextKey.parentSpan(), this, status, config);
+        runningExecutions.put(status.getId(), exe);
+
+        status = status.toBuilder().setState(CrawlExecutionStatus.State.RUNNING)
+                .setStartTime(ProtoUtils.getNowTs())
+                .build();
         db.updateExecutionStatus(status);
 
-        for (String s : seed) {
-            QueuedUri qUri = DbObjectFactory.create(QueuedUri.class)
-                    .addExecutionId(new QueuedUri.IdSeq(executionId, exe.getNextSequenceNum()))
-                    .withUri(s)
-                    .withSurt(UriConfigs.SURT_KEY.buildUri(s).toString())
-                    .withDiscoveryPath("");
-            exe.setCurrentUri(qUri);
-            executionsQueue.add(exe);
-        }
+        QueuedUri qUri = QueuedUri.newBuilder()
+                .addExecutionIds(QueuedUri.IdSeq.newBuilder().setId(status.getId()).setSeq(exe.getNextSequenceNum()))
+                .setUri(seed)
+                .setSurt(UriConfigs.SURT_KEY.buildUri(seed).toString())
+                .build();
+        exe.setCurrentUri(qUri);
+        executionsQueue.add(exe);
     }
 
     boolean alreadeyIncluded(QueuedUri qUri) {

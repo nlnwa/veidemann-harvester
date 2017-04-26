@@ -31,13 +31,18 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.Callable;
 
 import com.google.common.net.InetAddresses;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
+import io.opentracing.Span;
+import io.opentracing.tag.Tags;
+import io.opentracing.util.GlobalTracer;
+import no.nb.nna.broprox.commons.OpenTracingWrapper;
 import no.nb.nna.broprox.db.DbAdapter;
-import no.nb.nna.broprox.db.DbObjectFactory;
-import no.nb.nna.broprox.db.model.CrawlLog;
+import no.nb.nna.broprox.db.ProtoUtils;
+import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
 import org.littleshoot.proxy.HostResolver;
 import org.netpreserve.commons.util.datetime.DateFormat;
 import org.netpreserve.commons.util.datetime.Granularity;
@@ -115,48 +120,69 @@ public class DnsLookup implements HostResolver {
         }
     }
 
-    @Override
-    public InetSocketAddress resolve(String host, int port) throws UnknownHostException {
-        // Check if host is already an ip address
-        if (InetAddresses.isInetAddress(host)) {
-            return new InetSocketAddress(InetAddresses.forString(host), port);
+    private class Resolver implements Callable<InetSocketAddress> {
+
+        String host;
+
+        Integer port;
+
+        public Resolver(String host, Integer port) {
+            this.host = host;
+            this.port = port;
         }
 
-        State state = lookup(host);
+        @Override
+        public InetSocketAddress call() throws UnknownHostException {
+            // Check if host is already an ip address
+            if (InetAddresses.isInetAddress(host)) {
+                return new InetSocketAddress(InetAddresses.forString(host), port);
+            }
 
-        InetSocketAddress address;
+            State state = lookup(host);
 
-        for (Record r : state.answers) {
-            if (r.getType() == Type.A) {
-                ARecord ar = (ARecord) r;
-                address = new InetSocketAddress(ar.getAddress(), port);
-                if (!state.fromCache) {
-                    try {
-                        storeDnsRecord(host, state);
-                    } catch (IOException | NoSuchAlgorithmException ex) {
-                        throw new RuntimeException(ex);
+            InetSocketAddress address;
+
+            for (Record r : state.answers) {
+                if (r.getType() == Type.A) {
+                    ARecord ar = (ARecord) r;
+                    address = new InetSocketAddress(ar.getAddress(), port);
+                    if (!state.fromCache) {
+                        try {
+                            storeDnsRecord(host, state);
+                        } catch (IOException | NoSuchAlgorithmException ex) {
+                            throw new RuntimeException(ex);
+                        }
                     }
+                    return address;
+                }
+            }
+
+            if (getAcceptNonDnsResolves() || "localhost".equals(host)) {
+                // Do lookup that bypasses javadns.
+                address = new InetSocketAddress(InetAddress.getByName(host), port);
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Found address for {} using native dns.", host);
                 }
                 return address;
             }
+
+            throw new UnknownHostException(host);
         }
 
-        if (getAcceptNonDnsResolves() || "localhost".equals(host)) {
-            // Do lookup that bypasses javadns.
-            address = new InetSocketAddress(InetAddress.getByName(host), port);
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Found address for {} using native dns.", host);
-            }
-//            } catch (UnknownHostException e1) {
-//                address = null;
-//                if (LOG.isDebugEnabled()) {
-//                    LOG.debug("Failed find of address for {} using native dns.", host);
-//                }
-//            }
-            return address;
-        }
+    }
 
-        throw new UnknownHostException(host);
+    @Override
+    public InetSocketAddress resolve(String host, int port) throws UnknownHostException {
+        OpenTracingWrapper otw = new OpenTracingWrapper("DnsLookup", Tags.SPAN_KIND_CLIENT)
+                .addTag("lookup", host + ':' + port)
+                .setExtractParentSpanFromGrpcContext(false);
+        try {
+            return otw.call("resolve", new Resolver(host, port));
+        } catch (UnknownHostException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new RuntimeException(ex);
+        }
     }
 
     /**
@@ -210,31 +236,28 @@ public class DnsLookup implements HostResolver {
         byte[] buf = new byte[payload.readableBytes()];
         payload.getBytes(payload.readerIndex(), buf);
 
-        CrawlLog crawlLog = DbObjectFactory.create(CrawlLog.class)
-                .withRecordType("response")
-                .withRequestedUri("dns:" + host)
-                .withFetchTimeStamp(state.fetchStart)
-                .withIpAddress(state.dnsIp)
-                .withContentType("text/dns")
-                .withSize(payload.readableBytes());
+        CrawlLog.Builder crawlLogBuilder = CrawlLog.newBuilder()
+                .setRecordType("response")
+                .setRequestedUri("dns:" + host)
+                .setFetchTimeStamp(ProtoUtils.odtToTs(state.fetchStart))
+                .setIpAddress(state.dnsIp)
+                .setContentType("text/dns")
+                .setSize(payload.readableBytes());
 
         // Shall we get a digest on the content downloaded?
         if (digestContent) {
             MessageDigest digest = MessageDigest.getInstance(getDigestAlgorithm());
 
             String digestString = "sha1:" + new BigInteger(1, digest.digest(buf)).toString(16);
-            crawlLog.withBlockDigest(digestString);
+            crawlLogBuilder.setBlockDigest(digestString);
         }
 
-//        System.out.println("META:\n" + crawlLog.toJson());
-//        System.out.println("DATA:\n" + payload.toString(StandardCharsets.UTF_8));
-
+        CrawlLog crawlLog = crawlLogBuilder.build();
         if (db != null) {
-            db.addCrawlLog(crawlLog);
+            crawlLog = db.addCrawlLog(crawlLog);
         }
         if (contentWriterClient != null) {
             URI uri = contentWriterClient.writeRecord(crawlLog, payload, null);
-            System.out.println(">>> " + uri);
         }
 
         System.out.println("DNS record for " + host + " written");

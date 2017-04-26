@@ -16,17 +16,25 @@
 package no.nb.nna.broprox.harvester.proxy;
 
 import java.net.URI;
+import java.util.concurrent.Callable;
 
+import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.util.JsonFormat;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
+import io.opentracing.tag.Tags;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.client.Client;
 import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.client.WebTarget;
+import javax.ws.rs.core.MultivaluedHashMap;
+import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriBuilder;
-import no.nb.nna.broprox.db.model.CrawlLog;
+import no.nb.nna.broprox.commons.OpenTracingJersey;
+import no.nb.nna.broprox.commons.OpenTracingWrapper;
+import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
 import org.glassfish.jersey.media.multipart.FormDataMultiPart;
 import org.glassfish.jersey.media.multipart.MultiPart;
 import org.glassfish.jersey.media.multipart.MultiPartFeature;
@@ -47,28 +55,12 @@ public class ContentWriterClient implements AutoCloseable {
     }
 
     public URI writeRecord(CrawlLog logEntry, ByteBuf headers, ByteBuf payload) {
-        final MultiPart multipart = new FormDataMultiPart()
-                .field("logEntry", logEntry.toJson());
-
-        if (headers != null) {
-            final StreamDataBodyPart headersPart = new StreamDataBodyPart("headers", new ByteBufInputStream(headers));
-            multipart.bodyPart(headersPart);
+        OpenTracingWrapper otw = new OpenTracingWrapper("ContentWriterClient", Tags.SPAN_KIND_CLIENT);
+        try {
+            return otw.call("writeWarcRecord", new WriteRecordTask(logEntry, headers, payload));
+        } catch (Exception ex) {
+            throw new RuntimeException(ex);
         }
-
-        if (payload != null) {
-            final StreamDataBodyPart payloadPart = new StreamDataBodyPart("payload", new ByteBufInputStream(payload));
-            multipart.bodyPart(payloadPart);
-        }
-
-        Response storageRef = contentWriterTarget.path("warcrecord")
-                .request()
-                .post(Entity.entity(multipart, multipart.getMediaType()), Response.class);
-
-        if (storageRef.getStatusInfo().getFamily() != Response.Status.Family.SUCCESSFUL) {
-            throw new WebApplicationException(storageRef);
-        }
-
-        return storageRef.getLocation();
     }
 
     @Override
@@ -76,4 +68,53 @@ public class ContentWriterClient implements AutoCloseable {
         CLIENT.close();
     }
 
+    private class WriteRecordTask implements Callable<URI> {
+
+        final CrawlLog logEntry;
+
+        final ByteBuf headers;
+
+        final ByteBuf payload;
+
+        public WriteRecordTask(CrawlLog logEntry, ByteBuf headers, ByteBuf payload) {
+            this.logEntry = logEntry;
+            this.headers = headers;
+            this.payload = payload;
+        }
+
+        @Override
+        public URI call() throws Exception {
+            final MultiPart multipart;
+            try {
+                multipart = new FormDataMultiPart()
+                        .field("logEntry", JsonFormat.printer().print(logEntry));
+            } catch (InvalidProtocolBufferException ex) {
+                throw new RuntimeException(ex);
+            }
+
+            if (headers != null) {
+                final StreamDataBodyPart headersPart = new StreamDataBodyPart("headers", new ByteBufInputStream(headers));
+                multipart.bodyPart(headersPart);
+            }
+
+            if (payload != null) {
+                final StreamDataBodyPart payloadPart = new StreamDataBodyPart("payload", new ByteBufInputStream(payload));
+                multipart.bodyPart(payloadPart);
+            }
+
+            MultivaluedMap<String, Object> httpHeaders = new MultivaluedHashMap<>();
+            OpenTracingJersey.injectSpanHeaders(httpHeaders);
+
+            Response storageRef = contentWriterTarget.path("warcrecord")
+                    .request()
+                    .headers(httpHeaders)
+                    .post(Entity.entity(multipart, multipart.getMediaType()), Response.class);
+
+            if (storageRef.getStatusInfo().getFamily() != Response.Status.Family.SUCCESSFUL) {
+                throw new WebApplicationException(storageRef);
+            }
+
+            return storageRef.getLocation();
+        }
+    }
 }

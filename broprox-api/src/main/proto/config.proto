@@ -7,6 +7,31 @@ option java_outer_classname = "ConfigProto";
 
 import "google/protobuf/timestamp.proto";
 
+message Schedule {
+    string id = 1;
+    string name = 2;
+    string cron_expression = 3;
+    string description = 16;
+}
+
+message CrawlLimits {
+
+}
+
+message BrowserConfig {
+    int32 window_width = 1;
+    int32 window_height = 2;
+    string scope = 3;
+    int64 page_load_timeout = 4;
+    int64 min_time_between_page_load_millis = 5;
+    bool depth_first = 6;
+    int64 sleep_after_pageload = 7;
+}
+
+message Politeness {
+
+}
+
 // Message containing a javascript to be run in a browser
 message BrowserScript {
     enum Type {
@@ -22,14 +47,4 @@ message BrowserScript {
     string script = 4;
     string url_regexp = 5;
     map<string, string> parameters = 6;
-}
-
-message CrawlConfig {
-    int32 window_width = 1;
-    int32 window_height = 2;
-    string scope = 3;
-    int64 page_load_timeout = 4;
-    int64 min_time_between_page_load_millis = 5;
-    bool depth_first = 6;
-    int64 sleep_after_pageload = 7;
 }

@@ -17,7 +17,6 @@ package no.nb.nna.broprox.harvester.proxy;
 
 import java.net.InetSocketAddress;
 
-import io.grpc.Context;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpContent;
@@ -26,9 +25,7 @@ import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
-import io.opentracing.Span;
-import io.opentracing.contrib.OpenTracingContextKey;
-import io.opentracing.util.GlobalTracer;
+import no.nb.nna.broprox.commons.OpenTracingWrapper;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.harvester.BroproxHeaderConstants;
@@ -84,20 +81,17 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
     @Override
     public HttpResponse clientToProxyRequest(HttpObject httpObject) {
         if (httpObject instanceof HttpRequest) {
-            HttpRequest req = (HttpRequest) httpObject;
+            HttpRequest request = (HttpRequest) httpObject;
 
-            executionId = req.headers().get(EXECUTION_ID);
+            executionId = request.headers().get(EXECUTION_ID);
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Proxy got request for {} from execution {}", uri, executionId);
             }
-            Span span = GlobalTracer.get()
-                    .buildSpan("clientToProxyRequest")
-                    .asChildOf(OpenTracingSpans.get(executionId))
-                    .start();
-            Context grpcContext = Context.current()
-                    .withValue(OpenTracingContextKey.getKey(), span);
-            Context prevContext = grpcContext.attach();
-            try {
+
+            OpenTracingWrapper otw = new OpenTracingWrapper("RecorderFilter").setParentSpan(OpenTracingSpans
+                    .get(executionId));
+
+            return otw.map("clientToProxyRequest", req -> {
 
                 if (req.headers().get(DISCOVERY_PATH).endsWith("E")) {
                     FullHttpResponse cachedResponse = cache.get(uri, req.headers().get(EXECUTION_ID), req.headers()
@@ -129,10 +123,9 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
                         .remove(DISCOVERY_PATH)
                         .remove(EXECUTION_ID)
                         .remove(ALL_EXECUTION_IDS);
-            } finally {
-                grpcContext.detach(prevContext);
-                span.finish();
-            }
+
+                return null;
+            }, request);
         }
 
         return null;
@@ -140,17 +133,13 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
 
     @Override
     public HttpObject serverToProxyResponse(HttpObject httpObject) {
-        Span span = GlobalTracer.get()
-                .buildSpan("serverToProxyResponse")
-                .asChildOf(OpenTracingSpans.get(executionId))
-                .start();
-        Context grpcContext = Context.current()
-                .withValue(OpenTracingContextKey.getKey(), span);
-        Context prevContext = grpcContext.attach();
-        try {
+            OpenTracingWrapper otw = new OpenTracingWrapper("RecorderFilter").setParentSpan(OpenTracingSpans
+                    .get(executionId));
 
-            if (httpObject instanceof HttpResponse) {
-                HttpResponse res = (HttpResponse) httpObject;
+            return otw.map("serverToProxyResponse", response -> {
+
+            if (response instanceof HttpResponse) {
+                HttpResponse res = (HttpResponse) response;
                 responseStatus = res.status();
                 httpVersion = res.protocolVersion();
 
@@ -164,11 +153,11 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
                     payloadSizeField = 0L;
                 }
 
-            } else if (httpObject instanceof HttpContent) {
-                HttpContent res = (HttpContent) httpObject;
+            } else if (response instanceof HttpContent) {
+                HttpContent res = (HttpContent) response;
                 contentInterceptor.addPayload(res.content());
 
-                if (ProxyUtils.isLastChunk(httpObject)) {
+                if (ProxyUtils.isLastChunk(response)) {
                     if (toBeCached) {
                         cache.put(httpVersion,
                                 responseStatus,
@@ -181,14 +170,11 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
                     contentInterceptor.release();
                 }
             } else {
-                System.out.println(this.hashCode() + " :: RESP: " + httpObject.getClass());
+                System.out.println(this.hashCode() + " :: RESP: " + response.getClass());
             }
 
-            return httpObject;
-        } finally {
-            grpcContext.detach(prevContext);
-            span.finish();
-        }
+            return response;
+        }, httpObject);
     }
 
     @Override

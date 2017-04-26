@@ -31,15 +31,15 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.Callable;
 
 import com.google.common.net.InetAddresses;
-import io.grpc.Context;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.opentracing.Span;
-import io.opentracing.contrib.OpenTracingContextKey;
 import io.opentracing.tag.Tags;
 import io.opentracing.util.GlobalTracer;
+import no.nb.nna.broprox.commons.OpenTracingWrapper;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
@@ -120,58 +120,68 @@ public class DnsLookup implements HostResolver {
         }
     }
 
-    @Override
-    public InetSocketAddress resolve(String host, int port) throws UnknownHostException {
-        Span span = GlobalTracer.get().buildSpan("dnsResolver")
-                .withTag("lookup", host + ':' + port)
-                .withTag(Tags.COMPONENT.getKey(), "dnsLookup")
-                .start();
-        Context prevContext = Context.current().withValue(OpenTracingContextKey.getKey(), span).attach();
+    private class Resolver implements Callable<InetSocketAddress> {
 
-        try {
-        // Check if host is already an ip address
-        if (InetAddresses.isInetAddress(host)) {
-            return new InetSocketAddress(InetAddresses.forString(host), port);
+        String host;
+
+        Integer port;
+
+        public Resolver(String host, Integer port) {
+            this.host = host;
+            this.port = port;
         }
 
-        State state = lookup(host);
+        @Override
+        public InetSocketAddress call() throws UnknownHostException {
+            // Check if host is already an ip address
+            if (InetAddresses.isInetAddress(host)) {
+                return new InetSocketAddress(InetAddresses.forString(host), port);
+            }
 
-        InetSocketAddress address;
+            State state = lookup(host);
 
-        for (Record r : state.answers) {
-            if (r.getType() == Type.A) {
-                ARecord ar = (ARecord) r;
-                address = new InetSocketAddress(ar.getAddress(), port);
-                if (!state.fromCache) {
-                    try {
-                        storeDnsRecord(host, state);
-                    } catch (IOException | NoSuchAlgorithmException ex) {
-                        throw new RuntimeException(ex);
+            InetSocketAddress address;
+
+            for (Record r : state.answers) {
+                if (r.getType() == Type.A) {
+                    ARecord ar = (ARecord) r;
+                    address = new InetSocketAddress(ar.getAddress(), port);
+                    if (!state.fromCache) {
+                        try {
+                            storeDnsRecord(host, state);
+                        } catch (IOException | NoSuchAlgorithmException ex) {
+                            throw new RuntimeException(ex);
+                        }
                     }
+                    return address;
+                }
+            }
+
+            if (getAcceptNonDnsResolves() || "localhost".equals(host)) {
+                // Do lookup that bypasses javadns.
+                address = new InetSocketAddress(InetAddress.getByName(host), port);
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Found address for {} using native dns.", host);
                 }
                 return address;
             }
+
+            throw new UnknownHostException(host);
         }
 
-        if (getAcceptNonDnsResolves() || "localhost".equals(host)) {
-            // Do lookup that bypasses javadns.
-            address = new InetSocketAddress(InetAddress.getByName(host), port);
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Found address for {} using native dns.", host);
-            }
-//            } catch (UnknownHostException e1) {
-//                address = null;
-//                if (LOG.isDebugEnabled()) {
-//                    LOG.debug("Failed find of address for {} using native dns.", host);
-//                }
-//            }
-            return address;
-        }
+    }
 
-        throw new UnknownHostException(host);
-        } finally {
-            Context.current().detach(prevContext);
-            span.finish();
+    @Override
+    public InetSocketAddress resolve(String host, int port) throws UnknownHostException {
+        OpenTracingWrapper otw = new OpenTracingWrapper("DnsLookup", Tags.SPAN_KIND_CLIENT)
+                .addTag("lookup", host + ':' + port)
+                .setExtractParentSpanFromGrpcContext(false);
+        try {
+            return otw.call("resolve", new Resolver(host, port));
+        } catch (UnknownHostException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new RuntimeException(ex);
         }
     }
 
@@ -248,7 +258,6 @@ public class DnsLookup implements HostResolver {
         }
         if (contentWriterClient != null) {
             URI uri = contentWriterClient.writeRecord(crawlLog, payload, null);
-            System.out.println(">>> " + uri);
         }
 
         System.out.println("DNS record for " + host + " written");

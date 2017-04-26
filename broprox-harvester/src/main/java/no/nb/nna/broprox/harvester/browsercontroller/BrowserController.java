@@ -20,14 +20,17 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 
+import io.opentracing.tag.Tags;
 import no.nb.nna.broprox.chrome.client.ChromeDebugProtocol;
 import no.nb.nna.broprox.chrome.client.Session;
 import no.nb.nna.broprox.chrome.client.ws.CompleteMany;
+import no.nb.nna.broprox.commons.OpenTracingWrapper;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.model.MessagesProto.BrowserScript;
 import no.nb.nna.broprox.model.MessagesProto.CrawlConfig;
 import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
 import no.nb.nna.broprox.harvester.BroproxHeaderConstants;
+import no.nb.nna.broprox.harvester.OpenTracingSpans;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
@@ -44,7 +47,7 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
 
     private final DbAdapter db;
 
-    private final int sleep = 1000;
+    private final int sleep = 500;
 
     public BrowserController(String chromeHost, int chromePort, DbAdapter db) throws IOException {
         this.chromeHost = chromeHost;
@@ -55,6 +58,9 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
 
     public List<QueuedUri> render(String executionId, QueuedUri queuedUri) throws ExecutionException, InterruptedException, IOException, TimeoutException {
         System.out.println("RENDER " + executionId + " :: " + queuedUri.getUri());
+        OpenTracingWrapper otw = new OpenTracingWrapper("BrowserController", Tags.SPAN_KIND_CLIENT)
+                .setParentSpan(OpenTracingSpans.get(executionId));
+
         CrawlConfig config = queuedUri.getCrawlConfig();
 
         try (Session session = chrome.newSession(config.getWindowWidth(), config.getWindowHeight())) {
@@ -84,9 +90,9 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
                 System.out.println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>> SCRIPT RESUMED: " + scriptId);
             });
 
-            PageExecution pex = new PageExecution(executionId, queuedUri, session, config.getPageLoadTimeout());
-            pex.navigatePage();
-            pex.saveScreenshot(db);
+            PageExecution pex = new PageExecution(executionId, queuedUri, session, config.getPageLoadTimeout(), db, sleep);
+            otw.run("navigatePage", pex::navigatePage);
+            otw.run("saveScreenshot", pex::saveScreenshot);
 
 //                System.out.println("LINKS >>>>>>");
 //                for (PageDomain.FrameResource fs : session.page.getResourceTree().get().frameTree.resources) {
@@ -97,7 +103,7 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
 //                }
 //                System.out.println("<<<<<<");
             String script = db.getBrowserScripts(BrowserScript.Type.EXTRACT_OUTLINKS).get(0).getScript();
-            List<QueuedUri> outlinks = pex.extractOutlinks(db, script);
+            List<QueuedUri> outlinks = otw.map("extractOutlinks", pex::extractOutlinks, script);
             pex.getDocumentUrl();
             pex.scrollToTop();
             return outlinks;

@@ -15,8 +15,9 @@
  */
 package no.nb.nna.broprox.harvester;
 
-import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 
 import io.opentracing.Span;
 
@@ -25,20 +26,24 @@ import io.opentracing.Span;
  */
 public class OpenTracingSpans {
 
-    private static final Map<String, Span> spans = new HashMap<>();
+    private static final Map<String, Span> spans = new ConcurrentHashMap<>();
 
     private OpenTracingSpans() {
     }
 
     public static void register(String executionId, Span span) {
+        Objects.requireNonNull(executionId);
+        Objects.requireNonNull(span);
         spans.put(executionId, span);
     }
 
     public static Span get(String executionId) {
+        Objects.requireNonNull(executionId);
         return spans.get(executionId);
     }
 
     public static void remove(String executionId) {
+        Objects.requireNonNull(executionId);
         spans.remove(executionId);
     }
 }

@@ -46,6 +46,7 @@ import static no.nb.nna.broprox.harvester.BroproxHeaderConstants.EXECUTION_ID;
  *
  */
 public class PageExecution implements BroproxHeaderConstants {
+
     private final String executionId;
 
     private final QueuedUri queuedUri;
@@ -54,15 +55,21 @@ public class PageExecution implements BroproxHeaderConstants {
 
     private final long timeout;
 
+    private final long sleep;
+
     private final Map<String, Object> extraHeaders = new HashMap<>();
 
-    private String discoveryPath;
+    private final String discoveryPath;
 
-    public PageExecution(String executionId, QueuedUri queuedUri, Session session, long timeout) {
+    private final DbAdapter db;
+
+    public PageExecution(String executionId, QueuedUri queuedUri, Session session, long timeout, DbAdapter db, long sleep) {
         this.executionId = executionId;
         this.queuedUri = queuedUri;
         this.session = session;
         this.timeout = timeout;
+        this.sleep = sleep;
+        this.db = db;
 
         discoveryPath = queuedUri.getDiscoveryPath();
 
@@ -72,97 +79,120 @@ public class PageExecution implements BroproxHeaderConstants {
         extraHeaders.put(HttpHeaderNames.REFERER.toString(), queuedUri.getReferrer());
     }
 
-    public void navigatePage() throws InterruptedException, ExecutionException, TimeoutException {
-        CompletableFuture<PageDomain.FrameStoppedLoading> loaded = session.page.onFrameStoppedLoading();
+    public void navigatePage() {
+        try {
+            CompletableFuture<PageDomain.FrameStoppedLoading> loaded = session.page.onFrameStoppedLoading();
 
-        session.page.onNavigationRequested(nr -> {
-            extraHeaders.put(DISCOVERY_PATH, discoveryPath + "E");
-            session.network.setExtraHTTPHeaders(extraHeaders);
-            session.page.processNavigation("Proceed", nr.navigationId);
-        });
+            session.page.onNavigationRequested(nr -> {
+                extraHeaders.put(DISCOVERY_PATH, discoveryPath + "E");
+                session.network.setExtraHTTPHeaders(extraHeaders);
+                session.page.processNavigation("Proceed", nr.navigationId);
+            });
 
-        session.page.onJavascriptDialogOpening(js -> {
-            System.out.println("JS DIALOG: " + js.type + " :: " + js.message);
-            boolean accept = false;
-            if ("alert".equals(js.type)) {
-                accept = true;
-            }
-            session.page.handleJavaScriptDialog(accept, null);
-        });
+            session.page.onJavascriptDialogOpening(js -> {
+                System.out.println("JS DIALOG: " + js.type + " :: " + js.message);
+                boolean accept = false;
+                if ("alert".equals(js.type)) {
+                    accept = true;
+                }
+                session.page.handleJavaScriptDialog(accept, null);
+            });
 
-        session.network.setExtraHTTPHeaders(extraHeaders).get(timeout, MILLISECONDS);
-        session.page.navigate(queuedUri.getUri()).get(timeout, MILLISECONDS);
+            session.network.setExtraHTTPHeaders(extraHeaders).get(timeout, MILLISECONDS);
+            session.page.navigate(queuedUri.getUri()).get(timeout, MILLISECONDS);
 
-        loaded.get(timeout, MILLISECONDS);
-        // disable scrollbars
-        session.runtime.evaluate("document.getElementsByTagName('body')[0].style.overflow='hidden'",
-                null, null, null, null, null, null, null, null)
-                .get(timeout, MILLISECONDS);
+            loaded.get(timeout, MILLISECONDS);
+            // disable scrollbars
+            session.runtime.evaluate("document.getElementsByTagName('body')[0].style.overflow='hidden'",
+                    null, null, null, null, null, null, null, null)
+                    .get(timeout, MILLISECONDS);
 
-        // wait a little for any onload javascript to fire
-//            Thread.sleep(sleep);
+            // wait a little for any onload javascript to fire
+            Thread.sleep(sleep);
+        } catch (InterruptedException | ExecutionException | TimeoutException ex) {
+            throw new RuntimeException(ex);
+        }
     }
 
-    public List<QueuedUri> extractOutlinks(DbAdapter db, String script) throws InterruptedException, ExecutionException, TimeoutException {
-        List<QueuedUri> outlinks = Collections.EMPTY_LIST;
-        RuntimeDomain.Evaluate ev = session.runtime
-                .evaluate(script, null, null, null, null, Boolean.TRUE, null, null, null).get(timeout, MILLISECONDS);
-        if (ev.result.value != null) {
-            String resultString = ((String) ev.result.value).trim();
-            if (!resultString.isEmpty()) {
-                outlinks = new ArrayList<>();
-                String[] links = resultString.split("\n+");
-                String path = discoveryPath + "L";
-                for (int i = 0; i < links.length; i++) {
-                    outlinks.add(QueuedUri.newBuilder()
-                            .addAllExecutionIds(queuedUri.getExecutionIdsList())
-                            .setUri(links[i])
-                            .setReferrer(queuedUri.getUri())
-                            .setTimeStamp(ProtoUtils.odtToTs(OffsetDateTime.now()))
-                            .setDiscoveryPath(path)
-                            .build());
+    public List<QueuedUri> extractOutlinks(String script) {
+        try {
+            List<QueuedUri> outlinks = Collections.EMPTY_LIST;
+            RuntimeDomain.Evaluate ev = session.runtime
+                    .evaluate(script, null, null, null, null, Boolean.TRUE, null, null, null).get(timeout, MILLISECONDS);
+            if (ev.result.value != null) {
+                String resultString = ((String) ev.result.value).trim();
+                if (!resultString.isEmpty()) {
+                    outlinks = new ArrayList<>();
+                    String[] links = resultString.split("\n+");
+                    String path = discoveryPath + "L";
+                    for (int i = 0; i < links.length; i++) {
+                        outlinks.add(QueuedUri.newBuilder()
+                                .addAllExecutionIds(queuedUri.getExecutionIdsList())
+                                .setUri(links[i])
+                                .setReferrer(queuedUri.getUri())
+                                .setTimeStamp(ProtoUtils.odtToTs(OffsetDateTime.now()))
+                                .setDiscoveryPath(path)
+                                .build());
+                    }
                 }
             }
+            return outlinks;
+        } catch (InterruptedException | ExecutionException | TimeoutException ex) {
+            throw new RuntimeException(ex);
         }
-        return outlinks;
     }
 
-    public String getDocumentUrl() throws InterruptedException, ExecutionException, TimeoutException {
-        RuntimeDomain.Evaluate ev = session.runtime
-                .evaluate("document.URL", null, null, null, null, null, null, null, null).get(timeout, MILLISECONDS);
-        return (String) ev.result.value;
+    public String getDocumentUrl() {
+        try {
+            RuntimeDomain.Evaluate ev = session.runtime
+                    .evaluate("document.URL", null, null, null, null, null, null, null, null).get(timeout, MILLISECONDS);
+            return (String) ev.result.value;
+        } catch (InterruptedException | ExecutionException | TimeoutException ex) {
+            throw new RuntimeException(ex);
+        }
     }
 
-    public void scrollToTop() throws InterruptedException, ExecutionException, TimeoutException {
-        RuntimeDomain.Evaluate ev = session.runtime
-                .evaluate("window.scrollTo(0, 0);", null, null, null, null, null, null, null, null)
-                .get(timeout, MILLISECONDS);
-        System.out.println("Scroll to top: " + ev);
+    public void scrollToTop() {
+        try {
+            RuntimeDomain.Evaluate ev = session.runtime
+                    .evaluate("window.scrollTo(0, 0);", null, null, null, null, null, null, null, null)
+                    .get(timeout, MILLISECONDS);
+            System.out.println("Scroll to top: " + ev);
+        } catch (InterruptedException | ExecutionException | TimeoutException ex) {
+            throw new RuntimeException(ex);
+        }
     }
 
-    public void saveScreenshot(DbAdapter db) throws InterruptedException, ExecutionException, TimeoutException {
-        session.page.captureScreenshot().thenAccept(s -> {
-            byte[] img = Base64.getDecoder().decode(s.data);
+    public void saveScreenshot() {
+        try {
+            PageDomain.CaptureScreenshot screenshot = session.page.captureScreenshot().get(timeout, MILLISECONDS);
+            byte[] img = Base64.getDecoder().decode(screenshot.data);
 
             db.addScreenshot(Screenshot.newBuilder()
                     .setImg(ByteString.copyFrom(img))
                     .setExecutionId(executionId)
                     .setUri(queuedUri.getUri())
                     .build());
-        }).get(timeout, MILLISECONDS);
+        } catch (InterruptedException | ExecutionException | TimeoutException ex) {
+            throw new RuntimeException(ex);
+        }
     }
 
-    public void runBehaviour() throws InterruptedException, ExecutionException, TimeoutException {
+    public void runBehaviour() {
 //            behavior_script = brozzler.behavior_script(
 //                    page_url, behavior_parameters)
 //            self.run_behavior(behavior_script, timeout=900)
     }
 
-    public void tryLogin(String username, String password) throws InterruptedException, ExecutionException, TimeoutException {
-        RuntimeDomain.Evaluate ev = session.runtime
-                .evaluate("window.scrollTo(0, 0);", null, null, null, null, null, null, null, null)
-                .get(timeout, MILLISECONDS);
-        System.out.println("Document URL: " + ev.result.value);
+    public void tryLogin(String username, String password) {
+        try {
+            RuntimeDomain.Evaluate ev = session.runtime
+                    .evaluate("window.scrollTo(0, 0);", null, null, null, null, null, null, null, null)
+                    .get(timeout, MILLISECONDS);
+            System.out.println("Document URL: " + ev.result.value);
+        } catch (InterruptedException | ExecutionException | TimeoutException ex) {
+            throw new RuntimeException(ex);
+        }
     }
 
 //    def run_behavior(self, behavior_script, timeout=900):

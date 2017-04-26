@@ -23,12 +23,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.rethinkdb.RethinkDB;
-import io.grpc.Context;
-import io.opentracing.References;
 import io.opentracing.Span;
-import io.opentracing.contrib.OpenTracingContextKey;
 import io.opentracing.tag.Tags;
-import io.opentracing.util.GlobalTracer;
+import no.nb.nna.broprox.commons.OpenTracingWrapper;
 import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
 import no.nb.nna.broprox.model.MessagesProto;
@@ -246,16 +243,9 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker, Delayed {
     @Override
     public boolean block() throws InterruptedException {
         if (outlinks.isEmpty()) {
-            Span fetchSpan = GlobalTracer.get()
-                    .buildSpan("fetch")
-                    .asChildOf(OpenTracingContextKey.activeSpan())
-                    .withTag(Tags.HTTP_URL.getKey(), currentUri.getUri())
-                    .start();
-
-            Context prev = Context.current().withValue(OpenTracingContextKey.getKey(), fetchSpan).attach();
-            fetch();
-            Context.current().detach(prev);
-            fetchSpan.finish();
+            new OpenTracingWrapper("CrawlExecution")
+                    .addTag(Tags.HTTP_URL.getKey(), currentUri.getUri())
+                    .run("Fetch", this::fetch);
         }
         return true;
     }

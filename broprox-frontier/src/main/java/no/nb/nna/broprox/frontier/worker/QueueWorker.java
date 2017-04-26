@@ -20,12 +20,8 @@ import java.util.concurrent.RecursiveAction;
 
 import com.rethinkdb.RethinkDB;
 import com.rethinkdb.net.Cursor;
-import io.grpc.Context;
 import io.opentracing.References;
-import io.opentracing.Span;
-import io.opentracing.contrib.OpenTracingContextKey;
-import io.opentracing.tag.Tags;
-import io.opentracing.util.GlobalTracer;
+import no.nb.nna.broprox.commons.OpenTracingWrapper;
 import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.model.MessagesProto.CrawlExecutionStatus;
 import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
@@ -58,54 +54,52 @@ public class QueueWorker extends RecursiveAction {
                 System.out.println("Crawler thread stopped");
                 return;
             }
-            Span fetchSpan = GlobalTracer.get()
-                    .buildSpan("runNextFetch")
-                    .addReference(References.FOLLOWS_FROM, exe.getParentSpan().context())
-                    .start();
 
-            Context prev = Context.current().withValue(OpenTracingContextKey.getKey(), fetchSpan).attach();
+            new OpenTracingWrapper("QueueWorker")
+                    .setParentSpan(exe.getParentSpan())
+                    .setParentReferenceType(References.FOLLOWS_FROM)
+                    .run("runNextFetch", this::processExecution, exe);
+        }
+    }
 
-            if (!exe.isSeedResolved()) {
+    private void processExecution(CrawlExecution exe) {
+        if (!exe.isSeedResolved()) {
+            try {
+                getPool().managedBlock(exe);
+                exe.calculateDelay();
+                frontier.executionsQueue.add(exe);
+                System.out.println("End of Seed crawl");
+            } catch (InterruptedException ex) {
+                throw new RuntimeException(ex);
+            }
+        } else {
+            QueuedUri qUri = getNextToFetch(exe.getId());
+            if (qUri == null) {
+                // No more uris, we are done.
+                System.out.println("Reached end of crawl");
+                CrawlExecutionStatus.State state = exe.getStatus().getState();
+                if (state == CrawlExecutionStatus.State.RUNNING) {
+                    state = CrawlExecutionStatus.State.FINISHED;
+                }
+                exe.setStatus(exe.getStatus().toBuilder()
+                        .setState(state)
+                        .setEndTime(ProtoUtils.getNowTs())
+                        .build());
+                frontier.getDb().updateExecutionStatus(exe.getStatus());
+                frontier.getHarvesterClient().cleanupExecution(exe.getId());
+                frontier.runningExecutions.remove(exe.getId());
+            } else {
+                frontier.getDb().executeRequest(r.table(TABLE_URI_QUEUE).get(qUri.getId()).delete());
+                exe.setCurrentUri(qUri);
                 try {
                     getPool().managedBlock(exe);
                     exe.calculateDelay();
                     frontier.executionsQueue.add(exe);
-                    System.out.println("End of Seed crawl");
+                    System.out.println("End of Link crawl");
                 } catch (InterruptedException ex) {
                     throw new RuntimeException(ex);
                 }
-            } else {
-                QueuedUri qUri = getNextToFetch(exe.getId());
-                if (qUri == null) {
-                    // No more uris, we are done.
-                    System.out.println("Reached end of crawl");
-                    CrawlExecutionStatus.State state = exe.getStatus().getState();
-                    if (state == CrawlExecutionStatus.State.RUNNING) {
-                        state = CrawlExecutionStatus.State.FINISHED;
-                    }
-                    exe.setStatus(exe.getStatus().toBuilder()
-                            .setState(state)
-                            .setEndTime(ProtoUtils.getNowTs())
-                            .build());
-                    frontier.getDb().updateExecutionStatus(exe.getStatus());
-                    frontier.getHarvesterClient().cleanupExecution(exe.getId());
-                    frontier.runningExecutions.remove(exe.getId());
-                } else {
-                    frontier.getDb().executeRequest(r.table(TABLE_URI_QUEUE).get(qUri.getId()).delete());
-                    exe.setCurrentUri(qUri);
-                    try {
-                        getPool().managedBlock(exe);
-                        exe.calculateDelay();
-                        frontier.executionsQueue.add(exe);
-                        System.out.println("End of Link crawl");
-                    } catch (InterruptedException ex) {
-                        throw new RuntimeException(ex);
-                    }
-                }
             }
-
-            Context.current().detach(prev);
-            fetchSpan.finish();
         }
     }
 

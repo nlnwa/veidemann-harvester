@@ -18,7 +18,6 @@ package no.nb.nna.broprox.harvester.api;
 import java.util.List;
 
 import io.grpc.stub.StreamObserver;
-import io.opentracing.Span;
 import io.opentracing.contrib.OpenTracingContextKey;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.api.HarvesterGrpc;
@@ -51,8 +50,9 @@ public class HarvesterService extends HarvesterGrpc.HarvesterImplBase {
 
     @Override
     public void harvestPage(HarvestPageRequest request, StreamObserver<HarvestPageReply> respObserver) {
+        String executionId = null;
         try {
-            String executionId = request.getExecutionId();
+            executionId = request.getExecutionId();
             if (executionId.isEmpty()) {
                 executionId = BroproxHeaderConstants.MANUAL_EXID;
             }
@@ -67,13 +67,14 @@ public class HarvesterService extends HarvesterGrpc.HarvesterImplBase {
             respObserver.onCompleted();
         } catch (Exception ex) {
             respObserver.onError(ex);
+        } finally {
+            OpenTracingSpans.remove(executionId);
         }
     }
 
     @Override
     public void cleanupExecution(CleanupExecutionRequest request, StreamObserver<MessagesProto.Void> responseObserver) {
         proxy.cleanCache(request.getExecutionId());
-        OpenTracingSpans.remove(request.getExecutionId());
     }
 
 }

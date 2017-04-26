@@ -15,10 +15,7 @@
  */
 package no.nb.nna.broprox.frontier.worker;
 
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.DelayQueue;
 import java.util.concurrent.ForkJoinPool;
@@ -27,10 +24,8 @@ import java.util.concurrent.TimeUnit;
 import com.github.mgunlogson.cuckoofilter4j.CuckooFilter;
 import com.google.common.hash.Funnels;
 import com.rethinkdb.RethinkDB;
-import io.grpc.Context;
-import io.opentracing.Span;
-import io.opentracing.contrib.OpenTracingContextKey;
-import io.opentracing.util.GlobalTracer;
+import no.nb.nna.broprox.commons.OpenTracingParentContextKey;
+import no.nb.nna.broprox.commons.OpenTracingWrapper;
 import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
 import no.nb.nna.broprox.model.MessagesProto.CrawlConfig;
@@ -67,7 +62,7 @@ public class Frontier implements AutoCloseable {
         System.out.println("Starting Queue Processor");
 //        ForkJoinTask proc = EXECUTOR_SERVICE.submit(new Runnable() {
 //            @Override
-//            public void run() {
+//            public void map() {
 //                try (Cursor<Map<String, Map<String, Object>>> cursor = db.executeRequest(r.table(TABLE_URI_QUEUE)
 //                        .changes());) {
 //                    for (Map<String, Map<String, Object>> doc : cursor) {
@@ -91,16 +86,18 @@ public class Frontier implements AutoCloseable {
         }
     }
 
-    public void newExecution(Span span, CrawlConfig config, String... seed) {
-        Span scheduleSeedsSpan = GlobalTracer.get().buildSpan("scheduleSeeds").asChildOf(span).start();
-        Context prev = Context.current().withValue(OpenTracingContextKey.getKey(), scheduleSeedsSpan).attach();
+    public void newExecution(final CrawlConfig config, final String seed) {
+        OpenTracingWrapper otw = new OpenTracingWrapper("Frontier");
+        otw.run("scheduleSeed", this::scheduleSeed, config, seed);
+    }
 
+    public void scheduleSeed(final CrawlConfig config, final String seed) {
         CrawlExecutionStatus status = CrawlExecutionStatus.newBuilder()
                 .setState(CrawlExecutionStatus.State.CREATED)
                 .build();
 
         status = db.addExecutionStatus(status);
-        CrawlExecution exe = new CrawlExecution(span, this, status, config);
+        CrawlExecution exe = new CrawlExecution(OpenTracingParentContextKey.parentSpan(), this, status, config);
         runningExecutions.put(status.getId(), exe);
 
         status = status.toBuilder().setState(CrawlExecutionStatus.State.RUNNING)
@@ -108,18 +105,13 @@ public class Frontier implements AutoCloseable {
                 .build();
         db.updateExecutionStatus(status);
 
-        for (String s : seed) {
-            QueuedUri qUri = QueuedUri.newBuilder()
-                    .addExecutionIds(QueuedUri.IdSeq.newBuilder().setId(status.getId()).setSeq(exe.getNextSequenceNum()))
-                    .setUri(s)
-                    .setSurt(UriConfigs.SURT_KEY.buildUri(s).toString())
-                    .setDiscoveryPath("")
-                    .build();
-            exe.setCurrentUri(qUri);
-            executionsQueue.add(exe);
-        }
-        Context.current().detach(prev);
-        scheduleSeedsSpan.finish();
+        QueuedUri qUri = QueuedUri.newBuilder()
+                .addExecutionIds(QueuedUri.IdSeq.newBuilder().setId(status.getId()).setSeq(exe.getNextSequenceNum()))
+                .setUri(seed)
+                .setSurt(UriConfigs.SURT_KEY.buildUri(seed).toString())
+                .build();
+        exe.setCurrentUri(qUri);
+        executionsQueue.add(exe);
     }
 
     boolean alreadeyIncluded(QueuedUri qUri) {

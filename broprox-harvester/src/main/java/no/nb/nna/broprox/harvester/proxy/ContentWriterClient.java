@@ -16,22 +16,13 @@
 package no.nb.nna.broprox.harvester.proxy;
 
 import java.net.URI;
-import java.util.AbstractMap;
-import java.util.Iterator;
-import java.util.Map;
 import java.util.concurrent.Callable;
 
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
-import io.grpc.Context;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
-import io.opentracing.Span;
-import io.opentracing.contrib.OpenTracingContextKey;
-import io.opentracing.propagation.Format;
-import io.opentracing.propagation.TextMap;
 import io.opentracing.tag.Tags;
-import io.opentracing.util.GlobalTracer;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.client.Client;
 import javax.ws.rs.client.ClientBuilder;
@@ -41,6 +32,8 @@ import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriBuilder;
+import no.nb.nna.broprox.commons.OpenTracingJersey;
+import no.nb.nna.broprox.commons.OpenTracingWrapper;
 import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
 import org.glassfish.jersey.media.multipart.FormDataMultiPart;
 import org.glassfish.jersey.media.multipart.MultiPart;
@@ -62,19 +55,11 @@ public class ContentWriterClient implements AutoCloseable {
     }
 
     public URI writeRecord(CrawlLog logEntry, ByteBuf headers, ByteBuf payload) {
-        Span writeSpan = GlobalTracer.get()
-                .buildSpan("writeWarcRecord")
-                .asChildOf(OpenTracingContextKey.activeSpan())
-                .withTag(Tags.SPAN_KIND.getKey(), Tags.SPAN_KIND_CLIENT)
-                .start();
-
-        Context writeContext = Context.current().withValue(OpenTracingContextKey.getKey(), writeSpan);
+        OpenTracingWrapper otw = new OpenTracingWrapper("ContentWriterClient", Tags.SPAN_KIND_CLIENT);
         try {
-            return writeContext.call(new WriteRecordTask(logEntry, headers, payload));
+            return otw.call("writeWarcRecord", new WriteRecordTask(logEntry, headers, payload));
         } catch (Exception ex) {
             throw new RuntimeException(ex);
-        } finally {
-            writeSpan.finish();
         }
     }
 
@@ -118,7 +103,7 @@ public class ContentWriterClient implements AutoCloseable {
             }
 
             MultivaluedMap<String, Object> httpHeaders = new MultivaluedHashMap<>();
-            injectSpanHeaders(httpHeaders);
+            OpenTracingJersey.injectSpanHeaders(httpHeaders);
 
             Response storageRef = contentWriterTarget.path("warcrecord")
                     .request()
@@ -131,37 +116,5 @@ public class ContentWriterClient implements AutoCloseable {
 
             return storageRef.getLocation();
         }
-
-        private MultivaluedMap<String, Object> injectSpanHeaders(final MultivaluedMap<String, Object> httpHeaders) {
-            TextMap traceCarrier = new TextMap() {
-                @Override
-                public Iterator<Map.Entry<String, String>> iterator() {
-                    return new Iterator<Map.Entry<String, String>>() {
-                        Iterator<String> internal = httpHeaders.keySet().iterator();
-
-                        @Override
-                        public boolean hasNext() {
-                            return internal.hasNext();
-                        }
-
-                        @Override
-                        public Map.Entry<String, String> next() {
-                            String key = internal.next();
-                            return new AbstractMap.SimpleImmutableEntry(key, httpHeaders.getFirst(key));
-                        }
-                    };
-                }
-
-                @Override
-                public void put(String key, String value) {
-                    httpHeaders.putSingle(key, value);
-                }
-
-            };
-            GlobalTracer.get()
-                    .inject(OpenTracingContextKey.activeSpan().context(), Format.Builtin.HTTP_HEADERS, traceCarrier);
-            return httpHeaders;
-        }
-
     }
 }

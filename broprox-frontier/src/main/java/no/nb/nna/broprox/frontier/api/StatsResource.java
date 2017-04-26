@@ -24,9 +24,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.rethinkdb.RethinkDB;
 import com.rethinkdb.net.Cursor;
-import io.opentracing.Span;
 import io.opentracing.tag.Tags;
-import io.opentracing.util.GlobalTracer;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
@@ -36,6 +34,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
+import no.nb.nna.broprox.commons.OpenTracingWrapper;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
 import no.nb.nna.broprox.frontier.worker.Frontier;
@@ -104,11 +103,6 @@ public class StatsResource {
             @QueryParam("timeout") @DefaultValue("10000") long timeout,
             @QueryParam("waitTime") @DefaultValue("500") long waitTime) {
 
-        Span span = GlobalTracer.get().buildSpan("fetchSeed")
-                .withTag(Tags.HTTP_URL.getKey(), url)
-                .withTag(Tags.SPAN_KIND.getKey(), Tags.SPAN_KIND_SERVER)
-                .start();
-
         UriFormat f = UriConfigs.SURT_KEY_FORMAT;
         System.out.println("URL: " + url);
         CrawlConfig config = CrawlConfig.newBuilder()
@@ -121,13 +115,12 @@ public class StatsResource {
                 .build();
 
         try {
-            frontier.newExecution(span, config, url);
+            OpenTracingWrapper otw = new OpenTracingWrapper("Frontier_API", Tags.SPAN_KIND_SERVER)
+                    .addTag(Tags.HTTP_URL.getKey(), url);
+            otw.run("fetchSeed", frontier::newExecution, config, url);
         } catch (Exception e) {
-            span.setTag(Tags.ERROR.getKey(), true);
             e.printStackTrace();
             throw new WebApplicationException(e);
-        } finally {
-            span.finish();
         }
     }
 

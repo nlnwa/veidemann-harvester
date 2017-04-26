@@ -32,7 +32,7 @@ import io.opentracing.tag.Tags;
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListRequest;
 import no.nb.nna.broprox.commons.OpenTracingWrapper;
-import no.nb.nna.broprox.model.MessagesProto.BrowserScript;
+import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
 import no.nb.nna.broprox.model.MessagesProto.CrawlEntity;
 import no.nb.nna.broprox.model.MessagesProto.CrawlExecutionStatus;
 import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
@@ -317,6 +317,10 @@ public class RethinkDbAdapter implements DbAdapter {
     public CrawlEntity saveCrawlEntity(CrawlEntity entity) {
         Map rMap = ProtoUtils.protoToRethink(entity);
 
+        if (!rMap.containsKey("created")) {
+            rMap.put("created", r.now());
+        }
+
         Map<String, Object> response = otw.map("db-saveCrawlEntity",
                 this::executeRequest, r.table(TABLE_CRAWL_ENTITIES)
                         .insert(rMap)
@@ -330,11 +334,10 @@ public class RethinkDbAdapter implements DbAdapter {
     @Override
     public CrawlEntityListReply listCrawlEntities(CrawlEntityListRequest request) {
         ReqlExpr qry = r.table(TABLE_CRAWL_ENTITIES);
-        if (request != null) {
-            if (!request.getId().isEmpty()) {
-                qry = ((Table) qry).get(request.getId());
-            }
+        if (!request.getId().isEmpty()) {
+            qry = ((Table) qry).get(request.getId());
         }
+
         Object res = otw.map("db-listCrawlEntities",
                 this::executeRequest, qry);
 

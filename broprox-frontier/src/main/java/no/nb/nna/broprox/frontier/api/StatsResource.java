@@ -38,7 +38,7 @@ import no.nb.nna.broprox.commons.OpenTracingWrapper;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
 import no.nb.nna.broprox.frontier.worker.Frontier;
-import no.nb.nna.broprox.model.MessagesProto.CrawlConfig;
+import no.nb.nna.broprox.model.ConfigProto.CrawlConfig;
 import org.netpreserve.commons.uri.UriConfigs;
 import org.netpreserve.commons.uri.UriFormat;
 

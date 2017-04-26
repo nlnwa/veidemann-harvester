@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package broprox;
+option java_package = "no.nb.nna.broprox.model";
+//option java_multiple_files = true;
+option java_outer_classname = "ConfigProto";
+
+import "google/protobuf/timestamp.proto";
+
+// Message containing a javascript to be run in a browser
+message BrowserScript {
+    enum Type {
+        UNDEFINED = 0;
+        BEHAVIOR = 1;
+        EXTRACT_OUTLINKS = 2;
+        LOGIN = 3;
+    }
+
+    string id = 1;
+    Type type = 2;
+    string name = 3;
+    string script = 4;
+    string url_regexp = 5;
+    map<string, string> parameters = 6;
+}
+
+message CrawlConfig {
+    int32 window_width = 1;
+    int32 window_height = 2;
+    string scope = 3;
+    int64 page_load_timeout = 4;
+    int64 min_time_between_page_load_millis = 5;
+    bool depth_first = 6;
+    int64 sleep_after_pageload = 7;
+}

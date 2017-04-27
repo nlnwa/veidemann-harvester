@@ -20,6 +20,7 @@ import java.io.InputStream;
 import java.util.Map;
 
 import com.rethinkdb.RethinkDB;
+import com.rethinkdb.gen.exc.ReqlDriverError;
 import com.rethinkdb.net.Connection;
 import no.nb.nna.broprox.commons.TracerFactory;
 import com.typesafe.config.Config;
@@ -64,12 +65,36 @@ public class DbInitializer {
     }
 
     public DbInitializer() {
-        System.out.println("Connecting to: " +SETTINGS.getDbHost() + ":" + SETTINGS.getDbPort());
-        conn = r.connection()
-                .hostname(SETTINGS.getDbHost())
-                .port(SETTINGS.getDbPort())
-                .db(SETTINGS.getDbName())
-                .connect();
+        System.out.println("Connecting to: " + SETTINGS.getDbHost() + ":" + SETTINGS.getDbPort());
+        conn = connect();
+    }
+
+    private Connection connect() {
+        Connection c = null;
+        int attempts = 0;
+        while (c == null) {
+            attempts++;
+            try {
+                c = r.connection()
+                        .hostname(SETTINGS.getDbHost())
+                        .port(SETTINGS.getDbPort())
+                        .db(SETTINGS.getDbName())
+                        .connect();
+            } catch (ReqlDriverError e) {
+                System.err.println(e.getMessage());
+                if (attempts < 30) {
+                    try {
+                        Thread.sleep(1000);
+                    } catch (InterruptedException ex) {
+                        throw new RuntimeException(ex);
+                    }
+                } else {
+                    System.err.println("Too many connection attempts, giving up");
+                    throw e;
+                }
+            }
+        }
+        return c;
     }
 
     public void initialize() {

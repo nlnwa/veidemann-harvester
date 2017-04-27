@@ -305,7 +305,13 @@ public class RethinkDbAdapter implements DbAdapter {
             }
         }
 
-        return qry.run(conn);
+        T result = qry.run(conn);
+        if (result instanceof Map
+                && ((Map) result).containsKey("errors")
+                && !((Map) result).get("errors").equals(0L)) {
+            System.err.println("DB error: " + result);
+        }
+        return result;
     }
 
     @Override

@@ -115,33 +115,3 @@ message BrowserScript {
     string url_regexp = 5;
     map<string, string> parameters = 6;
 }
-
-// A crawl job definition where all
-//message CrawlJobAssembly {
-//    string id = 1;
-//    Meta meta = 2;
-//    CrawlScheduleConfig schedule = 3;
-//    CrawlLimitsConfig limits = 4;
-//    CrawlConfigAssembly config = 5;
-//}
-/*
-message CrawlConfigAssembly {
-    string id = 1;
-    Meta meta = 2;
-    BrowserConfigAssembly browser_config = 7;
-    Politeness politeness = 8;
-    ExtraConfig extra = 9;
-    bool depth_first = 20;
-}
-
-message BrowserConfigAssembly {
-    string id = 1;
-    Meta meta = 2;
-    int32 window_width = 3;
-    int32 window_height = 4;
-    int64 page_load_timeout_ms = 5;
-    int64 sleep_after_pageload_ms = 7;
-    repeated BrowserScript script = 8;
-    map<string, string> headers = 16;
-}
-*/

@@ -15,10 +15,12 @@
  */
 package no.nb.nna.broprox.db;
 
+import java.time.OffsetDateTime;
+
 import com.google.protobuf.InvalidProtocolBufferException;
-import com.google.protobuf.util.Timestamps;
 import no.nb.nna.broprox.api.ControllerProto;
-import no.nb.nna.broprox.model.MessagesProto.CrawlEntity;
+import no.nb.nna.broprox.model.ConfigProto;
+import no.nb.nna.broprox.model.ConfigProto.CrawlEntity;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -58,13 +60,16 @@ public class RethinkDbAdapterIT {
     public void testSaveCrawlEntity() throws InvalidProtocolBufferException {
         System.out.println("saveCrawlEntity");
         CrawlEntity entity = CrawlEntity.newBuilder()
-                .setName("Nasjonalbiblioteket")
-                .setCreated(Timestamps.fromMillis(System.currentTimeMillis()))
-                .addLabel("Daily")
-                .addLabel("Government")
+                .setMeta(ConfigProto.Meta.newBuilder()
+                        .setName("Nasjonalbiblioteket")
+                        .addLabel(ConfigProto.Label.newBuilder()
+                                .setKey("frequency")
+                                .setValue("Daily"))
+                        .addLabel(ConfigProto.Label.newBuilder()
+                                .setKey("orgType")
+                                .setValue("Government"))
+                        .setCreated(ProtoUtils.odtToTs(OffsetDateTime.parse("2017-04-06T06:20:35.779Z"))))
                 .build();
-
-        CrawlEntity expResult = null;
 
         CrawlEntity result = db.saveCrawlEntity(entity);
 
@@ -78,18 +83,28 @@ public class RethinkDbAdapterIT {
     @Test
     public void testListCrawlEntities() throws InvalidProtocolBufferException {
         CrawlEntity entity1 = CrawlEntity.newBuilder()
-                .setName("Nasjonalbiblioteket")
-                .setCreated(Timestamps.fromMillis(System.currentTimeMillis()))
-                .addLabel("Daily")
-                .addLabel("Government")
+                .setMeta(ConfigProto.Meta.newBuilder()
+                        .setName("Nasjonalbiblioteket")
+                        .addLabel(ConfigProto.Label.newBuilder()
+                                .setKey("frequency")
+                                .setValue("Daily"))
+                        .addLabel(ConfigProto.Label.newBuilder()
+                                .setKey("orgType")
+                                .setValue("Government"))
+                        .setCreated(ProtoUtils.odtToTs(OffsetDateTime.parse("2017-04-06T06:20:35.779Z"))))
                 .build();
         entity1 = db.saveCrawlEntity(entity1);
 
         CrawlEntity entity2 = CrawlEntity.newBuilder()
-                .setName("VG")
-                .setCreated(Timestamps.fromMillis(System.currentTimeMillis()))
-                .addLabel("Hourly")
-                .addLabel("News")
+                .setMeta(ConfigProto.Meta.newBuilder()
+                        .setName("VG")
+                        .addLabel(ConfigProto.Label.newBuilder()
+                                .setKey("frequency")
+                                .setValue("Hourly"))
+                        .addLabel(ConfigProto.Label.newBuilder()
+                                .setKey("orgType")
+                                .setValue("News"))
+                        .setCreated(ProtoUtils.odtToTs(OffsetDateTime.parse("2017-04-06T06:20:35.779Z"))))
                 .build();
         entity2 = db.saveCrawlEntity(entity2);
 

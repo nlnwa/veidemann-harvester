@@ -15,8 +15,6 @@
  */
 package no.nb.nna.broprox.db;
 
-import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -33,14 +31,13 @@ import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListRequest;
 import no.nb.nna.broprox.commons.OpenTracingWrapper;
 import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
-import no.nb.nna.broprox.model.MessagesProto.CrawlEntity;
+import no.nb.nna.broprox.model.ConfigProto.CrawlEntity;
 import no.nb.nna.broprox.model.MessagesProto.CrawlExecutionStatus;
 import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
 import no.nb.nna.broprox.model.MessagesProto.CrawledContent;
 import no.nb.nna.broprox.model.MessagesProto.ExtractedText;
 import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
 import no.nb.nna.broprox.model.MessagesProto.Screenshot;
-import org.yaml.snakeyaml.Yaml;
 
 /**
  * An implementation of DbAdapter for RethinkDb.
@@ -65,12 +62,6 @@ public class RethinkDbAdapter implements DbAdapter {
 
     static final RethinkDB r = RethinkDB.r;
 
-    final String dbHost;
-
-    final int dbPort;
-
-    final String dbName;
-
     final Connection conn;
 
     final OpenTracingWrapper otw = new OpenTracingWrapper("dbAdapter", Tags.SPAN_KIND_CLIENT)
@@ -80,62 +71,11 @@ public class RethinkDbAdapter implements DbAdapter {
             .setTraceEnabled(false);
 
     public RethinkDbAdapter(String dbHost, int dbPort, String dbName) {
-        this.dbHost = dbHost;
-        this.dbPort = dbPort;
-        this.dbName = dbName;
-
-        conn = connect();
-        createDb();
+        this(r.connection().hostname(dbHost).port(dbPort).db(dbName).connect());
     }
 
-    private final Connection connect() {
-        Connection c = r.connection().hostname(dbHost).port(dbPort).db(dbName).connect();
-        return c;
-    }
-
-    private final void createDb() {
-        if (!(boolean) r.dbList().contains(dbName).run(conn)) {
-            r.dbCreate(dbName).run(conn);
-
-            r.tableCreate(TABLE_CRAWL_LOG).optArg("primary_key", "warcId").run(conn);
-            r.table(TABLE_CRAWL_LOG)
-                    .indexCreate("surt_time", row -> r.array(row.g("surt"), row.g("timeStamp")))
-                    .run(conn);
-            r.table(TABLE_CRAWL_LOG).indexWait("surt_time").run(conn);
-
-            r.tableCreate(TABLE_CRAWLED_CONTENT).optArg("primary_key", "digest").run(conn);
-
-            r.tableCreate(TABLE_EXTRACTED_TEXT).optArg("primary_key", "warcId").run(conn);
-
-            r.tableCreate(TABLE_BROWSER_SCRIPTS).run(conn);
-
-            r.tableCreate(TABLE_URI_QUEUE).run(conn);
-            r.table(TABLE_URI_QUEUE).indexCreate("surt").run(conn);
-            r.table(TABLE_URI_QUEUE).indexCreate("executionIds", uri -> uri.g("executionIds")
-                    .map(eid -> r.array(eid.g("id"), eid.g("seq")))
-            ).optArg("multi", true).run(conn);
-
-            r.table(TABLE_URI_QUEUE).indexWait("surt", "executionIds").run(conn);
-
-            r.tableCreate(TABLE_EXECUTIONS).run(conn);
-
-            r.tableCreate(TABLE_SCREENSHOT).run(conn);
-
-            r.tableCreate(TABLE_CRAWL_ENTITIES).run(conn);
-
-            populateDb();
-        }
-    }
-
-    private final void populateDb() {
-        Yaml yaml = new Yaml();
-        try (InputStream in = getClass().getClassLoader().getResourceAsStream("browser-scripts/extract-outlinks.yaml")) {
-            Map<String, Object> scriptDef = yaml.loadAs(in, Map.class);
-            BrowserScript script = ProtoUtils.rethinkToProto(scriptDef, BrowserScript.class);
-            saveBrowserScript(script);
-        } catch (IOException ex) {
-            throw new RuntimeException(ex);
-        }
+    public RethinkDbAdapter(Connection conn) {
+        this.conn = conn;
     }
 
     @Override
@@ -359,7 +299,6 @@ public class RethinkDbAdapter implements DbAdapter {
             if (!conn.isOpen()) {
                 try {
                     conn.connect();
-                    createDb();
                 } catch (TimeoutException ex) {
                     throw new RuntimeException("Timed out waiting for connection");
                 }

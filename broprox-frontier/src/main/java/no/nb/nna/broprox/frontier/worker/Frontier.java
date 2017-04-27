@@ -29,6 +29,7 @@ import no.nb.nna.broprox.commons.OpenTracingWrapper;
 import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
 import no.nb.nna.broprox.model.ConfigProto.CrawlConfig;
+import no.nb.nna.broprox.model.ConfigProto.Seed;
 import no.nb.nna.broprox.model.MessagesProto.CrawlExecutionStatus;
 import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
 import org.netpreserve.commons.uri.UriConfigs;
@@ -86,18 +87,18 @@ public class Frontier implements AutoCloseable {
         }
     }
 
-    public void newExecution(final CrawlConfig config, final String seed) {
+    public void newExecution(final CrawlConfig config, final Seed seed) {
         OpenTracingWrapper otw = new OpenTracingWrapper("Frontier");
         otw.run("scheduleSeed", this::scheduleSeed, config, seed);
     }
 
-    public void scheduleSeed(final CrawlConfig config, final String seed) {
+    public void scheduleSeed(final CrawlConfig config, final Seed seed) {
         CrawlExecutionStatus status = CrawlExecutionStatus.newBuilder()
                 .setState(CrawlExecutionStatus.State.CREATED)
                 .build();
 
         status = db.addExecutionStatus(status);
-        CrawlExecution exe = new CrawlExecution(OpenTracingParentContextKey.parentSpan(), this, status, config);
+        CrawlExecution exe = new CrawlExecution(OpenTracingParentContextKey.parentSpan(), this, status, config, seed.getScope());
         runningExecutions.put(status.getId(), exe);
 
         status = status.toBuilder().setState(CrawlExecutionStatus.State.RUNNING)
@@ -107,8 +108,9 @@ public class Frontier implements AutoCloseable {
 
         QueuedUri qUri = QueuedUri.newBuilder()
                 .addExecutionIds(QueuedUri.IdSeq.newBuilder().setId(status.getId()).setSeq(exe.getNextSequenceNum()))
-                .setUri(seed)
-                .setSurt(UriConfigs.SURT_KEY.buildUri(seed).toString())
+                .setUri(seed.getUri())
+                .setSurt(UriConfigs.SURT_KEY.buildUri(seed.getUri()).toString())
+                .setScope(seed.getScope())
                 .build();
         exe.setCurrentUri(qUri);
         executionsQueue.add(exe);

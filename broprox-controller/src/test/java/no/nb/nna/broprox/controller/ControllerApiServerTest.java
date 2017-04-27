@@ -16,6 +16,7 @@
 package no.nb.nna.broprox.controller;
 
 import java.io.IOException;
+import java.time.OffsetDateTime;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -28,7 +29,9 @@ import no.nb.nna.broprox.api.ControllerGrpc;
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListRequest;
 import no.nb.nna.broprox.db.DbAdapter;
-import no.nb.nna.broprox.model.MessagesProto.CrawlEntity;
+import no.nb.nna.broprox.db.ProtoUtils;
+import no.nb.nna.broprox.model.ConfigProto;
+import no.nb.nna.broprox.model.ConfigProto.CrawlEntity;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -73,14 +76,28 @@ public class ControllerApiServerTest {
         inProcessServer = new ControllerApiServer(inProcessServerBuilder, dbMock).start();
 
         CrawlEntity request = CrawlEntity.newBuilder()
-                .setName("Nasjonalbiblioteket")
-                .setCreated(Timestamps.fromMillis(System.currentTimeMillis()))
+                .setMeta(ConfigProto.Meta.newBuilder()
+                        .setName("Nasjonalbiblioteket")
+                        .addLabel(ConfigProto.Label.newBuilder()
+                                .setKey("frequency")
+                                .setValue("Daily"))
+                        .addLabel(ConfigProto.Label.newBuilder()
+                                .setKey("orgType")
+                                .setValue("Government"))
+                        .setCreated(ProtoUtils.odtToTs(OffsetDateTime.parse("2017-04-06T06:20:35.779Z"))))
                 .build();
 
         CrawlEntity reply = CrawlEntity.newBuilder()
                 .setId("Random UID")
-                .setName("Nasjonalbiblioteket")
-                .setCreated(Timestamps.fromMillis(System.currentTimeMillis()))
+                .setMeta(ConfigProto.Meta.newBuilder()
+                        .setName("Nasjonalbiblioteket")
+                        .addLabel(ConfigProto.Label.newBuilder()
+                                .setKey("frequency")
+                                .setValue("Daily"))
+                        .addLabel(ConfigProto.Label.newBuilder()
+                                .setKey("orgType")
+                                .setValue("Government"))
+                        .setCreated(ProtoUtils.odtToTs(OffsetDateTime.parse("2017-04-06T06:20:35.779Z"))))
                 .build();
 
         when(dbMock.saveCrawlEntity(request)).thenReturn(reply);

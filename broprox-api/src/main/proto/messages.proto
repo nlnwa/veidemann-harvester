@@ -12,15 +12,6 @@ import "config.proto";
 message Void {
 }
 
-// A crawl entity (might be an organisation with one or more seeds)
-message CrawlEntity {
-    string id = 1;
-    string name = 2;
-    string description = 16;
-    repeated string label = 3;
-    google.protobuf.Timestamp created = 4;
-}
-
 message CrawlExecutionStatus {
     enum State {
         UNDEFINED = 0;
@@ -119,7 +110,7 @@ message QueuedUri {
      */
     string discovery_path = 6;
     string referrer = 7;
-    CrawlConfig crawl_config = 8;
+    CrawlScope scope = 8;
 }
 
 message Screenshot {

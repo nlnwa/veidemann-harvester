@@ -19,7 +19,7 @@ import io.grpc.stub.StreamObserver;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.api.ControllerGrpc;
 import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
-import no.nb.nna.broprox.model.MessagesProto.CrawlEntity;
+import no.nb.nna.broprox.model.ConfigProto.CrawlEntity;
 import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListReply;
 import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListRequest;
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;

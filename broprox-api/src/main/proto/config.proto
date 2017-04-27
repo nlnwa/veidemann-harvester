@@ -7,29 +7,96 @@ option java_outer_classname = "ConfigProto";
 
 import "google/protobuf/timestamp.proto";
 
-message Schedule {
-    string id = 1;
-    string name = 2;
-    string cron_expression = 3;
-    string description = 16;
+message Meta {
+    string name = 1;
+    string description = 2;
+    google.protobuf.Timestamp created = 3;
+    string created_by = 4;
+    google.protobuf.Timestamp last_modified = 5;
+    string last_modified_by = 6;
+    repeated Label label = 7;
 }
 
-message CrawlLimits {
+message Label {
+    string key = 1;
+    string value = 2;
+}
 
+// A crawl entity (might be an organisation with one or more seeds)
+message CrawlEntity {
+    string id = 1;
+    Meta meta = 2;
+}
+
+message Seed {
+    string id = 1;
+    Meta meta = 2;
+    string entity_id = 3;
+    string uri = 4;
+    CrawlScope scope = 5;
+    repeated string job_id = 6;
+}
+
+message CrawlJob {
+    string id = 1;
+    Meta meta = 2;
+    CrawlScheduleConfig schedule = 3;
+    CrawlLimitsConfig limits = 4;
+    CrawlConfig config = 5;
+}
+
+message CrawlConfig {
+    string id = 1;
+    Meta meta = 2;
+    oneof browser_config_or_id {
+        string browser_config_id = 7;
+        BrowserConfig browser_config = 16;
+    }
+    oneof politeness_or_id {
+        string politeness_id = 8;
+        PolitenessConfig politeness = 17;
+    }
+    ExtraConfig extra = 9;
+    bool depth_first = 20;
+}
+
+message CrawlScheduleConfig {
+    string id = 1;
+    Meta meta = 2;
+    string cron_expression = 3;
+}
+
+message CrawlScope {
+    string surt_prefix = 1;
+}
+
+message CrawlLimitsConfig {
+    int32 depth = 1;
+    int64 max_duration_s = 2;
+    int64 max_bytes = 3;
 }
 
 message BrowserConfig {
-    int32 window_width = 1;
-    int32 window_height = 2;
-    string scope = 3;
-    int64 page_load_timeout = 4;
-    int64 min_time_between_page_load_millis = 5;
-    bool depth_first = 6;
-    int64 sleep_after_pageload = 7;
+    string id = 1;
+    Meta meta = 2;
+    int32 window_width = 3;
+    int32 window_height = 4;
+    int64 page_load_timeout_ms = 5;
+    int64 sleep_after_pageload_ms = 7;
+    repeated string script_id = 8;
+    map<string, string> headers = 16;
 }
 
-message Politeness {
+message PolitenessConfig {
+    string id = 1;
+    Meta meta = 2;
+    bool ignore_robots = 3;
+    int64 min_time_between_page_load_ms = 4;
+}
 
+message ExtraConfig {
+    bool extract_text = 5;
+    bool create_snapshot = 6;
 }
 
 // Message containing a javascript to be run in a browser
@@ -42,9 +109,39 @@ message BrowserScript {
     }
 
     string id = 1;
-    Type type = 2;
-    string name = 3;
+    Meta meta = 2;
+    Type type = 3;
     string script = 4;
     string url_regexp = 5;
     map<string, string> parameters = 6;
 }
+
+// A crawl job definition where all
+//message CrawlJobAssembly {
+//    string id = 1;
+//    Meta meta = 2;
+//    CrawlScheduleConfig schedule = 3;
+//    CrawlLimitsConfig limits = 4;
+//    CrawlConfigAssembly config = 5;
+//}
+/*
+message CrawlConfigAssembly {
+    string id = 1;
+    Meta meta = 2;
+    BrowserConfigAssembly browser_config = 7;
+    Politeness politeness = 8;
+    ExtraConfig extra = 9;
+    bool depth_first = 20;
+}
+
+message BrowserConfigAssembly {
+    string id = 1;
+    Meta meta = 2;
+    int32 window_width = 3;
+    int32 window_height = 4;
+    int64 page_load_timeout_ms = 5;
+    int64 sleep_after_pageload_ms = 7;
+    repeated BrowserScript script = 8;
+    map<string, string> headers = 16;
+}
+*/

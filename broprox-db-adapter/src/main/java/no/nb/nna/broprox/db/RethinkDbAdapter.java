@@ -21,9 +21,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeoutException;
 
+import com.google.protobuf.Message;
 import com.rethinkdb.RethinkDB;
 import com.rethinkdb.gen.ast.ReqlExpr;
 import com.rethinkdb.gen.ast.Table;
+import com.rethinkdb.gen.exc.ReqlError;
 import com.rethinkdb.net.Connection;
 import com.rethinkdb.net.Cursor;
 import io.opentracing.tag.Tags;
@@ -97,26 +99,30 @@ public class RethinkDbAdapter implements DbAdapter {
 
     @Override
     public CrawledContent addCrawledContent(CrawledContent cc) {
+        ensureContainsValue(cc, "digest");
+        ensureContainsValue(cc, "warc_id");
+
         Map rMap = ProtoUtils.protoToRethink(cc);
         Map<String, Object> response = otw.map("db-addCrawledContent",
                 this::executeRequest, r.table(TABLE_CRAWLED_CONTENT)
                         .insert(rMap)
                         .optArg("conflict", "error"));
 
-        String key = ((List<String>) response.get("generated_keys")).get(0);
-        return cc.toBuilder().setDigest(key).build();
+        return cc;
     }
 
     @Override
     public ExtractedText addExtractedText(ExtractedText et) {
+        ensureContainsValue(et, "warc_id");
+        ensureContainsValue(et, "text");
+
         Map rMap = ProtoUtils.protoToRethink(et);
         Map<String, Object> response = otw.map("db-addExtractedText",
                 this::executeRequest, r.table(TABLE_EXTRACTED_TEXT)
                         .insert(rMap)
                         .optArg("conflict", "error"));
 
-        String key = ((List<String>) response.get("generated_keys")).get(0);
-        return et.toBuilder().setWarcId(key).build();
+        return et;
     }
 
     @Override
@@ -305,18 +311,29 @@ public class RethinkDbAdapter implements DbAdapter {
             }
         }
 
-        T result = qry.run(conn);
-        if (result instanceof Map
-                && ((Map) result).containsKey("errors")
-                && !((Map) result).get("errors").equals(0L)) {
-            System.err.println("DB error: " + result);
+        try {
+            T result = qry.run(conn);
+            if (result instanceof Map
+                    && ((Map) result).containsKey("errors")
+                    && !((Map) result).get("errors").equals(0L)) {
+                throw new DbException((String) ((Map) result).get("first_error"));
+            }
+            return result;
+        } catch (ReqlError e) {
+            throw new DbException(e.getMessage(), e);
         }
-        return result;
     }
 
     @Override
     public void close() {
         conn.close();
+    }
+
+    private void ensureContainsValue(Message msg, String fieldName) {
+        if (!msg.getAllFields().keySet().stream().filter(k -> k.getName().equals(fieldName)).findFirst().isPresent()) {
+            throw new IllegalArgumentException("The required field '" + fieldName + "' is missing from: '" + msg
+                    .getClass().getSimpleName() + "'");
+        }
     }
 
 }

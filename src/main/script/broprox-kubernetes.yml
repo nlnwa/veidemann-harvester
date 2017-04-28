@@ -52,7 +52,7 @@ metadata:
   labels:
     app: harvester
     tier: backend
-    role: master
+    role: worker
 spec:
   ports:
   - name: broprox-harvester-api
@@ -79,7 +79,7 @@ spec:
       labels:
         app: harvester
         tier: backend
-        role: master
+        role: worker
     spec:
       containers:
       - name: broprox-browser

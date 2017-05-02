@@ -133,7 +133,6 @@ public class DbInitializer {
         r.table(TABLE_URI_QUEUE).indexCreate("executionIds", uri -> uri.g("executionIds")
                 .map(eid -> r.array(eid.g("id"), eid.g("seq")))
         ).optArg("multi", true).run(conn);
-
         r.table(TABLE_URI_QUEUE).indexWait("surt", "executionIds").run(conn);
 
         r.tableCreate(TABLE_EXECUTIONS).run(conn);
@@ -141,6 +140,8 @@ public class DbInitializer {
         r.tableCreate(TABLE_SCREENSHOT).run(conn);
 
         r.tableCreate(TABLE_CRAWL_ENTITIES).run(conn);
+        r.table(TABLE_CRAWL_ENTITIES).indexCreate("name", row -> row.g("meta").g("name").downcase()).run(conn);
+        r.table(TABLE_CRAWL_ENTITIES).indexWait("name").run(conn);
     }
 
     private final void populateDb() {

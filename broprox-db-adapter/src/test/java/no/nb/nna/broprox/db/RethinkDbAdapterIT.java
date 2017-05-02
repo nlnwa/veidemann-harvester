@@ -19,7 +19,7 @@ import java.time.OffsetDateTime;
 import java.util.List;
 
 import com.google.protobuf.InvalidProtocolBufferException;
-import no.nb.nna.broprox.api.ControllerProto;
+import static no.nb.nna.broprox.api.ControllerProto.*;
 import no.nb.nna.broprox.model.ConfigProto;
 
 import static no.nb.nna.broprox.model.ConfigProto.*;
@@ -95,6 +95,9 @@ public class RethinkDbAdapterIT {
                         .addLabel(ConfigProto.Label.newBuilder()
                                 .setKey("orgType")
                                 .setValue("Government"))
+                        .addLabel(ConfigProto.Label.newBuilder()
+                                .setKey("orgType")
+                                .setValue("Culture"))
                         .setCreated(ProtoUtils.odtToTs(OffsetDateTime.parse("2017-04-06T06:20:35.779Z"))))
                 .build();
         entity1 = db.saveCrawlEntity(entity1);
@@ -112,15 +115,52 @@ public class RethinkDbAdapterIT {
                 .build();
         entity2 = db.saveCrawlEntity(entity2);
 
-        ControllerProto.CrawlEntityListRequest request = ControllerProto.CrawlEntityListRequest.getDefaultInstance();
-        ControllerProto.CrawlEntityListReply result = db.listCrawlEntities(request);
-        assertThat(result.getEntityCount()).isGreaterThanOrEqualTo(2);
-        assertThat(result.getEntityList()).contains(entity1, entity2);
+        CrawlEntity entity3 = CrawlEntity.newBuilder()
+                .setMeta(ConfigProto.Meta.newBuilder()
+                        .setName("Nasjonalballetten")
+                        .addLabel(ConfigProto.Label.newBuilder()
+                                .setKey("frequency")
+                                .setValue("Hourly"))
+                        .addLabel(ConfigProto.Label.newBuilder()
+                                .setKey("orgType")
+                                .setValue("Culture"))
+                        .setCreated(ProtoUtils.odtToTs(OffsetDateTime.parse("2017-04-06T06:20:35.779Z"))))
+                .build();
+        entity3 = db.saveCrawlEntity(entity3);
 
-        request = ControllerProto.CrawlEntityListRequest.newBuilder().setId(entity1.getId()).build();
+        try {
+        CrawlEntityListRequest request = CrawlEntityListRequest.getDefaultInstance();
+        CrawlEntityListReply result = db.listCrawlEntities(request);
+        assertThat(result.getEntityCount()).isGreaterThanOrEqualTo(3);
+//        assertThat(result.getCount()).isGreaterThanOrEqualTo(3);
+        assertThat(result.getEntityList()).contains(entity1, entity2, entity3);
+
+        request = CrawlEntityListRequest.newBuilder().setId(entity1.getId()).build();
         result = db.listCrawlEntities(request);
         assertThat(result.getEntityCount()).isEqualTo(1);
+//        assertThat(result.getCount()).isEqualTo(1);
         assertThat(result.getEntityList()).contains(entity1);
+
+        request = CrawlEntityListRequest.newBuilder().setNamePrefix("nasj").build();
+        result = db.listCrawlEntities(request);
+        assertThat(result.getEntityCount()).isEqualTo(2);
+//        assertThat(result.getCount()).isEqualTo(2);
+        assertThat(result.getEntityList()).contains(entity1, entity3);
+
+        request = CrawlEntityListRequest.newBuilder().setPageSize(2).build();
+        result = db.listCrawlEntities(request);
+        assertThat(result.getEntityCount()).isEqualTo(2);
+//        assertThat(result.getCount()).isGreaterThanOrEqualTo(3);
+        assertThat(result.getEntityList()).contains(entity3, entity1);
+
+        request = CrawlEntityListRequest.newBuilder().setPageSize(2).setPage(1).build();
+        result = db.listCrawlEntities(request);
+        assertThat(result.getEntityCount()).isEqualTo(1);
+//        assertThat(result.getCount()).isGreaterThanOrEqualTo(3);
+        assertThat(result.getEntityList()).contains(entity2);
+        } catch (Throwable t) {
+            t.printStackTrace();
+        }
     }
 
     /**

@@ -262,7 +262,6 @@ public class RethinkDbAdapter implements DbAdapter {
     @Override
     public CrawlEntity saveCrawlEntity(CrawlEntity entity) {
         Map rMap = ProtoUtils.protoToRethink(entity);
-
         if (!rMap.containsKey("created")) {
             rMap.put("created", r.now());
         }
@@ -280,14 +279,32 @@ public class RethinkDbAdapter implements DbAdapter {
     @Override
     public CrawlEntityListReply listCrawlEntities(CrawlEntityListRequest request) {
         ReqlExpr qry = r.table(TABLE_CRAWL_ENTITIES);
-        if (!request.getId().isEmpty()) {
-            qry = ((Table) qry).get(request.getId());
+        switch (request.getQryCase()) {
+            case ID:
+                qry = ((Table) qry).get(request.getId());
+                break;
+            case NAME_PREFIX:
+                String prefix = request.getNamePrefix().toLowerCase();
+                qry = qry.between(prefix, prefix + Character.toString(Character.MAX_VALUE)).optArg("index", "name");
+                break;
+        }
+
+        if (request.getQryCase() != CrawlEntityListRequest.QryCase.ID) {
+            qry = qry.orderBy().optArg("index", "name");
+            if (request.getPageSize() > 0) {
+                qry = qry.skip(request.getPage() * request.getPageSize()).limit(request.getPageSize());
+            }
         }
 
         Object res = otw.map("db-listCrawlEntities",
                 this::executeRequest, qry);
+        long count = otw.map("db-listCrawlEntities",
+                this::executeRequest, qry.count());
 
-        CrawlEntityListReply.Builder reply = CrawlEntityListReply.newBuilder();
+        CrawlEntityListReply.Builder reply = CrawlEntityListReply.newBuilder()
+                .setPageSize(request.getPageSize())
+                .setPage(request.getPage())
+                .setCount(count);
         if (res instanceof Cursor) {
             Cursor<Map<String, Object>> cursor = (Cursor) res;
             for (Map<String, Object> entity : cursor) {

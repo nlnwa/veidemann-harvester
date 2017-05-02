@@ -279,6 +279,7 @@ public class RethinkDbAdapter implements DbAdapter {
     @Override
     public CrawlEntityListReply listCrawlEntities(CrawlEntityListRequest request) {
         ReqlExpr qry = r.table(TABLE_CRAWL_ENTITIES);
+        long count = 1;
         switch (request.getQryCase()) {
             case ID:
                 qry = ((Table) qry).get(request.getId());
@@ -290,6 +291,9 @@ public class RethinkDbAdapter implements DbAdapter {
         }
 
         if (request.getQryCase() != CrawlEntityListRequest.QryCase.ID) {
+            count = otw.map("db-listCrawlEntities",
+                    this::executeRequest, qry.count());
+
             qry = qry.orderBy().optArg("index", "name");
             if (request.getPageSize() > 0) {
                 qry = qry.skip(request.getPage() * request.getPageSize()).limit(request.getPageSize());
@@ -298,9 +302,6 @@ public class RethinkDbAdapter implements DbAdapter {
 
         Object res = otw.map("db-listCrawlEntities",
                 this::executeRequest, qry);
-        long count = otw.map("db-listCrawlEntities",
-                this::executeRequest, qry.count());
-
         CrawlEntityListReply.Builder reply = CrawlEntityListReply.newBuilder()
                 .setPageSize(request.getPageSize())
                 .setPage(request.getPage())

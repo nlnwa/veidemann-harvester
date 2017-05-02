@@ -128,39 +128,35 @@ public class RethinkDbAdapterIT {
                 .build();
         entity3 = db.saveCrawlEntity(entity3);
 
-        try {
         CrawlEntityListRequest request = CrawlEntityListRequest.getDefaultInstance();
         CrawlEntityListReply result = db.listCrawlEntities(request);
         assertThat(result.getEntityCount()).isGreaterThanOrEqualTo(3);
-//        assertThat(result.getCount()).isGreaterThanOrEqualTo(3);
+        assertThat(result.getCount()).isGreaterThanOrEqualTo(3);
         assertThat(result.getEntityList()).contains(entity1, entity2, entity3);
 
         request = CrawlEntityListRequest.newBuilder().setId(entity1.getId()).build();
         result = db.listCrawlEntities(request);
         assertThat(result.getEntityCount()).isEqualTo(1);
-//        assertThat(result.getCount()).isEqualTo(1);
+        assertThat(result.getCount()).isEqualTo(1);
         assertThat(result.getEntityList()).contains(entity1);
 
         request = CrawlEntityListRequest.newBuilder().setNamePrefix("nasj").build();
         result = db.listCrawlEntities(request);
         assertThat(result.getEntityCount()).isEqualTo(2);
-//        assertThat(result.getCount()).isEqualTo(2);
+        assertThat(result.getCount()).isEqualTo(2);
         assertThat(result.getEntityList()).contains(entity1, entity3);
 
         request = CrawlEntityListRequest.newBuilder().setPageSize(2).build();
         result = db.listCrawlEntities(request);
         assertThat(result.getEntityCount()).isEqualTo(2);
-//        assertThat(result.getCount()).isGreaterThanOrEqualTo(3);
+        assertThat(result.getCount()).isGreaterThanOrEqualTo(3);
         assertThat(result.getEntityList()).contains(entity3, entity1);
 
         request = CrawlEntityListRequest.newBuilder().setPageSize(2).setPage(1).build();
         result = db.listCrawlEntities(request);
         assertThat(result.getEntityCount()).isEqualTo(1);
-//        assertThat(result.getCount()).isGreaterThanOrEqualTo(3);
+        assertThat(result.getCount()).isGreaterThanOrEqualTo(3);
         assertThat(result.getEntityList()).contains(entity2);
-        } catch (Throwable t) {
-            t.printStackTrace();
-        }
     }
 
     /**

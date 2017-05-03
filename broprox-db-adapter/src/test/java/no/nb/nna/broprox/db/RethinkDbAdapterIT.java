@@ -64,21 +64,34 @@ public class RethinkDbAdapterIT {
     @Test
     public void testSaveCrawlEntity() throws InvalidProtocolBufferException {
         CrawlEntity entity = CrawlEntity.newBuilder()
-                .setMeta(ConfigProto.Meta.newBuilder()
+                .setMeta(Meta.newBuilder()
                         .setName("Nasjonalbiblioteket")
-                        .addLabel(ConfigProto.Label.newBuilder()
+                        .addLabel(Label.newBuilder()
                                 .setKey("frequency")
                                 .setValue("Daily"))
-                        .addLabel(ConfigProto.Label.newBuilder()
+                        .addLabel(Label.newBuilder()
                                 .setKey("orgType")
                                 .setValue("Government"))
-                        .setCreated(ProtoUtils.odtToTs(OffsetDateTime.parse("2017-04-06T06:20:35.779Z"))))
+                        .setCreated(ProtoUtils.odtToTs(OffsetDateTime.parse("2017-04-06T06:20:35.779Z")))
+                        .setCreatedBy("anonymous"))
                 .build();
 
         CrawlEntity result = db.saveCrawlEntity(entity);
 
         assertThat(result.getId()).isNotEmpty();
-        assertThat(result).isEqualTo(entity.toBuilder().setId(result.getId()).build());
+        assertThat(result.getMeta().getName()).isEqualTo("Nasjonalbiblioteket");
+        assertThat(result.getMeta().getCreated()).isEqualTo(
+                ProtoUtils.odtToTs(OffsetDateTime.parse("2017-04-06T06:20:35.779Z")));
+        assertThat(result.getMeta().getCreatedBy()).isEqualTo("anonymous");
+        assertThat(result.getMeta().getLastModified()).isNotNull();
+        assertThat(result.getMeta().getLastModifiedBy()).isEqualTo("anonymous");
+        assertThat(result.getMeta().getLabelList()).containsOnly(
+                Label.newBuilder()
+                        .setKey("frequency")
+                        .setValue("Daily").build(),
+                Label.newBuilder()
+                        .setKey("orgType")
+                        .setValue("Government").build());
     }
 
     /**
@@ -87,15 +100,15 @@ public class RethinkDbAdapterIT {
     @Test
     public void testListCrawlEntities() throws InvalidProtocolBufferException {
         CrawlEntity entity1 = CrawlEntity.newBuilder()
-                .setMeta(ConfigProto.Meta.newBuilder()
+                .setMeta(Meta.newBuilder()
                         .setName("Nasjonalbiblioteket")
-                        .addLabel(ConfigProto.Label.newBuilder()
+                        .addLabel(Label.newBuilder()
                                 .setKey("frequency")
                                 .setValue("Daily"))
-                        .addLabel(ConfigProto.Label.newBuilder()
+                        .addLabel(Label.newBuilder()
                                 .setKey("orgType")
                                 .setValue("Government"))
-                        .addLabel(ConfigProto.Label.newBuilder()
+                        .addLabel(Label.newBuilder()
                                 .setKey("orgType")
                                 .setValue("Culture"))
                         .setCreated(ProtoUtils.odtToTs(OffsetDateTime.parse("2017-04-06T06:20:35.779Z"))))
@@ -103,12 +116,12 @@ public class RethinkDbAdapterIT {
         entity1 = db.saveCrawlEntity(entity1);
 
         CrawlEntity entity2 = CrawlEntity.newBuilder()
-                .setMeta(ConfigProto.Meta.newBuilder()
+                .setMeta(Meta.newBuilder()
                         .setName("VG")
-                        .addLabel(ConfigProto.Label.newBuilder()
+                        .addLabel(Label.newBuilder()
                                 .setKey("frequency")
                                 .setValue("Hourly"))
-                        .addLabel(ConfigProto.Label.newBuilder()
+                        .addLabel(Label.newBuilder()
                                 .setKey("orgType")
                                 .setValue("News"))
                         .setCreated(ProtoUtils.odtToTs(OffsetDateTime.parse("2017-04-06T06:20:35.779Z"))))
@@ -116,12 +129,12 @@ public class RethinkDbAdapterIT {
         entity2 = db.saveCrawlEntity(entity2);
 
         CrawlEntity entity3 = CrawlEntity.newBuilder()
-                .setMeta(ConfigProto.Meta.newBuilder()
+                .setMeta(Meta.newBuilder()
                         .setName("Nasjonalballetten")
-                        .addLabel(ConfigProto.Label.newBuilder()
+                        .addLabel(Label.newBuilder()
                                 .setKey("frequency")
                                 .setValue("Hourly"))
-                        .addLabel(ConfigProto.Label.newBuilder()
+                        .addLabel(Label.newBuilder()
                                 .setKey("orgType")
                                 .setValue("Culture"))
                         .setCreated(ProtoUtils.odtToTs(OffsetDateTime.parse("2017-04-06T06:20:35.779Z"))))

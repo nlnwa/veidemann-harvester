@@ -23,6 +23,7 @@ import java.util.concurrent.TimeoutException;
 
 import com.google.protobuf.Message;
 import com.rethinkdb.RethinkDB;
+import com.rethinkdb.gen.ast.Insert;
 import com.rethinkdb.gen.ast.ReqlExpr;
 import com.rethinkdb.gen.ast.Table;
 import com.rethinkdb.gen.exc.ReqlError;
@@ -262,18 +263,15 @@ public class RethinkDbAdapter implements DbAdapter {
     @Override
     public CrawlEntity saveCrawlEntity(CrawlEntity entity) {
         Map rMap = ProtoUtils.protoToRethink(entity);
-        if (!rMap.containsKey("created")) {
-            rMap.put("created", r.now());
-        }
 
-        Map<String, Object> response = otw.map("db-saveCrawlEntity",
-                this::executeRequest, r.table(TABLE_CRAWL_ENTITIES)
+        rMap.put("meta", updateMeta((Map) rMap.get("meta"), null));
+
+        return otw.map("db-saveCrawlEntity",
+                this::executeInsert,
+                r.table(TABLE_CRAWL_ENTITIES)
                         .insert(rMap)
-                        .optArg("conflict", "replace"));
-
-        String key = ((List<String>) response.get("generated_keys")).get(0);
-
-        return entity.toBuilder().setId(key).build();
+                        .optArg("conflict", "replace"),
+                CrawlEntity.class);
     }
 
     @Override
@@ -316,6 +314,36 @@ public class RethinkDbAdapter implements DbAdapter {
         }
 
         return reply.build();
+    }
+
+    private Map updateMeta(Map meta, String user) {
+        if (meta == null) {
+            meta = r.hashMap();
+        }
+
+        if (user == null || user.isEmpty()) {
+            user = "anonymous";
+        }
+
+        if (!meta.containsKey("created")) {
+            meta.put("created", r.now());
+            meta.put("createdBy", user);
+        }
+
+        meta.put("lastModified", r.now());
+        meta.put("lastModifiedBy", user);
+
+        return meta;
+    }
+
+    public <T extends Message> T executeInsert(Insert qry, Class<T> type) {
+        qry = qry.optArg("return_changes", "always");
+
+        Map<String, Object> response = executeRequest(qry);
+        List<Map<String, Map>> changes = (List<Map<String, Map>>) response.get("changes");
+
+        Map newDoc = changes.get(0).get("new_val");
+        return ProtoUtils.rethinkToProto(newDoc, type);
     }
 
     public <T> T executeRequest(ReqlExpr qry) {

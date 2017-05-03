@@ -47,6 +47,8 @@ import no.nb.nna.broprox.model.MessagesProto.Screenshot;
  */
 public class RethinkDbAdapter implements DbAdapter {
 
+    public static final String TABLE_SYSTEM = "system";
+
     public static final String TABLE_CRAWL_LOG = "crawl_log";
 
     public static final String TABLE_CRAWLED_CONTENT = "crawled_content";
@@ -62,6 +64,18 @@ public class RethinkDbAdapter implements DbAdapter {
     public static final String TABLE_EXECUTIONS = "executions";
 
     public static final String TABLE_CRAWL_ENTITIES = "crawl_entities";
+
+    public static final String TABLE_SEEDS = "seeds";
+
+    public static final String TABLE_CRAWL_JOBS = "crawl_jobs";
+
+    public static final String TABLE_CRAWL_CONFIGS = "crawl_configs";
+
+    public static final String TABLE_CRAWL_SCHEDULE_CONFIGS = "crawl_schedule_configs";
+
+    public static final String TABLE_BROWSER_CONFIGS = "browser_configs";
+
+    public static final String TABLE_POLITENESS_CONFIGS = "politeness_configs";
 
     static final RethinkDB r = RethinkDB.r;
 

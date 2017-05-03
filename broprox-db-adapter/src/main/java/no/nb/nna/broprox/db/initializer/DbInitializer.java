@@ -22,10 +22,10 @@ import java.util.Map;
 import com.rethinkdb.RethinkDB;
 import com.rethinkdb.gen.exc.ReqlDriverError;
 import com.rethinkdb.net.Connection;
-import no.nb.nna.broprox.commons.TracerFactory;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigBeanFactory;
 import com.typesafe.config.ConfigFactory;
+import no.nb.nna.broprox.commons.TracerFactory;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
@@ -34,13 +34,20 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 
+import static no.nb.nna.broprox.db.RethinkDbAdapter.TABLE_BROWSER_CONFIGS;
 import static no.nb.nna.broprox.db.RethinkDbAdapter.TABLE_BROWSER_SCRIPTS;
 import static no.nb.nna.broprox.db.RethinkDbAdapter.TABLE_CRAWLED_CONTENT;
+import static no.nb.nna.broprox.db.RethinkDbAdapter.TABLE_CRAWL_CONFIGS;
 import static no.nb.nna.broprox.db.RethinkDbAdapter.TABLE_CRAWL_ENTITIES;
+import static no.nb.nna.broprox.db.RethinkDbAdapter.TABLE_CRAWL_JOBS;
 import static no.nb.nna.broprox.db.RethinkDbAdapter.TABLE_CRAWL_LOG;
+import static no.nb.nna.broprox.db.RethinkDbAdapter.TABLE_CRAWL_SCHEDULE_CONFIGS;
 import static no.nb.nna.broprox.db.RethinkDbAdapter.TABLE_EXECUTIONS;
 import static no.nb.nna.broprox.db.RethinkDbAdapter.TABLE_EXTRACTED_TEXT;
+import static no.nb.nna.broprox.db.RethinkDbAdapter.TABLE_POLITENESS_CONFIGS;
 import static no.nb.nna.broprox.db.RethinkDbAdapter.TABLE_SCREENSHOT;
+import static no.nb.nna.broprox.db.RethinkDbAdapter.TABLE_SEEDS;
+import static no.nb.nna.broprox.db.RethinkDbAdapter.TABLE_SYSTEM;
 import static no.nb.nna.broprox.db.RethinkDbAdapter.TABLE_URI_QUEUE;
 
 /**
@@ -116,6 +123,8 @@ public class DbInitializer {
     private final void createDb() {
         r.dbCreate(SETTINGS.getDbName()).run(conn);
 
+        r.tableCreate(TABLE_SYSTEM).run(conn);
+
         r.tableCreate(TABLE_CRAWL_LOG).optArg("primary_key", "warcId").run(conn);
         r.table(TABLE_CRAWL_LOG)
                 .indexCreate("surt_time", row -> r.array(row.g("surt"), row.g("timeStamp")))
@@ -127,6 +136,7 @@ public class DbInitializer {
         r.tableCreate(TABLE_EXTRACTED_TEXT).optArg("primary_key", "warcId").run(conn);
 
         r.tableCreate(TABLE_BROWSER_SCRIPTS).run(conn);
+        createMetaIndexes(TABLE_BROWSER_SCRIPTS);
 
         r.tableCreate(TABLE_URI_QUEUE).run(conn);
         r.table(TABLE_URI_QUEUE).indexCreate("surt").run(conn);
@@ -140,8 +150,30 @@ public class DbInitializer {
         r.tableCreate(TABLE_SCREENSHOT).run(conn);
 
         r.tableCreate(TABLE_CRAWL_ENTITIES).run(conn);
-        r.table(TABLE_CRAWL_ENTITIES).indexCreate("name", row -> row.g("meta").g("name").downcase()).run(conn);
-        r.table(TABLE_CRAWL_ENTITIES).indexWait("name").run(conn);
+        createMetaIndexes(TABLE_CRAWL_ENTITIES);
+
+        r.tableCreate(TABLE_SEEDS).run(conn);
+        createMetaIndexes(TABLE_SEEDS);
+
+        r.tableCreate(TABLE_CRAWL_JOBS).run(conn);
+        createMetaIndexes(TABLE_CRAWL_JOBS);
+
+        r.tableCreate(TABLE_CRAWL_CONFIGS).run(conn);
+        createMetaIndexes(TABLE_CRAWL_CONFIGS);
+
+        r.tableCreate(TABLE_CRAWL_SCHEDULE_CONFIGS).run(conn);
+        createMetaIndexes(TABLE_CRAWL_SCHEDULE_CONFIGS);
+
+        r.tableCreate(TABLE_BROWSER_CONFIGS).run(conn);
+        createMetaIndexes(TABLE_BROWSER_CONFIGS);
+
+        r.tableCreate(TABLE_POLITENESS_CONFIGS).run(conn);
+        createMetaIndexes(TABLE_POLITENESS_CONFIGS);
+    }
+
+    private final void createMetaIndexes(String tableName) {
+        r.table(tableName).indexCreate("name", row -> row.g("meta").g("name").downcase()).run(conn);
+        r.table(tableName).indexWait("name").run(conn);
     }
 
     private final void populateDb() {

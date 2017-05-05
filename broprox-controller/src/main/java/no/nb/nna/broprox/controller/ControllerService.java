@@ -24,6 +24,7 @@ import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListReply;
 import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListRequest;
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListRequest;
+import no.nb.nna.broprox.model.MessagesProto;
 
 /**
  *
@@ -50,6 +51,16 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     public void listCrawlEntities(CrawlEntityListRequest request, StreamObserver<CrawlEntityListReply> respObserver) {
         try {
             respObserver.onNext(db.listCrawlEntities(request));
+            respObserver.onCompleted();
+        } catch (Exception e) {
+            respObserver.onError(e);
+        }
+    }
+
+    @Override
+    public void deleteEntity(CrawlEntity request, StreamObserver<MessagesProto.Void> respObserver) {
+        try {
+            respObserver.onNext(db.deleteCrawlEntity(request));
             respObserver.onCompleted();
         } catch (Exception e) {
             respObserver.onError(e);

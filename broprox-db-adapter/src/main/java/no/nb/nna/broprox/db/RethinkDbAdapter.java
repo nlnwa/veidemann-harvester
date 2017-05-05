@@ -35,6 +35,7 @@ import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListRequest;
 import no.nb.nna.broprox.commons.OpenTracingWrapper;
 import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
 import no.nb.nna.broprox.model.ConfigProto.CrawlEntity;
+import no.nb.nna.broprox.model.MessagesProto;
 import no.nb.nna.broprox.model.MessagesProto.CrawlExecutionStatus;
 import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
 import no.nb.nna.broprox.model.MessagesProto.CrawledContent;
@@ -328,6 +329,16 @@ public class RethinkDbAdapter implements DbAdapter {
         }
 
         return reply.build();
+    }
+
+    @Override
+    public MessagesProto.Void deleteCrawlEntity(CrawlEntity entity) {
+        otw.map("db-deleteCrawlEntity",
+                this::executeRequest,
+                r.table(TABLE_CRAWL_ENTITIES)
+                        .get(entity.getId())
+                        .delete());
+        return MessagesProto.Void.getDefaultInstance();
     }
 
     private Map updateMeta(Map meta, String user) {

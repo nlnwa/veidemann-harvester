@@ -6,12 +6,15 @@ option java_package = "no.nb.nna.broprox.api";
 option java_outer_classname = "ControllerProto";
 
 import "config.proto";
+import "messages.proto";
 
 // Service for communicating with controller.
 service Controller {
     // List a set of entities
     rpc ListCrawlEntities (CrawlEntityListRequest) returns (CrawlEntityListReply) {}
     rpc SaveEntity (CrawlEntity) returns (CrawlEntity) {}
+    rpc DeleteEntity (CrawlEntity) returns (Void) {}
+
     rpc ListBrowserScripts (BrowserScriptListRequest) returns (BrowserScriptListReply) {}
     rpc SaveBrowserScript (BrowserScript) returns (BrowserScript) {}
 }

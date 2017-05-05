@@ -40,9 +40,15 @@ message Seed {
 message CrawlJob {
     string id = 1;
     Meta meta = 2;
-    CrawlScheduleConfig schedule = 3;
+    oneof scedule_config_or_id {
+        string schedule_id = 3;
+        CrawlScheduleConfig schedule = 16;
+    }
     CrawlLimitsConfig limits = 4;
-    CrawlConfig config = 5;
+    oneof crawl_config_or_id {
+        string crawl_config_id = 5;
+        CrawlConfig crawl_config = 17;
+    }
 }
 
 message CrawlConfig {

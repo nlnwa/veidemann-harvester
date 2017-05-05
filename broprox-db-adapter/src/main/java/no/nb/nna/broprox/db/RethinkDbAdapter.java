@@ -32,11 +32,13 @@ import com.rethinkdb.gen.exc.ReqlError;
 import com.rethinkdb.net.Connection;
 import com.rethinkdb.net.Cursor;
 import io.opentracing.tag.Tags;
+import no.nb.nna.broprox.api.ControllerProto.BrowserConfigListReply;
 import no.nb.nna.broprox.api.ControllerProto.CrawlConfigListReply;
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;
 import no.nb.nna.broprox.api.ControllerProto.CrawlJobListReply;
 import no.nb.nna.broprox.api.ControllerProto.CrawlScheduleConfigListReply;
 import no.nb.nna.broprox.api.ControllerProto.ListRequest;
+import no.nb.nna.broprox.api.ControllerProto.PolitenessConfigListReply;
 import no.nb.nna.broprox.api.ControllerProto.SeedListReply;
 import no.nb.nna.broprox.commons.OpenTracingWrapper;
 import no.nb.nna.broprox.model.ConfigProto.BrowserConfig;
@@ -321,7 +323,20 @@ public class RethinkDbAdapter implements DbAdapter {
 
     @Override
     public CrawlJob saveCrawlJob(CrawlJob crawlJob) {
-        return saveConfigMessage(crawlJob, TABLES.CRAWL_JOBS);
+        CrawlJob.Builder builder = crawlJob.toBuilder();
+
+        if (crawlJob.getSceduleConfigOrIdCase() == CrawlJob.SceduleConfigOrIdCase.SCHEDULE) {
+            CrawlScheduleConfig schedule = crawlJob.getSchedule();
+            schedule = saveCrawlScheduleConfig(schedule);
+            builder.setScheduleId(schedule.getId());
+        }
+        if (crawlJob.getCrawlConfigOrIdCase() == CrawlJob.CrawlConfigOrIdCase.CRAWL_CONFIG) {
+            CrawlConfig crawlConfig = crawlJob.getCrawlConfig();
+            crawlConfig = saveCrawlConfig(crawlConfig);
+            builder.setCrawlConfigId(crawlConfig.getId());
+        }
+
+        return saveConfigMessage(builder.build(), TABLES.CRAWL_JOBS);
     }
 
     @Override
@@ -336,7 +351,20 @@ public class RethinkDbAdapter implements DbAdapter {
 
     @Override
     public CrawlConfig saveCrawlConfig(CrawlConfig crawlConfig) {
-        return saveConfigMessage(crawlConfig, TABLES.CRAWL_CONFIGS);
+        CrawlConfig.Builder builder = crawlConfig.toBuilder();
+
+        if (crawlConfig.getBrowserConfigOrIdCase()== CrawlConfig.BrowserConfigOrIdCase.BROWSER_CONFIG) {
+            BrowserConfig browserConfig = crawlConfig.getBrowserConfig();
+            browserConfig = saveBrowserConfig(browserConfig);
+            builder.setBrowserConfigId(browserConfig.getId());
+        }
+        if (crawlConfig.getPolitenessOrIdCase()== CrawlConfig.PolitenessOrIdCase.POLITENESS) {
+            PolitenessConfig politenessConfig = crawlConfig.getPoliteness();
+            politenessConfig = savePolitenessConfig(politenessConfig);
+            builder.setPolitenessId(politenessConfig.getId());
+        }
+
+        return saveConfigMessage(builder.build(), TABLES.CRAWL_CONFIGS);
     }
 
     @Override
@@ -357,6 +385,36 @@ public class RethinkDbAdapter implements DbAdapter {
     @Override
     public Empty deleteCrawlScheduleConfig(CrawlScheduleConfig crawlScheduleConfig) {
         return deleteConfigMessage(crawlScheduleConfig, TABLES.CRAWL_SCHEDULE_CONFIGS);
+    }
+
+    @Override
+    public PolitenessConfigListReply listPolitenessConfigs(ListRequest request) {
+        return listConfigMessages(request, PolitenessConfigListReply.newBuilder(), TABLES.POLITENESS_CONFIGS);
+    }
+
+    @Override
+    public PolitenessConfig savePolitenessConfig(PolitenessConfig politenessConfig) {
+        return saveConfigMessage(politenessConfig, TABLES.POLITENESS_CONFIGS);
+    }
+
+    @Override
+    public Empty deletePolitenessConfig(PolitenessConfig politenessConfig) {
+        return deleteConfigMessage(politenessConfig, TABLES.POLITENESS_CONFIGS);
+    }
+
+    @Override
+    public BrowserConfigListReply listBrowserConfigs(ListRequest request) {
+        return listConfigMessages(request, BrowserConfigListReply.newBuilder(), TABLES.BROWSER_CONFIGS);
+    }
+
+    @Override
+    public BrowserConfig saveBrowserConfig(BrowserConfig browserConfig) {
+        return saveConfigMessage(browserConfig, TABLES.BROWSER_CONFIGS);
+    }
+
+    @Override
+    public Empty deleteBrowserConfig(BrowserConfig browserConfig) {
+        return deleteConfigMessage(browserConfig, TABLES.BROWSER_CONFIGS);
     }
 
     public <T extends Message> T saveConfigMessage(T msg, TABLES table) {
@@ -421,11 +479,12 @@ public class RethinkDbAdapter implements DbAdapter {
         if (res instanceof Cursor) {
             Cursor<Map<String, Object>> cursor = (Cursor) res;
             for (Map<String, Object> entity : cursor) {
-                resultBuilder.addRepeatedField(valueField, ProtoUtils.rethinkToProto(entity, CrawlEntity.class));
+                resultBuilder.addRepeatedField(valueField,
+                        ProtoUtils.rethinkToProto(entity, table.schema.newBuilderForType()));
             }
         } else {
             resultBuilder.addRepeatedField(
-                    valueField, ProtoUtils.rethinkToProto((Map<String, Object>) res, CrawlEntity.class));
+                    valueField, ProtoUtils.rethinkToProto((Map<String, Object>) res, table.schema.newBuilderForType()));
         }
 
         return (T) resultBuilder.build();

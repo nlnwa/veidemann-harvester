@@ -19,17 +19,21 @@ import java.util.List;
 import java.util.Optional;
 
 import com.google.protobuf.Empty;
+import no.nb.nna.broprox.api.ControllerProto.BrowserConfigListReply;
 import no.nb.nna.broprox.api.ControllerProto.CrawlConfigListReply;
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;
 import no.nb.nna.broprox.api.ControllerProto.CrawlJobListReply;
 import no.nb.nna.broprox.api.ControllerProto.CrawlScheduleConfigListReply;
 import no.nb.nna.broprox.api.ControllerProto.ListRequest;
+import no.nb.nna.broprox.api.ControllerProto.PolitenessConfigListReply;
 import no.nb.nna.broprox.api.ControllerProto.SeedListReply;
+import no.nb.nna.broprox.model.ConfigProto.BrowserConfig;
 import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
 import no.nb.nna.broprox.model.ConfigProto.CrawlConfig;
 import no.nb.nna.broprox.model.ConfigProto.CrawlEntity;
 import no.nb.nna.broprox.model.ConfigProto.CrawlJob;
 import no.nb.nna.broprox.model.ConfigProto.CrawlScheduleConfig;
+import no.nb.nna.broprox.model.ConfigProto.PolitenessConfig;
 import no.nb.nna.broprox.model.ConfigProto.Seed;
 import no.nb.nna.broprox.model.MessagesProto.CrawlExecutionStatus;
 import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
@@ -96,6 +100,18 @@ public interface DbAdapter extends AutoCloseable {
     CrawlScheduleConfig saveCrawlScheduleConfig(CrawlScheduleConfig crawlScheduleConfig);
 
     Empty deleteCrawlScheduleConfig(CrawlScheduleConfig crawlScheduleConfig);
+
+    PolitenessConfigListReply listPolitenessConfigs(ListRequest request);
+
+    PolitenessConfig savePolitenessConfig(PolitenessConfig politenessConfig);
+
+    Empty deletePolitenessConfig(PolitenessConfig politenessConfig);
+
+    BrowserConfigListReply listBrowserConfigs(ListRequest request);
+
+    BrowserConfig saveBrowserConfig(BrowserConfig browserConfig);
+
+    Empty deleteBrowserConfig(BrowserConfig browserConfig);
 
     @Override
     public void close();

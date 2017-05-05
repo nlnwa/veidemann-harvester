@@ -193,6 +193,70 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
+    public void deleteBrowserConfig(ConfigProto.BrowserConfig request, StreamObserver<Empty> respObserver) {
+        try {
+            respObserver.onNext(db.deleteBrowserConfig(request));
+            respObserver.onCompleted();
+        } catch (Exception e) {
+            respObserver.onError(e);
+        }
+    }
+
+    @Override
+    public void saveBrowserConfig(ConfigProto.BrowserConfig request,
+            StreamObserver<ConfigProto.BrowserConfig> respObserver) {
+        try {
+            respObserver.onNext(db.saveBrowserConfig(request));
+            respObserver.onCompleted();
+        } catch (Exception e) {
+            respObserver.onError(e);
+        }
+    }
+
+    @Override
+    public void listBrowserConfigs(ListRequest request,
+            StreamObserver<ControllerProto.BrowserConfigListReply> respObserver) {
+        try {
+            respObserver.onNext(db.listBrowserConfigs(request));
+            respObserver.onCompleted();
+        } catch (Exception e) {
+            respObserver.onError(e);
+        }
+    }
+
+    @Override
+    public void deletePolitenessConfig(ConfigProto.PolitenessConfig request, StreamObserver<Empty> respObserver) {
+        try {
+            respObserver.onNext(db.deletePolitenessConfig(request));
+            respObserver.onCompleted();
+        } catch (Exception e) {
+            respObserver.onError(e);
+        }
+    }
+
+    @Override
+    public void savePolitenessConfig(ConfigProto.PolitenessConfig request,
+            StreamObserver<ConfigProto.PolitenessConfig> respObserver) {
+        try {
+            respObserver.onNext(db.savePolitenessConfig(request));
+            respObserver.onCompleted();
+        } catch (Exception e) {
+            respObserver.onError(e);
+        }
+    }
+
+    @Override
+    public void listPolitenessConfigs(ListRequest request,
+            StreamObserver<ControllerProto.PolitenessConfigListReply> respObserver) {
+        try {
+            respObserver.onNext(db.listPolitenessConfigs(request));
+            respObserver.onCompleted();
+        } catch (Exception e) {
+            respObserver.onError(e);
+        }
+    }
+
+    @Override
     public void saveBrowserScript(BrowserScript request, StreamObserver<BrowserScript> respObserver) {
         try {
             respObserver.onNext(db.saveBrowserScript(request));

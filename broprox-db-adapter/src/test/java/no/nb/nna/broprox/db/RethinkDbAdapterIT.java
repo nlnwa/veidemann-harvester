@@ -18,11 +18,14 @@ package no.nb.nna.broprox.db;
 import java.time.OffsetDateTime;
 import java.util.List;
 
+import com.google.protobuf.Empty;
 import com.google.protobuf.InvalidProtocolBufferException;
+import no.nb.nna.broprox.api.ControllerProto;
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;
 import no.nb.nna.broprox.api.ControllerProto.ListRequest;
 import no.nb.nna.broprox.model.ConfigProto;
 import no.nb.nna.broprox.model.ConfigProto.CrawlEntity;
+import no.nb.nna.broprox.model.ConfigProto.CrawlJob;
 import no.nb.nna.broprox.model.ConfigProto.Label;
 import no.nb.nna.broprox.model.ConfigProto.Meta;
 import no.nb.nna.broprox.model.MessagesProto.CrawlExecutionStatus;
@@ -445,6 +448,205 @@ public class RethinkDbAdapterIT {
         RethinkDbAdapter instance = null;
         Screenshot expResult = null;
         Screenshot result = instance.addScreenshot(s);
+//        assertEquals(expResult, result);
+        // TODO review the generated test code and remove the default call to fail.
+        fail("The test case is a prototype.");
+    }
+
+    /**
+     * Test of listSeeds method, of class RethinkDbAdapter.
+     */
+    @Test
+    @Ignore
+    public void testListSeeds() {
+        System.out.println("listSeeds");
+        ListRequest request = null;
+        RethinkDbAdapter instance = null;
+        ControllerProto.SeedListReply expResult = null;
+        ControllerProto.SeedListReply result = instance.listSeeds(request);
+//        assertEquals(expResult, result);
+        // TODO review the generated test code and remove the default call to fail.
+        fail("The test case is a prototype.");
+    }
+
+    /**
+     * Test of saveSeed method, of class RethinkDbAdapter.
+     */
+    @Test
+    @Ignore
+    public void testSaveSeed() {
+        System.out.println("saveSeed");
+        ConfigProto.Seed seed = null;
+        RethinkDbAdapter instance = null;
+        ConfigProto.Seed expResult = null;
+        ConfigProto.Seed result = instance.saveSeed(seed);
+//        assertEquals(expResult, result);
+        // TODO review the generated test code and remove the default call to fail.
+        fail("The test case is a prototype.");
+    }
+
+    /**
+     * Test of deleteSeed method, of class RethinkDbAdapter.
+     */
+    @Test
+    @Ignore
+    public void testDeleteSeed() {
+        System.out.println("deleteSeed");
+        ConfigProto.Seed seed = null;
+        RethinkDbAdapter instance = null;
+        Empty expResult = null;
+        Empty result = instance.deleteSeed(seed);
+//        assertEquals(expResult, result);
+        // TODO review the generated test code and remove the default call to fail.
+        fail("The test case is a prototype.");
+    }
+
+    /**
+     * Test of listCrawlJobs method, of class RethinkDbAdapter.
+     */
+    @Test
+    @Ignore
+    public void testListCrawlJobs() {
+        System.out.println("listCrawlJobs");
+        ListRequest request = null;
+        RethinkDbAdapter instance = null;
+        ControllerProto.CrawlJobListReply expResult = null;
+        ControllerProto.CrawlJobListReply result = instance.listCrawlJobs(request);
+//        assertEquals(expResult, result);
+        // TODO review the generated test code and remove the default call to fail.
+        fail("The test case is a prototype.");
+    }
+
+    /**
+     * Test of saveCrawlJob method, of class RethinkDbAdapter.
+     */
+    @Test
+    public void testSaveCrawlJob() {
+        CrawlJob crawlJob = CrawlJob.newBuilder()
+                .setSchedule(ConfigProto.CrawlScheduleConfig.newBuilder()
+                        .setCronExpression("* * * * *"))
+                .build();
+
+        try {
+            CrawlJob result = db.saveCrawlJob(crawlJob);
+            System.out.println("CRAWL JOB: " + result);
+            System.out.println("SCHEDULE: " + db.listCrawlJobs(ListRequest.newBuilder().setId(result.getId()).build()));
+        } catch (Throwable t) {
+            t.printStackTrace();
+        }
+//        ConfigProto.CrawlJob expResult = null;
+//        assertEquals(expResult, result);
+        // TODO review the generated test code and remove the default call to fail.
+        fail("The test case is a prototype.");
+    }
+
+    /**
+     * Test of deleteCrawlJob method, of class RethinkDbAdapter.
+     */
+    @Test
+    @Ignore
+    public void testDeleteCrawlJob() {
+        System.out.println("deleteCrawlJob");
+        ConfigProto.CrawlJob crawlJob = null;
+        RethinkDbAdapter instance = null;
+        Empty expResult = null;
+        Empty result = instance.deleteCrawlJob(crawlJob);
+//        assertEquals(expResult, result);
+        // TODO review the generated test code and remove the default call to fail.
+        fail("The test case is a prototype.");
+    }
+
+    /**
+     * Test of listCrawlConfigs method, of class RethinkDbAdapter.
+     */
+    @Test
+    @Ignore
+    public void testListCrawlConfigs() {
+        System.out.println("listCrawlConfigs");
+        ListRequest request = null;
+        RethinkDbAdapter instance = null;
+        ControllerProto.CrawlConfigListReply expResult = null;
+        ControllerProto.CrawlConfigListReply result = instance.listCrawlConfigs(request);
+//        assertEquals(expResult, result);
+        // TODO review the generated test code and remove the default call to fail.
+        fail("The test case is a prototype.");
+    }
+
+    /**
+     * Test of saveCrawlConfig method, of class RethinkDbAdapter.
+     */
+    @Test
+    @Ignore
+    public void testSaveCrawlConfig() {
+        System.out.println("saveCrawlConfig");
+        ConfigProto.CrawlConfig crawlConfig = null;
+        RethinkDbAdapter instance = null;
+        ConfigProto.CrawlConfig expResult = null;
+        ConfigProto.CrawlConfig result = instance.saveCrawlConfig(crawlConfig);
+//        assertEquals(expResult, result);
+        // TODO review the generated test code and remove the default call to fail.
+        fail("The test case is a prototype.");
+    }
+
+    /**
+     * Test of deleteCrawlConfig method, of class RethinkDbAdapter.
+     */
+    @Test
+    @Ignore
+    public void testDeleteCrawlConfig() {
+        System.out.println("deleteCrawlConfig");
+        ConfigProto.CrawlConfig crawlConfig = null;
+        RethinkDbAdapter instance = null;
+        Empty expResult = null;
+        Empty result = instance.deleteCrawlConfig(crawlConfig);
+//        assertEquals(expResult, result);
+        // TODO review the generated test code and remove the default call to fail.
+        fail("The test case is a prototype.");
+    }
+
+    /**
+     * Test of listCrawlScheduleConfigs method, of class RethinkDbAdapter.
+     */
+    @Test
+    @Ignore
+    public void testListCrawlScheduleConfigs() {
+        System.out.println("listCrawlScheduleConfigs");
+        ListRequest request = null;
+        RethinkDbAdapter instance = null;
+        ControllerProto.CrawlScheduleConfigListReply expResult = null;
+        ControllerProto.CrawlScheduleConfigListReply result = instance.listCrawlScheduleConfigs(request);
+//        assertEquals(expResult, result);
+        // TODO review the generated test code and remove the default call to fail.
+        fail("The test case is a prototype.");
+    }
+
+    /**
+     * Test of saveCrawlScheduleConfig method, of class RethinkDbAdapter.
+     */
+    @Test
+    @Ignore
+    public void testSaveCrawlScheduleConfig() {
+        System.out.println("saveCrawlScheduleConfig");
+        ConfigProto.CrawlScheduleConfig crawlScheduleConfig = null;
+        RethinkDbAdapter instance = null;
+        ConfigProto.CrawlScheduleConfig expResult = null;
+        ConfigProto.CrawlScheduleConfig result = instance.saveCrawlScheduleConfig(crawlScheduleConfig);
+//        assertEquals(expResult, result);
+        // TODO review the generated test code and remove the default call to fail.
+        fail("The test case is a prototype.");
+    }
+
+    /**
+     * Test of deleteCrawlScheduleConfig method, of class RethinkDbAdapter.
+     */
+    @Test
+    @Ignore
+    public void testDeleteCrawlScheduleConfig() {
+        System.out.println("deleteCrawlScheduleConfig");
+        ConfigProto.CrawlScheduleConfig crawlScheduleConfig = null;
+        RethinkDbAdapter instance = null;
+        Empty expResult = null;
+        Empty result = instance.deleteCrawlScheduleConfig(crawlScheduleConfig);
 //        assertEquals(expResult, result);
         // TODO review the generated test code and remove the default call to fail.
         fail("The test case is a prototype.");

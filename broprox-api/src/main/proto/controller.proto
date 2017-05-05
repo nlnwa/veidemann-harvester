@@ -35,6 +35,16 @@ service Controller {
     rpc SaveCrawlScheduleConfig (CrawlScheduleConfig) returns (CrawlScheduleConfig) {}
     rpc DeleteCrawlScheduleConfig (CrawlScheduleConfig) returns (google.protobuf.Empty) {}
 
+    // List a set of politeness configs
+    rpc ListPolitenessConfigs (ListRequest) returns (PolitenessConfigListReply) {}
+    rpc SavePolitenessConfig (PolitenessConfig) returns (PolitenessConfig) {}
+    rpc DeletePolitenessConfig (PolitenessConfig) returns (google.protobuf.Empty) {}
+
+    // List a set of browser configs
+    rpc ListBrowserConfigs (ListRequest) returns (BrowserConfigListReply) {}
+    rpc SaveBrowserConfig (BrowserConfig) returns (BrowserConfig) {}
+    rpc DeleteBrowserConfig (BrowserConfig) returns (google.protobuf.Empty) {}
+
     rpc ListBrowserScripts (BrowserScriptListRequest) returns (BrowserScriptListReply) {}
     rpc SaveBrowserScript (BrowserScript) returns (BrowserScript) {}
 }
@@ -80,6 +90,20 @@ message CrawlConfigListReply {
 
 message CrawlScheduleConfigListReply {
     repeated CrawlScheduleConfig value = 1;
+    int64 count = 2;
+    int32 page_size = 14;
+    int32 page = 15;
+}
+
+message PolitenessConfigListReply {
+    repeated PolitenessConfig value = 1;
+    int64 count = 2;
+    int32 page_size = 14;
+    int32 page = 15;
+}
+
+message BrowserConfigListReply {
+    repeated BrowserConfig value = 1;
     int64 count = 2;
     int32 page_size = 14;
     int32 page = 15;

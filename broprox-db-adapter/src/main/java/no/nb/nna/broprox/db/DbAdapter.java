@@ -19,10 +19,18 @@ import java.util.List;
 import java.util.Optional;
 
 import com.google.protobuf.Empty;
+import no.nb.nna.broprox.api.ControllerProto.CrawlConfigListReply;
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;
+import no.nb.nna.broprox.api.ControllerProto.CrawlJobListReply;
+import no.nb.nna.broprox.api.ControllerProto.CrawlScheduleConfigListReply;
 import no.nb.nna.broprox.api.ControllerProto.ListRequest;
+import no.nb.nna.broprox.api.ControllerProto.SeedListReply;
 import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
+import no.nb.nna.broprox.model.ConfigProto.CrawlConfig;
 import no.nb.nna.broprox.model.ConfigProto.CrawlEntity;
+import no.nb.nna.broprox.model.ConfigProto.CrawlJob;
+import no.nb.nna.broprox.model.ConfigProto.CrawlScheduleConfig;
+import no.nb.nna.broprox.model.ConfigProto.Seed;
 import no.nb.nna.broprox.model.MessagesProto.CrawlExecutionStatus;
 import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
 import no.nb.nna.broprox.model.MessagesProto.CrawledContent;
@@ -64,6 +72,30 @@ public interface DbAdapter extends AutoCloseable {
     CrawlEntityListReply listCrawlEntities(ListRequest request);
 
     Empty deleteCrawlEntity(CrawlEntity entity);
+
+    SeedListReply listSeeds(ListRequest request);
+
+    Seed saveSeed(Seed seed);
+
+    Empty deleteSeed(Seed seed);
+
+    CrawlJobListReply listCrawlJobs(ListRequest request);
+
+    CrawlJob saveCrawlJob(CrawlJob crawlJob);
+
+    Empty deleteCrawlJob(CrawlJob crawlJob);
+
+    CrawlConfigListReply listCrawlConfigs(ListRequest request);
+
+    CrawlConfig saveCrawlConfig(CrawlConfig crawlConfig);
+
+    Empty deleteCrawlConfig(CrawlConfig crawlConfig);
+
+    CrawlScheduleConfigListReply listCrawlScheduleConfigs(ListRequest request);
+
+    CrawlScheduleConfig saveCrawlScheduleConfig(CrawlScheduleConfig crawlScheduleConfig);
+
+    Empty deleteCrawlScheduleConfig(CrawlScheduleConfig crawlScheduleConfig);
 
     @Override
     public void close();

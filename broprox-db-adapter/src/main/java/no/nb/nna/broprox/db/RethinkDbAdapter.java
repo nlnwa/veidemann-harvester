@@ -32,8 +32,12 @@ import com.rethinkdb.gen.exc.ReqlError;
 import com.rethinkdb.net.Connection;
 import com.rethinkdb.net.Cursor;
 import io.opentracing.tag.Tags;
+import no.nb.nna.broprox.api.ControllerProto.CrawlConfigListReply;
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;
+import no.nb.nna.broprox.api.ControllerProto.CrawlJobListReply;
+import no.nb.nna.broprox.api.ControllerProto.CrawlScheduleConfigListReply;
 import no.nb.nna.broprox.api.ControllerProto.ListRequest;
+import no.nb.nna.broprox.api.ControllerProto.SeedListReply;
 import no.nb.nna.broprox.commons.OpenTracingWrapper;
 import no.nb.nna.broprox.model.ConfigProto.BrowserConfig;
 import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
@@ -293,6 +297,66 @@ public class RethinkDbAdapter implements DbAdapter {
     @Override
     public CrawlEntityListReply listCrawlEntities(ListRequest request) {
         return listConfigMessages(request, CrawlEntityListReply.newBuilder(), TABLES.CRAWL_ENTITIES);
+    }
+
+    @Override
+    public SeedListReply listSeeds(ListRequest request) {
+        return listConfigMessages(request, SeedListReply.newBuilder(), TABLES.SEEDS);
+    }
+
+    @Override
+    public Seed saveSeed(Seed seed) {
+        return saveConfigMessage(seed, TABLES.SEEDS);
+    }
+
+    @Override
+    public Empty deleteSeed(Seed seed) {
+        return deleteConfigMessage(seed, TABLES.SEEDS);
+    }
+
+    @Override
+    public CrawlJobListReply listCrawlJobs(ListRequest request) {
+        return listConfigMessages(request, CrawlJobListReply.newBuilder(), TABLES.CRAWL_JOBS);
+    }
+
+    @Override
+    public CrawlJob saveCrawlJob(CrawlJob crawlJob) {
+        return saveConfigMessage(crawlJob, TABLES.CRAWL_JOBS);
+    }
+
+    @Override
+    public Empty deleteCrawlJob(CrawlJob crawlJob) {
+        return deleteConfigMessage(crawlJob, TABLES.CRAWL_JOBS);
+    }
+
+    @Override
+    public CrawlConfigListReply listCrawlConfigs(ListRequest request) {
+        return listConfigMessages(request, CrawlConfigListReply.newBuilder(), TABLES.CRAWL_CONFIGS);
+    }
+
+    @Override
+    public CrawlConfig saveCrawlConfig(CrawlConfig crawlConfig) {
+        return saveConfigMessage(crawlConfig, TABLES.CRAWL_CONFIGS);
+    }
+
+    @Override
+    public Empty deleteCrawlConfig(CrawlConfig crawlConfig) {
+        return deleteConfigMessage(crawlConfig, TABLES.CRAWL_CONFIGS);
+    }
+
+    @Override
+    public CrawlScheduleConfigListReply listCrawlScheduleConfigs(ListRequest request) {
+        return listConfigMessages(request, CrawlScheduleConfigListReply.newBuilder(), TABLES.CRAWL_SCHEDULE_CONFIGS);
+    }
+
+    @Override
+    public CrawlScheduleConfig saveCrawlScheduleConfig(CrawlScheduleConfig crawlScheduleConfig) {
+        return saveConfigMessage(crawlScheduleConfig, TABLES.CRAWL_SCHEDULE_CONFIGS);
+    }
+
+    @Override
+    public Empty deleteCrawlScheduleConfig(CrawlScheduleConfig crawlScheduleConfig) {
+        return deleteConfigMessage(crawlScheduleConfig, TABLES.CRAWL_SCHEDULE_CONFIGS);
     }
 
     public <T extends Message> T saveConfigMessage(T msg, TABLES table) {

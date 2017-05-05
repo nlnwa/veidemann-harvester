@@ -19,12 +19,18 @@ import java.time.OffsetDateTime;
 import java.util.List;
 
 import com.google.protobuf.InvalidProtocolBufferException;
-import static no.nb.nna.broprox.api.ControllerProto.*;
+import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;
+import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListRequest;
 import no.nb.nna.broprox.model.ConfigProto;
-
-import static no.nb.nna.broprox.model.ConfigProto.*;
-import static no.nb.nna.broprox.model.MessagesProto.*;
-
+import no.nb.nna.broprox.model.ConfigProto.CrawlEntity;
+import no.nb.nna.broprox.model.ConfigProto.Label;
+import no.nb.nna.broprox.model.ConfigProto.Meta;
+import no.nb.nna.broprox.model.MessagesProto.CrawlExecutionStatus;
+import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
+import no.nb.nna.broprox.model.MessagesProto.CrawledContent;
+import no.nb.nna.broprox.model.MessagesProto.ExtractedText;
+import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
+import no.nb.nna.broprox.model.MessagesProto.Screenshot;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
@@ -170,6 +176,52 @@ public class RethinkDbAdapterIT {
         assertThat(result.getEntityCount()).isEqualTo(1);
         assertThat(result.getCount()).isGreaterThanOrEqualTo(3);
         assertThat(result.getEntityList()).contains(entity2);
+    }
+
+    /**
+     * Test of deleteCrawlEntity method, of class RethinkDbAdapter.
+     */
+    @Test
+    public void testDeleteCrawlEntity() {
+        CrawlEntity entity1 = CrawlEntity.newBuilder()
+                .setMeta(Meta.newBuilder()
+                        .setName("Nasjonalbiblioteket")
+                        .addLabel(Label.newBuilder()
+                                .setKey("frequency")
+                                .setValue("Daily"))
+                        .addLabel(Label.newBuilder()
+                                .setKey("orgType")
+                                .setValue("Government"))
+                        .addLabel(Label.newBuilder()
+                                .setKey("orgType")
+                                .setValue("Culture"))
+                        .setCreated(ProtoUtils.odtToTs(OffsetDateTime.parse("2017-04-06T06:20:35.779Z"))))
+                .build();
+        entity1 = db.saveCrawlEntity(entity1);
+
+        CrawlEntity entity2 = CrawlEntity.newBuilder()
+                .setMeta(Meta.newBuilder()
+                        .setName("VG")
+                        .addLabel(Label.newBuilder()
+                                .setKey("frequency")
+                                .setValue("Hourly"))
+                        .addLabel(Label.newBuilder()
+                                .setKey("orgType")
+                                .setValue("News"))
+                        .setCreated(ProtoUtils.odtToTs(OffsetDateTime.parse("2017-04-06T06:20:35.779Z"))))
+                .build();
+        entity2 = db.saveCrawlEntity(entity2);
+
+        CrawlEntityListReply result = db.listCrawlEntities(CrawlEntityListRequest.getDefaultInstance());
+        assertThat(result.getEntityCount()).isGreaterThanOrEqualTo(2);
+        assertThat(result.getEntityList()).contains(entity1, entity2);
+
+        db.deleteCrawlEntity(entity2);
+
+        result = db.listCrawlEntities(CrawlEntityListRequest.getDefaultInstance());
+        assertThat(result.getEntityCount()).isGreaterThanOrEqualTo(1);
+        assertThat(result.getEntityList()).contains(entity1);
+        assertThat(result.getEntityList()).doesNotContain(entity2);
     }
 
     /**

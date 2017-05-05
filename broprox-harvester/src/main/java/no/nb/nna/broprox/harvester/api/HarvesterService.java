@@ -60,7 +60,7 @@ public class HarvesterService extends HarvesterGrpc.HarvesterImplBase {
             OpenTracingSpans.register(executionId, OpenTracingContextKey.activeSpan());
 
             QueuedUri fetchUri = request.getQueuedUri();
-            List<QueuedUri> outlinks = controller.render(executionId, fetchUri);
+            List<QueuedUri> outlinks = controller.render(executionId, fetchUri, request.getCrawlConfig());
             HarvestPageReply reply = HarvestPageReply.newBuilder().addAllOutlinks(outlinks).build();
 
             respObserver.onNext(reply);

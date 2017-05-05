@@ -29,6 +29,7 @@ import no.nb.nna.broprox.api.HarvesterGrpc.HarvesterStub;
 import no.nb.nna.broprox.api.HarvesterProto.CleanupExecutionRequest;
 import no.nb.nna.broprox.api.HarvesterProto.HarvestPageReply;
 import no.nb.nna.broprox.api.HarvesterProto.HarvestPageRequest;
+import no.nb.nna.broprox.model.ConfigProto.CrawlConfig;
 import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,11 +60,12 @@ public class HarvesterClient implements AutoCloseable {
         asyncStub = HarvesterGrpc.newStub(channel);
     }
 
-    public List<QueuedUri> fetchPage(String executionId, QueuedUri qUri) {
+    public List<QueuedUri> fetchPage(String executionId, QueuedUri qUri, CrawlConfig config) {
         try {
             HarvestPageRequest request = HarvestPageRequest.newBuilder()
                     .setExecutionId(executionId)
                     .setQueuedUri(qUri)
+                    .setCrawlConfig(config)
                     .build();
             HarvestPageReply reply = blockingStub.harvestPage(request);
             return reply.getOutlinksList();

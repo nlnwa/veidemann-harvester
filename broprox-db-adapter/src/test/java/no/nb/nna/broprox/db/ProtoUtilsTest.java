@@ -24,8 +24,8 @@ import com.google.protobuf.Message;
 import com.google.protobuf.Timestamp;
 import com.google.protobuf.util.Timestamps;
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;
-import no.nb.nna.broprox.model.MessagesProto;
-import no.nb.nna.broprox.model.MessagesProto.CrawlEntity;
+import no.nb.nna.broprox.model.ConfigProto;
+import no.nb.nna.broprox.model.ConfigProto.CrawlEntity;
 import org.junit.Test;
 
 import static no.nb.nna.broprox.db.RethinkDbAdapter.r;
@@ -44,16 +44,25 @@ public class ProtoUtilsTest {
         CrawlEntityListReply msg = CrawlEntityListReply.newBuilder()
                 .addEntity(CrawlEntity.newBuilder()
                         .setId("UUID")
-                        .setName("Nasjonalbiblioteket")
-                        .addLabel("Daily")
-                        .addLabel("Government")
-                        .setCreated(ProtoUtils.odtToTs(OffsetDateTime.parse("2017-04-06T06:20:35.779Z")))
+                        .setMeta(ConfigProto.Meta.newBuilder()
+                                .setName("Nasjonalbiblioteket")
+                                .addLabel(ConfigProto.Label.newBuilder()
+                                        .setKey("frequency")
+                                        .setValue("Daily"))
+                                .addLabel(ConfigProto.Label.newBuilder()
+                                        .setKey("orgType")
+                                        .setValue("Government"))
+                                .setCreated(ProtoUtils.odtToTs(OffsetDateTime.parse("2017-04-06T06:20:35.779Z"))))
                 ).build();
 
         Map crawlEntity = r.hashMap("id", "UUID")
-                .with("name", "Nasjonalbiblioteket")
-                .with("created", OffsetDateTime.parse("2017-04-06T06:20:35.779Z"))
-                .with("label", r.array("Daily", "Government"));
+                .with("meta", r.hashMap()
+                        .with("name", "Nasjonalbiblioteket")
+                        .with("created", OffsetDateTime.parse("2017-04-06T06:20:35.779Z"))
+                        .with("label", r.array(
+                                r.hashMap("key", "frequency").with("value", "Daily"),
+                                r.hashMap("key", "orgType").with("value", "Government")))
+                );
         Map crawlEntityList = r.hashMap("entity", r.array(crawlEntity));
 
         Map<String, Object> result = ProtoUtils.protoToRethink(msg);
@@ -69,16 +78,25 @@ public class ProtoUtilsTest {
         CrawlEntityListReply expResult = CrawlEntityListReply.newBuilder()
                 .addEntity(CrawlEntity.newBuilder()
                         .setId("UUID")
-                        .setName("Nasjonalbiblioteket")
-                        .addLabel("Daily")
-                        .addLabel("Government")
-                        .setCreated(ProtoUtils.odtToTs(OffsetDateTime.parse("2017-04-06T06:20:35.779Z")))
+                        .setMeta(ConfigProto.Meta.newBuilder()
+                                .setName("Nasjonalbiblioteket")
+                                .addLabel(ConfigProto.Label.newBuilder()
+                                        .setKey("frequency")
+                                        .setValue("Daily"))
+                                .addLabel(ConfigProto.Label.newBuilder()
+                                        .setKey("orgType")
+                                        .setValue("Government"))
+                                .setCreated(ProtoUtils.odtToTs(OffsetDateTime.parse("2017-04-06T06:20:35.779Z"))))
                 ).build();
 
         Map crawlEntity = r.hashMap("id", "UUID")
-                .with("name", "Nasjonalbiblioteket")
-                .with("created", OffsetDateTime.parse("2017-04-06T06:20:35.779Z"))
-                .with("label", r.array("Daily", "Government"));
+                .with("meta", r.hashMap()
+                        .with("name", "Nasjonalbiblioteket")
+                        .with("created", OffsetDateTime.parse("2017-04-06T06:20:35.779Z"))
+                        .with("label", r.array(
+                                r.hashMap("key", "frequency").with("value", "Daily"),
+                                r.hashMap("key", "orgType").with("value", "Government")))
+                );
         Map crawlEntityList = r.hashMap("entity", r.array(crawlEntity));
 
         CrawlEntityListReply result = ProtoUtils.rethinkToProto(crawlEntityList, CrawlEntityListReply.class);
@@ -94,16 +112,25 @@ public class ProtoUtilsTest {
         CrawlEntityListReply expResult = CrawlEntityListReply.newBuilder()
                 .addEntity(CrawlEntity.newBuilder()
                         .setId("UUID")
-                        .setName("Nasjonalbiblioteket")
-                        .addLabel("Daily")
-                        .addLabel("Government")
-                        .setCreated(ProtoUtils.odtToTs(OffsetDateTime.parse("2017-04-06T06:20:35.779Z")))
+                        .setMeta(ConfigProto.Meta.newBuilder()
+                                .setName("Nasjonalbiblioteket")
+                                .addLabel(ConfigProto.Label.newBuilder()
+                                        .setKey("frequency")
+                                        .setValue("Daily"))
+                                .addLabel(ConfigProto.Label.newBuilder()
+                                        .setKey("orgType")
+                                        .setValue("Government"))
+                                .setCreated(ProtoUtils.odtToTs(OffsetDateTime.parse("2017-04-06T06:20:35.779Z"))))
                 ).build();
 
         Map crawlEntity = r.hashMap("id", "UUID")
-                .with("name", "Nasjonalbiblioteket")
-                .with("created", OffsetDateTime.parse("2017-04-06T06:20:35.779Z"))
-                .with("label", r.array("Daily", "Government"));
+                .with("meta", r.hashMap()
+                        .with("name", "Nasjonalbiblioteket")
+                        .with("created", OffsetDateTime.parse("2017-04-06T06:20:35.779Z"))
+                        .with("label", r.array(
+                                r.hashMap("key", "frequency").with("value", "Daily"),
+                                r.hashMap("key", "orgType").with("value", "Government")))
+                );
         Map crawlEntityList = r.hashMap("entity", r.array(crawlEntity));
 
         Message result = ProtoUtils.rethinkToProto(crawlEntityList, CrawlEntityListReply.newBuilder());

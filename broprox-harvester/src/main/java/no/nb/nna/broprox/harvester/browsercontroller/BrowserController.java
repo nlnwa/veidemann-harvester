@@ -26,8 +26,8 @@ import no.nb.nna.broprox.chrome.client.Session;
 import no.nb.nna.broprox.chrome.client.ws.CompleteMany;
 import no.nb.nna.broprox.commons.OpenTracingWrapper;
 import no.nb.nna.broprox.db.DbAdapter;
-import no.nb.nna.broprox.model.MessagesProto.BrowserScript;
-import no.nb.nna.broprox.model.MessagesProto.CrawlConfig;
+import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
+import no.nb.nna.broprox.model.ConfigProto.CrawlConfig;
 import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
 import no.nb.nna.broprox.harvester.BroproxHeaderConstants;
 import no.nb.nna.broprox.harvester.OpenTracingSpans;
@@ -56,14 +56,17 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
         this.db = db;
     }
 
-    public List<QueuedUri> render(String executionId, QueuedUri queuedUri) throws ExecutionException, InterruptedException, IOException, TimeoutException {
+    public List<QueuedUri> render(String executionId, QueuedUri queuedUri, CrawlConfig config)
+            throws ExecutionException, InterruptedException, IOException, TimeoutException {
+
         System.out.println("RENDER " + executionId + " :: " + queuedUri.getUri());
         OpenTracingWrapper otw = new OpenTracingWrapper("BrowserController", Tags.SPAN_KIND_CLIENT)
                 .setParentSpan(OpenTracingSpans.get(executionId));
 
-        CrawlConfig config = queuedUri.getCrawlConfig();
+        try (Session session = chrome.newSession(
+                config.getBrowserConfig().getWindowWidth(),
+                config.getBrowserConfig().getWindowHeight())) {
 
-        try (Session session = chrome.newSession(config.getWindowWidth(), config.getWindowHeight())) {
             new CompleteMany(
                     session.debugger.enable(),
                     session.page.enable(),
@@ -71,16 +74,16 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
                     session.network.enable(null, null),
                     session.network.setCacheDisabled(true),
                     session.runtime
-                    .evaluate("navigator.userAgent;", null, false, false, null, false, false, false, false)
-                    .thenAccept(e -> {
-                        session.network.setUserAgentOverride(((String) e.result.value)
-                                .replace("HeadlessChrome", session.version()));
-                    }),
+                            .evaluate("navigator.userAgent;", null, false, false, null, false, false, false, false)
+                            .thenAccept(e -> {
+                                session.network.setUserAgentOverride(((String) e.result.value)
+                                        .replace("HeadlessChrome", session.version()));
+                            }),
                     session.debugger
-                    .setBreakpointByUrl(1, null, "https?://www.google-analytics.com/analytics.js", null, null),
+                            .setBreakpointByUrl(1, null, "https?://www.google-analytics.com/analytics.js", null, null),
                     session.debugger.setBreakpointByUrl(1, null, "https?://www.google-analytics.com/ga.js", null, null),
                     session.page.setControlNavigations(Boolean.TRUE)
-            ).get(config.getPageLoadTimeout(), MILLISECONDS);
+            ).get(config.getBrowserConfig().getPageLoadTimeoutMs(), MILLISECONDS);
 
             session.debugger.onPaused(p -> {
                 String scriptId = p.callFrames.get(0).location.scriptId;
@@ -90,7 +93,8 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
                 System.out.println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>> SCRIPT RESUMED: " + scriptId);
             });
 
-            PageExecution pex = new PageExecution(executionId, queuedUri, session, config.getPageLoadTimeout(), db, sleep);
+            PageExecution pex = new PageExecution(executionId, queuedUri, session, config.getBrowserConfig()
+                    .getPageLoadTimeoutMs(), db, sleep);
             otw.run("navigatePage", pex::navigatePage);
             otw.run("saveScreenshot", pex::saveScreenshot);
 

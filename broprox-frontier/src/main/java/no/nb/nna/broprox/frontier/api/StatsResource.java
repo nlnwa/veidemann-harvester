@@ -38,7 +38,11 @@ import no.nb.nna.broprox.commons.OpenTracingWrapper;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
 import no.nb.nna.broprox.frontier.worker.Frontier;
-import no.nb.nna.broprox.model.MessagesProto.CrawlConfig;
+import no.nb.nna.broprox.model.ConfigProto.BrowserConfig;
+import no.nb.nna.broprox.model.ConfigProto.CrawlConfig;
+import no.nb.nna.broprox.model.ConfigProto.CrawlScope;
+import no.nb.nna.broprox.model.ConfigProto.PolitenessConfig;
+import no.nb.nna.broprox.model.ConfigProto.Seed;
 import org.netpreserve.commons.uri.UriConfigs;
 import org.netpreserve.commons.uri.UriFormat;
 
@@ -106,18 +110,25 @@ public class StatsResource {
         UriFormat f = UriConfigs.SURT_KEY_FORMAT;
         System.out.println("URL: " + url);
         CrawlConfig config = CrawlConfig.newBuilder()
-                .setWindowWidth(900)
-                .setWindowHeight(900)
-                .setScope(generateScope(url))
-                .setMinTimeBetweenPageLoadMillis(waitTime)
-                .setPageLoadTimeout(timeout)
+                .setBrowserConfig(BrowserConfig.newBuilder()
+                        .setWindowWidth(900)
+                        .setWindowHeight(900)
+                        .setPageLoadTimeoutMs(timeout)
+                )
+                .setPoliteness(PolitenessConfig.newBuilder()
+                        .setMinTimeBetweenPageLoadMs(waitTime))
                 .setDepthFirst(false)
+                .build();
+
+        Seed seed = Seed.newBuilder()
+                .setUri(url)
+                .setScope(CrawlScope.newBuilder().setSurtPrefix(generateScope(url)))
                 .build();
 
         try {
             OpenTracingWrapper otw = new OpenTracingWrapper("Frontier_API", Tags.SPAN_KIND_SERVER)
                     .addTag(Tags.HTTP_URL.getKey(), url);
-            otw.run("fetchSeed", frontier::newExecution, config, url);
+            otw.run("fetchSeed", frontier::newExecution, config, seed);
         } catch (Exception e) {
             e.printStackTrace();
             throw new WebApplicationException(e);

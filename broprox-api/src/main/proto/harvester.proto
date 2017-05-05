@@ -6,6 +6,7 @@ option java_package = "no.nb.nna.broprox.api";
 option java_outer_classname = "HarvesterProto";
 
 import "messages.proto";
+import "config.proto";
 
 // Service for communicating with harvester.
 service Harvester {
@@ -18,6 +19,7 @@ service Harvester {
 message HarvestPageRequest {
     string execution_id = 1;
     QueuedUri queued_uri = 2;
+    CrawlConfig crawl_config = 3;
 }
 
 message HarvestPageReply {

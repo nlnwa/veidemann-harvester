@@ -29,7 +29,8 @@ import no.nb.nna.broprox.commons.OpenTracingWrapper;
 import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
 import no.nb.nna.broprox.model.MessagesProto;
-import no.nb.nna.broprox.model.MessagesProto.CrawlConfig;
+import no.nb.nna.broprox.model.ConfigProto.CrawlConfig;
+import no.nb.nna.broprox.model.ConfigProto.CrawlScope;
 import no.nb.nna.broprox.model.MessagesProto.CrawlExecutionStatus;
 import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
 import org.netpreserve.commons.uri.UriConfigs;
@@ -50,6 +51,8 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker, Delayed {
 
     private final CrawlConfig config;
 
+    private final CrawlScope scope;
+
     private QueuedUri currentUri;
 
     private volatile List<QueuedUri> outlinks;
@@ -62,12 +65,13 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker, Delayed {
 
     private final Span parentSpan;
 
-    public CrawlExecution(Span span, Frontier frontier, CrawlExecutionStatus status, CrawlConfig config) {
+    public CrawlExecution(Span span, Frontier frontier, CrawlExecutionStatus status, CrawlConfig config, CrawlScope scope) {
         System.out.println("NEW CRAWL EXECUTION: " + status.getId());
         this.frontier = frontier;
         this.status = status;
         this.config = config;
         this.parentSpan = span;
+        this.scope = scope;
     }
 
     public String getId() {
@@ -98,13 +102,13 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker, Delayed {
     public void fetch() {
         System.out.println("Fetching " + currentUri.getUri());
         currentUri = currentUri.toBuilder()
-                .setCrawlConfig(config)
                 .setSurt(UriConfigs.SURT_KEY.buildUri(currentUri.getUri()).toString())
+                .setScope(scope)
                 .build();
 
         try {
             try {
-                outlinks = frontier.getHarvesterClient().fetchPage(status.getId(), currentUri);
+                outlinks = frontier.getHarvesterClient().fetchPage(status.getId(), currentUri, config);
                 seedResolved = true;
 
                 status = status.toBuilder()
@@ -226,7 +230,7 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker, Delayed {
                                         .limit(1)
                         ).isEmpty());
 
-        if (notSeen && outlink.getSurt().startsWith(config.getScope())) {
+        if (notSeen && outlink.getSurt().startsWith(scope.getSurtPrefix())) {
             return true;
         }
         return false;
@@ -268,7 +272,7 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker, Delayed {
     }
 
     public void calculateDelay() {
-        nextExecTimestamp = System.currentTimeMillis() + getConfig().getMinTimeBetweenPageLoadMillis();
+        nextExecTimestamp = System.currentTimeMillis() + getConfig().getPoliteness().getMinTimeBetweenPageLoadMs();
     }
 
     @Override

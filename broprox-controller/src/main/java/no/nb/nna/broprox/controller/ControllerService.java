@@ -18,8 +18,8 @@ package no.nb.nna.broprox.controller;
 import io.grpc.stub.StreamObserver;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.api.ControllerGrpc;
-import no.nb.nna.broprox.model.MessagesProto.BrowserScript;
-import no.nb.nna.broprox.model.MessagesProto.CrawlEntity;
+import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
+import no.nb.nna.broprox.model.ConfigProto.CrawlEntity;
 import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListReply;
 import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListRequest;
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;
@@ -38,28 +38,44 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
 
     @Override
     public void saveEntity(CrawlEntity request, StreamObserver<CrawlEntity> respObserver) {
-        respObserver.onNext(db.saveCrawlEntity(request));
-        respObserver.onCompleted();
+        try {
+            respObserver.onNext(db.saveCrawlEntity(request));
+            respObserver.onCompleted();
+        } catch (Exception e) {
+            respObserver.onError(e);
+        }
     }
 
     @Override
     public void listCrawlEntities(CrawlEntityListRequest request, StreamObserver<CrawlEntityListReply> respObserver) {
-        respObserver.onNext(db.listCrawlEntities(request));
-        respObserver.onCompleted();
+        try {
+            respObserver.onNext(db.listCrawlEntities(request));
+            respObserver.onCompleted();
+        } catch (Exception e) {
+            respObserver.onError(e);
+        }
     }
 
     @Override
     public void saveBrowserScript(BrowserScript request, StreamObserver<BrowserScript> respObserver) {
-        respObserver.onNext(db.saveBrowserScript(request));
-        respObserver.onCompleted();
+        try {
+            respObserver.onNext(db.saveBrowserScript(request));
+            respObserver.onCompleted();
+        } catch (Exception e) {
+            respObserver.onError(e);
+        }
     }
 
     @Override
     public void listBrowserScripts(BrowserScriptListRequest request, StreamObserver<BrowserScriptListReply> respObserver) {
-        BrowserScriptListReply.Builder builder = BrowserScriptListReply.newBuilder();
-        db.getBrowserScripts(request.getType()).forEach(bs -> builder.addScript(bs));
-        respObserver.onNext(builder.build());
-        respObserver.onCompleted();
+        try {
+            BrowserScriptListReply.Builder builder = BrowserScriptListReply.newBuilder();
+            db.getBrowserScripts(request.getType()).forEach(bs -> builder.addScript(bs));
+            respObserver.onNext(builder.build());
+            respObserver.onCompleted();
+        } catch (Exception e) {
+            respObserver.onError(e);
+        }
     }
 
 }

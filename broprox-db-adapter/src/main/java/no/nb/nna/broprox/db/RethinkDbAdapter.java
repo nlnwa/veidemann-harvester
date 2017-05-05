@@ -15,37 +15,39 @@
  */
 package no.nb.nna.broprox.db;
 
-import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeoutException;
 
+import com.google.protobuf.Message;
 import com.rethinkdb.RethinkDB;
+import com.rethinkdb.gen.ast.Insert;
 import com.rethinkdb.gen.ast.ReqlExpr;
 import com.rethinkdb.gen.ast.Table;
+import com.rethinkdb.gen.exc.ReqlError;
 import com.rethinkdb.net.Connection;
 import com.rethinkdb.net.Cursor;
 import io.opentracing.tag.Tags;
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListRequest;
 import no.nb.nna.broprox.commons.OpenTracingWrapper;
-import no.nb.nna.broprox.model.MessagesProto.BrowserScript;
-import no.nb.nna.broprox.model.MessagesProto.CrawlEntity;
+import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
+import no.nb.nna.broprox.model.ConfigProto.CrawlEntity;
 import no.nb.nna.broprox.model.MessagesProto.CrawlExecutionStatus;
 import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
 import no.nb.nna.broprox.model.MessagesProto.CrawledContent;
 import no.nb.nna.broprox.model.MessagesProto.ExtractedText;
 import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
 import no.nb.nna.broprox.model.MessagesProto.Screenshot;
-import org.yaml.snakeyaml.Yaml;
 
 /**
  * An implementation of DbAdapter for RethinkDb.
  */
 public class RethinkDbAdapter implements DbAdapter {
+
+    public static final String TABLE_SYSTEM = "system";
 
     public static final String TABLE_CRAWL_LOG = "crawl_log";
 
@@ -63,13 +65,19 @@ public class RethinkDbAdapter implements DbAdapter {
 
     public static final String TABLE_CRAWL_ENTITIES = "crawl_entities";
 
+    public static final String TABLE_SEEDS = "seeds";
+
+    public static final String TABLE_CRAWL_JOBS = "crawl_jobs";
+
+    public static final String TABLE_CRAWL_CONFIGS = "crawl_configs";
+
+    public static final String TABLE_CRAWL_SCHEDULE_CONFIGS = "crawl_schedule_configs";
+
+    public static final String TABLE_BROWSER_CONFIGS = "browser_configs";
+
+    public static final String TABLE_POLITENESS_CONFIGS = "politeness_configs";
+
     static final RethinkDB r = RethinkDB.r;
-
-    final String dbHost;
-
-    final int dbPort;
-
-    final String dbName;
 
     final Connection conn;
 
@@ -80,62 +88,11 @@ public class RethinkDbAdapter implements DbAdapter {
             .setTraceEnabled(false);
 
     public RethinkDbAdapter(String dbHost, int dbPort, String dbName) {
-        this.dbHost = dbHost;
-        this.dbPort = dbPort;
-        this.dbName = dbName;
-
-        conn = connect();
-        createDb();
+        this(r.connection().hostname(dbHost).port(dbPort).db(dbName).connect());
     }
 
-    private final Connection connect() {
-        Connection c = r.connection().hostname(dbHost).port(dbPort).db(dbName).connect();
-        return c;
-    }
-
-    private final void createDb() {
-        if (!(boolean) r.dbList().contains(dbName).run(conn)) {
-            r.dbCreate(dbName).run(conn);
-
-            r.tableCreate(TABLE_CRAWL_LOG).optArg("primary_key", "warcId").run(conn);
-            r.table(TABLE_CRAWL_LOG)
-                    .indexCreate("surt_time", row -> r.array(row.g("surt"), row.g("timeStamp")))
-                    .run(conn);
-            r.table(TABLE_CRAWL_LOG).indexWait("surt_time").run(conn);
-
-            r.tableCreate(TABLE_CRAWLED_CONTENT).optArg("primary_key", "digest").run(conn);
-
-            r.tableCreate(TABLE_EXTRACTED_TEXT).optArg("primary_key", "warcId").run(conn);
-
-            r.tableCreate(TABLE_BROWSER_SCRIPTS).run(conn);
-
-            r.tableCreate(TABLE_URI_QUEUE).run(conn);
-            r.table(TABLE_URI_QUEUE).indexCreate("surt").run(conn);
-            r.table(TABLE_URI_QUEUE).indexCreate("executionIds", uri -> uri.g("executionIds")
-                    .map(eid -> r.array(eid.g("id"), eid.g("seq")))
-            ).optArg("multi", true).run(conn);
-
-            r.table(TABLE_URI_QUEUE).indexWait("surt", "executionIds").run(conn);
-
-            r.tableCreate(TABLE_EXECUTIONS).run(conn);
-
-            r.tableCreate(TABLE_SCREENSHOT).run(conn);
-
-            r.tableCreate(TABLE_CRAWL_ENTITIES).run(conn);
-
-            populateDb();
-        }
-    }
-
-    private final void populateDb() {
-        Yaml yaml = new Yaml();
-        try (InputStream in = getClass().getClassLoader().getResourceAsStream("browser-scripts/extract-outlinks.yaml")) {
-            Map<String, Object> scriptDef = yaml.loadAs(in, Map.class);
-            BrowserScript script = ProtoUtils.rethinkToProto(scriptDef, BrowserScript.class);
-            saveBrowserScript(script);
-        } catch (IOException ex) {
-            throw new RuntimeException(ex);
-        }
+    public RethinkDbAdapter(Connection conn) {
+        this.conn = conn;
     }
 
     @Override
@@ -157,26 +114,30 @@ public class RethinkDbAdapter implements DbAdapter {
 
     @Override
     public CrawledContent addCrawledContent(CrawledContent cc) {
+        ensureContainsValue(cc, "digest");
+        ensureContainsValue(cc, "warc_id");
+
         Map rMap = ProtoUtils.protoToRethink(cc);
         Map<String, Object> response = otw.map("db-addCrawledContent",
                 this::executeRequest, r.table(TABLE_CRAWLED_CONTENT)
                         .insert(rMap)
                         .optArg("conflict", "error"));
 
-        String key = ((List<String>) response.get("generated_keys")).get(0);
-        return cc.toBuilder().setDigest(key).build();
+        return cc;
     }
 
     @Override
     public ExtractedText addExtractedText(ExtractedText et) {
+        ensureContainsValue(et, "warc_id");
+        ensureContainsValue(et, "text");
+
         Map rMap = ProtoUtils.protoToRethink(et);
         Map<String, Object> response = otw.map("db-addExtractedText",
                 this::executeRequest, r.table(TABLE_EXTRACTED_TEXT)
                         .insert(rMap)
                         .optArg("conflict", "error"));
 
-        String key = ((List<String>) response.get("generated_keys")).get(0);
-        return et.toBuilder().setWarcId(key).build();
+        return et;
     }
 
     @Override
@@ -317,28 +278,46 @@ public class RethinkDbAdapter implements DbAdapter {
     public CrawlEntity saveCrawlEntity(CrawlEntity entity) {
         Map rMap = ProtoUtils.protoToRethink(entity);
 
-        Map<String, Object> response = otw.map("db-saveCrawlEntity",
-                this::executeRequest, r.table(TABLE_CRAWL_ENTITIES)
+        rMap.put("meta", updateMeta((Map) rMap.get("meta"), null));
+
+        return otw.map("db-saveCrawlEntity",
+                this::executeInsert,
+                r.table(TABLE_CRAWL_ENTITIES)
                         .insert(rMap)
-                        .optArg("conflict", "replace"));
-
-        String key = ((List<String>) response.get("generated_keys")).get(0);
-
-        return entity.toBuilder().setId(key).build();
+                        .optArg("conflict", "replace"),
+                CrawlEntity.class);
     }
 
     @Override
     public CrawlEntityListReply listCrawlEntities(CrawlEntityListRequest request) {
         ReqlExpr qry = r.table(TABLE_CRAWL_ENTITIES);
-        if (request != null) {
-            if (!request.getId().isEmpty()) {
+        long count = 1;
+        switch (request.getQryCase()) {
+            case ID:
                 qry = ((Table) qry).get(request.getId());
+                break;
+            case NAME_PREFIX:
+                String prefix = request.getNamePrefix().toLowerCase();
+                qry = qry.between(prefix, prefix + Character.toString(Character.MAX_VALUE)).optArg("index", "name");
+                break;
+        }
+
+        if (request.getQryCase() != CrawlEntityListRequest.QryCase.ID) {
+            count = otw.map("db-listCrawlEntities",
+                    this::executeRequest, qry.count());
+
+            qry = qry.orderBy().optArg("index", "name");
+            if (request.getPageSize() > 0) {
+                qry = qry.skip(request.getPage() * request.getPageSize()).limit(request.getPageSize());
             }
         }
+
         Object res = otw.map("db-listCrawlEntities",
                 this::executeRequest, qry);
-
-        CrawlEntityListReply.Builder reply = CrawlEntityListReply.newBuilder();
+        CrawlEntityListReply.Builder reply = CrawlEntityListReply.newBuilder()
+                .setPageSize(request.getPageSize())
+                .setPage(request.getPage())
+                .setCount(count);
         if (res instanceof Cursor) {
             Cursor<Map<String, Object>> cursor = (Cursor) res;
             for (Map<String, Object> entity : cursor) {
@@ -351,24 +330,70 @@ public class RethinkDbAdapter implements DbAdapter {
         return reply.build();
     }
 
+    private Map updateMeta(Map meta, String user) {
+        if (meta == null) {
+            meta = r.hashMap();
+        }
+
+        if (user == null || user.isEmpty()) {
+            user = "anonymous";
+        }
+
+        if (!meta.containsKey("created")) {
+            meta.put("created", r.now());
+            meta.put("createdBy", user);
+        }
+
+        meta.put("lastModified", r.now());
+        meta.put("lastModifiedBy", user);
+
+        return meta;
+    }
+
+    public <T extends Message> T executeInsert(Insert qry, Class<T> type) {
+        qry = qry.optArg("return_changes", "always");
+
+        Map<String, Object> response = executeRequest(qry);
+        List<Map<String, Map>> changes = (List<Map<String, Map>>) response.get("changes");
+
+        Map newDoc = changes.get(0).get("new_val");
+        return ProtoUtils.rethinkToProto(newDoc, type);
+    }
+
     public <T> T executeRequest(ReqlExpr qry) {
         synchronized (this) {
             if (!conn.isOpen()) {
                 try {
                     conn.connect();
-                    createDb();
                 } catch (TimeoutException ex) {
                     throw new RuntimeException("Timed out waiting for connection");
                 }
             }
         }
 
-        return qry.run(conn);
+        try {
+            T result = qry.run(conn);
+            if (result instanceof Map
+                    && ((Map) result).containsKey("errors")
+                    && !((Map) result).get("errors").equals(0L)) {
+                throw new DbException((String) ((Map) result).get("first_error"));
+            }
+            return result;
+        } catch (ReqlError e) {
+            throw new DbException(e.getMessage(), e);
+        }
     }
 
     @Override
     public void close() {
         conn.close();
+    }
+
+    private void ensureContainsValue(Message msg, String fieldName) {
+        if (!msg.getAllFields().keySet().stream().filter(k -> k.getName().equals(fieldName)).findFirst().isPresent()) {
+            throw new IllegalArgumentException("The required field '" + fieldName + "' is missing from: '" + msg
+                    .getClass().getSimpleName() + "'");
+        }
     }
 
 }

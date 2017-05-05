@@ -5,7 +5,7 @@ option java_package = "no.nb.nna.broprox.api";
 //option java_multiple_files = true;
 option java_outer_classname = "ControllerProto";
 
-import "messages.proto";
+import "config.proto";
 
 // Service for communicating with controller.
 service Controller {
@@ -18,12 +18,20 @@ service Controller {
 
 // Specification of wich entities to get.
 message CrawlEntityListRequest {
-    string id = 1;
+    oneof qry {
+        string id = 1;
+        string name_prefix = 2;
+    }
+    int32 page_size = 14;
+    int32 page = 15;
 }
 
 // A list of entities
 message CrawlEntityListReply {
     repeated CrawlEntity entity = 1;
+    int64 count = 2;
+    int32 page_size = 14;
+    int32 page = 15;
 }
 
 // Specification of wich browserscripts to get.

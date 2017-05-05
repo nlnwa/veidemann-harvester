@@ -6,44 +6,10 @@ option java_package = "no.nb.nna.broprox.model";
 option java_outer_classname = "MessagesProto";
 
 import "google/protobuf/timestamp.proto";
+import "config.proto";
 
 // A message containing no data. Useful for rpc methods returning no data
 message Void {
-}
-
-// Message containing a javascript to be run in a browser
-message BrowserScript {
-    enum Type {
-        UNDEFINED = 0;
-        BEHAVIOR = 1;
-        EXTRACT_OUTLINKS = 2;
-        LOGIN = 3;
-    }
-
-    string id = 1;
-    Type type = 2;
-    string name = 3;
-    string script = 4;
-    string url_regexp = 5;
-    map<string, string> parameters = 6;
-}
-
-// A crawl entity (might be an organisation with one or more seeds)
-message CrawlEntity {
-    string id = 1;
-    string name = 2;
-    string description = 16;
-    repeated string label = 3;
-    google.protobuf.Timestamp created = 4;
-}
-
-message CrawlConfig {
-    int32 window_width = 1;
-    int32 window_height = 2;
-    string scope = 3;
-    int64 page_load_timeout = 4;
-    int64 min_time_between_page_load_millis = 5;
-    bool depth_first = 6;
 }
 
 message CrawlExecutionStatus {
@@ -144,7 +110,7 @@ message QueuedUri {
      */
     string discovery_path = 6;
     string referrer = 7;
-    CrawlConfig crawl_config = 8;
+    CrawlScope scope = 8;
 }
 
 message Screenshot {

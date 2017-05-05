@@ -1,5 +1,5 @@
 # Requires Docker Compose 1.6.0+ and Docker Engine 1.10.0+
-version: '2'
+version: '2.1'
 
 volumes:
     harvester-workdir:
@@ -15,6 +15,13 @@ services:
             - "8888:8080"
         volumes:
             - rethink-data:/data
+
+    db_initializer:
+        image: norsknettarkiv/broprox-db-initializer
+        depends_on:
+            - db
+        environment:
+            - "DB_HOST=db"
 
     # Chrome headless
     browser:
@@ -34,12 +41,12 @@ services:
             - "9090:9090"
         volumes:
              - harvester-workdir:/workdir
-        links:
-            - "db"
-            - "browser"
-            - "content-writer"
-            - "testsites"
-            - "tracer"
+        depends_on:
+            - db_initializer
+            - browser
+            - content-writer
+            - testsites
+            - tracer
         environment:
             - "BROWSER_HOST=browser"
             - "DB_HOST=db"
@@ -56,9 +63,9 @@ services:
         volumes:
             - ./work/warcs:/warcs
             - ./work/writer:/workdir
-        links:
-            - "db"
-            - "tracer"
+        depends_on:
+            - db_initializer
+            - tracer
         environment:
             - "DB_HOST=db"
             - "TRACER_URI=http://tracer:9411/api/v1/spans"
@@ -70,10 +77,10 @@ services:
             - "7700:7700"
         volumes:
             - ./work/frontier:/workdir
-        links:
-            - "db"
-            - "harvester"
-            - "tracer"
+        depends_on:
+            - db_initializer
+            - harvester
+            - tracer
         environment:
             - "DB_HOST=db"
             - "HARVESTER_HOST=harvester"
@@ -90,9 +97,9 @@ services:
         image: norsknettarkiv/broprox-controller
         ports:
             - "50051:50051"
-        links:
-            - "db"
-            - "tracer"
+        depends_on:
+            - db_initializer
+            - tracer
         environment:
             - "DB_HOST=db"
             - "TRACER_URI=http://tracer:9411/api/v1/spans"

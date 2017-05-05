@@ -15,11 +15,12 @@
  */
 package no.nb.nna.broprox.db;
 
-import java.util.List;
 import java.util.Optional;
 
 import com.google.protobuf.Empty;
 import no.nb.nna.broprox.api.ControllerProto.BrowserConfigListReply;
+import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListReply;
+import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListRequest;
 import no.nb.nna.broprox.api.ControllerProto.CrawlConfigListReply;
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;
 import no.nb.nna.broprox.api.ControllerProto.CrawlJobListReply;
@@ -56,10 +57,6 @@ public interface DbAdapter extends AutoCloseable {
     CrawlLog updateCrawlLog(CrawlLog cl);
 
     ExtractedText addExtractedText(ExtractedText et);
-
-    BrowserScript saveBrowserScript(BrowserScript script);
-
-    List<BrowserScript> getBrowserScripts(BrowserScript.Type type);
 
     CrawlExecutionStatus addExecutionStatus(CrawlExecutionStatus status);
 
@@ -112,6 +109,12 @@ public interface DbAdapter extends AutoCloseable {
     BrowserConfig saveBrowserConfig(BrowserConfig browserConfig);
 
     Empty deleteBrowserConfig(BrowserConfig browserConfig);
+
+    BrowserScript saveBrowserScript(BrowserScript script);
+
+    Empty deleteBrowserScript(BrowserScript script);
+
+    BrowserScriptListReply listBrowserScripts(BrowserScriptListRequest request);
 
     @Override
     public void close();

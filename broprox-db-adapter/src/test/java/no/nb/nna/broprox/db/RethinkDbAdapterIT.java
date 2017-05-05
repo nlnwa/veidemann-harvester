@@ -16,18 +16,26 @@
 package no.nb.nna.broprox.db;
 
 import java.time.OffsetDateTime;
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 
 import com.google.protobuf.Empty;
 import com.google.protobuf.InvalidProtocolBufferException;
+import com.rethinkdb.RethinkDB;
+import com.rethinkdb.net.Cursor;
 import no.nb.nna.broprox.api.ControllerProto;
+import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListReply;
+import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListRequest;
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;
 import no.nb.nna.broprox.api.ControllerProto.ListRequest;
 import no.nb.nna.broprox.model.ConfigProto;
+import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
 import no.nb.nna.broprox.model.ConfigProto.CrawlEntity;
 import no.nb.nna.broprox.model.ConfigProto.CrawlJob;
+import no.nb.nna.broprox.model.ConfigProto.CrawlScheduleConfig;
 import no.nb.nna.broprox.model.ConfigProto.Label;
 import no.nb.nna.broprox.model.ConfigProto.Meta;
+import no.nb.nna.broprox.model.ConfigProto.Seed;
 import no.nb.nna.broprox.model.MessagesProto.CrawlExecutionStatus;
 import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
 import no.nb.nna.broprox.model.MessagesProto.CrawledContent;
@@ -35,6 +43,7 @@ import no.nb.nna.broprox.model.MessagesProto.ExtractedText;
 import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
 import no.nb.nna.broprox.model.MessagesProto.Screenshot;
 import org.junit.AfterClass;
+import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -64,6 +73,16 @@ public class RethinkDbAdapterIT {
     public static void shutdown() {
         if (db != null) {
             db.close();
+        }
+    }
+
+    @Before
+    public void cleanDb() {
+        RethinkDB r = RethinkDB.r;
+        for (RethinkDbAdapter.TABLES table : RethinkDbAdapter.TABLES.values()) {
+            if (table != RethinkDbAdapter.TABLES.SYSTEM) {
+                db.executeRequest(r.table(table.name).delete());
+            }
         }
     }
 
@@ -152,8 +171,8 @@ public class RethinkDbAdapterIT {
 
         ListRequest request = ListRequest.getDefaultInstance();
         CrawlEntityListReply result = db.listCrawlEntities(request);
-        assertThat(result.getValueCount()).isGreaterThanOrEqualTo(3);
-        assertThat(result.getCount()).isGreaterThanOrEqualTo(3);
+        assertThat(result.getValueCount()).isEqualTo(3);
+        assertThat(result.getCount()).isEqualTo(3);
         assertThat(result.getValueList()).contains(entity1, entity2, entity3);
 
         request = ListRequest.newBuilder().setId(entity1.getId()).build();
@@ -171,13 +190,13 @@ public class RethinkDbAdapterIT {
         request = ListRequest.newBuilder().setPageSize(2).build();
         result = db.listCrawlEntities(request);
         assertThat(result.getValueCount()).isEqualTo(2);
-        assertThat(result.getCount()).isGreaterThanOrEqualTo(3);
+        assertThat(result.getCount()).isEqualTo(3);
         assertThat(result.getValueList()).contains(entity3, entity1);
 
         request = ListRequest.newBuilder().setPageSize(2).setPage(1).build();
         result = db.listCrawlEntities(request);
         assertThat(result.getValueCount()).isEqualTo(1);
-        assertThat(result.getCount()).isGreaterThanOrEqualTo(3);
+        assertThat(result.getCount()).isEqualTo(3);
         assertThat(result.getValueList()).contains(entity2);
     }
 
@@ -216,13 +235,13 @@ public class RethinkDbAdapterIT {
         entity2 = db.saveCrawlEntity(entity2);
 
         CrawlEntityListReply result = db.listCrawlEntities(ListRequest.getDefaultInstance());
-        assertThat(result.getValueCount()).isGreaterThanOrEqualTo(2);
+        assertThat(result.getValueCount()).isEqualTo(2);
         assertThat(result.getValueList()).contains(entity1, entity2);
 
         db.deleteCrawlEntity(entity2);
 
         result = db.listCrawlEntities(ListRequest.getDefaultInstance());
-        assertThat(result.getValueCount()).isGreaterThanOrEqualTo(1);
+        assertThat(result.getValueCount()).isEqualTo(1);
         assertThat(result.getValueList()).contains(entity1);
         assertThat(result.getValueList()).doesNotContain(entity2);
     }
@@ -313,16 +332,13 @@ public class RethinkDbAdapterIT {
      * Test of addCrawlLog method, of class RethinkDbAdapter.
      */
     @Test
-    @Ignore
     public void testAddCrawlLog() {
-        System.out.println("addCrawlLog");
-        CrawlLog cl = null;
-        RethinkDbAdapter instance = null;
-        CrawlLog expResult = null;
-        CrawlLog result = instance.addCrawlLog(cl);
-//        assertEquals(expResult, result);
-        // TODO review the generated test code and remove the default call to fail.
-        fail("The test case is a prototype.");
+        CrawlLog cl = CrawlLog.newBuilder()
+                .setContentType("text/plain")
+                .build();
+        CrawlLog result = db.addCrawlLog(cl);
+        assertThat(result.getContentType()).isEqualTo("text/plain");
+        assertThat(result.getWarcId()).isNotEmpty();
     }
 
     /**
@@ -345,32 +361,59 @@ public class RethinkDbAdapterIT {
      * Test of saveBrowserScript method, of class RethinkDbAdapter.
      */
     @Test
-    @Ignore
     public void testSaveBrowserScript() {
-        System.out.println("saveBrowserScript");
-        ConfigProto.BrowserScript script = null;
-        RethinkDbAdapter instance = null;
-        ConfigProto.BrowserScript expResult = null;
-        ConfigProto.BrowserScript result = instance.saveBrowserScript(script);
-//        assertEquals(expResult, result);
-        // TODO review the generated test code and remove the default call to fail.
-        fail("The test case is a prototype.");
+        BrowserScript script = BrowserScript.newBuilder()
+                .setMeta(Meta.newBuilder().setName("test.js"))
+                .setScript("code")
+                .setType(BrowserScript.Type.LOGIN)
+                .build();
+
+        BrowserScript result = db.saveBrowserScript(script);
+        assertThat(result.getId()).isNotEmpty();
+        assertThat(result.getScript()).isEqualTo("code");
+        assertThat(result.getType()).isSameAs(BrowserScript.Type.LOGIN);
     }
 
     /**
      * Test of getBrowserScripts method, of class RethinkDbAdapter.
      */
     @Test
-    @Ignore
-    public void testGetBrowserScripts() {
-        System.out.println("getBrowserScripts");
-        ConfigProto.BrowserScript.Type type = null;
-        RethinkDbAdapter instance = null;
-        List<ConfigProto.BrowserScript> expResult = null;
-        List<ConfigProto.BrowserScript> result = instance.getBrowserScripts(type);
-//        assertEquals(expResult, result);
-        // TODO review the generated test code and remove the default call to fail.
-        fail("The test case is a prototype.");
+    public void testListBrowserScripts() {
+        BrowserScript script1 = BrowserScript.newBuilder()
+                .setMeta(Meta.newBuilder().setName("test.js"))
+                .setScript("code")
+                .setType(BrowserScript.Type.LOGIN)
+                .build();
+        BrowserScript script2 = BrowserScript.newBuilder()
+                .setMeta(Meta.newBuilder().setName("extract-outlinks.js"))
+                .setScript("code")
+                .setType(BrowserScript.Type.EXTRACT_OUTLINKS)
+                .build();
+        script1 = db.saveBrowserScript(script1);
+        script2 = db.saveBrowserScript(script2);
+
+        BrowserScriptListRequest request = BrowserScriptListRequest.getDefaultInstance();
+        BrowserScriptListReply result = db.listBrowserScripts(request);
+        assertThat(result.getValueCount()).isEqualTo(2);
+        assertThat(result.getCount()).isEqualTo(2);
+        assertThat(result.getValueList()).containsExactly(script2, script1);
+
+        request = BrowserScriptListRequest.newBuilder().setType(BrowserScript.Type.EXTRACT_OUTLINKS).build();
+        result = db.listBrowserScripts(request);
+        assertThat(result.getValueCount()).isEqualTo(1);
+        assertThat(result.getCount()).isEqualTo(1);
+        assertThat(result.getValueList()).containsExactly(script2);
+
+        request = BrowserScriptListRequest.newBuilder().setType(BrowserScript.Type.BEHAVIOR).build();
+        result = db.listBrowserScripts(request);
+        assertThat(result.getValueCount()).isEqualTo(0);
+        assertThat(result.getCount()).isEqualTo(0);
+
+        request = BrowserScriptListRequest.newBuilder().setNamePrefix("extr").build();
+        result = db.listBrowserScripts(request);
+        assertThat(result.getValueCount()).isEqualTo(1);
+        assertThat(result.getCount()).isEqualTo(1);
+        assertThat(result.getValueList()).containsExactly(script2);
     }
 
     /**
@@ -523,37 +566,95 @@ public class RethinkDbAdapterIT {
     @Test
     public void testSaveCrawlJob() {
         CrawlJob crawlJob = CrawlJob.newBuilder()
+                .setMeta(Meta.newBuilder().setName("Test job"))
                 .setSchedule(ConfigProto.CrawlScheduleConfig.newBuilder()
-                        .setCronExpression("* * * * *"))
+                        .setCronExpression("* * * * *")
+                        .setMeta(Meta.newBuilder().setName("Every minute")))
+                .setCrawlConfig(ConfigProto.CrawlConfig.newBuilder()
+                        .setMeta(Meta.newBuilder().setName("Test crawl config"))
+                        .setBrowserConfig(ConfigProto.BrowserConfig.newBuilder()
+                                .setMeta(Meta.newBuilder().setName("Test browser config"))
+                                .setWindowWidth(100))
+                        .setPoliteness(ConfigProto.PolitenessConfig.newBuilder()
+                                .setMeta(Meta.newBuilder().setName("Test politeness config"))
+                                .setMinTimeBetweenPageLoadMs(500)))
                 .build();
 
-        try {
-            CrawlJob result = db.saveCrawlJob(crawlJob);
-            System.out.println("CRAWL JOB: " + result);
-            System.out.println("SCHEDULE: " + db.listCrawlJobs(ListRequest.newBuilder().setId(result.getId()).build()));
-        } catch (Throwable t) {
-            t.printStackTrace();
-        }
-//        ConfigProto.CrawlJob expResult = null;
-//        assertEquals(expResult, result);
-        // TODO review the generated test code and remove the default call to fail.
-        fail("The test case is a prototype.");
+        CrawlJob result = db.saveCrawlJob(crawlJob);
+        assertThat(result.getId()).isNotEmpty();
+
+        assertThat(db.listCrawlJobs(ListRequest.getDefaultInstance()))
+                .satisfies(r -> {
+                    assertThat(r.getCount()).isEqualTo(1);
+                    assertThat(r.getValue(0).getMeta().getName()).isEqualTo("Test job");
+                });
+
+        assertThat(db.listCrawlScheduleConfigs(ListRequest.getDefaultInstance()))
+                .satisfies(r -> {
+                    assertThat(r.getCount()).isEqualTo(1);
+                    assertThat(r.getValue(0).getId()).isEqualTo(result.getScheduleId());
+                    assertThat(r.getValue(0).getMeta().getName()).isEqualTo("Every minute");
+                    assertThat(r.getValue(0).getCronExpression()).isEqualTo("* * * * *");
+                });
+
+        Map<String, String> id = new HashMap<>();
+        assertThat(db.listCrawlConfigs(ListRequest.getDefaultInstance()))
+                .satisfies(r -> {
+                    assertThat(r.getCount()).isEqualTo(1);
+                    assertThat(r.getValue(0).getId()).isEqualTo(result.getCrawlConfigId());
+                    assertThat(r.getValue(0).getMeta().getName()).isEqualTo("Test crawl config");
+                    id.put("browserConfig", r.getValue(0).getBrowserConfigId());
+                    id.put("politenessConfig", r.getValue(0).getPolitenessId());
+                });
+
+        assertThat(db.listBrowserConfigs(ListRequest.getDefaultInstance()))
+                .satisfies(r -> {
+                    assertThat(r.getCount()).isEqualTo(1);
+                    assertThat(r.getValue(0).getId()).isEqualTo(id.get("browserConfig"));
+                    assertThat(r.getValue(0).getWindowWidth()).isEqualTo(100);
+                    assertThat(r.getValue(0).getMeta().getName()).isEqualTo("Test browser config");
+                });
+
+        assertThat(db.listPolitenessConfigs(ListRequest.getDefaultInstance()))
+                .satisfies(r -> {
+                    assertThat(r.getCount()).isEqualTo(1);
+                    assertThat(r.getValue(0).getId()).isEqualTo(id.get("politenessConfig"));
+                    assertThat(r.getValue(0).getMinTimeBetweenPageLoadMs()).isEqualTo(500);
+                    assertThat(r.getValue(0).getMeta().getName()).isEqualTo("Test politeness config");
+                });
     }
 
     /**
      * Test of deleteCrawlJob method, of class RethinkDbAdapter.
      */
     @Test
-    @Ignore
     public void testDeleteCrawlJob() {
-        System.out.println("deleteCrawlJob");
-        ConfigProto.CrawlJob crawlJob = null;
-        RethinkDbAdapter instance = null;
-        Empty expResult = null;
-        Empty result = instance.deleteCrawlJob(crawlJob);
-//        assertEquals(expResult, result);
-        // TODO review the generated test code and remove the default call to fail.
-        fail("The test case is a prototype.");
+        CrawlJob crawlJob = CrawlJob.newBuilder()
+                .setMeta(Meta.newBuilder().setName("Test job"))
+                .build();
+
+        CrawlJob result = db.saveCrawlJob(crawlJob);
+        assertThat(db.listCrawlJobs(ListRequest.getDefaultInstance()).getCount()).isEqualTo(1);
+        db.deleteCrawlJob(crawlJob);
+        assertThat(db.listCrawlJobs(ListRequest.getDefaultInstance()).getCount()).isEqualTo(1);
+        db.deleteCrawlJob(result);
+        assertThat(db.listCrawlJobs(ListRequest.getDefaultInstance()).getCount()).isEqualTo(0);
+
+
+        CrawlJob toBeDeleted = db.saveCrawlJob(crawlJob);
+        Seed seed = Seed.newBuilder()
+                .setMeta(Meta.newBuilder().setName("Test seed"))
+                .addJobId(toBeDeleted.getId())
+                .build();
+
+        seed = db.saveSeed(seed);
+
+        assertThatThrownBy(() -> db.deleteCrawlJob(toBeDeleted))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Can't delete CrawlJob, there are 1 Seed(s) referring it");
+
+        db.deleteSeed(seed);
+        db.deleteCrawlJob(toBeDeleted);
     }
 
     /**
@@ -640,16 +741,36 @@ public class RethinkDbAdapterIT {
      * Test of deleteCrawlScheduleConfig method, of class RethinkDbAdapter.
      */
     @Test
-    @Ignore
     public void testDeleteCrawlScheduleConfig() {
-        System.out.println("deleteCrawlScheduleConfig");
-        ConfigProto.CrawlScheduleConfig crawlScheduleConfig = null;
-        RethinkDbAdapter instance = null;
-        Empty expResult = null;
-        Empty result = instance.deleteCrawlScheduleConfig(crawlScheduleConfig);
-//        assertEquals(expResult, result);
-        // TODO review the generated test code and remove the default call to fail.
-        fail("The test case is a prototype.");
+        CrawlScheduleConfig scheduleConfig = CrawlScheduleConfig.newBuilder()
+                .setCronExpression("* * * * *")
+                .setMeta(Meta.newBuilder().setName("Every minute"))
+                .build();
+
+        CrawlScheduleConfig result = db.saveCrawlScheduleConfig(scheduleConfig);
+        assertThat(db.listCrawlScheduleConfigs(ListRequest.getDefaultInstance()).getCount()).isEqualTo(1);
+        db.deleteCrawlScheduleConfig(scheduleConfig);
+        assertThat(db.listCrawlScheduleConfigs(ListRequest.getDefaultInstance()).getCount()).isEqualTo(1);
+        db.deleteCrawlScheduleConfig(result);
+        assertThat(db.listCrawlScheduleConfigs(ListRequest.getDefaultInstance()).getCount()).isEqualTo(0);
+
+        CrawlJob crawlJob = CrawlJob.newBuilder()
+                .setMeta(Meta.newBuilder().setName("Test job"))
+                .setSchedule(ConfigProto.CrawlScheduleConfig.newBuilder()
+                        .setCronExpression("* * * * *")
+                        .setMeta(Meta.newBuilder().setName("Every minute")))
+                .build();
+
+        crawlJob = db.saveCrawlJob(crawlJob);
+        assertThat(db.listCrawlScheduleConfigs(ListRequest.getDefaultInstance()).getCount()).isEqualTo(1);
+
+        CrawlScheduleConfig toBeDeleted = CrawlScheduleConfig.newBuilder().setId(crawlJob.getScheduleId()).build();
+        assertThatThrownBy(() -> db.deleteCrawlScheduleConfig(toBeDeleted))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Can't delete CrawlScheduleConfig, there are 1 CrawlJob(s) referring it");
+
+        db.deleteCrawlJob(crawlJob);
+        db.deleteCrawlScheduleConfig(toBeDeleted);
     }
 
 }

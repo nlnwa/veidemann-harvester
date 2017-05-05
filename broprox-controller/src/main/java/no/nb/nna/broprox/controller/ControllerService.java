@@ -269,9 +269,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     @Override
     public void listBrowserScripts(BrowserScriptListRequest request, StreamObserver<BrowserScriptListReply> respObserver) {
         try {
-            BrowserScriptListReply.Builder builder = BrowserScriptListReply.newBuilder();
-            db.getBrowserScripts(request.getType()).forEach(bs -> builder.addValue(bs));
-            respObserver.onNext(builder.build());
+            respObserver.onNext(db.listBrowserScripts(request));
             respObserver.onCompleted();
         } catch (Exception e) {
             respObserver.onError(e);

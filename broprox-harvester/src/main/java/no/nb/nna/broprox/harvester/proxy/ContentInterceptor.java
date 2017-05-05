@@ -151,35 +151,36 @@ public class ContentInterceptor {
         return headerSize;
     }
 
-    public void writeData(CrawlLog.Builder logEntry) {
+    public void writeData(CrawlLog.Builder logEntryBuilder) {
         String payloadDigestString = getPayloadDigest();
-        logEntry.setFetchTimeMillis(Duration.between(ProtoUtils.tsToOdt(
-                logEntry.getFetchTimeStamp()), OffsetDateTime.now(ZoneOffset.UTC)).toMillis());
+        logEntryBuilder.setFetchTimeMillis(Duration.between(ProtoUtils.tsToOdt(
+                logEntryBuilder.getFetchTimeStamp()), OffsetDateTime.now(ZoneOffset.UTC)).toMillis());
 
         Optional<CrawledContent> isDuplicate = db.isDuplicateContent(payloadDigestString);
 
+        CrawlLog logEntry;
         if (isDuplicate.isPresent()) {
-            logEntry.setRecordType("revisit")
+            logEntryBuilder.setRecordType("revisit")
                     .setBlockDigest(getHeaderDigest())
                     .setSize(headerSize)
                     .setWarcRefersTo(isDuplicate.get().getWarcId());
 
-            CrawlLog crawlLog = db.addCrawlLog(logEntry.build());
+            logEntry = db.addCrawlLog(logEntryBuilder.build());
             if (LOG.isDebugEnabled()) {
-                LOG.debug("Writing {} as a revisit of {}", logEntry.getRequestedUri(), logEntry.getWarcRefersTo());
+                LOG.debug("Writing {} as a revisit of {}", logEntryBuilder.getRequestedUri(), logEntryBuilder.getWarcRefersTo());
             }
-            contentWriterClient.writeRecord(crawlLog, headerBuf, null);
+            contentWriterClient.writeRecord(logEntry, headerBuf, null);
         } else {
-            logEntry.setRecordType("response")
+            logEntryBuilder.setRecordType("response")
                     .setBlockDigest(getBlockDigest())
                     .setPayloadDigest(payloadDigestString)
                     .setSize(headerSize + 2 + payloadSize);
 
-            CrawlLog crawlLog = db.addCrawlLog(logEntry.build());
+            logEntry = db.addCrawlLog(logEntryBuilder.build());
             if (LOG.isDebugEnabled()) {
-                LOG.debug("Writing {}", logEntry.getRequestedUri());
+                LOG.debug("Writing {}", logEntryBuilder.getRequestedUri());
             }
-            contentWriterClient.writeRecord(crawlLog, headerBuf, payloadBuf);
+            contentWriterClient.writeRecord(logEntry, headerBuf, payloadBuf);
         }
 
 //        headerBuf.release();

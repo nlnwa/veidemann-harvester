@@ -21,6 +21,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 
 import io.opentracing.tag.Tags;
+import no.nb.nna.broprox.api.ControllerProto;
 import no.nb.nna.broprox.chrome.client.ChromeDebugProtocol;
 import no.nb.nna.broprox.chrome.client.Session;
 import no.nb.nna.broprox.chrome.client.ws.CompleteMany;
@@ -106,7 +107,11 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
 //                    }
 //                }
 //                System.out.println("<<<<<<");
-            String script = db.getBrowserScripts(BrowserScript.Type.EXTRACT_OUTLINKS).get(0).getScript();
+
+            ControllerProto.BrowserScriptListRequest req = ControllerProto.BrowserScriptListRequest.newBuilder()
+                    .setType(BrowserScript.Type.EXTRACT_OUTLINKS)
+                    .build();
+            String script = db.listBrowserScripts(req).getValue(0).getScript();
             List<QueuedUri> outlinks = otw.map("extractOutlinks", pex::extractOutlinks, script);
             pex.getDocumentUrl();
             pex.scrollToTop();

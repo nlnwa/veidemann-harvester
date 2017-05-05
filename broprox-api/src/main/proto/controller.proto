@@ -47,6 +47,7 @@ service Controller {
 
     rpc ListBrowserScripts (BrowserScriptListRequest) returns (BrowserScriptListReply) {}
     rpc SaveBrowserScript (BrowserScript) returns (BrowserScript) {}
+    rpc DeleteBrowserScript (BrowserScript) returns (google.protobuf.Empty) {}
 }
 
 // Specification of wich entities to get.
@@ -111,7 +112,13 @@ message BrowserConfigListReply {
 
 // Specification of wich browserscripts to get.
 message BrowserScriptListRequest {
-    BrowserScript.Type type = 1;
+    oneof qry {
+        string id = 1;
+        string name_prefix = 2;
+        BrowserScript.Type type = 3;
+    }
+    int32 page_size = 14;
+    int32 page = 15;
 }
 
 // A list of browserscripts

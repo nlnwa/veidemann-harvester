@@ -1,4 +1,5 @@
-name: "extract-outlinks.js"
+meta:
+    name: "extract-outlinks.js"
 type: "EXTRACT_OUTLINKS"
 script: |
     var __brzl_framesDone = new Set();

@@ -16,6 +16,7 @@
 package no.nb.nna.broprox.db;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -27,12 +28,15 @@ import com.google.protobuf.Message;
 import com.rethinkdb.RethinkDB;
 import com.rethinkdb.gen.ast.Insert;
 import com.rethinkdb.gen.ast.ReqlExpr;
+import com.rethinkdb.gen.ast.ReqlFunction1;
 import com.rethinkdb.gen.ast.Table;
 import com.rethinkdb.gen.exc.ReqlError;
 import com.rethinkdb.net.Connection;
 import com.rethinkdb.net.Cursor;
 import io.opentracing.tag.Tags;
 import no.nb.nna.broprox.api.ControllerProto.BrowserConfigListReply;
+import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListReply;
+import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListRequest;
 import no.nb.nna.broprox.api.ControllerProto.CrawlConfigListReply;
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;
 import no.nb.nna.broprox.api.ControllerProto.CrawlJobListReply;
@@ -191,33 +195,18 @@ public class RethinkDbAdapter implements DbAdapter {
 
     @Override
     public BrowserScript saveBrowserScript(BrowserScript script) {
-        Map rMap = ProtoUtils.protoToRethink(script);
-
-        Map<String, Object> response = otw.map("db-saveBrowserScript",
-                this::executeRequest, r.table(TABLES.BROWSER_SCRIPTS.name)
-                        .insert(rMap)
-                        .optArg("conflict", "replace"));
-
-        String key = ((List<String>) response.get("generated_keys")).get(0);
-        script = script.toBuilder().setId(key).build();
-
-        return script;
+        return saveConfigMessage(script, TABLES.BROWSER_SCRIPTS);
     }
 
     @Override
-    public List<BrowserScript> getBrowserScripts(BrowserScript.Type type) {
-        try (Cursor<Map<String, Object>> cursor = otw.map("db-getBrowserScripts",
-                this::executeRequest, r.table(TABLES.BROWSER_SCRIPTS.name)
-                        .filter(r.hashMap("type", type.name())));) {
+    public Empty deleteBrowserScript(BrowserScript script) {
+        checkDependencies(script, TABLES.BROWSER_CONFIGS, BrowserConfig.getDefaultInstance(), "script_id");
+        return deleteConfigMessage(script, TABLES.BROWSER_SCRIPTS);
+    }
 
-            List<BrowserScript> result = new ArrayList<>();
-
-            for (Map<String, Object> m : cursor) {
-                result.add(ProtoUtils.rethinkToProto(m, BrowserScript.class));
-            }
-
-            return result;
-        }
+    @Override
+    public BrowserScriptListReply listBrowserScripts(BrowserScriptListRequest request) {
+        return listConfigMessages(request, BrowserScriptListReply.newBuilder(), TABLES.BROWSER_SCRIPTS).build();
     }
 
     @Override
@@ -293,17 +282,18 @@ public class RethinkDbAdapter implements DbAdapter {
 
     @Override
     public Empty deleteCrawlEntity(CrawlEntity entity) {
+        checkDependencies(entity, TABLES.SEEDS, Seed.getDefaultInstance(), "entity_id");
         return deleteConfigMessage(entity, TABLES.CRAWL_ENTITIES);
     }
 
     @Override
     public CrawlEntityListReply listCrawlEntities(ListRequest request) {
-        return listConfigMessages(request, CrawlEntityListReply.newBuilder(), TABLES.CRAWL_ENTITIES);
+        return listConfigMessages(request, CrawlEntityListReply.newBuilder(), TABLES.CRAWL_ENTITIES).build();
     }
 
     @Override
     public SeedListReply listSeeds(ListRequest request) {
-        return listConfigMessages(request, SeedListReply.newBuilder(), TABLES.SEEDS);
+        return listConfigMessages(request, SeedListReply.newBuilder(), TABLES.SEEDS).build();
     }
 
     @Override
@@ -318,7 +308,7 @@ public class RethinkDbAdapter implements DbAdapter {
 
     @Override
     public CrawlJobListReply listCrawlJobs(ListRequest request) {
-        return listConfigMessages(request, CrawlJobListReply.newBuilder(), TABLES.CRAWL_JOBS);
+        return listConfigMessages(request, CrawlJobListReply.newBuilder(), TABLES.CRAWL_JOBS).build();
     }
 
     @Override
@@ -341,24 +331,25 @@ public class RethinkDbAdapter implements DbAdapter {
 
     @Override
     public Empty deleteCrawlJob(CrawlJob crawlJob) {
+        checkDependencies(crawlJob, TABLES.SEEDS, Seed.getDefaultInstance(), "job_id");
         return deleteConfigMessage(crawlJob, TABLES.CRAWL_JOBS);
     }
 
     @Override
     public CrawlConfigListReply listCrawlConfigs(ListRequest request) {
-        return listConfigMessages(request, CrawlConfigListReply.newBuilder(), TABLES.CRAWL_CONFIGS);
+        return listConfigMessages(request, CrawlConfigListReply.newBuilder(), TABLES.CRAWL_CONFIGS).build();
     }
 
     @Override
     public CrawlConfig saveCrawlConfig(CrawlConfig crawlConfig) {
         CrawlConfig.Builder builder = crawlConfig.toBuilder();
 
-        if (crawlConfig.getBrowserConfigOrIdCase()== CrawlConfig.BrowserConfigOrIdCase.BROWSER_CONFIG) {
+        if (crawlConfig.getBrowserConfigOrIdCase() == CrawlConfig.BrowserConfigOrIdCase.BROWSER_CONFIG) {
             BrowserConfig browserConfig = crawlConfig.getBrowserConfig();
             browserConfig = saveBrowserConfig(browserConfig);
             builder.setBrowserConfigId(browserConfig.getId());
         }
-        if (crawlConfig.getPolitenessOrIdCase()== CrawlConfig.PolitenessOrIdCase.POLITENESS) {
+        if (crawlConfig.getPolitenessOrIdCase() == CrawlConfig.PolitenessOrIdCase.POLITENESS) {
             PolitenessConfig politenessConfig = crawlConfig.getPoliteness();
             politenessConfig = savePolitenessConfig(politenessConfig);
             builder.setPolitenessId(politenessConfig.getId());
@@ -369,12 +360,14 @@ public class RethinkDbAdapter implements DbAdapter {
 
     @Override
     public Empty deleteCrawlConfig(CrawlConfig crawlConfig) {
+        checkDependencies(crawlConfig, TABLES.CRAWL_JOBS, CrawlJob.getDefaultInstance(), "crawl_config_id");
         return deleteConfigMessage(crawlConfig, TABLES.CRAWL_CONFIGS);
     }
 
     @Override
     public CrawlScheduleConfigListReply listCrawlScheduleConfigs(ListRequest request) {
-        return listConfigMessages(request, CrawlScheduleConfigListReply.newBuilder(), TABLES.CRAWL_SCHEDULE_CONFIGS);
+        return listConfigMessages(request, CrawlScheduleConfigListReply.newBuilder(), TABLES.CRAWL_SCHEDULE_CONFIGS)
+                .build();
     }
 
     @Override
@@ -384,12 +377,13 @@ public class RethinkDbAdapter implements DbAdapter {
 
     @Override
     public Empty deleteCrawlScheduleConfig(CrawlScheduleConfig crawlScheduleConfig) {
+        checkDependencies(crawlScheduleConfig, TABLES.CRAWL_JOBS, CrawlJob.getDefaultInstance(), "schedule_id");
         return deleteConfigMessage(crawlScheduleConfig, TABLES.CRAWL_SCHEDULE_CONFIGS);
     }
 
     @Override
     public PolitenessConfigListReply listPolitenessConfigs(ListRequest request) {
-        return listConfigMessages(request, PolitenessConfigListReply.newBuilder(), TABLES.POLITENESS_CONFIGS);
+        return listConfigMessages(request, PolitenessConfigListReply.newBuilder(), TABLES.POLITENESS_CONFIGS).build();
     }
 
     @Override
@@ -399,12 +393,13 @@ public class RethinkDbAdapter implements DbAdapter {
 
     @Override
     public Empty deletePolitenessConfig(PolitenessConfig politenessConfig) {
+        checkDependencies(politenessConfig, TABLES.CRAWL_CONFIGS, CrawlConfig.getDefaultInstance(), "politeness_id");
         return deleteConfigMessage(politenessConfig, TABLES.POLITENESS_CONFIGS);
     }
 
     @Override
     public BrowserConfigListReply listBrowserConfigs(ListRequest request) {
-        return listConfigMessages(request, BrowserConfigListReply.newBuilder(), TABLES.BROWSER_CONFIGS);
+        return listConfigMessages(request, BrowserConfigListReply.newBuilder(), TABLES.BROWSER_CONFIGS).build();
     }
 
     @Override
@@ -414,11 +409,18 @@ public class RethinkDbAdapter implements DbAdapter {
 
     @Override
     public Empty deleteBrowserConfig(BrowserConfig browserConfig) {
+        checkDependencies(browserConfig, TABLES.CRAWL_CONFIGS, CrawlConfig.getDefaultInstance(), "browser_config_id");
         return deleteConfigMessage(browserConfig, TABLES.BROWSER_CONFIGS);
     }
 
     public <T extends Message> T saveConfigMessage(T msg, TABLES table) {
         Map rMap = ProtoUtils.protoToRethink(msg);
+
+        // Check that name is set if this is a new object
+        if (!rMap.containsKey("id") && (!rMap.containsKey("meta") || !((Map) rMap.get("meta")).containsKey("name"))) {
+            throw new IllegalArgumentException("Trying to store a new " + msg.getClass().getSimpleName()
+                    + " object, but meta.name is not set.");
+        }
 
         rMap.put("meta", updateMeta((Map) rMap.get("meta"), null));
 
@@ -441,28 +443,14 @@ public class RethinkDbAdapter implements DbAdapter {
         return Empty.getDefaultInstance();
     }
 
-    public <T extends Message> T listConfigMessages(ListRequest request, T.Builder resultBuilder, TABLES table) {
-        ReqlExpr qry = r.table(table.name);
-        long count = 1;
-        switch (request.getQryCase()) {
-            case ID:
-                qry = ((Table) qry).get(request.getId());
-                break;
-            case NAME_PREFIX:
-                String prefix = request.getNamePrefix().toLowerCase();
-                qry = qry.between(prefix, prefix + Character.toString(Character.MAX_VALUE)).optArg("index", "name");
-                break;
-        }
+    public <T extends Message.Builder> T listConfigMessages(Message request, T resultBuilder, TABLES table,
+            ReqlFunction1... filter) {
 
-        if (request.getQryCase() != ListRequest.QryCase.ID) {
-            count = otw.map("db-countConfigObjects",
-                    this::executeRequest, qry.count());
+        ConfigMessageQuery cmq = createConfigMessageQuery(request, table, filter);
+        long count = countConfigMessages(cmq);
 
-            qry = qry.orderBy().optArg("index", "name");
-            if (request.getPageSize() > 0) {
-                qry = qry.skip(request.getPage() * request.getPageSize()).limit(request.getPageSize());
-            }
-        }
+        Object res = otw.map("db-listConfigObjects",
+                this::executeRequest, cmq.listQry);
 
         Descriptors.Descriptor resDescr = resultBuilder.getDescriptorForType();
         Descriptors.FieldDescriptor pageSizeField = resDescr.findFieldByName("page_size");
@@ -470,12 +458,11 @@ public class RethinkDbAdapter implements DbAdapter {
         Descriptors.FieldDescriptor countField = resDescr.findFieldByName("count");
         Descriptors.FieldDescriptor valueField = resDescr.findFieldByName("value");
 
-        Object res = otw.map("db-listConfigObjects",
-                this::executeRequest, qry);
         resultBuilder
-                .setField(pageSizeField, request.getPageSize())
-                .setField(pageField, request.getPage())
+                .setField(pageSizeField, cmq.pageSize)
+                .setField(pageField, cmq.page)
                 .setField(countField, count);
+
         if (res instanceof Cursor) {
             Cursor<Map<String, Object>> cursor = (Cursor) res;
             for (Map<String, Object> entity : cursor) {
@@ -487,7 +474,101 @@ public class RethinkDbAdapter implements DbAdapter {
                     valueField, ProtoUtils.rethinkToProto((Map<String, Object>) res, table.schema.newBuilderForType()));
         }
 
-        return (T) resultBuilder.build();
+        return (T) resultBuilder;
+    }
+
+    private static class ConfigMessageQuery {
+
+        ReqlExpr listQry;
+
+        ReqlExpr countQry;
+
+        int page;
+
+        int pageSize;
+
+        String id;
+
+        List<ReqlFunction1> filters = new ArrayList<>();
+
+    }
+
+    public ConfigMessageQuery createConfigMessageQuery(Message request, TABLES table, ReqlFunction1... filter) {
+        ConfigMessageQuery cmq = new ConfigMessageQuery();
+
+        Arrays.stream(filter).forEach(f -> cmq.filters.add(f));
+
+        ReqlExpr qry = r.table(table.name);
+
+        switch (request.getDescriptorForType().getFullName()) {
+            case "broprox.ListRequest":
+                ListRequest listRequest = (ListRequest) request;
+                cmq.page = listRequest.getPage();
+                cmq.pageSize = listRequest.getPageSize();
+
+                switch (listRequest.getQryCase()) {
+                    case ID:
+                        cmq.id = listRequest.getId();
+                        break;
+                    case NAME_PREFIX:
+                        String prefix = listRequest.getNamePrefix().toLowerCase();
+                        qry = qry.between(prefix, prefix + Character.toString(Character.MAX_VALUE))
+                                .optArg("index", "name");
+                        break;
+                }
+                break;
+
+            case "broprox.BrowserScriptListRequest":
+                BrowserScriptListRequest bslr = (BrowserScriptListRequest) request;
+                cmq.page = bslr.getPage();
+                cmq.pageSize = bslr.getPageSize();
+
+                switch (bslr.getQryCase()) {
+                    case ID:
+                        cmq.id = bslr.getId();
+                        break;
+                    case NAME_PREFIX:
+                        String prefix = bslr.getNamePrefix().toLowerCase();
+                        qry = qry.between(prefix, prefix + Character.toString(Character.MAX_VALUE))
+                                .optArg("index", "name");
+                        break;
+                    case TYPE:
+                        cmq.filters.add(row -> row.g("type").eq(bslr.getType().name()));
+                        break;
+                }
+                break;
+
+            default:
+                throw new IllegalArgumentException("Unknown query message: "
+                        + request.getDescriptorForType().getFullName());
+        }
+
+        if (cmq.id != null) {
+            cmq.listQry = ((Table) qry).get(cmq.id);
+        } else {
+            cmq.countQry = qry;
+            cmq.listQry = qry.orderBy().optArg("index", "name");
+
+            cmq.filters.forEach(f -> {
+                cmq.countQry = cmq.countQry.filter(f);
+                cmq.listQry = cmq.listQry.filter(f);
+            });
+
+            cmq.countQry = cmq.countQry.count();
+
+            if (cmq.pageSize > 0) {
+                cmq.listQry = cmq.listQry.skip(cmq.page * cmq.pageSize).limit(cmq.pageSize);
+            }
+        }
+        return cmq;
+    }
+
+    public long countConfigMessages(ConfigMessageQuery cmq) {
+        if (cmq.id != null) {
+            return 1L;
+        } else {
+            return otw.map("db-countConfigObjects", this::executeRequest, cmq.countQry);
+        }
     }
 
     private Map updateMeta(Map meta, String user) {
@@ -547,6 +628,41 @@ public class RethinkDbAdapter implements DbAdapter {
     @Override
     public void close() {
         conn.close();
+    }
+
+    /**
+     * Check references to Config object.
+     *
+     * @param messageToCheck the config message which other objects might refer.
+     * @param dependentTable the table containing objects which might have a dependency to the object to check.
+     * @param dependentMessage the object type in the table containing objects which might have a dependency to the
+     * object to check.
+     * @param dependentFieldName the field name in the dependent message which might contain reference to the id field
+     * in the object to check.
+     * @throws IllegalStateException if there are dependencies.
+     */
+    private void checkDependencies(Message messageToCheck, TABLES dependentTable,
+            Message dependentMessage, String dependentFieldName) {
+
+        Descriptors.FieldDescriptor messageIdField = messageToCheck.getDescriptorForType().findFieldByName("id");
+        Descriptors.FieldDescriptor dependentField = dependentMessage.getDescriptorForType()
+                .findFieldByName(dependentFieldName);
+
+        ConfigMessageQuery cmq;
+        if (dependentField.isRepeated()) {
+            cmq = createConfigMessageQuery(ListRequest.getDefaultInstance(), dependentTable,
+                    j -> j.g(dependentField.getJsonName()).contains(messageToCheck.getField(messageIdField)));
+        } else {
+            cmq = createConfigMessageQuery(ListRequest.getDefaultInstance(), dependentTable,
+                    j -> j.g(dependentField.getJsonName()).eq(messageToCheck.getField(messageIdField)));
+        }
+
+        long dependencyCount = countConfigMessages(cmq);
+        if (dependencyCount > 0) {
+            throw new IllegalStateException("Can't delete " + messageToCheck.getClass().getSimpleName()
+                    + ", there are " + dependencyCount + " " + dependentMessage.getClass().getSimpleName()
+                    + "(s) referring it");
+        }
     }
 
     private void ensureContainsValue(Message msg, String fieldName) {

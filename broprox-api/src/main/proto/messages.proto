@@ -8,10 +8,6 @@ option java_outer_classname = "MessagesProto";
 import "google/protobuf/timestamp.proto";
 import "config.proto";
 
-// A message containing no data. Useful for rpc methods returning no data
-message Void {
-}
-
 message CrawlExecutionStatus {
     enum State {
         UNDEFINED = 0;

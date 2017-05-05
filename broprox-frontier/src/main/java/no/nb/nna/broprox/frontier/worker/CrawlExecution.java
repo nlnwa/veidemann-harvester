@@ -219,13 +219,13 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker, Delayed {
     boolean shouldInclude(MessagesProto.QueuedUriOrBuilder outlink) {
         RethinkDB r = RethinkDB.r;
         boolean notSeen = frontier.getDb().executeRequest(
-                r.table(RethinkDbAdapter.TABLE_CRAWL_LOG)
+                r.table(RethinkDbAdapter.TABLES.CRAWL_LOG.name)
                         .between(
                                 r.array(outlink.getSurt(), ProtoUtils.tsToOdt(status.getStartTime())),
                                 r.array(outlink.getSurt(), r.maxval()))
                         .optArg("index", "surt_time").filter(row -> row.g("statusCode").lt(500)).limit(1)
                         .union(
-                                r.table(RethinkDbAdapter.TABLE_URI_QUEUE).getAll(outlink.getSurt())
+                                r.table(RethinkDbAdapter.TABLES.URI_QUEUE.name).getAll(outlink.getSurt())
                                         .optArg("index", "surt")
                                         .limit(1)
                         ).isEmpty());

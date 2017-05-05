@@ -34,21 +34,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 
-import static no.nb.nna.broprox.db.RethinkDbAdapter.TABLE_BROWSER_CONFIGS;
-import static no.nb.nna.broprox.db.RethinkDbAdapter.TABLE_BROWSER_SCRIPTS;
-import static no.nb.nna.broprox.db.RethinkDbAdapter.TABLE_CRAWLED_CONTENT;
-import static no.nb.nna.broprox.db.RethinkDbAdapter.TABLE_CRAWL_CONFIGS;
-import static no.nb.nna.broprox.db.RethinkDbAdapter.TABLE_CRAWL_ENTITIES;
-import static no.nb.nna.broprox.db.RethinkDbAdapter.TABLE_CRAWL_JOBS;
-import static no.nb.nna.broprox.db.RethinkDbAdapter.TABLE_CRAWL_LOG;
-import static no.nb.nna.broprox.db.RethinkDbAdapter.TABLE_CRAWL_SCHEDULE_CONFIGS;
-import static no.nb.nna.broprox.db.RethinkDbAdapter.TABLE_EXECUTIONS;
-import static no.nb.nna.broprox.db.RethinkDbAdapter.TABLE_EXTRACTED_TEXT;
-import static no.nb.nna.broprox.db.RethinkDbAdapter.TABLE_POLITENESS_CONFIGS;
-import static no.nb.nna.broprox.db.RethinkDbAdapter.TABLE_SCREENSHOT;
-import static no.nb.nna.broprox.db.RethinkDbAdapter.TABLE_SEEDS;
-import static no.nb.nna.broprox.db.RethinkDbAdapter.TABLE_SYSTEM;
-import static no.nb.nna.broprox.db.RethinkDbAdapter.TABLE_URI_QUEUE;
+import static no.nb.nna.broprox.db.RethinkDbAdapter.TABLES;
 
 /**
  *
@@ -123,58 +109,59 @@ public class DbInitializer {
     private final void createDb() {
         r.dbCreate(SETTINGS.getDbName()).run(conn);
 
-        r.tableCreate(TABLE_SYSTEM).run(conn);
-        r.table(TABLE_SYSTEM).insert(r.hashMap("id", "db_version").with("db_version", "0.1")).run(conn);
+        r.tableCreate(TABLES.SYSTEM.name).run(conn);
+        r.table(TABLES.SYSTEM.name).insert(r.hashMap("id", "db_version").with("db_version", "0.1")).run(conn);
 
-        r.tableCreate(TABLE_CRAWL_LOG).optArg("primary_key", "warcId").run(conn);
-        r.table(TABLE_CRAWL_LOG)
+        r.tableCreate(TABLES.CRAWL_LOG.name).optArg("primary_key", "warcId").run(conn);
+        r.table(TABLES.CRAWL_LOG.name)
                 .indexCreate("surt_time", row -> r.array(row.g("surt"), row.g("timeStamp")))
                 .run(conn);
-        r.table(TABLE_CRAWL_LOG).indexWait("surt_time").run(conn);
 
-        r.tableCreate(TABLE_CRAWLED_CONTENT).optArg("primary_key", "digest").run(conn);
+        r.tableCreate(TABLES.CRAWLED_CONTENT.name).optArg("primary_key", "digest").run(conn);
 
-        r.tableCreate(TABLE_EXTRACTED_TEXT).optArg("primary_key", "warcId").run(conn);
+        r.tableCreate(TABLES.EXTRACTED_TEXT.name).optArg("primary_key", "warcId").run(conn);
 
-        r.tableCreate(TABLE_BROWSER_SCRIPTS).run(conn);
-        createMetaIndexes(TABLE_BROWSER_SCRIPTS);
+        r.tableCreate(TABLES.BROWSER_SCRIPTS.name).run(conn);
+        createMetaIndexes(TABLES.BROWSER_SCRIPTS);
 
-        r.tableCreate(TABLE_URI_QUEUE).run(conn);
-        r.table(TABLE_URI_QUEUE).indexCreate("surt").run(conn);
-        r.table(TABLE_URI_QUEUE).indexCreate("executionIds", uri -> uri.g("executionIds")
+        r.tableCreate(TABLES.URI_QUEUE.name).run(conn);
+        r.table(TABLES.URI_QUEUE.name).indexCreate("surt").run(conn);
+        r.table(TABLES.URI_QUEUE.name).indexCreate("executionIds", uri -> uri.g("executionIds")
                 .map(eid -> r.array(eid.g("id"), eid.g("seq")))
         ).optArg("multi", true).run(conn);
-        r.table(TABLE_URI_QUEUE).indexWait("surt", "executionIds").run(conn);
 
-        r.tableCreate(TABLE_EXECUTIONS).run(conn);
+        r.tableCreate(TABLES.EXECUTIONS.name).run(conn);
 
-        r.tableCreate(TABLE_SCREENSHOT).run(conn);
+        r.tableCreate(TABLES.SCREENSHOT.name).run(conn);
 
-        r.tableCreate(TABLE_CRAWL_ENTITIES).run(conn);
-        createMetaIndexes(TABLE_CRAWL_ENTITIES);
+        r.tableCreate(TABLES.CRAWL_ENTITIES.name).run(conn);
+        createMetaIndexes(TABLES.CRAWL_ENTITIES);
 
-        r.tableCreate(TABLE_SEEDS).run(conn);
-        createMetaIndexes(TABLE_SEEDS);
+        r.tableCreate(TABLES.SEEDS.name).run(conn);
+        createMetaIndexes(TABLES.SEEDS);
 
-        r.tableCreate(TABLE_CRAWL_JOBS).run(conn);
-        createMetaIndexes(TABLE_CRAWL_JOBS);
+        r.tableCreate(TABLES.CRAWL_JOBS.name).run(conn);
+        createMetaIndexes(TABLES.CRAWL_JOBS);
 
-        r.tableCreate(TABLE_CRAWL_CONFIGS).run(conn);
-        createMetaIndexes(TABLE_CRAWL_CONFIGS);
+        r.tableCreate(TABLES.CRAWL_CONFIGS.name).run(conn);
+        createMetaIndexes(TABLES.CRAWL_CONFIGS);
 
-        r.tableCreate(TABLE_CRAWL_SCHEDULE_CONFIGS).run(conn);
-        createMetaIndexes(TABLE_CRAWL_SCHEDULE_CONFIGS);
+        r.tableCreate(TABLES.CRAWL_SCHEDULE_CONFIGS.name).run(conn);
+        createMetaIndexes(TABLES.CRAWL_SCHEDULE_CONFIGS);
 
-        r.tableCreate(TABLE_BROWSER_CONFIGS).run(conn);
-        createMetaIndexes(TABLE_BROWSER_CONFIGS);
+        r.tableCreate(TABLES.BROWSER_CONFIGS.name).run(conn);
+        createMetaIndexes(TABLES.BROWSER_CONFIGS);
 
-        r.tableCreate(TABLE_POLITENESS_CONFIGS).run(conn);
-        createMetaIndexes(TABLE_POLITENESS_CONFIGS);
+        r.tableCreate(TABLES.POLITENESS_CONFIGS.name).run(conn);
+        createMetaIndexes(TABLES.POLITENESS_CONFIGS);
+
+        r.table(TABLES.URI_QUEUE.name).indexWait("surt", "executionIds").run(conn);
+        r.table(TABLES.CRAWL_LOG.name).indexWait("surt_time").run(conn);
     }
 
-    private final void createMetaIndexes(String tableName) {
-        r.table(tableName).indexCreate("name", row -> row.g("meta").g("name").downcase()).run(conn);
-        r.table(tableName).indexWait("name").run(conn);
+    private final void createMetaIndexes(TABLES table) {
+        r.table(table.name).indexCreate("name", row -> row.g("meta").g("name").downcase()).run(conn);
+        r.table(table.name).indexWait("name").run(conn);
     }
 
     private final void populateDb() {

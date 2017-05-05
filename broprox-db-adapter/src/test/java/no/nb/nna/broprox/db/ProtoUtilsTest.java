@@ -42,7 +42,7 @@ public class ProtoUtilsTest {
     @Test
     public void testProtoToRethink() {
         CrawlEntityListReply msg = CrawlEntityListReply.newBuilder()
-                .addEntity(CrawlEntity.newBuilder()
+                .addValue(CrawlEntity.newBuilder()
                         .setId("UUID")
                         .setMeta(ConfigProto.Meta.newBuilder()
                                 .setName("Nasjonalbiblioteket")
@@ -63,7 +63,7 @@ public class ProtoUtilsTest {
                                 r.hashMap("key", "frequency").with("value", "Daily"),
                                 r.hashMap("key", "orgType").with("value", "Government")))
                 );
-        Map crawlEntityList = r.hashMap("entity", r.array(crawlEntity));
+        Map crawlEntityList = r.hashMap("value", r.array(crawlEntity));
 
         Map<String, Object> result = ProtoUtils.protoToRethink(msg);
 
@@ -76,7 +76,7 @@ public class ProtoUtilsTest {
     @Test
     public void testRethinkToProto_Map_Class() {
         CrawlEntityListReply expResult = CrawlEntityListReply.newBuilder()
-                .addEntity(CrawlEntity.newBuilder()
+                .addValue(CrawlEntity.newBuilder()
                         .setId("UUID")
                         .setMeta(ConfigProto.Meta.newBuilder()
                                 .setName("Nasjonalbiblioteket")
@@ -97,7 +97,7 @@ public class ProtoUtilsTest {
                                 r.hashMap("key", "frequency").with("value", "Daily"),
                                 r.hashMap("key", "orgType").with("value", "Government")))
                 );
-        Map crawlEntityList = r.hashMap("entity", r.array(crawlEntity));
+        Map crawlEntityList = r.hashMap("value", r.array(crawlEntity));
 
         CrawlEntityListReply result = ProtoUtils.rethinkToProto(crawlEntityList, CrawlEntityListReply.class);
 
@@ -110,7 +110,7 @@ public class ProtoUtilsTest {
     @Test
     public void testRethinkToProto_Map_MessageBuilder() {
         CrawlEntityListReply expResult = CrawlEntityListReply.newBuilder()
-                .addEntity(CrawlEntity.newBuilder()
+                .addValue(CrawlEntity.newBuilder()
                         .setId("UUID")
                         .setMeta(ConfigProto.Meta.newBuilder()
                                 .setName("Nasjonalbiblioteket")
@@ -131,7 +131,7 @@ public class ProtoUtilsTest {
                                 r.hashMap("key", "frequency").with("value", "Daily"),
                                 r.hashMap("key", "orgType").with("value", "Government")))
                 );
-        Map crawlEntityList = r.hashMap("entity", r.array(crawlEntity));
+        Map crawlEntityList = r.hashMap("value", r.array(crawlEntity));
 
         Message result = ProtoUtils.rethinkToProto(crawlEntityList, CrawlEntityListReply.newBuilder());
 

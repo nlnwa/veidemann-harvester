@@ -20,14 +20,13 @@ import java.time.OffsetDateTime;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import com.google.protobuf.util.Timestamps;
 import io.grpc.ManagedChannel;
 import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
 import io.grpc.stub.StreamObserver;
 import no.nb.nna.broprox.api.ControllerGrpc;
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;
-import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListRequest;
+import no.nb.nna.broprox.api.ControllerProto.ListRequest;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.model.ConfigProto;
@@ -135,7 +134,7 @@ public class ControllerApiServerTest {
         DbAdapter dbMock = mock(DbAdapter.class);
         inProcessServer = new ControllerApiServer(inProcessServerBuilder, dbMock).start();
 
-        CrawlEntityListRequest request = CrawlEntityListRequest.newBuilder().build();
+        ListRequest request = ListRequest.newBuilder().build();
         CrawlEntityListReply reply = CrawlEntityListReply.newBuilder().build();
 
         when(dbMock.listCrawlEntities(request)).thenReturn(reply);

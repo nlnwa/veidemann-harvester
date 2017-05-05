@@ -6,21 +6,41 @@ option java_package = "no.nb.nna.broprox.api";
 option java_outer_classname = "ControllerProto";
 
 import "config.proto";
-import "messages.proto";
+import "google/protobuf/empty.proto";
 
 // Service for communicating with controller.
 service Controller {
     // List a set of entities
-    rpc ListCrawlEntities (CrawlEntityListRequest) returns (CrawlEntityListReply) {}
+    rpc ListCrawlEntities (ListRequest) returns (CrawlEntityListReply) {}
     rpc SaveEntity (CrawlEntity) returns (CrawlEntity) {}
-    rpc DeleteEntity (CrawlEntity) returns (Void) {}
+    rpc DeleteEntity (CrawlEntity) returns (google.protobuf.Empty) {}
+
+    // List a set of seeds
+    rpc ListSeeds (ListRequest) returns (SeedListReply) {}
+    rpc SaveSeed (Seed) returns (Seed) {}
+    rpc DeleteSeed (Seed) returns (google.protobuf.Empty) {}
+
+    // List a set of crawl jobs
+    rpc ListCrawlJobs (ListRequest) returns (CrawlJobListReply) {}
+    rpc SaveCrawlJob (CrawlJob) returns (CrawlJob) {}
+    rpc DeleteCrawlJob (CrawlJob) returns (google.protobuf.Empty) {}
+
+    // List a set of crawl configs
+    rpc ListCrawlConfigs (ListRequest) returns (CrawlConfigListReply) {}
+    rpc SaveCrawlConfig (CrawlConfig) returns (CrawlConfig) {}
+    rpc DeleteCrawlConfig (CrawlConfig) returns (google.protobuf.Empty) {}
+
+    // List a set of crawl schedule configs
+    rpc ListCrawlScheduleConfigs (ListRequest) returns (CrawlScheduleConfigListReply) {}
+    rpc SaveCrawlScheduleConfig (CrawlScheduleConfig) returns (CrawlScheduleConfig) {}
+    rpc DeleteCrawlScheduleConfig (CrawlScheduleConfig) returns (google.protobuf.Empty) {}
 
     rpc ListBrowserScripts (BrowserScriptListRequest) returns (BrowserScriptListReply) {}
     rpc SaveBrowserScript (BrowserScript) returns (BrowserScript) {}
 }
 
 // Specification of wich entities to get.
-message CrawlEntityListRequest {
+message ListRequest {
     oneof qry {
         string id = 1;
         string name_prefix = 2;
@@ -31,7 +51,35 @@ message CrawlEntityListRequest {
 
 // A list of entities
 message CrawlEntityListReply {
-    repeated CrawlEntity entity = 1;
+    repeated CrawlEntity value = 1;
+    int64 count = 2;
+    int32 page_size = 14;
+    int32 page = 15;
+}
+
+message SeedListReply {
+    repeated Seed value = 1;
+    int64 count = 2;
+    int32 page_size = 14;
+    int32 page = 15;
+}
+
+message CrawlJobListReply {
+    repeated CrawlJob value = 1;
+    int64 count = 2;
+    int32 page_size = 14;
+    int32 page = 15;
+}
+
+message CrawlConfigListReply {
+    repeated CrawlConfig value = 1;
+    int64 count = 2;
+    int32 page_size = 14;
+    int32 page = 15;
+}
+
+message CrawlScheduleConfigListReply {
+    repeated CrawlScheduleConfig value = 1;
     int64 count = 2;
     int32 page_size = 14;
     int32 page = 15;
@@ -44,5 +92,8 @@ message BrowserScriptListRequest {
 
 // A list of browserscripts
 message BrowserScriptListReply {
-    repeated BrowserScript script = 1;
+    repeated BrowserScript value = 1;
+    int64 count = 2;
+    int32 page_size = 14;
+    int32 page = 15;
 }

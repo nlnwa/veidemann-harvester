@@ -20,7 +20,7 @@ import java.util.List;
 
 import com.google.protobuf.InvalidProtocolBufferException;
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;
-import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListRequest;
+import no.nb.nna.broprox.api.ControllerProto.ListRequest;
 import no.nb.nna.broprox.model.ConfigProto;
 import no.nb.nna.broprox.model.ConfigProto.CrawlEntity;
 import no.nb.nna.broprox.model.ConfigProto.Label;
@@ -147,35 +147,35 @@ public class RethinkDbAdapterIT {
                 .build();
         entity3 = db.saveCrawlEntity(entity3);
 
-        CrawlEntityListRequest request = CrawlEntityListRequest.getDefaultInstance();
+        ListRequest request = ListRequest.getDefaultInstance();
         CrawlEntityListReply result = db.listCrawlEntities(request);
-        assertThat(result.getEntityCount()).isGreaterThanOrEqualTo(3);
+        assertThat(result.getValueCount()).isGreaterThanOrEqualTo(3);
         assertThat(result.getCount()).isGreaterThanOrEqualTo(3);
-        assertThat(result.getEntityList()).contains(entity1, entity2, entity3);
+        assertThat(result.getValueList()).contains(entity1, entity2, entity3);
 
-        request = CrawlEntityListRequest.newBuilder().setId(entity1.getId()).build();
+        request = ListRequest.newBuilder().setId(entity1.getId()).build();
         result = db.listCrawlEntities(request);
-        assertThat(result.getEntityCount()).isEqualTo(1);
+        assertThat(result.getValueCount()).isEqualTo(1);
         assertThat(result.getCount()).isEqualTo(1);
-        assertThat(result.getEntityList()).contains(entity1);
+        assertThat(result.getValueList()).contains(entity1);
 
-        request = CrawlEntityListRequest.newBuilder().setNamePrefix("nasj").build();
+        request = ListRequest.newBuilder().setNamePrefix("nasj").build();
         result = db.listCrawlEntities(request);
-        assertThat(result.getEntityCount()).isEqualTo(2);
+        assertThat(result.getValueCount()).isEqualTo(2);
         assertThat(result.getCount()).isEqualTo(2);
-        assertThat(result.getEntityList()).contains(entity1, entity3);
+        assertThat(result.getValueList()).contains(entity1, entity3);
 
-        request = CrawlEntityListRequest.newBuilder().setPageSize(2).build();
+        request = ListRequest.newBuilder().setPageSize(2).build();
         result = db.listCrawlEntities(request);
-        assertThat(result.getEntityCount()).isEqualTo(2);
+        assertThat(result.getValueCount()).isEqualTo(2);
         assertThat(result.getCount()).isGreaterThanOrEqualTo(3);
-        assertThat(result.getEntityList()).contains(entity3, entity1);
+        assertThat(result.getValueList()).contains(entity3, entity1);
 
-        request = CrawlEntityListRequest.newBuilder().setPageSize(2).setPage(1).build();
+        request = ListRequest.newBuilder().setPageSize(2).setPage(1).build();
         result = db.listCrawlEntities(request);
-        assertThat(result.getEntityCount()).isEqualTo(1);
+        assertThat(result.getValueCount()).isEqualTo(1);
         assertThat(result.getCount()).isGreaterThanOrEqualTo(3);
-        assertThat(result.getEntityList()).contains(entity2);
+        assertThat(result.getValueList()).contains(entity2);
     }
 
     /**
@@ -212,16 +212,16 @@ public class RethinkDbAdapterIT {
                 .build();
         entity2 = db.saveCrawlEntity(entity2);
 
-        CrawlEntityListReply result = db.listCrawlEntities(CrawlEntityListRequest.getDefaultInstance());
-        assertThat(result.getEntityCount()).isGreaterThanOrEqualTo(2);
-        assertThat(result.getEntityList()).contains(entity1, entity2);
+        CrawlEntityListReply result = db.listCrawlEntities(ListRequest.getDefaultInstance());
+        assertThat(result.getValueCount()).isGreaterThanOrEqualTo(2);
+        assertThat(result.getValueList()).contains(entity1, entity2);
 
         db.deleteCrawlEntity(entity2);
 
-        result = db.listCrawlEntities(CrawlEntityListRequest.getDefaultInstance());
-        assertThat(result.getEntityCount()).isGreaterThanOrEqualTo(1);
-        assertThat(result.getEntityList()).contains(entity1);
-        assertThat(result.getEntityList()).doesNotContain(entity2);
+        result = db.listCrawlEntities(ListRequest.getDefaultInstance());
+        assertThat(result.getValueCount()).isGreaterThanOrEqualTo(1);
+        assertThat(result.getValueList()).contains(entity1);
+        assertThat(result.getValueList()).doesNotContain(entity2);
     }
 
     /**

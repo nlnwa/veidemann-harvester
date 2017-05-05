@@ -18,11 +18,11 @@ package no.nb.nna.broprox.db;
 import java.util.List;
 import java.util.Optional;
 
+import com.google.protobuf.Empty;
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;
-import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListRequest;
+import no.nb.nna.broprox.api.ControllerProto.ListRequest;
 import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
 import no.nb.nna.broprox.model.ConfigProto.CrawlEntity;
-import no.nb.nna.broprox.model.MessagesProto;
 import no.nb.nna.broprox.model.MessagesProto.CrawlExecutionStatus;
 import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
 import no.nb.nna.broprox.model.MessagesProto.CrawledContent;
@@ -59,11 +59,11 @@ public interface DbAdapter extends AutoCloseable {
 
     Screenshot addScreenshot(Screenshot s);
 
-    CrawlEntity saveCrawlEntity(CrawlEntity entity);
+    CrawlEntity saveCrawlEntity(CrawlEntity msg);
 
-    CrawlEntityListReply listCrawlEntities(CrawlEntityListRequest request);
+    CrawlEntityListReply listCrawlEntities(ListRequest request);
 
-    MessagesProto.Void deleteCrawlEntity(CrawlEntity entity);
+    Empty deleteCrawlEntity(CrawlEntity entity);
 
     @Override
     public void close();

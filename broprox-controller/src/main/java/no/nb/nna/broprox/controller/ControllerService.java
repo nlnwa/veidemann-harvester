@@ -15,6 +15,7 @@
  */
 package no.nb.nna.broprox.controller;
 
+import com.google.protobuf.Empty;
 import io.grpc.stub.StreamObserver;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.api.ControllerGrpc;
@@ -23,8 +24,7 @@ import no.nb.nna.broprox.model.ConfigProto.CrawlEntity;
 import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListReply;
 import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListRequest;
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;
-import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListRequest;
-import no.nb.nna.broprox.model.MessagesProto;
+import no.nb.nna.broprox.api.ControllerProto.ListRequest;
 
 /**
  *
@@ -48,7 +48,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
-    public void listCrawlEntities(CrawlEntityListRequest request, StreamObserver<CrawlEntityListReply> respObserver) {
+    public void listCrawlEntities(ListRequest request, StreamObserver<CrawlEntityListReply> respObserver) {
         try {
             respObserver.onNext(db.listCrawlEntities(request));
             respObserver.onCompleted();
@@ -58,7 +58,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
-    public void deleteEntity(CrawlEntity request, StreamObserver<MessagesProto.Void> respObserver) {
+    public void deleteEntity(CrawlEntity request, StreamObserver<Empty> respObserver) {
         try {
             respObserver.onNext(db.deleteCrawlEntity(request));
             respObserver.onCompleted();
@@ -81,7 +81,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     public void listBrowserScripts(BrowserScriptListRequest request, StreamObserver<BrowserScriptListReply> respObserver) {
         try {
             BrowserScriptListReply.Builder builder = BrowserScriptListReply.newBuilder();
-            db.getBrowserScripts(request.getType()).forEach(bs -> builder.addScript(bs));
+            db.getBrowserScripts(request.getType()).forEach(bs -> builder.addValue(bs));
             respObserver.onNext(builder.build());
             respObserver.onCompleted();
         } catch (Exception e) {

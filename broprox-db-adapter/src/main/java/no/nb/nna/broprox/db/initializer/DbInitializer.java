@@ -124,7 +124,7 @@ public class DbInitializer {
         r.dbCreate(SETTINGS.getDbName()).run(conn);
 
         r.tableCreate(TABLE_SYSTEM).run(conn);
-        r.table(TABLE_SYSTEM).insert(r.hashMap("id", "db_version").put("db_version", "0.1")).run(conn);
+        r.table(TABLE_SYSTEM).insert(r.hashMap("id", "db_version").with("db_version", "0.1")).run(conn);
 
         r.tableCreate(TABLE_CRAWL_LOG).optArg("primary_key", "warcId").run(conn);
         r.table(TABLE_CRAWL_LOG)

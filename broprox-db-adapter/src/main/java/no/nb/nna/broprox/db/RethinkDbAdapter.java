@@ -428,7 +428,15 @@ public class RethinkDbAdapter implements DbAdapter {
                 this::executeInsert,
                 r.table(table.name)
                         .insert(rMap)
-                        .optArg("conflict", "replace"),
+                        // A rethink function which copies created and createby from old doc,
+                        // and copies name if not existent in new doc
+                        .optArg("conflict", (id, old_doc, new_doc) -> new_doc.merge(
+                        r.hashMap("meta", r.hashMap()
+                                .with("name", r.branch(new_doc.g("meta").hasFields("name"),
+                                        new_doc.g("meta").g("name"), old_doc.g("meta").g("name")))
+                                .with("created", old_doc.g("meta").g("created"))
+                                .with("createdBy", old_doc.g("meta").g("createdBy"))
+                        ))),
                 (Class<T>) msg.getClass());
     }
 
@@ -586,7 +594,9 @@ public class RethinkDbAdapter implements DbAdapter {
         }
 
         meta.put("lastModified", r.now());
-        meta.put("lastModifiedBy", user);
+        if (!meta.containsKey("lastModifiedBy")) {
+            meta.put("lastModifiedBy", user);
+        }
 
         return meta;
     }

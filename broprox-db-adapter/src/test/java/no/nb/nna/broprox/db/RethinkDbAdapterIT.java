@@ -22,7 +22,6 @@ import java.util.Map;
 import com.google.protobuf.Empty;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.rethinkdb.RethinkDB;
-import com.rethinkdb.net.Cursor;
 import no.nb.nna.broprox.api.ControllerProto;
 import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListReply;
 import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListRequest;
@@ -104,6 +103,7 @@ public class RethinkDbAdapterIT {
                         .setCreatedBy("anonymous"))
                 .build();
 
+        OffsetDateTime start = OffsetDateTime.now();
         CrawlEntity result = db.saveCrawlEntity(entity);
 
         assertThat(result.getId()).isNotEmpty();
@@ -112,6 +112,9 @@ public class RethinkDbAdapterIT {
                 ProtoUtils.odtToTs(OffsetDateTime.parse("2017-04-06T06:20:35.779Z")));
         assertThat(result.getMeta().getCreatedBy()).isEqualTo("anonymous");
         assertThat(result.getMeta().getLastModified()).isNotNull();
+        assertThat(ProtoUtils.tsToOdt(result.getMeta().getLastModified()))
+                .isAfterOrEqualTo(start)
+                .isBeforeOrEqualTo(OffsetDateTime.now());
         assertThat(result.getMeta().getLastModifiedBy()).isEqualTo("anonymous");
         assertThat(result.getMeta().getLabelList()).containsOnly(
                 Label.newBuilder()
@@ -120,6 +123,61 @@ public class RethinkDbAdapterIT {
                 Label.newBuilder()
                         .setKey("orgType")
                         .setValue("Government").build());
+
+        // Override
+        CrawlEntity override = CrawlEntity.newBuilder()
+                .setId(result.getId())
+                .build();
+
+        start = OffsetDateTime.now();
+        CrawlEntity overrideResult = db.saveCrawlEntity(override);
+
+        assertThat(overrideResult.getId()).isEqualTo(result.getId());
+        assertThat(overrideResult.getMeta().getName()).isEqualTo("Nasjonalbiblioteket");
+        assertThat(overrideResult.getMeta().getCreated()).isEqualTo(
+                ProtoUtils.odtToTs(OffsetDateTime.parse("2017-04-06T06:20:35.779Z")));
+        assertThat(overrideResult.getMeta().getCreatedBy()).isEqualTo("anonymous");
+        assertThat(overrideResult.getMeta().getLastModified()).isNotNull();
+        assertThat(overrideResult.getMeta().getLastModified()).isNotEqualTo(result.getMeta().getLastModified());
+        assertThat(ProtoUtils.tsToOdt(overrideResult.getMeta().getLastModified()))
+                .isAfterOrEqualTo(start)
+                .isBeforeOrEqualTo(OffsetDateTime.now());
+        assertThat(overrideResult.getMeta().getLastModifiedBy()).isEqualTo("anonymous");
+        assertThat(overrideResult.getMeta().getLabelList()).isEmpty();
+
+        // override
+        override = CrawlEntity.newBuilder()
+                .setId(result.getId())
+                .setMeta(Meta.newBuilder()
+                        .setName("Foo")
+                        .setCreated(ProtoUtils.getNowTs())
+                        .setCreatedBy("Bar")
+                        .setLastModified(ProtoUtils.odtToTs(OffsetDateTime.parse("2017-04-06T06:20:35.779Z")))
+                        .setLastModifiedBy("person")
+                        .addLabel(Label.newBuilder()
+                                .setKey("orgType")
+                                .setValue("Media")))
+                .build();
+
+        start = OffsetDateTime.now();
+        overrideResult = db.saveCrawlEntity(override);
+
+        assertThat(overrideResult.getId()).isEqualTo(result.getId());
+        assertThat(overrideResult.getMeta().getName()).isEqualTo("Foo");
+        assertThat(overrideResult.getMeta().getCreated()).isEqualTo(
+                ProtoUtils.odtToTs(OffsetDateTime.parse("2017-04-06T06:20:35.779Z")));
+        assertThat(overrideResult.getMeta().getCreatedBy()).isEqualTo("anonymous");
+        assertThat(overrideResult.getMeta().getLastModified()).isNotNull();
+        assertThat(overrideResult.getMeta().getLastModified()).isNotEqualTo(result.getMeta().getLastModified());
+        assertThat(ProtoUtils.tsToOdt(overrideResult.getMeta().getLastModified()))
+                .isAfterOrEqualTo(start)
+                .isBeforeOrEqualTo(OffsetDateTime.now());
+        assertThat(overrideResult.getMeta().getLastModifiedBy()).isEqualTo("person");
+        assertThat(overrideResult.getMeta().getLabelList()).containsOnly(
+                Label.newBuilder()
+                        .setKey("orgType")
+                        .setValue("Media").build());
+
     }
 
     /**
@@ -639,7 +697,6 @@ public class RethinkDbAdapterIT {
         assertThat(db.listCrawlJobs(ListRequest.getDefaultInstance()).getCount()).isEqualTo(1);
         db.deleteCrawlJob(result);
         assertThat(db.listCrawlJobs(ListRequest.getDefaultInstance()).getCount()).isEqualTo(0);
-
 
         CrawlJob toBeDeleted = db.saveCrawlJob(crawlJob);
         Seed seed = Seed.newBuilder()

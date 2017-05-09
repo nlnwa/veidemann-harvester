@@ -26,8 +26,8 @@ import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListReply;
 import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListRequest;
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;
 import no.nb.nna.broprox.api.ControllerProto.CrawlJobListRequest;
-import no.nb.nna.broprox.api.ControllerProto.CrawlJobListReply;
 import no.nb.nna.broprox.api.ControllerProto.ListRequest;
+import no.nb.nna.broprox.api.ControllerProto.SeedListRequest;
 import no.nb.nna.broprox.model.ConfigProto;
 
 /**
@@ -76,6 +76,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
         try {
             respObserver.onNext(db.deleteCrawlScheduleConfig(request));
             respObserver.onCompleted();
+
         } catch (Exception e) {
             respObserver.onError(e);
         }
@@ -185,7 +186,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
-    public void listSeeds(ListRequest request, StreamObserver<ControllerProto.SeedListReply> respObserver) {
+    public void listSeeds(SeedListRequest request, StreamObserver<ControllerProto.SeedListReply> respObserver) {
         try {
             respObserver.onNext(db.listSeeds(request));
             respObserver.onCompleted();

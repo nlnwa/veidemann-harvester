@@ -45,7 +45,7 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
 
     private String id;
 
-    private final RethinkDbAdapter.TABLES table;
+    final RethinkDbAdapter.TABLES table;
 
     public ConfigListQueryBuilder(T request, RethinkDbAdapter.TABLES table) {
         this.request = Objects.requireNonNull(request, "The request cannot be null");

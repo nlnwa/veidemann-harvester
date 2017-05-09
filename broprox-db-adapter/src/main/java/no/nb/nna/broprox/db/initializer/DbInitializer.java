@@ -139,6 +139,7 @@ public class DbInitializer {
 
         r.tableCreate(TABLES.SEEDS.name).run(conn);
         createMetaIndexes(TABLES.SEEDS);
+        r.table(TABLES.SEEDS.name).indexCreate("jobId").optArg("multi", true).run(conn);
 
         r.tableCreate(TABLES.CRAWL_JOBS.name).run(conn);
         createMetaIndexes(TABLES.CRAWL_JOBS);
@@ -157,6 +158,7 @@ public class DbInitializer {
 
         r.table(TABLES.URI_QUEUE.name).indexWait("surt", "executionIds").run(conn);
         r.table(TABLES.CRAWL_LOG.name).indexWait("surt_time").run(conn);
+        r.table(TABLES.SEEDS.name).indexWait("jobId").run(conn);
     }
 
     private final void createMetaIndexes(TABLES table) {

@@ -29,6 +29,7 @@ import no.nb.nna.broprox.api.ControllerProto.CrawlScheduleConfigListReply;
 import no.nb.nna.broprox.api.ControllerProto.ListRequest;
 import no.nb.nna.broprox.api.ControllerProto.PolitenessConfigListReply;
 import no.nb.nna.broprox.api.ControllerProto.SeedListReply;
+import no.nb.nna.broprox.api.ControllerProto.SeedListRequest;
 import no.nb.nna.broprox.model.ConfigProto.BrowserConfig;
 import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
 import no.nb.nna.broprox.model.ConfigProto.CrawlConfig;
@@ -75,7 +76,7 @@ public interface DbAdapter extends AutoCloseable {
 
     Empty deleteCrawlEntity(CrawlEntity entity);
 
-    SeedListReply listSeeds(ListRequest request);
+    SeedListReply listSeeds(SeedListRequest request);
 
     Seed saveSeed(Seed seed);
 

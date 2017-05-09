@@ -28,6 +28,8 @@ import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListRequest;
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;
 import no.nb.nna.broprox.api.ControllerProto.CrawlJobListRequest;
 import no.nb.nna.broprox.api.ControllerProto.ListRequest;
+import no.nb.nna.broprox.api.ControllerProto.SeedListReply;
+import no.nb.nna.broprox.api.ControllerProto.SeedListRequest;
 import no.nb.nna.broprox.model.ConfigProto;
 import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
 import no.nb.nna.broprox.model.ConfigProto.CrawlEntity;
@@ -559,16 +561,32 @@ public class RethinkDbAdapterIT {
      * Test of listSeeds method, of class RethinkDbAdapter.
      */
     @Test
-    @Ignore
     public void testListSeeds() {
-        System.out.println("listSeeds");
-        ListRequest request = null;
-        RethinkDbAdapter instance = null;
-        ControllerProto.SeedListReply expResult = null;
-        ControllerProto.SeedListReply result = instance.listSeeds(request);
-//        assertEquals(expResult, result);
-        // TODO review the generated test code and remove the default call to fail.
-        fail("The test case is a prototype.");
+        Seed seed1 = Seed.newBuilder()
+                .setMeta(Meta.newBuilder().setName("Seed 1"))
+                .setUri("http://seed1.foo")
+                .addJobId("job1")
+                .build();
+        Seed savedSeed1 = db.saveSeed(seed1);
+
+        Seed seed2 = Seed.newBuilder()
+                .setMeta(Meta.newBuilder().setName("Seed 2"))
+                .setUri("http://seed2.foo")
+                .addJobId("job1")
+                .addJobId("job2")
+                .build();
+        Seed savedSeed2 = db.saveSeed(seed2);
+
+        Seed seed3 = Seed.newBuilder()
+                .setMeta(Meta.newBuilder().setName("Seed 3"))
+                .setUri("http://seed3.foo")
+                .addJobId("job2")
+                .build();
+        Seed savedSeed3 = db.saveSeed(seed3);
+
+        SeedListRequest request = SeedListRequest.newBuilder().setCrawlJobId("job1").build();
+        SeedListReply result = db.listSeeds(request);
+        assertThat(result.getValueList()).containsOnly(savedSeed1, savedSeed2);
     }
 
     /**

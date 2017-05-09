@@ -40,6 +40,7 @@ import no.nb.nna.broprox.api.ControllerProto.CrawlScheduleConfigListReply;
 import no.nb.nna.broprox.api.ControllerProto.ListRequest;
 import no.nb.nna.broprox.api.ControllerProto.PolitenessConfigListReply;
 import no.nb.nna.broprox.api.ControllerProto.SeedListReply;
+import no.nb.nna.broprox.api.ControllerProto.SeedListRequest;
 import no.nb.nna.broprox.commons.OpenTracingWrapper;
 import no.nb.nna.broprox.model.ConfigProto.BrowserConfig;
 import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
@@ -290,9 +291,9 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
-    public SeedListReply listSeeds(ListRequest request) {
-        ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, TABLES.SEEDS);
-        return queryBuilder.executeList(otw, this, SeedListReply.newBuilder()).build();
+    public SeedListReply listSeeds(SeedListRequest request) {
+        SeedListRequestQueryBuilder queryBuilder = new SeedListRequestQueryBuilder(request);
+        return queryBuilder.executeList(otw, this).build();
     }
 
     @Override

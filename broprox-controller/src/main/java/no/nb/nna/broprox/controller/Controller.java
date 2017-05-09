@@ -56,7 +56,7 @@ public class Controller {
     public Controller start() {
         try (DbAdapter db = new RethinkDbAdapter(SETTINGS.getDbHost(), SETTINGS.getDbPort(), SETTINGS.getDbName());
                 ControllerApiServer apiServer = new ControllerApiServer(SETTINGS.getApiPort(), db).start();
-                CrawlJobScheduler scheduler = new CrawlJobScheduler().start();) {
+                CrawlJobScheduler scheduler = new CrawlJobScheduler(db).start();) {
 
             LOG.info("Broprox Controller (v. {}) started", Controller.class.getPackage().getImplementationVersion());
 

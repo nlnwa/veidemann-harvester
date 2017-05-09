@@ -16,6 +16,7 @@
 package no.nb.nna.broprox.controller.scheduler;
 
 import it.sauronsoftware.cron4j.Scheduler;
+import no.nb.nna.broprox.db.DbAdapter;
 
 /**
  *
@@ -24,9 +25,15 @@ public class CrawlJobScheduler implements AutoCloseable {
 
     Scheduler scheduler;
 
+    final DbAdapter db;
+
+    public CrawlJobScheduler(DbAdapter db) {
+        this.db = db;
+    }
+
     public CrawlJobScheduler start() {
         scheduler = new Scheduler();
-        scheduler.addTaskCollector(new CrawlJobCollector());
+        scheduler.addTaskCollector(new CrawlJobCollector(db));
         scheduler.start();
         return this;
     }

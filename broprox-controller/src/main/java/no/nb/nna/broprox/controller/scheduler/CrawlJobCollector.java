@@ -13,25 +13,41 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package no.nb.nna.broprox.controller.scheduler;
 
 import it.sauronsoftware.cron4j.SchedulingPattern;
 import it.sauronsoftware.cron4j.Task;
 import it.sauronsoftware.cron4j.TaskCollector;
 import it.sauronsoftware.cron4j.TaskTable;
+import no.nb.nna.broprox.api.ControllerProto.CrawlJobListRequest;
+import no.nb.nna.broprox.db.DbAdapter;
+import no.nb.nna.broprox.model.ConfigProto.CrawlJob;
 
 /**
  *
  */
 public class CrawlJobCollector implements TaskCollector {
 
+    final DbAdapter db;
+
+    final CrawlJobListRequest listRequest;
+
+    public CrawlJobCollector(DbAdapter db) {
+        this.db = db;
+        this.listRequest = CrawlJobListRequest.newBuilder().setExpand(true).build();
+    }
+
     @Override
     public TaskTable getTasks() {
         TaskTable tasks = new TaskTable();
-        SchedulingPattern pattern = new SchedulingPattern("* * * * *");
-        Task task = new ScheduledCrawlJob();
-        tasks.add(pattern, task);
+
+        for (CrawlJob job : db.listCrawlJobs(listRequest).getValueList()) {
+            System.out.println("Job: " + job.getMeta().getName() + ", Cron: " + job.getSchedule().getCronExpression());
+            SchedulingPattern pattern = new SchedulingPattern(job.getSchedule().getCronExpression());
+            Task task = new ScheduledCrawlJob(db, job);
+            tasks.add(pattern, task);
+        }
+
         return tasks;
     }
 

@@ -21,7 +21,7 @@ service Controller {
     rpc DeleteSeed (Seed) returns (google.protobuf.Empty) {}
 
     // List a set of crawl jobs
-    rpc ListCrawlJobs (ListRequest) returns (CrawlJobListReply) {}
+    rpc ListCrawlJobs (CrawlJobListRequest) returns (CrawlJobListReply) {}
     rpc SaveCrawlJob (CrawlJob) returns (CrawlJob) {}
     rpc DeleteCrawlJob (CrawlJob) returns (google.protobuf.Empty) {}
 
@@ -71,6 +71,17 @@ message CrawlEntityListReply {
 message SeedListReply {
     repeated Seed value = 1;
     int64 count = 2;
+    int32 page_size = 14;
+    int32 page = 15;
+}
+
+message CrawlJobListRequest {
+    oneof qry {
+        string id = 1;
+        string name_prefix = 2;
+    }
+    // Expand dependencies (i.e. include the complete object graph)
+    bool expand = 13;
     int32 page_size = 14;
     int32 page = 15;
 }

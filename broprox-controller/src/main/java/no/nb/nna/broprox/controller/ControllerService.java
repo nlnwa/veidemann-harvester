@@ -25,6 +25,8 @@ import no.nb.nna.broprox.model.ConfigProto.CrawlEntity;
 import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListReply;
 import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListRequest;
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;
+import no.nb.nna.broprox.api.ControllerProto.CrawlJobListRequest;
+import no.nb.nna.broprox.api.ControllerProto.CrawlJobListReply;
 import no.nb.nna.broprox.api.ControllerProto.ListRequest;
 import no.nb.nna.broprox.model.ConfigProto;
 
@@ -153,7 +155,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
-    public void listCrawlJobs(ListRequest request, StreamObserver<ControllerProto.CrawlJobListReply> respObserver) {
+    public void listCrawlJobs(CrawlJobListRequest request, StreamObserver<ControllerProto.CrawlJobListReply> respObserver) {
         try {
             respObserver.onNext(db.listCrawlJobs(request));
             respObserver.onCompleted();

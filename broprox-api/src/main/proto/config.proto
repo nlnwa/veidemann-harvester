@@ -49,6 +49,7 @@ message CrawlJob {
         string crawl_config_id = 5;
         CrawlConfig crawl_config = 17;
     }
+    bool disabled = 18;
 }
 
 message CrawlConfig {

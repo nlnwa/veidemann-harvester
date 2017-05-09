@@ -26,6 +26,7 @@ import no.nb.nna.broprox.api.ControllerProto;
 import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListReply;
 import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListRequest;
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;
+import no.nb.nna.broprox.api.ControllerProto.CrawlJobListRequest;
 import no.nb.nna.broprox.api.ControllerProto.ListRequest;
 import no.nb.nna.broprox.model.ConfigProto;
 import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
@@ -603,26 +604,10 @@ public class RethinkDbAdapterIT {
     }
 
     /**
-     * Test of listCrawlJobs method, of class RethinkDbAdapter.
-     */
-    @Test
-    @Ignore
-    public void testListCrawlJobs() {
-        System.out.println("listCrawlJobs");
-        ListRequest request = null;
-        RethinkDbAdapter instance = null;
-        ControllerProto.CrawlJobListReply expResult = null;
-        ControllerProto.CrawlJobListReply result = instance.listCrawlJobs(request);
-//        assertEquals(expResult, result);
-        // TODO review the generated test code and remove the default call to fail.
-        fail("The test case is a prototype.");
-    }
-
-    /**
      * Test of saveCrawlJob method, of class RethinkDbAdapter.
      */
     @Test
-    public void testSaveCrawlJob() {
+    public void testSaveAndListCrawlJob() {
         CrawlJob crawlJob = CrawlJob.newBuilder()
                 .setMeta(Meta.newBuilder().setName("Test job"))
                 .setSchedule(ConfigProto.CrawlScheduleConfig.newBuilder()
@@ -641,10 +626,12 @@ public class RethinkDbAdapterIT {
         CrawlJob result = db.saveCrawlJob(crawlJob);
         assertThat(result.getId()).isNotEmpty();
 
-        assertThat(db.listCrawlJobs(ListRequest.getDefaultInstance()))
+        assertThat(db.listCrawlJobs(CrawlJobListRequest.getDefaultInstance()))
                 .satisfies(r -> {
                     assertThat(r.getCount()).isEqualTo(1);
                     assertThat(r.getValue(0).getMeta().getName()).isEqualTo("Test job");
+                    assertThat(r.getValue(0).getSceduleConfigOrIdCase())
+                            .isSameAs(CrawlJob.SceduleConfigOrIdCase.SCHEDULE_ID);
                 });
 
         assertThat(db.listCrawlScheduleConfigs(ListRequest.getDefaultInstance()))
@@ -680,6 +667,47 @@ public class RethinkDbAdapterIT {
                     assertThat(r.getValue(0).getMinTimeBetweenPageLoadMs()).isEqualTo(500);
                     assertThat(r.getValue(0).getMeta().getName()).isEqualTo("Test politeness config");
                 });
+
+        // Test with resolve parameter
+        assertThat(db.listCrawlJobs(CrawlJobListRequest.newBuilder().setExpand(true).build()))
+                .satisfies(r -> {
+                    assertThat(r.getCount()).isEqualTo(1);
+                    assertThat(r.getValue(0).getMeta().getName()).isEqualTo("Test job");
+                    assertThat(r.getValue(0).getSceduleConfigOrIdCase())
+                            .isSameAs(CrawlJob.SceduleConfigOrIdCase.SCHEDULE);
+                });
+
+        crawlJob = CrawlJob.newBuilder()
+                .setMeta(Meta.newBuilder().setName("Test job"))
+                .setCrawlConfig(ConfigProto.CrawlConfig.newBuilder()
+                        .setMeta(Meta.newBuilder().setName("Test crawl config"))
+                        .setPoliteness(ConfigProto.PolitenessConfig.newBuilder()
+                                .setMeta(Meta.newBuilder().setName("Test politeness config"))
+                                .setMinTimeBetweenPageLoadMs(500)))
+                .build();
+
+        CrawlJob result2 = db.saveCrawlJob(crawlJob);
+
+        assertThat(db.listCrawlJobs(CrawlJobListRequest.newBuilder().setId(result2.getId()).setExpand(true).build()))
+                .satisfies(r -> {
+                    assertThat(r.getCount()).isEqualTo(1);
+                    assertThat(r.getValue(0).getMeta().getName()).isEqualTo("Test job");
+                    assertThat(r.getValue(0).getSceduleConfigOrIdCase())
+                            .isSameAs(CrawlJob.SceduleConfigOrIdCase.SCEDULECONFIGORID_NOT_SET);
+                    assertThat(r.getValue(0).getCrawlConfigOrIdCase())
+                            .isSameAs(CrawlJob.CrawlConfigOrIdCase.CRAWL_CONFIG);
+                });
+
+        CrawlJob badCrawlJob = CrawlJob.newBuilder()
+                .setMeta(Meta.newBuilder().setName("Test job"))
+                .setSchedule(ConfigProto.CrawlScheduleConfig.newBuilder()
+                        .setCronExpression("* * * * *")
+                        .setMeta(Meta.newBuilder().setName("Every minute")))
+                .build();
+
+        assertThatThrownBy(() -> db.saveCrawlJob(badCrawlJob))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("A crawl config is required for crawl jobs");
     }
 
     /**
@@ -689,14 +717,16 @@ public class RethinkDbAdapterIT {
     public void testDeleteCrawlJob() {
         CrawlJob crawlJob = CrawlJob.newBuilder()
                 .setMeta(Meta.newBuilder().setName("Test job"))
+                .setCrawlConfig(ConfigProto.CrawlConfig.newBuilder()
+                        .setMeta(Meta.newBuilder().setName("Test crawl config")))
                 .build();
 
         CrawlJob result = db.saveCrawlJob(crawlJob);
-        assertThat(db.listCrawlJobs(ListRequest.getDefaultInstance()).getCount()).isEqualTo(1);
+        assertThat(db.listCrawlJobs(CrawlJobListRequest.getDefaultInstance()).getCount()).isEqualTo(1);
         db.deleteCrawlJob(crawlJob);
-        assertThat(db.listCrawlJobs(ListRequest.getDefaultInstance()).getCount()).isEqualTo(1);
+        assertThat(db.listCrawlJobs(CrawlJobListRequest.getDefaultInstance()).getCount()).isEqualTo(1);
         db.deleteCrawlJob(result);
-        assertThat(db.listCrawlJobs(ListRequest.getDefaultInstance()).getCount()).isEqualTo(0);
+        assertThat(db.listCrawlJobs(CrawlJobListRequest.getDefaultInstance()).getCount()).isEqualTo(0);
 
         CrawlJob toBeDeleted = db.saveCrawlJob(crawlJob);
         Seed seed = Seed.newBuilder()
@@ -816,6 +846,8 @@ public class RethinkDbAdapterIT {
                 .setSchedule(ConfigProto.CrawlScheduleConfig.newBuilder()
                         .setCronExpression("* * * * *")
                         .setMeta(Meta.newBuilder().setName("Every minute")))
+                .setCrawlConfig(ConfigProto.CrawlConfig.newBuilder()
+                        .setMeta(Meta.newBuilder().setName("Test crawl config")))
                 .build();
 
         crawlJob = db.saveCrawlJob(crawlJob);

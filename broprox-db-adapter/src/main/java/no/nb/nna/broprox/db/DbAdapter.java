@@ -24,6 +24,7 @@ import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListRequest;
 import no.nb.nna.broprox.api.ControllerProto.CrawlConfigListReply;
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;
 import no.nb.nna.broprox.api.ControllerProto.CrawlJobListReply;
+import no.nb.nna.broprox.api.ControllerProto.CrawlJobListRequest;
 import no.nb.nna.broprox.api.ControllerProto.CrawlScheduleConfigListReply;
 import no.nb.nna.broprox.api.ControllerProto.ListRequest;
 import no.nb.nna.broprox.api.ControllerProto.PolitenessConfigListReply;
@@ -80,7 +81,7 @@ public interface DbAdapter extends AutoCloseable {
 
     Empty deleteSeed(Seed seed);
 
-    CrawlJobListReply listCrawlJobs(ListRequest request);
+    CrawlJobListReply listCrawlJobs(CrawlJobListRequest request);
 
     CrawlJob saveCrawlJob(CrawlJob crawlJob);
 

@@ -15,8 +15,6 @@
  */
 package no.nb.nna.broprox.db;
 
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -28,11 +26,8 @@ import com.google.protobuf.Message;
 import com.rethinkdb.RethinkDB;
 import com.rethinkdb.gen.ast.Insert;
 import com.rethinkdb.gen.ast.ReqlExpr;
-import com.rethinkdb.gen.ast.ReqlFunction1;
-import com.rethinkdb.gen.ast.Table;
 import com.rethinkdb.gen.exc.ReqlError;
 import com.rethinkdb.net.Connection;
-import com.rethinkdb.net.Cursor;
 import io.opentracing.tag.Tags;
 import no.nb.nna.broprox.api.ControllerProto.BrowserConfigListReply;
 import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListReply;
@@ -40,6 +35,7 @@ import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListRequest;
 import no.nb.nna.broprox.api.ControllerProto.CrawlConfigListReply;
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;
 import no.nb.nna.broprox.api.ControllerProto.CrawlJobListReply;
+import no.nb.nna.broprox.api.ControllerProto.CrawlJobListRequest;
 import no.nb.nna.broprox.api.ControllerProto.CrawlScheduleConfigListReply;
 import no.nb.nna.broprox.api.ControllerProto.ListRequest;
 import no.nb.nna.broprox.api.ControllerProto.PolitenessConfigListReply;
@@ -206,7 +202,8 @@ public class RethinkDbAdapter implements DbAdapter {
 
     @Override
     public BrowserScriptListReply listBrowserScripts(BrowserScriptListRequest request) {
-        return listConfigMessages(request, BrowserScriptListReply.newBuilder(), TABLES.BROWSER_SCRIPTS).build();
+        BrowserScriptListRequestQueryBuilder queryBuilder = new BrowserScriptListRequestQueryBuilder(request);
+        return queryBuilder.executeList(otw, this).build();
     }
 
     @Override
@@ -288,12 +285,14 @@ public class RethinkDbAdapter implements DbAdapter {
 
     @Override
     public CrawlEntityListReply listCrawlEntities(ListRequest request) {
-        return listConfigMessages(request, CrawlEntityListReply.newBuilder(), TABLES.CRAWL_ENTITIES).build();
+        ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, TABLES.CRAWL_ENTITIES);
+        return queryBuilder.executeList(otw, this, CrawlEntityListReply.newBuilder()).build();
     }
 
     @Override
     public SeedListReply listSeeds(ListRequest request) {
-        return listConfigMessages(request, SeedListReply.newBuilder(), TABLES.SEEDS).build();
+        ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, TABLES.SEEDS);
+        return queryBuilder.executeList(otw, this, SeedListReply.newBuilder()).build();
     }
 
     @Override
@@ -307,8 +306,9 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
-    public CrawlJobListReply listCrawlJobs(ListRequest request) {
-        return listConfigMessages(request, CrawlJobListReply.newBuilder(), TABLES.CRAWL_JOBS).build();
+    public CrawlJobListReply listCrawlJobs(CrawlJobListRequest request) {
+        CrawlJobListRequestQueryBuilder queryBuilder = new CrawlJobListRequestQueryBuilder(request);
+        return queryBuilder.executeList(otw, this).build();
     }
 
     @Override
@@ -320,10 +320,14 @@ public class RethinkDbAdapter implements DbAdapter {
             schedule = saveCrawlScheduleConfig(schedule);
             builder.setScheduleId(schedule.getId());
         }
-        if (crawlJob.getCrawlConfigOrIdCase() == CrawlJob.CrawlConfigOrIdCase.CRAWL_CONFIG) {
-            CrawlConfig crawlConfig = crawlJob.getCrawlConfig();
-            crawlConfig = saveCrawlConfig(crawlConfig);
-            builder.setCrawlConfigId(crawlConfig.getId());
+        switch (crawlJob.getCrawlConfigOrIdCase()) {
+            case CRAWL_CONFIG:
+                CrawlConfig crawlConfig = crawlJob.getCrawlConfig();
+                crawlConfig = saveCrawlConfig(crawlConfig);
+                builder.setCrawlConfigId(crawlConfig.getId());
+                break;
+            case CRAWLCONFIGORID_NOT_SET:
+                throw new IllegalArgumentException("A crawl config is required for crawl jobs");
         }
 
         return saveConfigMessage(builder.build(), TABLES.CRAWL_JOBS);
@@ -337,7 +341,8 @@ public class RethinkDbAdapter implements DbAdapter {
 
     @Override
     public CrawlConfigListReply listCrawlConfigs(ListRequest request) {
-        return listConfigMessages(request, CrawlConfigListReply.newBuilder(), TABLES.CRAWL_CONFIGS).build();
+        ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, TABLES.CRAWL_CONFIGS);
+        return queryBuilder.executeList(otw, this, CrawlConfigListReply.newBuilder()).build();
     }
 
     @Override
@@ -366,8 +371,8 @@ public class RethinkDbAdapter implements DbAdapter {
 
     @Override
     public CrawlScheduleConfigListReply listCrawlScheduleConfigs(ListRequest request) {
-        return listConfigMessages(request, CrawlScheduleConfigListReply.newBuilder(), TABLES.CRAWL_SCHEDULE_CONFIGS)
-                .build();
+        ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, TABLES.CRAWL_SCHEDULE_CONFIGS);
+        return queryBuilder.executeList(otw, this, CrawlScheduleConfigListReply.newBuilder()).build();
     }
 
     @Override
@@ -383,7 +388,8 @@ public class RethinkDbAdapter implements DbAdapter {
 
     @Override
     public PolitenessConfigListReply listPolitenessConfigs(ListRequest request) {
-        return listConfigMessages(request, PolitenessConfigListReply.newBuilder(), TABLES.POLITENESS_CONFIGS).build();
+        ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, TABLES.POLITENESS_CONFIGS);
+        return queryBuilder.executeList(otw, this, PolitenessConfigListReply.newBuilder()).build();
     }
 
     @Override
@@ -399,7 +405,8 @@ public class RethinkDbAdapter implements DbAdapter {
 
     @Override
     public BrowserConfigListReply listBrowserConfigs(ListRequest request) {
-        return listConfigMessages(request, BrowserConfigListReply.newBuilder(), TABLES.BROWSER_CONFIGS).build();
+        ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, TABLES.BROWSER_CONFIGS);
+        return queryBuilder.executeList(otw, this, BrowserConfigListReply.newBuilder()).build();
     }
 
     @Override
@@ -449,134 +456,6 @@ public class RethinkDbAdapter implements DbAdapter {
                         .get(entity.getField(idDescriptor))
                         .delete());
         return Empty.getDefaultInstance();
-    }
-
-    public <T extends Message.Builder> T listConfigMessages(Message request, T resultBuilder, TABLES table,
-            ReqlFunction1... filter) {
-
-        ConfigMessageQuery cmq = createConfigMessageQuery(request, table, filter);
-        long count = countConfigMessages(cmq);
-
-        Object res = otw.map("db-listConfigObjects",
-                this::executeRequest, cmq.listQry);
-
-        Descriptors.Descriptor resDescr = resultBuilder.getDescriptorForType();
-        Descriptors.FieldDescriptor pageSizeField = resDescr.findFieldByName("page_size");
-        Descriptors.FieldDescriptor pageField = resDescr.findFieldByName("page");
-        Descriptors.FieldDescriptor countField = resDescr.findFieldByName("count");
-        Descriptors.FieldDescriptor valueField = resDescr.findFieldByName("value");
-
-        resultBuilder
-                .setField(pageSizeField, cmq.pageSize)
-                .setField(pageField, cmq.page)
-                .setField(countField, count);
-
-        if (res instanceof Cursor) {
-            Cursor<Map<String, Object>> cursor = (Cursor) res;
-            for (Map<String, Object> entity : cursor) {
-                resultBuilder.addRepeatedField(valueField,
-                        ProtoUtils.rethinkToProto(entity, table.schema.newBuilderForType()));
-            }
-        } else {
-            resultBuilder.addRepeatedField(
-                    valueField, ProtoUtils.rethinkToProto((Map<String, Object>) res, table.schema.newBuilderForType()));
-        }
-
-        return (T) resultBuilder;
-    }
-
-    private static class ConfigMessageQuery {
-
-        ReqlExpr listQry;
-
-        ReqlExpr countQry;
-
-        int page;
-
-        int pageSize;
-
-        String id;
-
-        List<ReqlFunction1> filters = new ArrayList<>();
-
-    }
-
-    public ConfigMessageQuery createConfigMessageQuery(Message request, TABLES table, ReqlFunction1... filter) {
-        ConfigMessageQuery cmq = new ConfigMessageQuery();
-
-        Arrays.stream(filter).forEach(f -> cmq.filters.add(f));
-
-        ReqlExpr qry = r.table(table.name);
-
-        switch (request.getDescriptorForType().getFullName()) {
-            case "broprox.ListRequest":
-                ListRequest listRequest = (ListRequest) request;
-                cmq.page = listRequest.getPage();
-                cmq.pageSize = listRequest.getPageSize();
-
-                switch (listRequest.getQryCase()) {
-                    case ID:
-                        cmq.id = listRequest.getId();
-                        break;
-                    case NAME_PREFIX:
-                        String prefix = listRequest.getNamePrefix().toLowerCase();
-                        qry = qry.between(prefix, prefix + Character.toString(Character.MAX_VALUE))
-                                .optArg("index", "name");
-                        break;
-                }
-                break;
-
-            case "broprox.BrowserScriptListRequest":
-                BrowserScriptListRequest bslr = (BrowserScriptListRequest) request;
-                cmq.page = bslr.getPage();
-                cmq.pageSize = bslr.getPageSize();
-
-                switch (bslr.getQryCase()) {
-                    case ID:
-                        cmq.id = bslr.getId();
-                        break;
-                    case NAME_PREFIX:
-                        String prefix = bslr.getNamePrefix().toLowerCase();
-                        qry = qry.between(prefix, prefix + Character.toString(Character.MAX_VALUE))
-                                .optArg("index", "name");
-                        break;
-                    case TYPE:
-                        cmq.filters.add(row -> row.g("type").eq(bslr.getType().name()));
-                        break;
-                }
-                break;
-
-            default:
-                throw new IllegalArgumentException("Unknown query message: "
-                        + request.getDescriptorForType().getFullName());
-        }
-
-        if (cmq.id != null) {
-            cmq.listQry = ((Table) qry).get(cmq.id);
-        } else {
-            cmq.countQry = qry;
-            cmq.listQry = qry.orderBy().optArg("index", "name");
-
-            cmq.filters.forEach(f -> {
-                cmq.countQry = cmq.countQry.filter(f);
-                cmq.listQry = cmq.listQry.filter(f);
-            });
-
-            cmq.countQry = cmq.countQry.count();
-
-            if (cmq.pageSize > 0) {
-                cmq.listQry = cmq.listQry.skip(cmq.page * cmq.pageSize).limit(cmq.pageSize);
-            }
-        }
-        return cmq;
-    }
-
-    public long countConfigMessages(ConfigMessageQuery cmq) {
-        if (cmq.id != null) {
-            return 1L;
-        } else {
-            return otw.map("db-countConfigObjects", this::executeRequest, cmq.countQry);
-        }
     }
 
     private Map updateMeta(Map meta, String user) {
@@ -658,16 +537,14 @@ public class RethinkDbAdapter implements DbAdapter {
         Descriptors.FieldDescriptor dependentField = dependentMessage.getDescriptorForType()
                 .findFieldByName(dependentFieldName);
 
-        ConfigMessageQuery cmq;
+        ListRequestQueryBuilder qry = new ListRequestQueryBuilder(ListRequest.getDefaultInstance(), dependentTable);
         if (dependentField.isRepeated()) {
-            cmq = createConfigMessageQuery(ListRequest.getDefaultInstance(), dependentTable,
-                    j -> j.g(dependentField.getJsonName()).contains(messageToCheck.getField(messageIdField)));
+            qry.addFilter(j -> j.g(dependentField.getJsonName()).contains(messageToCheck.getField(messageIdField)));
         } else {
-            cmq = createConfigMessageQuery(ListRequest.getDefaultInstance(), dependentTable,
-                    j -> j.g(dependentField.getJsonName()).eq(messageToCheck.getField(messageIdField)));
+            qry.addFilter(j -> j.g(dependentField.getJsonName()).eq(messageToCheck.getField(messageIdField)));
         }
 
-        long dependencyCount = countConfigMessages(cmq);
+        long dependencyCount = qry.executeCount(otw, this);
         if (dependencyCount > 0) {
             throw new IllegalStateException("Can't delete " + messageToCheck.getClass().getSimpleName()
                     + ", there are " + dependencyCount + " " + dependentMessage.getClass().getSimpleName()

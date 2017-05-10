@@ -29,6 +29,8 @@ import no.nb.nna.broprox.api.ControllerProto.CrawlJobListRequest;
 import no.nb.nna.broprox.api.ControllerProto.ListRequest;
 import no.nb.nna.broprox.api.ControllerProto.SeedListRequest;
 import no.nb.nna.broprox.model.ConfigProto;
+import org.netpreserve.commons.uri.UriConfigs;
+import org.netpreserve.commons.uri.UriFormat;
 
 /**
  *
@@ -178,6 +180,14 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     @Override
     public void saveSeed(ConfigProto.Seed request, StreamObserver<ConfigProto.Seed> respObserver) {
         try {
+            // If scope is not set, apply default scope
+            if (request.getScope().getSurtPrefix().isEmpty()) {
+                UriFormat f = UriConfigs.SURT_KEY_FORMAT.ignorePort(true).ignorePath(true).ignoreQuery(true);
+                String scope = UriConfigs.SURT_KEY.buildUri(request.getUri()).toCustomString(f);
+                scope = scope.substring(0, scope.length() - 1);
+                request = request.toBuilder().setScope(request.getScope().toBuilder().setSurtPrefix(scope)).build();
+            }
+
             respObserver.onNext(db.saveSeed(request));
             respObserver.onCompleted();
         } catch (Exception e) {

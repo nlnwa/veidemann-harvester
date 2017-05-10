@@ -22,6 +22,7 @@ import com.typesafe.config.ConfigException;
 import com.typesafe.config.ConfigFactory;
 import no.nb.nna.broprox.commons.TracerFactory;
 import no.nb.nna.broprox.controller.scheduler.CrawlJobScheduler;
+import no.nb.nna.broprox.controller.scheduler.FrontierClient;
 import no.nb.nna.broprox.controller.settings.Settings;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
@@ -55,8 +56,10 @@ public class Controller {
      */
     public Controller start() {
         try (DbAdapter db = new RethinkDbAdapter(SETTINGS.getDbHost(), SETTINGS.getDbPort(), SETTINGS.getDbName());
+                FrontierClient frontierClient = new FrontierClient(SETTINGS.getFrontierHost(), SETTINGS
+                        .getFrontierPort());
                 ControllerApiServer apiServer = new ControllerApiServer(SETTINGS.getApiPort(), db).start();
-                CrawlJobScheduler scheduler = new CrawlJobScheduler(db).start();) {
+                CrawlJobScheduler scheduler = new CrawlJobScheduler(db, frontierClient).start();) {
 
             LOG.info("Broprox Controller (v. {}) started", Controller.class.getPackage().getImplementationVersion());
 

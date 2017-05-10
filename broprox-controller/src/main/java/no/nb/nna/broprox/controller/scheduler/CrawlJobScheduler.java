@@ -27,13 +27,16 @@ public class CrawlJobScheduler implements AutoCloseable {
 
     final DbAdapter db;
 
-    public CrawlJobScheduler(DbAdapter db) {
+    final FrontierClient frontierClient;
+
+    public CrawlJobScheduler(DbAdapter db, FrontierClient frontierClient) {
         this.db = db;
+        this.frontierClient = frontierClient;
     }
 
     public CrawlJobScheduler start() {
         scheduler = new Scheduler();
-        scheduler.addTaskCollector(new CrawlJobCollector(db));
+        scheduler.addTaskCollector(new CrawlJobCollector(db, frontierClient));
         scheduler.start();
         return this;
     }

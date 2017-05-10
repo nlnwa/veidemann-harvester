@@ -17,24 +17,31 @@ package no.nb.nna.broprox.db.initializer;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.util.Map;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
+import com.google.protobuf.Message;
 import com.rethinkdb.RethinkDB;
 import com.rethinkdb.gen.exc.ReqlDriverError;
 import com.rethinkdb.net.Connection;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigBeanFactory;
 import com.typesafe.config.ConfigFactory;
+import no.nb.nna.broprox.api.ControllerProto.CrawlJobListRequest;
 import no.nb.nna.broprox.commons.TracerFactory;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
-import no.nb.nna.broprox.model.ConfigProto;
+import no.nb.nna.broprox.db.RethinkDbAdapter.TABLES;
+import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
+import no.nb.nna.broprox.model.ConfigProto.CrawlJob;
+import no.nb.nna.broprox.model.ConfigProto.Meta;
+import no.nb.nna.broprox.model.ConfigProto.Seed;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
-
-import static no.nb.nna.broprox.db.RethinkDbAdapter.TABLES;
 
 /**
  *
@@ -168,14 +175,43 @@ public class DbInitializer {
 
     private final void populateDb() {
         DbAdapter db = new RethinkDbAdapter(conn);
-        Yaml yaml = new Yaml();
-        try (InputStream in = getClass().getClassLoader().getResourceAsStream("browser-scripts/extract-outlinks.yaml")) {
-            Map<String, Object> scriptDef = yaml.loadAs(in, Map.class);
-            ConfigProto.BrowserScript script = ProtoUtils.rethinkToProto(scriptDef, ConfigProto.BrowserScript.class);
-            db.saveBrowserScript(script);
+        try {
+            try (InputStream in = getClass().getClassLoader()
+                    .getResourceAsStream("default_objects/browser-scripts.yaml")) {
+                readYamlFile(in, BrowserScript.class)
+                        .forEach(o -> db.saveBrowserScript(o));
+            }
+            try (InputStream in = getClass().getClassLoader()
+                    .getResourceAsStream("default_objects/crawl-jobs.yaml")) {
+                readYamlFile(in, CrawlJob.class)
+                        .forEach(o -> db.saveCrawlJob(o));
+            }
         } catch (IOException ex) {
-            throw new RuntimeException(ex);
+            throw new UncheckedIOException(ex);
         }
+
+        // Insert test seeds.
+        // TODO: Should be removed
+        String jobId = db.listCrawlJobs(CrawlJobListRequest.newBuilder().setNamePrefix("default").build())
+                .getValue(0).getId();
+        Seed seed = Seed.newBuilder()
+                .setMeta(Meta.newBuilder().setName("Seed1"))
+                .setUri("http://seed1.foo")
+                .addJobId(jobId)
+                .build();
+        db.saveSeed(seed);
+        seed = Seed.newBuilder()
+                .setMeta(Meta.newBuilder().setName("Seed2"))
+                .setUri("http://seed2.foo")
+                .addJobId(jobId)
+                .build();
+        db.saveSeed(seed);
+    }
+
+    <T extends Message> Stream<T> readYamlFile(InputStream in, Class<T> type) {
+        Yaml yaml = new Yaml();
+        return StreamSupport.stream(yaml.loadAll(in).spliterator(), false)
+                .map(o -> ProtoUtils.rethinkToProto((Map) o, type));
     }
 
 }

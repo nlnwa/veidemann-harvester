@@ -23,10 +23,12 @@ message CrawlExecutionStatus {
 
     string id = 1;
     State state = 2;
-    google.protobuf.Timestamp start_time = 3;
-    google.protobuf.Timestamp end_time = 4;
-    int64 documents_crawled = 5;
-    int64 bytes_crawled = 6;
+    string job_id = 3;
+    string seed_id = 4;
+    google.protobuf.Timestamp start_time = 5;
+    google.protobuf.Timestamp end_time = 6;
+    int64 documents_crawled = 7;
+    int64 bytes_crawled = 8;
 }
 
 message CrawlLog {

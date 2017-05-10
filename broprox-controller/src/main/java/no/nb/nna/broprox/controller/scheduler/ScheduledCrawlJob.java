@@ -21,32 +21,42 @@ import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.api.ControllerProto.SeedListRequest;
 import no.nb.nna.broprox.model.ConfigProto.CrawlJob;
 import no.nb.nna.broprox.model.ConfigProto.Seed;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  *
  */
 public class ScheduledCrawlJob extends Task {
 
+    private static final Logger LOG = LoggerFactory.getLogger(ScheduledCrawlJob.class);
+
     final CrawlJob job;
 
     final DbAdapter db;
 
-    public ScheduledCrawlJob(DbAdapter db, CrawlJob job) {
+    final FrontierClient frontierClient;
+
+    public ScheduledCrawlJob(DbAdapter db, FrontierClient frontierClient, CrawlJob job) {
         this.db = db;
         this.job = job;
+        this.frontierClient = frontierClient;
     }
 
     @Override
     public void execute(TaskExecutionContext context) throws RuntimeException {
-        System.out.println("Job '" + job.getMeta().getName() + "' starting");
+        LOG.info("Job '{}' starting", job.getMeta().getName());
         SeedListRequest request = SeedListRequest.newBuilder()
                 .setCrawlJobId(job.getId())
                 .build();
 
         for (Seed seed : db.listSeeds(request).getValueList()) {
-            System.out.println("Start harvest of: " + seed.getMeta().getName() + ", URI: " + seed.getUri());
+            if (LOG.isInfoEnabled()) {
+                LOG.info("Start harvest of: {}, URI: {}", seed.getMeta().getName(), seed.getUri());
+                frontierClient.crawlSeed(job, seed);
+            }
         }
-        System.out.println("All seeds for job '" + job.getMeta().getName() + "' started");
+        LOG.info("All seeds for job '{}' started", job.getMeta().getName());
     }
 
 }

@@ -22,19 +22,25 @@ import it.sauronsoftware.cron4j.TaskTable;
 import no.nb.nna.broprox.api.ControllerProto.CrawlJobListRequest;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.model.ConfigProto.CrawlJob;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  *
  */
 public class CrawlJobCollector implements TaskCollector {
+    private static final Logger LOG = LoggerFactory.getLogger(CrawlJobCollector.class);
 
     final DbAdapter db;
 
     final CrawlJobListRequest listRequest;
 
-    public CrawlJobCollector(DbAdapter db) {
+    final FrontierClient frontierClient;
+
+    public CrawlJobCollector(DbAdapter db, FrontierClient frontierClient) {
         this.db = db;
         this.listRequest = CrawlJobListRequest.newBuilder().setExpand(true).build();
+        this.frontierClient = frontierClient;
     }
 
     @Override
@@ -42,9 +48,13 @@ public class CrawlJobCollector implements TaskCollector {
         TaskTable tasks = new TaskTable();
 
         for (CrawlJob job : db.listCrawlJobs(listRequest).getValueList()) {
-            System.out.println("Job: " + job.getMeta().getName() + ", Cron: " + job.getSchedule().getCronExpression());
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Read Job: '{}' with cron expression '{}'",
+                        job.getMeta().getName(), job.getSchedule().getCronExpression());
+            }
+
             SchedulingPattern pattern = new SchedulingPattern(job.getSchedule().getCronExpression());
-            Task task = new ScheduledCrawlJob(db, job);
+            Task task = new ScheduledCrawlJob(db, frontierClient, job);
             tasks.add(pattern, task);
         }
 

@@ -41,7 +41,7 @@ import no.nb.nna.broprox.api.ControllerProto.ListRequest;
 import no.nb.nna.broprox.api.ControllerProto.PolitenessConfigListReply;
 import no.nb.nna.broprox.api.ControllerProto.SeedListReply;
 import no.nb.nna.broprox.api.ControllerProto.SeedListRequest;
-import no.nb.nna.broprox.commons.OpenTracingWrapper;
+import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
 import no.nb.nna.broprox.model.ConfigProto.BrowserConfig;
 import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
 import no.nb.nna.broprox.model.ConfigProto.CrawlConfig;

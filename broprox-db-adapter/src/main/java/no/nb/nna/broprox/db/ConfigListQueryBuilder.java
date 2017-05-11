@@ -24,7 +24,7 @@ import com.google.protobuf.Message;
 import com.rethinkdb.gen.ast.ReqlExpr;
 import com.rethinkdb.gen.ast.ReqlFunction1;
 import com.rethinkdb.net.Cursor;
-import no.nb.nna.broprox.commons.OpenTracingWrapper;
+import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
 
 import static no.nb.nna.broprox.db.RethinkDbAdapter.r;
 

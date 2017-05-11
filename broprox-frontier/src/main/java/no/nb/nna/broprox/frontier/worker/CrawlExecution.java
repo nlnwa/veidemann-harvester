@@ -25,7 +25,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import com.rethinkdb.RethinkDB;
 import io.opentracing.Span;
 import io.opentracing.tag.Tags;
-import no.nb.nna.broprox.commons.OpenTracingWrapper;
+import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
 import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
 import no.nb.nna.broprox.model.MessagesProto;

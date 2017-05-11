@@ -25,7 +25,7 @@ import no.nb.nna.broprox.api.ControllerProto;
 import no.nb.nna.broprox.chrome.client.ChromeDebugProtocol;
 import no.nb.nna.broprox.chrome.client.Session;
 import no.nb.nna.broprox.chrome.client.ws.CompleteMany;
-import no.nb.nna.broprox.commons.OpenTracingWrapper;
+import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
 import no.nb.nna.broprox.model.ConfigProto.CrawlConfig;

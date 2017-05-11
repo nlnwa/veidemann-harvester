@@ -18,7 +18,7 @@ package no.nb.nna.broprox.db;
 
 import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListReply;
 import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListRequest;
-import no.nb.nna.broprox.commons.OpenTracingWrapper;
+import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
 
 /**
  *

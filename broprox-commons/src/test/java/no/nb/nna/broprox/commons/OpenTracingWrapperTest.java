@@ -16,6 +16,7 @@
 package no.nb.nna.broprox.commons;
 
 
+import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
 import io.opentracing.tag.Tags;
 import org.junit.Test;
 

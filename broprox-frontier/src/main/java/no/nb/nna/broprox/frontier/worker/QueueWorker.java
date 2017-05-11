@@ -21,7 +21,7 @@ import java.util.concurrent.RecursiveAction;
 import com.rethinkdb.RethinkDB;
 import com.rethinkdb.net.Cursor;
 import io.opentracing.References;
-import no.nb.nna.broprox.commons.OpenTracingWrapper;
+import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
 import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.model.MessagesProto.CrawlExecutionStatus;
 import no.nb.nna.broprox.model.MessagesProto.QueuedUri;

@@ -28,6 +28,7 @@ import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;
 import no.nb.nna.broprox.api.ControllerProto.CrawlJobListRequest;
 import no.nb.nna.broprox.api.ControllerProto.ListRequest;
 import no.nb.nna.broprox.api.ControllerProto.SeedListRequest;
+import no.nb.nna.broprox.commons.util.CrawlScopes;
 import no.nb.nna.broprox.model.ConfigProto;
 import org.netpreserve.commons.uri.UriConfigs;
 import org.netpreserve.commons.uri.UriFormat;
@@ -182,9 +183,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
         try {
             // If scope is not set, apply default scope
             if (request.getScope().getSurtPrefix().isEmpty()) {
-                UriFormat f = UriConfigs.SURT_KEY_FORMAT.ignorePort(true).ignorePath(true).ignoreQuery(true);
-                String scope = UriConfigs.SURT_KEY.buildUri(request.getUri()).toCustomString(f);
-                scope = scope.substring(0, scope.length() - 1);
+                String scope = CrawlScopes.generateDomainScope(request.getUri());
                 request = request.toBuilder().setScope(request.getScope().toBuilder().setSurtPrefix(scope)).build();
             }
 

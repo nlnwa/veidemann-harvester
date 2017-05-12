@@ -50,6 +50,7 @@ import no.nb.nna.broprox.model.ConfigProto.CrawlJob;
 import no.nb.nna.broprox.model.ConfigProto.CrawlScheduleConfig;
 import no.nb.nna.broprox.model.ConfigProto.PolitenessConfig;
 import no.nb.nna.broprox.model.ConfigProto.Seed;
+import no.nb.nna.broprox.model.ConfigProto.Selector;
 import no.nb.nna.broprox.model.MessagesProto.CrawlExecutionStatus;
 import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
 import no.nb.nna.broprox.model.MessagesProto.CrawledContent;
@@ -316,16 +317,40 @@ public class RethinkDbAdapter implements DbAdapter {
     public CrawlJob saveCrawlJob(CrawlJob crawlJob) {
         CrawlJob.Builder builder = crawlJob.toBuilder();
 
-        if (crawlJob.getSceduleConfigOrIdCase() == CrawlJob.SceduleConfigOrIdCase.SCHEDULE) {
-            CrawlScheduleConfig schedule = crawlJob.getSchedule();
-            schedule = saveCrawlScheduleConfig(schedule);
-            builder.setScheduleId(schedule.getId());
+        switch (crawlJob.getSceduleConfigOrIdCase()) {
+            case SCHEDULE:
+                CrawlScheduleConfig schedule = crawlJob.getSchedule();
+                schedule = saveCrawlScheduleConfig(schedule);
+                builder.setScheduleId(schedule.getId());
+                break;
+            case SCHEDULE_SELECTOR:
+                Selector selector = crawlJob.getScheduleSelector();
+                CrawlScheduleConfigListReply res = listCrawlScheduleConfigs(
+                        ListRequest.newBuilder().setSelector(selector).build());
+                if (res.getCount() == 1) {
+                    builder.setScheduleId(res.getValue(0).getId());
+                } else {
+                    throw new IllegalArgumentException("Schedule selector should return exactly one match, was: "
+                            + res.getCount());
+                }
+                break;
         }
+
         switch (crawlJob.getCrawlConfigOrIdCase()) {
             case CRAWL_CONFIG:
                 CrawlConfig crawlConfig = crawlJob.getCrawlConfig();
                 crawlConfig = saveCrawlConfig(crawlConfig);
                 builder.setCrawlConfigId(crawlConfig.getId());
+                break;
+            case CRAWL_CONFIG_SELECTOR:
+                Selector selector = crawlJob.getCrawlConfigSelector();
+                CrawlConfigListReply res = listCrawlConfigs(ListRequest.newBuilder().setSelector(selector).build());
+                if (res.getCount() == 1) {
+                    builder.setCrawlConfigId(res.getValue(0).getId());
+                } else {
+                    throw new IllegalArgumentException("CrawlConfig selector should return exactly one match, was: "
+                            + res.getCount());
+                }
                 break;
             case CRAWLCONFIGORID_NOT_SET:
                 throw new IllegalArgumentException("A crawl config is required for crawl jobs");
@@ -350,15 +375,41 @@ public class RethinkDbAdapter implements DbAdapter {
     public CrawlConfig saveCrawlConfig(CrawlConfig crawlConfig) {
         CrawlConfig.Builder builder = crawlConfig.toBuilder();
 
-        if (crawlConfig.getBrowserConfigOrIdCase() == CrawlConfig.BrowserConfigOrIdCase.BROWSER_CONFIG) {
-            BrowserConfig browserConfig = crawlConfig.getBrowserConfig();
-            browserConfig = saveBrowserConfig(browserConfig);
-            builder.setBrowserConfigId(browserConfig.getId());
+        switch (crawlConfig.getBrowserConfigOrIdCase()) {
+            case BROWSER_CONFIG:
+                BrowserConfig browserConfig = crawlConfig.getBrowserConfig();
+                browserConfig = saveBrowserConfig(browserConfig);
+                builder.setBrowserConfigId(browserConfig.getId());
+                break;
+            case BROWSER_CONFIG_SELECTOR:
+                Selector selector = crawlConfig.getBrowserConfigSelector();
+                BrowserConfigListReply res = listBrowserConfigs(ListRequest.newBuilder().setSelector(selector).build());
+                if (res.getCount() == 1) {
+                    builder.setBrowserConfigId(res.getValue(0).getId());
+                } else {
+                    throw new IllegalArgumentException("BrowserConfig selector should return exactly one match, was: "
+                            + res.getCount());
+                }
+                break;
         }
-        if (crawlConfig.getPolitenessOrIdCase() == CrawlConfig.PolitenessOrIdCase.POLITENESS) {
-            PolitenessConfig politenessConfig = crawlConfig.getPoliteness();
-            politenessConfig = savePolitenessConfig(politenessConfig);
-            builder.setPolitenessId(politenessConfig.getId());
+
+        switch (crawlConfig.getPolitenessOrIdCase()) {
+            case POLITENESS:
+                PolitenessConfig politenessConfig = crawlConfig.getPoliteness();
+                politenessConfig = savePolitenessConfig(politenessConfig);
+                builder.setPolitenessId(politenessConfig.getId());
+                break;
+            case POLITENESS_SELECTOR:
+                Selector selector = crawlConfig.getPolitenessSelector();
+                PolitenessConfigListReply res = listPolitenessConfigs(
+                        ListRequest.newBuilder().setSelector(selector).build());
+                if (res.getCount() == 1) {
+                    builder.setPolitenessId(res.getValue(0).getId());
+                } else {
+                    throw new IllegalArgumentException("Politeness selector should return exactly one match, was: "
+                            + res.getCount());
+                }
+                break;
         }
 
         return saveConfigMessage(builder.build(), TABLES.CRAWL_CONFIGS);

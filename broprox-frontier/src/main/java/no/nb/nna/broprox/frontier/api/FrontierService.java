@@ -47,7 +47,7 @@ public class FrontierService extends FrontierGrpc.FrontierImplBase {
     public void crawlSeed(CrawlSeedRequest request, StreamObserver<CrawlExecutionStatus> respObserver) {
         try {
             OpenTracingWrapper otw = new OpenTracingWrapper("Frontier_API", Tags.SPAN_KIND_SERVER)
-                    .addTag(Tags.HTTP_URL.getKey(), request.getSeed().getUri());
+                    .addTag(Tags.HTTP_URL.getKey(), request.getSeed().getMeta().getName());
             CrawlExecutionStatus reply = otw.map(
                     "fetchSeed", frontier::newExecution, request.getJob(), request.getSeed());
 

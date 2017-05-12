@@ -1,5 +1,11 @@
 meta:
     name: "extract-outlinks.js"
+    description: "Script which extracts outlinks from <a href> tags"
+    label:
+    - key: "scope"
+      value: "default"
+    - key: "type"
+      value: "extract_outlinks"
 type: "EXTRACT_OUTLINKS"
 script: |
     var __brzl_framesDone = new Set();

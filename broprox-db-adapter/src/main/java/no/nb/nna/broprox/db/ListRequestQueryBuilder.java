@@ -33,6 +33,9 @@ public class ListRequestQueryBuilder extends ConfigListQueryBuilder<ListRequest>
             case NAME_PREFIX:
                 buildNamePrefixQuery(request.getNamePrefix());
                 break;
+            case SELECTOR:
+                buildSelectorQuery(request.getSelector());
+                break;
             default:
                 buildAllQuery();
                 break;

@@ -183,7 +183,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
         try {
             // If scope is not set, apply default scope
             if (request.getScope().getSurtPrefix().isEmpty()) {
-                String scope = CrawlScopes.generateDomainScope(request.getUri());
+                String scope = CrawlScopes.generateDomainScope(request.getMeta().getName());
                 request = request.toBuilder().setScope(request.getScope().toBuilder().setSurtPrefix(scope)).build();
             }
 

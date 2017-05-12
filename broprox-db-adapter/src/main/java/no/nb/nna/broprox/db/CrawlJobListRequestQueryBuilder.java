@@ -39,6 +39,9 @@ public class CrawlJobListRequestQueryBuilder extends ConfigListQueryBuilder<Craw
             case NAME_PREFIX:
                 buildNamePrefixQuery(request.getNamePrefix());
                 break;
+            case SELECTOR:
+                buildSelectorQuery(request.getSelector());
+                break;
             default:
                 buildAllQuery();
                 break;

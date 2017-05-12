@@ -38,6 +38,7 @@ import no.nb.nna.broprox.model.ConfigProto.CrawlScheduleConfig;
 import no.nb.nna.broprox.model.ConfigProto.Label;
 import no.nb.nna.broprox.model.ConfigProto.Meta;
 import no.nb.nna.broprox.model.ConfigProto.Seed;
+import no.nb.nna.broprox.model.ConfigProto.Selector;
 import no.nb.nna.broprox.model.MessagesProto.CrawlExecutionStatus;
 import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
 import no.nb.nna.broprox.model.MessagesProto.CrawledContent;
@@ -188,18 +189,25 @@ public class RethinkDbAdapterIT {
      */
     @Test
     public void testListCrawlEntities() throws InvalidProtocolBufferException {
+        Label freqDaily = Label.newBuilder().setKey("frequency").setValue("Daily").build();
+        Label freqHourly = Label.newBuilder().setKey("frequency").setValue("Hourly").build();
+        Label orgCulture = Label.newBuilder().setKey("orgType").setValue("Culture").build();
+        Label orgNews = Label.newBuilder().setKey("orgType").setValue("News").build();
+        Label orgGovernment = Label.newBuilder().setKey("orgType").setValue("Government").build();
+        Label priHigh = Label.newBuilder().setKey("priority").setValue("high").build();
+        Label priLow = Label.newBuilder().setKey("priority").setValue("low").build();
+        Label fooHigh = Label.newBuilder().setKey("foo").setValue("high").build();
+        Label fooLow = Label.newBuilder().setKey("foo").setValue("low").build();
+        Label fooLower = Label.newBuilder().setKey("foo").setValue("lower").build();
+        Label fooLowest = Label.newBuilder().setKey("foo").setValue("lowest").build();
+
         CrawlEntity entity1 = CrawlEntity.newBuilder()
                 .setMeta(Meta.newBuilder()
                         .setName("Nasjonalbiblioteket")
-                        .addLabel(Label.newBuilder()
-                                .setKey("frequency")
-                                .setValue("Daily"))
-                        .addLabel(Label.newBuilder()
-                                .setKey("orgType")
-                                .setValue("Government"))
-                        .addLabel(Label.newBuilder()
-                                .setKey("orgType")
-                                .setValue("Culture"))
+                        .addLabel(freqDaily)
+                        .addLabel(orgGovernment)
+                        .addLabel(orgCulture)
+                        .addLabel(fooHigh)
                         .setCreated(ProtoUtils.odtToTs(OffsetDateTime.parse("2017-04-06T06:20:35.779Z"))))
                 .build();
         entity1 = db.saveCrawlEntity(entity1);
@@ -207,12 +215,10 @@ public class RethinkDbAdapterIT {
         CrawlEntity entity2 = CrawlEntity.newBuilder()
                 .setMeta(Meta.newBuilder()
                         .setName("VG")
-                        .addLabel(Label.newBuilder()
-                                .setKey("frequency")
-                                .setValue("Hourly"))
-                        .addLabel(Label.newBuilder()
-                                .setKey("orgType")
-                                .setValue("News"))
+                        .addLabel(freqHourly)
+                        .addLabel(orgNews)
+                        .addLabel(fooLower)
+                        .addLabel(priHigh)
                         .setCreated(ProtoUtils.odtToTs(OffsetDateTime.parse("2017-04-06T06:20:35.779Z"))))
                 .build();
         entity2 = db.saveCrawlEntity(entity2);
@@ -220,12 +226,9 @@ public class RethinkDbAdapterIT {
         CrawlEntity entity3 = CrawlEntity.newBuilder()
                 .setMeta(Meta.newBuilder()
                         .setName("Nasjonalballetten")
-                        .addLabel(Label.newBuilder()
-                                .setKey("frequency")
-                                .setValue("Hourly"))
-                        .addLabel(Label.newBuilder()
-                                .setKey("orgType")
-                                .setValue("Culture"))
+                        .addLabel(freqHourly)
+                        .addLabel(orgCulture)
+                        .addLabel(fooLowest)
                         .setCreated(ProtoUtils.odtToTs(OffsetDateTime.parse("2017-04-06T06:20:35.779Z"))))
                 .build();
         entity3 = db.saveCrawlEntity(entity3);
@@ -259,6 +262,36 @@ public class RethinkDbAdapterIT {
         assertThat(result.getValueCount()).isEqualTo(1);
         assertThat(result.getCount()).isEqualTo(3);
         assertThat(result.getValueList()).contains(entity2);
+
+        // Select on label
+        request = ListRequest.newBuilder().setSelector(Selector.newBuilder().addLabel(freqHourly)).build();
+        result = db.listCrawlEntities(request);
+        assertThat(result.getCount()).isEqualTo(2);
+        assertThat(result.getValueList()).contains(entity2, entity3);
+
+        request = ListRequest.newBuilder().setSelector(
+                Selector.newBuilder().addLabel(freqHourly).addLabel(orgNews)).build();
+        result = db.listCrawlEntities(request);
+        assertThat(result.getCount()).isEqualTo(1);
+        assertThat(result.getValueList()).contains(entity2);
+
+        Label fooLowTrunc = Label.newBuilder().setKey("foo").setValue("low*").build();
+        request = ListRequest.newBuilder().setSelector(Selector.newBuilder().addLabel(fooLowTrunc)).build();
+        result = db.listCrawlEntities(request);
+        assertThat(result.getCount()).isEqualTo(2);
+        assertThat(result.getValueList()).contains(entity2, entity3);
+
+        Label anyHigh = Label.newBuilder().setValue("high").build();
+        request = ListRequest.newBuilder().setSelector(Selector.newBuilder().addLabel(anyHigh)).build();
+        result = db.listCrawlEntities(request);
+        assertThat(result.getCount()).isEqualTo(2);
+        assertThat(result.getValueList()).contains(entity1, entity2);
+
+        Label anyLowTrunc = Label.newBuilder().setValue("low*").build();
+        request = ListRequest.newBuilder().setSelector(Selector.newBuilder().addLabel(anyLowTrunc)).build();
+        result = db.listCrawlEntities(request);
+        assertThat(result.getCount()).isEqualTo(2);
+        assertThat(result.getValueList()).contains(entity2, entity3);
     }
 
     /**
@@ -563,23 +596,20 @@ public class RethinkDbAdapterIT {
     @Test
     public void testListSeeds() {
         Seed seed1 = Seed.newBuilder()
-                .setMeta(Meta.newBuilder().setName("Seed 1"))
-                .setUri("http://seed1.foo")
+                .setMeta(Meta.newBuilder().setName("http://seed1.foo"))
                 .addJobId("job1")
                 .build();
         Seed savedSeed1 = db.saveSeed(seed1);
 
         Seed seed2 = Seed.newBuilder()
-                .setMeta(Meta.newBuilder().setName("Seed 2"))
-                .setUri("http://seed2.foo")
+                .setMeta(Meta.newBuilder().setName("http://seed2.foo"))
                 .addJobId("job1")
                 .addJobId("job2")
                 .build();
         Seed savedSeed2 = db.saveSeed(seed2);
 
         Seed seed3 = Seed.newBuilder()
-                .setMeta(Meta.newBuilder().setName("Seed 3"))
-                .setUri("http://seed3.foo")
+                .setMeta(Meta.newBuilder().setName("http://seed3.foo"))
                 .addJobId("job2")
                 .build();
         Seed savedSeed3 = db.saveSeed(seed3);
@@ -695,10 +725,11 @@ public class RethinkDbAdapterIT {
                             .isSameAs(CrawlJob.SceduleConfigOrIdCase.SCHEDULE);
                 });
 
+        Label label = Label.newBuilder().setKey("type").setValue("default").build();
         crawlJob = CrawlJob.newBuilder()
                 .setMeta(Meta.newBuilder().setName("Test job"))
                 .setCrawlConfig(ConfigProto.CrawlConfig.newBuilder()
-                        .setMeta(Meta.newBuilder().setName("Test crawl config"))
+                        .setMeta(Meta.newBuilder().setName("Test crawl config with label").addLabel(label))
                         .setPoliteness(ConfigProto.PolitenessConfig.newBuilder()
                                 .setMeta(Meta.newBuilder().setName("Test politeness config"))
                                 .setMinTimeBetweenPageLoadMs(500)))
@@ -726,6 +757,27 @@ public class RethinkDbAdapterIT {
         assertThatThrownBy(() -> db.saveCrawlJob(badCrawlJob))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("A crawl config is required for crawl jobs");
+
+        CrawlJob crawlJobWithSelector = CrawlJob.newBuilder()
+                .setMeta(Meta.newBuilder().setName("Test job"))
+                .setCrawlConfigSelector(Selector.newBuilder().addLabel(label))
+                .build();
+
+        CrawlJob result3 = db.saveCrawlJob(crawlJobWithSelector);
+
+        assertThat(db.listCrawlJobs(CrawlJobListRequest.newBuilder().setId(result3.getId()).setExpand(true).build()))
+                .satisfies(r -> {
+                    assertThat(r.getCount()).isEqualTo(1);
+                    assertThat(r.getValue(0).getMeta().getName()).isEqualTo("Test job");
+                    assertThat(r.getValue(0).getSceduleConfigOrIdCase())
+                            .isSameAs(CrawlJob.SceduleConfigOrIdCase.SCEDULECONFIGORID_NOT_SET);
+                    assertThat(r.getValue(0).getCrawlConfigOrIdCase())
+                            .isSameAs(CrawlJob.CrawlConfigOrIdCase.CRAWL_CONFIG);
+                    assertThat(r.getValue(0).getCrawlConfig().getId())
+                            .isEqualTo(result3.getCrawlConfigId());
+                    assertThat(r.getValue(0).getCrawlConfig().getMeta().getName())
+                            .isEqualTo("Test crawl config with label");
+                });
     }
 
     /**

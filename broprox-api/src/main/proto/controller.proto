@@ -55,6 +55,7 @@ message ListRequest {
     oneof qry {
         string id = 1;
         string name_prefix = 2;
+        Selector selector = 3;
     }
     int32 page_size = 14;
     int32 page = 15;
@@ -73,6 +74,7 @@ message SeedListRequest {
         string id = 1;
         string name_prefix = 2;
         string crawl_job_id = 3;
+        Selector selector = 4;
     }
     int32 page_size = 14;
     int32 page = 15;
@@ -89,6 +91,7 @@ message CrawlJobListRequest {
     oneof qry {
         string id = 1;
         string name_prefix = 2;
+        Selector selector = 3;
     }
     // Expand dependencies (i.e. include the complete object graph)
     bool expand = 13;
@@ -137,6 +140,7 @@ message BrowserScriptListRequest {
         string id = 1;
         string name_prefix = 2;
         BrowserScript.Type type = 3;
+        Selector selector = 4;
     }
     int32 page_size = 14;
     int32 page = 15;

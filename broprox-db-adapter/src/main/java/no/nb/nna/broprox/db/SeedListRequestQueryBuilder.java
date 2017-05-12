@@ -38,6 +38,9 @@ public class SeedListRequestQueryBuilder extends ConfigListQueryBuilder<SeedList
             case NAME_PREFIX:
                 buildNamePrefixQuery(request.getNamePrefix());
                 break;
+            case SELECTOR:
+                buildSelectorQuery(request.getSelector());
+                break;
             case CRAWL_JOB_ID:
                 setCountQry(r.table(table.name).getAll(request.getCrawlJobId()).optArg("index", "jobId"));
                 setListQry(getCountQry());

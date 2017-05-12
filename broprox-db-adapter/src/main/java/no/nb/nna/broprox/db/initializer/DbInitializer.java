@@ -36,6 +36,7 @@ import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
 import no.nb.nna.broprox.db.RethinkDbAdapter.TABLES;
 import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
+import no.nb.nna.broprox.model.ConfigProto.CrawlEntity;
 import no.nb.nna.broprox.model.ConfigProto.CrawlJob;
 import no.nb.nna.broprox.model.ConfigProto.Meta;
 import no.nb.nna.broprox.model.ConfigProto.Seed;
@@ -129,7 +130,6 @@ public class DbInitializer {
         r.tableCreate(TABLES.EXTRACTED_TEXT.name).optArg("primary_key", "warcId").run(conn);
 
         r.tableCreate(TABLES.BROWSER_SCRIPTS.name).run(conn);
-        createMetaIndexes(TABLES.BROWSER_SCRIPTS);
 
         r.tableCreate(TABLES.URI_QUEUE.name).run(conn);
         r.table(TABLES.URI_QUEUE.name).indexCreate("surt").run(conn);
@@ -142,35 +142,54 @@ public class DbInitializer {
         r.tableCreate(TABLES.SCREENSHOT.name).run(conn);
 
         r.tableCreate(TABLES.CRAWL_ENTITIES.name).run(conn);
-        createMetaIndexes(TABLES.CRAWL_ENTITIES);
 
         r.tableCreate(TABLES.SEEDS.name).run(conn);
-        createMetaIndexes(TABLES.SEEDS);
         r.table(TABLES.SEEDS.name).indexCreate("jobId").optArg("multi", true).run(conn);
 
         r.tableCreate(TABLES.CRAWL_JOBS.name).run(conn);
-        createMetaIndexes(TABLES.CRAWL_JOBS);
 
         r.tableCreate(TABLES.CRAWL_CONFIGS.name).run(conn);
-        createMetaIndexes(TABLES.CRAWL_CONFIGS);
 
         r.tableCreate(TABLES.CRAWL_SCHEDULE_CONFIGS.name).run(conn);
-        createMetaIndexes(TABLES.CRAWL_SCHEDULE_CONFIGS);
 
         r.tableCreate(TABLES.BROWSER_CONFIGS.name).run(conn);
-        createMetaIndexes(TABLES.BROWSER_CONFIGS);
 
         r.tableCreate(TABLES.POLITENESS_CONFIGS.name).run(conn);
-        createMetaIndexes(TABLES.POLITENESS_CONFIGS);
+
+        createMetaIndexes(TABLES.BROWSER_SCRIPTS,
+                TABLES.CRAWL_ENTITIES,
+                TABLES.SEEDS,
+                TABLES.CRAWL_JOBS,
+                TABLES.CRAWL_CONFIGS,
+                TABLES.CRAWL_SCHEDULE_CONFIGS,
+                TABLES.BROWSER_CONFIGS,
+                TABLES.POLITENESS_CONFIGS
+        );
 
         r.table(TABLES.URI_QUEUE.name).indexWait("surt", "executionIds").run(conn);
         r.table(TABLES.CRAWL_LOG.name).indexWait("surt_time").run(conn);
         r.table(TABLES.SEEDS.name).indexWait("jobId").run(conn);
     }
 
-    private final void createMetaIndexes(TABLES table) {
-        r.table(table.name).indexCreate("name", row -> row.g("meta").g("name").downcase()).run(conn);
-        r.table(table.name).indexWait("name").run(conn);
+    private final void createMetaIndexes(TABLES... tables) {
+        for (TABLES table : tables) {
+            r.table(table.name).indexCreate("name", row -> row.g("meta").g("name").downcase()).run(conn);
+            r.table(table.name)
+                    .indexCreate("label",
+                            row -> row.g("meta").g("label").map(
+                                    label -> r.array(label.g("key").downcase(), label.g("value").downcase())))
+                    .optArg("multi", true)
+                    .run(conn);
+            r.table(table.name)
+                    .indexCreate("label_value",
+                            row -> row.g("meta").g("label").map(
+                                    label -> label.g("value").downcase()))
+                    .optArg("multi", true)
+                    .run(conn);
+        }
+        for (TABLES table : tables) {
+            r.table(table.name).indexWait("name", "label", "label_value").run(conn);
+        }
     }
 
     private final void populateDb() {
@@ -194,15 +213,21 @@ public class DbInitializer {
         // TODO: Should be removed
         String jobId = db.listCrawlJobs(CrawlJobListRequest.newBuilder().setNamePrefix("default").build())
                 .getValue(0).getId();
+
+        CrawlEntity entity = CrawlEntity.newBuilder().setMeta(Meta.newBuilder().setName("Entity1")).build();
+        entity = db.saveCrawlEntity(entity);
         Seed seed = Seed.newBuilder()
-                .setMeta(Meta.newBuilder().setName("Seed1"))
-                .setUri("http://seed1.foo")
+                .setMeta(Meta.newBuilder().setName("http://seed1.foo"))
+                .setEntityId(entity.getId())
                 .addJobId(jobId)
                 .build();
         db.saveSeed(seed);
+
+        entity = CrawlEntity.newBuilder().setMeta(Meta.newBuilder().setName("Entity1")).build();
+        entity = db.saveCrawlEntity(entity);
         seed = Seed.newBuilder()
-                .setMeta(Meta.newBuilder().setName("Seed2"))
-                .setUri("http://seed2.foo")
+                .setMeta(Meta.newBuilder().setName("http://seed2.foo"))
+                .setEntityId(entity.getId())
                 .addJobId(jobId)
                 .build();
         db.saveSeed(seed);

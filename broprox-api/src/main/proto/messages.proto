@@ -109,6 +109,30 @@ message QueuedUri {
     string discovery_path = 6;
     string referrer = 7;
     CrawlScope scope = 8;
+    repeated Cookie cookies = 9;
+}
+
+message Cookie {
+    // Cookie name.
+    string name = 1;
+    // Cookie value.
+    string value = 2;
+    // Cookie domain.
+    string domain = 3;
+    // Cookie path.
+    string path = 4;
+    // Cookie expiration date as the number of seconds since the UNIX epoch.
+    double expires = 5;
+    // Cookie size.
+    int32 size = 6;
+    // True if cookie is http-only.
+    bool http_only = 7;
+    // True if cookie is secure.
+    bool secure = 8;
+    // True in case of session cookie.
+    bool session = 9;
+    // Cookie SameSite type.
+    string same_site = 10;
 }
 
 message Screenshot {

@@ -18,24 +18,28 @@ package no.nb.nna.broprox.harvester.browsercontroller;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Base64;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 
 import com.google.protobuf.ByteString;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import no.nb.nna.broprox.chrome.client.PageDomain;
 import no.nb.nna.broprox.chrome.client.RuntimeDomain;
 import no.nb.nna.broprox.chrome.client.Session;
+import no.nb.nna.broprox.commons.util.ApiTools;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
 import no.nb.nna.broprox.model.MessagesProto.Screenshot;
 import no.nb.nna.broprox.harvester.BroproxHeaderConstants;
+import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
+import no.nb.nna.broprox.model.ConfigProto.Label;
+import no.nb.nna.broprox.model.MessagesProto;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static no.nb.nna.broprox.harvester.BroproxHeaderConstants.ALL_EXECUTION_IDS;
@@ -114,25 +118,57 @@ public class PageExecution implements BroproxHeaderConstants {
         }
     }
 
-    public List<QueuedUri> extractOutlinks(String script) {
+    List<MessagesProto.Cookie> extractCookies() {
         try {
-            List<QueuedUri> outlinks = Collections.EMPTY_LIST;
-            RuntimeDomain.Evaluate ev = session.runtime
-                    .evaluate(script, null, null, null, null, Boolean.TRUE, null, null, null).get(timeout, MILLISECONDS);
-            if (ev.result.value != null) {
-                String resultString = ((String) ev.result.value).trim();
-                if (!resultString.isEmpty()) {
-                    outlinks = new ArrayList<>();
-                    String[] links = resultString.split("\n+");
-                    String path = discoveryPath + "L";
-                    for (int i = 0; i < links.length; i++) {
-                        outlinks.add(QueuedUri.newBuilder()
-                                .addAllExecutionIds(queuedUri.getExecutionIdsList())
-                                .setUri(links[i])
-                                .setReferrer(queuedUri.getUri())
-                                .setTimeStamp(ProtoUtils.odtToTs(OffsetDateTime.now()))
-                                .setDiscoveryPath(path)
-                                .build());
+        return session.network.getCookies().get(timeout, MILLISECONDS).cookies.stream()
+                .map(c -> {
+                    return MessagesProto.Cookie.newBuilder()
+                            .setName(c.name)
+                            .setValue(c.value)
+                            .setDomain(c.domain)
+                            .setPath(c.path)
+                            .setExpires(c.expires)
+                            .setSize(c.size)
+                            .setHttpOnly(c.httpOnly)
+                            .setSecure(c.secure)
+                            .setSession(c.session)
+                            .setSameSite(c.sameSite)
+                            .build();
+                })
+                .collect(Collectors.toList());
+        } catch (InterruptedException | ExecutionException | TimeoutException ex) {
+            throw new RuntimeException(ex);
+        }
+    }
+
+    public List<QueuedUri> extractOutlinks(List<BrowserScript> scripts) {
+        Label outlinksLabel = ApiTools.buildLabel("type", "extract_outlinks");
+        List<MessagesProto.Cookie> cookies = extractCookies();
+        try {
+            List<QueuedUri> outlinks = new ArrayList<>();
+            for (BrowserScript script : scripts) {
+                if (ApiTools.hasLabel(script.getMeta(), outlinksLabel)) {
+
+                    RuntimeDomain.Evaluate ev = session.runtime
+                            .evaluate(script.getScript(), null, null, null, null, Boolean.TRUE, null, null, null)
+                            .get(timeout, MILLISECONDS);
+
+                    if (ev.result.value != null) {
+                        String resultString = ((String) ev.result.value).trim();
+                        if (!resultString.isEmpty()) {
+                            String[] links = resultString.split("\n+");
+                            String path = discoveryPath + "L";
+                            for (int i = 0; i < links.length; i++) {
+                                outlinks.add(QueuedUri.newBuilder()
+                                        .addAllExecutionIds(queuedUri.getExecutionIdsList())
+                                        .setUri(links[i])
+                                        .setReferrer(queuedUri.getUri())
+                                        .setTimeStamp(ProtoUtils.odtToTs(OffsetDateTime.now()))
+                                        .setDiscoveryPath(path)
+                                        .addAllCookies(cookies)
+                                        .build());
+                            }
+                        }
                     }
                 }
             }

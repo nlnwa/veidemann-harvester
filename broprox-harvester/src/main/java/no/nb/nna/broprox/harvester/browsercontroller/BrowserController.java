@@ -16,15 +16,19 @@
 package no.nb.nna.broprox.harvester.browsercontroller;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 
 import io.opentracing.tag.Tags;
 import no.nb.nna.broprox.api.ControllerProto;
 import no.nb.nna.broprox.chrome.client.ChromeDebugProtocol;
 import no.nb.nna.broprox.chrome.client.Session;
-import no.nb.nna.broprox.chrome.client.ws.CompleteMany;
 import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
@@ -42,17 +46,11 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
 
     private final ChromeDebugProtocol chrome;
 
-    private final String chromeHost;
-
-    private final int chromePort;
-
     private final DbAdapter db;
 
-    private final int sleep = 500;
+    private final Map<String, BrowserScript> scriptCache = new HashMap<>();
 
     public BrowserController(String chromeHost, int chromePort, DbAdapter db) throws IOException {
-        this.chromeHost = chromeHost;
-        this.chromePort = chromePort;
         this.chrome = new ChromeDebugProtocol(chromeHost, chromePort);
         this.db = db;
     }
@@ -68,7 +66,7 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
                 config.getBrowserConfig().getWindowWidth(),
                 config.getBrowserConfig().getWindowHeight())) {
 
-            new CompleteMany(
+            CompletableFuture.allOf(
                     session.debugger.enable(),
                     session.page.enable(),
                     session.runtime.enable(),
@@ -86,6 +84,13 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
                     session.page.setControlNavigations(Boolean.TRUE)
             ).get(config.getBrowserConfig().getPageLoadTimeoutMs(), MILLISECONDS);
 
+            // set cookies
+            CompletableFuture.allOf(queuedUri.getCookiesList().stream()
+                    .map(c -> session.network.setCookie(queuedUri.getUri(), c.getName(), c.getValue(), c.getDomain(),
+                    c.getPath(), c.getSecure(), c.getHttpOnly(), c.getSameSite(), c.getExpires()))
+                    .collect(Collectors.toList()).toArray(new CompletableFuture[]{}))
+                    .get(config.getBrowserConfig().getPageLoadTimeoutMs(), MILLISECONDS);
+
             session.debugger.onPaused(p -> {
                 String scriptId = p.callFrames.get(0).location.scriptId;
                 System.out.println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>> SCRIPT BLE PAUSET: " + scriptId);
@@ -95,7 +100,7 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
             });
 
             PageExecution pex = new PageExecution(executionId, queuedUri, session, config.getBrowserConfig()
-                    .getPageLoadTimeoutMs(), db, sleep);
+                    .getPageLoadTimeoutMs(), db, config.getBrowserConfig().getSleepAfterPageloadMs());
             otw.run("navigatePage", pex::navigatePage);
             otw.run("saveScreenshot", pex::saveScreenshot);
 
@@ -107,16 +112,39 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
 //                    }
 //                }
 //                System.out.println("<<<<<<");
-
-            ControllerProto.BrowserScriptListRequest req = ControllerProto.BrowserScriptListRequest.newBuilder()
-                    .setType(BrowserScript.Type.EXTRACT_OUTLINKS)
-                    .build();
-            String script = db.listBrowserScripts(req).getValue(0).getScript();
-            List<QueuedUri> outlinks = otw.map("extractOutlinks", pex::extractOutlinks, script);
+            List<BrowserScript> scripts = getScripts(config);
+            List<QueuedUri> outlinks = otw.map("extractOutlinks", pex::extractOutlinks, scripts);
             pex.getDocumentUrl();
             pex.scrollToTop();
             return outlinks;
         }
+    }
+
+    private List<BrowserScript> getScripts(CrawlConfig config) {
+        List<BrowserScript> scripts = new ArrayList<>();
+        for (String scriptId : config.getBrowserConfig().getScriptIdList()) {
+            BrowserScript script = scriptCache.get(scriptId);
+            if (script == null) {
+                ControllerProto.BrowserScriptListRequest req = ControllerProto.BrowserScriptListRequest.newBuilder()
+                        .setId(scriptId)
+                        .build();
+                script = db.listBrowserScripts(req).getValue(0);
+                scriptCache.put(scriptId, script);
+            }
+            scripts.add(script);
+        }
+        if (config.getBrowserConfig().hasScriptSelector()) {
+            ControllerProto.BrowserScriptListRequest req = ControllerProto.BrowserScriptListRequest.newBuilder()
+                    .setSelector(config.getBrowserConfig().getScriptSelector())
+                    .build();
+            for (BrowserScript script : db.listBrowserScripts(req).getValueList()) {
+                if (!scriptCache.containsKey(script.getId())) {
+                    scriptCache.put(script.getId(), script);
+                }
+                scripts.add(script);
+            }
+        }
+        return scripts;
     }
 
     @Override

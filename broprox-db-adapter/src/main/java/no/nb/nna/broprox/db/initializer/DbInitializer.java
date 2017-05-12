@@ -223,7 +223,7 @@ public class DbInitializer {
                 .build();
         db.saveSeed(seed);
 
-        entity = CrawlEntity.newBuilder().setMeta(Meta.newBuilder().setName("Entity1")).build();
+        entity = CrawlEntity.newBuilder().setMeta(Meta.newBuilder().setName("Entity2")).build();
         entity = db.saveCrawlEntity(entity);
         seed = Seed.newBuilder()
                 .setMeta(Meta.newBuilder().setName("http://seed2.foo"))

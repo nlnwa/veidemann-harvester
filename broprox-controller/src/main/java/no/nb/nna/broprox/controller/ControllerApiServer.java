@@ -18,17 +18,11 @@ package no.nb.nna.broprox.controller;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 
-import com.typesafe.config.Config;
-import com.typesafe.config.ConfigBeanFactory;
-import com.typesafe.config.ConfigFactory;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.opentracing.contrib.ServerTracingInterceptor;
 import io.opentracing.util.GlobalTracer;
-import no.nb.nna.broprox.commons.TracerFactory;
-import no.nb.nna.broprox.controller.settings.Settings;
 import no.nb.nna.broprox.db.DbAdapter;
-import no.nb.nna.broprox.db.RethinkDbAdapter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,27 +33,12 @@ public class ControllerApiServer implements AutoCloseable {
 
     private static final Logger LOG = LoggerFactory.getLogger(ControllerApiServer.class);
 
-    private static final Settings SETTINGS;
-
-    static {
-        Config config = ConfigFactory.load();
-        config.checkValid(ConfigFactory.defaultReference());
-        SETTINGS = ConfigBeanFactory.create(config, Settings.class);
-
-        TracerFactory.init("Controller", SETTINGS.getTracerUri());
-    }
-
     private final Server server;
 
     private final DbAdapter db;
 
-    public ControllerApiServer() {
-        this(SETTINGS.getApiPort());
-    }
-
-    public ControllerApiServer(int port) {
-        this(ServerBuilder.forPort(port),
-                new RethinkDbAdapter(SETTINGS.getDbHost(), SETTINGS.getDbPort(), SETTINGS.getDbName()));
+    public ControllerApiServer(int port, DbAdapter db) {
+        this(ServerBuilder.forPort(port), db);
     }
 
     public ControllerApiServer(ServerBuilder<?> serverBuilder, DbAdapter db) {
@@ -77,9 +56,7 @@ public class ControllerApiServer implements AutoCloseable {
         try {
             server.start();
 
-            LOG.info("Broprox Controller (v. {}) started",
-                    ControllerApiServer.class.getPackage().getImplementationVersion());
-            LOG.info("Listening on {}", server.getPort());
+            LOG.info("Controller api listening on {}", server.getPort());
 
             Runtime.getRuntime().addShutdownHook(new Thread() {
                 @Override

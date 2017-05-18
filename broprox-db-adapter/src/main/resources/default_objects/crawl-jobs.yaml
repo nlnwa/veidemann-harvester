@@ -1,0 +1,63 @@
+meta:
+    name: "Default"
+    description: "The default job definition"
+    label:
+        - key: "type"
+          value: "default"
+schedule:
+    meta:
+        name: "Every minute"
+        description: "A schedule which triggers every minute"
+    cronExpression: "* * * * *"
+limits:
+    maxDurationS: 60
+crawlConfig:
+    meta:
+        name: "Default"
+        description: "Default crawl configuration"
+        label:
+        - key: "type"
+          value: "default"
+
+    browserConfig:
+        meta:
+            name: "Default"
+            description: "Default browser configuration"
+        userAgent: ""
+        windowWidth: 900
+        windowHeight: 900
+        pageLoadTimeoutMs: 10000
+        sleepAfterPageLoadMs: 500
+        scriptSelector:
+            label:
+            - key: "scope"
+              value: "default"
+
+    politeness:
+        meta:
+            name: "Default"
+            description: "Default politeness configuration"
+        ignoreRobots: false
+        minTimeBetweenPageLoadMs: 1000
+    extra:
+        extractText: true
+        createSnapshot: true
+    depthFirst: false
+---
+meta:
+    name: "Every day"
+    description: "A job running every day"
+    label:
+        - key: "type"
+          value: "default"
+schedule:
+    meta:
+        name: "Every day"
+        description: "A schedule which triggers every day"
+    cronExpression: "0 6 * * *"
+limits:
+    maxDurationS: 86400
+crawlConfigSelector:
+    label:
+    - key: "type"
+      value: "default"

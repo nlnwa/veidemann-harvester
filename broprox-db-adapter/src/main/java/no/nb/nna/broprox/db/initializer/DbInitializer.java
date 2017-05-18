@@ -17,38 +17,32 @@ package no.nb.nna.broprox.db.initializer;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.util.Map;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
+import com.google.protobuf.Message;
 import com.rethinkdb.RethinkDB;
 import com.rethinkdb.gen.exc.ReqlDriverError;
 import com.rethinkdb.net.Connection;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigBeanFactory;
 import com.typesafe.config.ConfigFactory;
-import no.nb.nna.broprox.commons.TracerFactory;
+import no.nb.nna.broprox.api.ControllerProto.CrawlJobListRequest;
+import no.nb.nna.broprox.commons.opentracing.TracerFactory;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
-import no.nb.nna.broprox.model.ConfigProto;
+import no.nb.nna.broprox.db.RethinkDbAdapter.TABLES;
+import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
+import no.nb.nna.broprox.model.ConfigProto.CrawlEntity;
+import no.nb.nna.broprox.model.ConfigProto.CrawlJob;
+import no.nb.nna.broprox.model.ConfigProto.Meta;
+import no.nb.nna.broprox.model.ConfigProto.Seed;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
-
-import static no.nb.nna.broprox.db.RethinkDbAdapter.TABLE_BROWSER_CONFIGS;
-import static no.nb.nna.broprox.db.RethinkDbAdapter.TABLE_BROWSER_SCRIPTS;
-import static no.nb.nna.broprox.db.RethinkDbAdapter.TABLE_CRAWLED_CONTENT;
-import static no.nb.nna.broprox.db.RethinkDbAdapter.TABLE_CRAWL_CONFIGS;
-import static no.nb.nna.broprox.db.RethinkDbAdapter.TABLE_CRAWL_ENTITIES;
-import static no.nb.nna.broprox.db.RethinkDbAdapter.TABLE_CRAWL_JOBS;
-import static no.nb.nna.broprox.db.RethinkDbAdapter.TABLE_CRAWL_LOG;
-import static no.nb.nna.broprox.db.RethinkDbAdapter.TABLE_CRAWL_SCHEDULE_CONFIGS;
-import static no.nb.nna.broprox.db.RethinkDbAdapter.TABLE_EXECUTIONS;
-import static no.nb.nna.broprox.db.RethinkDbAdapter.TABLE_EXTRACTED_TEXT;
-import static no.nb.nna.broprox.db.RethinkDbAdapter.TABLE_POLITENESS_CONFIGS;
-import static no.nb.nna.broprox.db.RethinkDbAdapter.TABLE_SCREENSHOT;
-import static no.nb.nna.broprox.db.RethinkDbAdapter.TABLE_SEEDS;
-import static no.nb.nna.broprox.db.RethinkDbAdapter.TABLE_SYSTEM;
-import static no.nb.nna.broprox.db.RethinkDbAdapter.TABLE_URI_QUEUE;
 
 /**
  *
@@ -123,70 +117,126 @@ public class DbInitializer {
     private final void createDb() {
         r.dbCreate(SETTINGS.getDbName()).run(conn);
 
-        r.tableCreate(TABLE_SYSTEM).run(conn);
-        r.table(TABLE_SYSTEM).insert(r.hashMap("id", "db_version").put("db_version", "0.1")).run(conn);
+        r.tableCreate(TABLES.SYSTEM.name).run(conn);
+        r.table(TABLES.SYSTEM.name).insert(r.hashMap("id", "db_version").with("db_version", "0.1")).run(conn);
 
-        r.tableCreate(TABLE_CRAWL_LOG).optArg("primary_key", "warcId").run(conn);
-        r.table(TABLE_CRAWL_LOG)
+        r.tableCreate(TABLES.CRAWL_LOG.name).optArg("primary_key", "warcId").run(conn);
+        r.table(TABLES.CRAWL_LOG.name)
                 .indexCreate("surt_time", row -> r.array(row.g("surt"), row.g("timeStamp")))
                 .run(conn);
-        r.table(TABLE_CRAWL_LOG).indexWait("surt_time").run(conn);
 
-        r.tableCreate(TABLE_CRAWLED_CONTENT).optArg("primary_key", "digest").run(conn);
+        r.tableCreate(TABLES.CRAWLED_CONTENT.name).optArg("primary_key", "digest").run(conn);
 
-        r.tableCreate(TABLE_EXTRACTED_TEXT).optArg("primary_key", "warcId").run(conn);
+        r.tableCreate(TABLES.EXTRACTED_TEXT.name).optArg("primary_key", "warcId").run(conn);
 
-        r.tableCreate(TABLE_BROWSER_SCRIPTS).run(conn);
-        createMetaIndexes(TABLE_BROWSER_SCRIPTS);
+        r.tableCreate(TABLES.BROWSER_SCRIPTS.name).run(conn);
 
-        r.tableCreate(TABLE_URI_QUEUE).run(conn);
-        r.table(TABLE_URI_QUEUE).indexCreate("surt").run(conn);
-        r.table(TABLE_URI_QUEUE).indexCreate("executionIds", uri -> uri.g("executionIds")
+        r.tableCreate(TABLES.URI_QUEUE.name).run(conn);
+        r.table(TABLES.URI_QUEUE.name).indexCreate("surt").run(conn);
+        r.table(TABLES.URI_QUEUE.name).indexCreate("executionIds", uri -> uri.g("executionIds")
                 .map(eid -> r.array(eid.g("id"), eid.g("seq")))
         ).optArg("multi", true).run(conn);
-        r.table(TABLE_URI_QUEUE).indexWait("surt", "executionIds").run(conn);
 
-        r.tableCreate(TABLE_EXECUTIONS).run(conn);
+        r.tableCreate(TABLES.EXECUTIONS.name).run(conn);
 
-        r.tableCreate(TABLE_SCREENSHOT).run(conn);
+        r.tableCreate(TABLES.SCREENSHOT.name).run(conn);
 
-        r.tableCreate(TABLE_CRAWL_ENTITIES).run(conn);
-        createMetaIndexes(TABLE_CRAWL_ENTITIES);
+        r.tableCreate(TABLES.CRAWL_ENTITIES.name).run(conn);
 
-        r.tableCreate(TABLE_SEEDS).run(conn);
-        createMetaIndexes(TABLE_SEEDS);
+        r.tableCreate(TABLES.SEEDS.name).run(conn);
+        r.table(TABLES.SEEDS.name).indexCreate("jobId").optArg("multi", true).run(conn);
 
-        r.tableCreate(TABLE_CRAWL_JOBS).run(conn);
-        createMetaIndexes(TABLE_CRAWL_JOBS);
+        r.tableCreate(TABLES.CRAWL_JOBS.name).run(conn);
 
-        r.tableCreate(TABLE_CRAWL_CONFIGS).run(conn);
-        createMetaIndexes(TABLE_CRAWL_CONFIGS);
+        r.tableCreate(TABLES.CRAWL_CONFIGS.name).run(conn);
 
-        r.tableCreate(TABLE_CRAWL_SCHEDULE_CONFIGS).run(conn);
-        createMetaIndexes(TABLE_CRAWL_SCHEDULE_CONFIGS);
+        r.tableCreate(TABLES.CRAWL_SCHEDULE_CONFIGS.name).run(conn);
 
-        r.tableCreate(TABLE_BROWSER_CONFIGS).run(conn);
-        createMetaIndexes(TABLE_BROWSER_CONFIGS);
+        r.tableCreate(TABLES.BROWSER_CONFIGS.name).run(conn);
 
-        r.tableCreate(TABLE_POLITENESS_CONFIGS).run(conn);
-        createMetaIndexes(TABLE_POLITENESS_CONFIGS);
+        r.tableCreate(TABLES.POLITENESS_CONFIGS.name).run(conn);
+
+        createMetaIndexes(TABLES.BROWSER_SCRIPTS,
+                TABLES.CRAWL_ENTITIES,
+                TABLES.SEEDS,
+                TABLES.CRAWL_JOBS,
+                TABLES.CRAWL_CONFIGS,
+                TABLES.CRAWL_SCHEDULE_CONFIGS,
+                TABLES.BROWSER_CONFIGS,
+                TABLES.POLITENESS_CONFIGS
+        );
+
+        r.table(TABLES.URI_QUEUE.name).indexWait("surt", "executionIds").run(conn);
+        r.table(TABLES.CRAWL_LOG.name).indexWait("surt_time").run(conn);
+        r.table(TABLES.SEEDS.name).indexWait("jobId").run(conn);
     }
 
-    private final void createMetaIndexes(String tableName) {
-        r.table(tableName).indexCreate("name", row -> row.g("meta").g("name").downcase()).run(conn);
-        r.table(tableName).indexWait("name").run(conn);
+    private final void createMetaIndexes(TABLES... tables) {
+        for (TABLES table : tables) {
+            r.table(table.name).indexCreate("name", row -> row.g("meta").g("name").downcase()).run(conn);
+            r.table(table.name)
+                    .indexCreate("label",
+                            row -> row.g("meta").g("label").map(
+                                    label -> r.array(label.g("key").downcase(), label.g("value").downcase())))
+                    .optArg("multi", true)
+                    .run(conn);
+            r.table(table.name)
+                    .indexCreate("label_value",
+                            row -> row.g("meta").g("label").map(
+                                    label -> label.g("value").downcase()))
+                    .optArg("multi", true)
+                    .run(conn);
+        }
+        for (TABLES table : tables) {
+            r.table(table.name).indexWait("name", "label", "label_value").run(conn);
+        }
     }
 
     private final void populateDb() {
         DbAdapter db = new RethinkDbAdapter(conn);
-        Yaml yaml = new Yaml();
-        try (InputStream in = getClass().getClassLoader().getResourceAsStream("browser-scripts/extract-outlinks.yaml")) {
-            Map<String, Object> scriptDef = yaml.loadAs(in, Map.class);
-            ConfigProto.BrowserScript script = ProtoUtils.rethinkToProto(scriptDef, ConfigProto.BrowserScript.class);
-            db.saveBrowserScript(script);
+        try {
+            try (InputStream in = getClass().getClassLoader()
+                    .getResourceAsStream("default_objects/browser-scripts.yaml")) {
+                readYamlFile(in, BrowserScript.class)
+                        .forEach(o -> db.saveBrowserScript(o));
+            }
+            try (InputStream in = getClass().getClassLoader()
+                    .getResourceAsStream("default_objects/crawl-jobs.yaml")) {
+                readYamlFile(in, CrawlJob.class)
+                        .forEach(o -> db.saveCrawlJob(o));
+            }
         } catch (IOException ex) {
-            throw new RuntimeException(ex);
+            throw new UncheckedIOException(ex);
         }
+
+        // Insert test seeds.
+        // TODO: Should be removed
+        String jobId = db.listCrawlJobs(CrawlJobListRequest.newBuilder().setNamePrefix("default").build())
+                .getValue(0).getId();
+
+        CrawlEntity entity = CrawlEntity.newBuilder().setMeta(Meta.newBuilder().setName("Entity1")).build();
+        entity = db.saveCrawlEntity(entity);
+        Seed seed = Seed.newBuilder()
+                .setMeta(Meta.newBuilder().setName("http://seed1.foo"))
+                .setEntityId(entity.getId())
+                .addJobId(jobId)
+                .build();
+        db.saveSeed(seed);
+
+        entity = CrawlEntity.newBuilder().setMeta(Meta.newBuilder().setName("Entity2")).build();
+        entity = db.saveCrawlEntity(entity);
+        seed = Seed.newBuilder()
+                .setMeta(Meta.newBuilder().setName("http://seed2.foo"))
+                .setEntityId(entity.getId())
+                .addJobId(jobId)
+                .build();
+        db.saveSeed(seed);
+    }
+
+    <T extends Message> Stream<T> readYamlFile(InputStream in, Class<T> type) {
+        Yaml yaml = new Yaml();
+        return StreamSupport.stream(yaml.loadAll(in).spliterator(), false)
+                .map(o -> ProtoUtils.rethinkToProto((Map) o, type));
     }
 
 }

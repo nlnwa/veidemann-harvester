@@ -24,12 +24,32 @@ public class Settings extends CommonSettings {
 
     private int apiPort;
 
+    private String frontierHost;
+
+    private int frontierPort;
+
     public int getApiPort() {
         return apiPort;
     }
 
     public void setApiPort(int apiPort) {
         this.apiPort = apiPort;
+    }
+
+    public String getFrontierHost() {
+        return frontierHost;
+    }
+
+    public void setFrontierHost(String frontierHost) {
+        this.frontierHost = frontierHost;
+    }
+
+    public int getFrontierPort() {
+        return frontierPort;
+    }
+
+    public void setFrontierPort(int frontierPort) {
+        this.frontierPort = frontierPort;
     }
 
 }

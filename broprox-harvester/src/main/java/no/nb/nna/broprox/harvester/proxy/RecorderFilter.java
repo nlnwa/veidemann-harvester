@@ -25,7 +25,7 @@ import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
-import no.nb.nna.broprox.commons.OpenTracingWrapper;
+import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.harvester.BroproxHeaderConstants;

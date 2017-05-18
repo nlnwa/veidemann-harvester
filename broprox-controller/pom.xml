@@ -28,6 +28,16 @@
             <version>${project.version}</version>
         </dependency>
 
+        <dependency>
+            <groupId>it.sauronsoftware.cron4j</groupId>
+            <artifactId>cron4j</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.netpreserve.commons</groupId>
+            <artifactId>webarchive-commons-uri</artifactId>
+        </dependency>
+
         <!-- Configuration framework -->
         <dependency>
             <groupId>com.typesafe</groupId>

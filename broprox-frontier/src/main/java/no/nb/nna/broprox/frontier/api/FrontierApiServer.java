@@ -15,16 +15,15 @@
  */
 package no.nb.nna.broprox.frontier.api;
 
-import java.net.URI;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 
-import javax.ws.rs.core.UriBuilder;
+import io.grpc.Server;
+import io.grpc.ServerBuilder;
+import io.opentracing.contrib.ServerTracingInterceptor;
+import io.opentracing.util.GlobalTracer;
 import no.nb.nna.broprox.db.DbAdapter;
-import no.nb.nna.broprox.frontier.FrontierService;
 import no.nb.nna.broprox.frontier.worker.Frontier;
-import org.glassfish.grizzly.http.server.HttpServer;
-import org.glassfish.hk2.utilities.binding.AbstractBinder;
-import org.glassfish.jersey.grizzly2.httpserver.GrizzlyHttpServerFactory;
-import org.glassfish.jersey.server.ResourceConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,40 +34,74 @@ public class FrontierApiServer implements AutoCloseable {
 
     private static final Logger LOG = LoggerFactory.getLogger(FrontierApiServer.class);
 
-    final HttpServer server;
+    private final Server server;
 
-    /**
-     * Construct a new REST API server.
-     */
-    public FrontierApiServer(DbAdapter db, Frontier queueProcessor) {
-        final int port = FrontierService.getSettings().getApiPort();
+    private final DbAdapter db;
 
-        LOG.info("Starting server listening on port {}.", port);
-        URI baseUri = UriBuilder.fromUri("http://0.0.0.0/").port(port).build();
-        ResourceConfig resourceConfig = new ResourceConfig()
-                .register(StatsResource.class)
-                .register(new AbstractBinder() {
-                    @Override
-                    protected void configure() {
-                        bind(db).to(DbAdapter.class);
-                    }
+    private final Frontier frontier;
 
-                })
-                .register(new AbstractBinder() {
-                    @Override
-                    protected void configure() {
-                        bind(queueProcessor);
-                    }
+    public FrontierApiServer(int port, DbAdapter db, Frontier frontier) {
+        this(ServerBuilder.forPort(port), db, frontier);
+    }
 
-                });
+    public FrontierApiServer(ServerBuilder<?> serverBuilder, DbAdapter db, Frontier frontier) {
+        this.db = db;
+        this.frontier = frontier;
 
-        server = GrizzlyHttpServerFactory.createHttpServer(baseUri, resourceConfig);
+        ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor.Builder(GlobalTracer.get())
+                .withTracedAttributes(ServerTracingInterceptor.ServerRequestAttribute.CALL_ATTRIBUTES,
+                        ServerTracingInterceptor.ServerRequestAttribute.METHOD_TYPE)
+                .build();
+
+        server = serverBuilder.addService(tracingInterceptor.intercept(new FrontierService(db, frontier))).build();
+    }
+
+    public FrontierApiServer start() {
+        try {
+            server.start();
+
+            LOG.info("Controller api listening on {}", server.getPort());
+
+            Runtime.getRuntime().addShutdownHook(new Thread() {
+                @Override
+                public void run() {
+                    // Use stderr here since the logger may have been reset by its JVM shutdown hook.
+                    System.err.println("*** shutting down gRPC server since JVM is shutting down");
+                    FrontierApiServer.this.close();
+                }
+
+            });
+
+            return this;
+        } catch (IOException ex) {
+            close();
+            throw new UncheckedIOException(ex);
+        }
     }
 
     @Override
     public void close() {
-        LOG.info("Shutting down API server.");
-        server.shutdown();
+        if (server != null) {
+            server.shutdown();
+        }
+        if (db != null) {
+            db.close();
+        }
+        System.err.println("*** server shut down");
+    }
+
+    /**
+     * Await termination on the main thread since the grpc library uses daemon threads.
+     */
+    public void blockUntilShutdown() {
+        if (server != null) {
+            try {
+                server.awaitTermination();
+            } catch (InterruptedException ex) {
+                close();
+                throw new RuntimeException(ex);
+            }
+        }
     }
 
 }

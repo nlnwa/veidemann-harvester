@@ -13,28 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package no.nb.nna.broprox.frontier;
+package no.nb.nna.broprox.controller;
+
 
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigBeanFactory;
 import com.typesafe.config.ConfigException;
 import com.typesafe.config.ConfigFactory;
 import no.nb.nna.broprox.commons.opentracing.TracerFactory;
+import no.nb.nna.broprox.controller.scheduler.CrawlJobScheduler;
+import no.nb.nna.broprox.controller.scheduler.FrontierClient;
+import no.nb.nna.broprox.controller.settings.Settings;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
-import no.nb.nna.broprox.frontier.api.FrontierApiServer;
-import no.nb.nna.broprox.frontier.worker.HarvesterClient;
-import no.nb.nna.broprox.frontier.worker.Frontier;
-import no.nb.nna.broprox.frontier.settings.Settings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Class for launching the service.
+ *
  */
-public class FrontierService {
+public class Controller {
 
-    private static final Logger LOG = LoggerFactory.getLogger(FrontierService.class);
+    private static final Logger LOG = LoggerFactory.getLogger(Controller.class);
 
     private static final Settings SETTINGS;
 
@@ -43,13 +43,10 @@ public class FrontierService {
         config.checkValid(ConfigFactory.defaultReference());
         SETTINGS = ConfigBeanFactory.create(config, Settings.class);
 
-        TracerFactory.init("Frontier", SETTINGS.getTracerUri());
+        TracerFactory.init("Controller", SETTINGS.getTracerUri());
     }
 
-    /**
-     * Create a new Broprox service.
-     */
-    public FrontierService() {
+    public Controller() {
     }
 
     /**
@@ -57,15 +54,14 @@ public class FrontierService {
      * <p>
      * @return this instance
      */
-    public FrontierService start() {
+    public Controller start() {
         try (DbAdapter db = new RethinkDbAdapter(SETTINGS.getDbHost(), SETTINGS.getDbPort(), SETTINGS.getDbName());
-                HarvesterClient harvesterClient = new HarvesterClient(SETTINGS.getHarvesterHost(), SETTINGS
-                        .getHarvesterPort());
-                Frontier frontier = new Frontier((RethinkDbAdapter) db, harvesterClient);
-                FrontierApiServer apiServer = new FrontierApiServer(SETTINGS.getApiPort(), db, frontier).start();) {
+                FrontierClient frontierClient = new FrontierClient(SETTINGS.getFrontierHost(), SETTINGS
+                        .getFrontierPort());
+                ControllerApiServer apiServer = new ControllerApiServer(SETTINGS.getApiPort(), db).start();
+                CrawlJobScheduler scheduler = new CrawlJobScheduler(db, frontierClient).start();) {
 
-            LOG.info("Broprox Frontier (v. {}) started",
-                    FrontierService.class.getPackage().getImplementationVersion());
+            LOG.info("Broprox Controller (v. {}) started", Controller.class.getPackage().getImplementationVersion());
 
             try {
                 Thread.currentThread().join();
@@ -75,8 +71,6 @@ public class FrontierService {
         } catch (ConfigException ex) {
             System.err.println("Configuration error: " + ex.getLocalizedMessage());
             System.exit(1);
-        } catch (Exception ex) {
-            LOG.error("Could not start service", ex);
         }
 
         return this;

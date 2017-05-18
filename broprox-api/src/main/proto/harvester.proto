@@ -7,12 +7,13 @@ option java_outer_classname = "HarvesterProto";
 
 import "messages.proto";
 import "config.proto";
+import "google/protobuf/empty.proto";
 
 // Service for communicating with harvester.
 service Harvester {
     // harvest a page
     rpc HarvestPage (HarvestPageRequest) returns (HarvestPageReply) {}
-    rpc CleanupExecution (CleanupExecutionRequest) returns (Void) {}
+    rpc CleanupExecution (CleanupExecutionRequest) returns (google.protobuf.Empty) {}
 }
 
 // A request telling which page to harves.

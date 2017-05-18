@@ -102,6 +102,7 @@ services:
             - tracer
         environment:
             - "DB_HOST=db"
+            - "FRONTIER_HOST=frontier"
             - "TRACER_URI=http://tracer:9411/api/v1/spans"
 
     # Zipkin

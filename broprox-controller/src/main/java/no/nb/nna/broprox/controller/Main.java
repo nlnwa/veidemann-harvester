@@ -37,7 +37,7 @@ public final class Main {
         // logging is even loaded.
         System.setProperty("java.util.logging.manager", "org.apache.logging.log4j.jul.LogManager");
 
-        new ControllerApiServer().start().blockUntilShutdown();
+        new Controller().start();
     }
 
 }

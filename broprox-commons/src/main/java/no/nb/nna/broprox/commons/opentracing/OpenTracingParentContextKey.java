@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package no.nb.nna.broprox.commons;
+package no.nb.nna.broprox.commons.opentracing;
 
 import io.grpc.Context;
 import io.opentracing.Span;

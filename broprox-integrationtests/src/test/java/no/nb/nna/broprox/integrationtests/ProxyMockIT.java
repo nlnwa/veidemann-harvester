@@ -16,9 +16,7 @@
 package no.nb.nna.broprox.integrationtests;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
@@ -27,11 +25,9 @@ import com.google.gson.Gson;
 import no.nb.nna.broprox.chrome.client.ChromeDebugProtocol;
 import no.nb.nna.broprox.chrome.client.PageDomain;
 import no.nb.nna.broprox.chrome.client.Session;
-import no.nb.nna.broprox.chrome.client.ws.CompleteMany;
 import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
 import no.nb.nna.broprox.harvester.BroproxHeaderConstants;
-import no.nb.nna.broprox.harvester.browsercontroller.PageExecution;
 import org.junit.Ignore;
 import org.junit.Test;
 //import static org.junit.Assert.*;
@@ -67,7 +63,7 @@ public class ProxyMockIT implements BroproxHeaderConstants {
 //        l.add("bar");
         Gson gson = new Gson();
         try (Session session = chrome.newSession(900, 900)) {
-            new CompleteMany(
+            CompletableFuture.allOf(
                     session.debugger.enable(),
                     session.page.enable(),
                     session.runtime.enable(),

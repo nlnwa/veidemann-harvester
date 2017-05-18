@@ -8,10 +8,6 @@ option java_outer_classname = "MessagesProto";
 import "google/protobuf/timestamp.proto";
 import "config.proto";
 
-// A message containing no data. Useful for rpc methods returning no data
-message Void {
-}
-
 message CrawlExecutionStatus {
     enum State {
         UNDEFINED = 0;
@@ -27,10 +23,12 @@ message CrawlExecutionStatus {
 
     string id = 1;
     State state = 2;
-    google.protobuf.Timestamp start_time = 3;
-    google.protobuf.Timestamp end_time = 4;
-    int64 documents_crawled = 5;
-    int64 bytes_crawled = 6;
+    string job_id = 3;
+    string seed_id = 4;
+    google.protobuf.Timestamp start_time = 5;
+    google.protobuf.Timestamp end_time = 6;
+    int64 documents_crawled = 7;
+    int64 bytes_crawled = 8;
 }
 
 message CrawlLog {
@@ -111,6 +109,30 @@ message QueuedUri {
     string discovery_path = 6;
     string referrer = 7;
     CrawlScope scope = 8;
+    repeated Cookie cookies = 9;
+}
+
+message Cookie {
+    // Cookie name.
+    string name = 1;
+    // Cookie value.
+    string value = 2;
+    // Cookie domain.
+    string domain = 3;
+    // Cookie path.
+    string path = 4;
+    // Cookie expiration date as the number of seconds since the UNIX epoch.
+    double expires = 5;
+    // Cookie size.
+    int32 size = 6;
+    // True if cookie is http-only.
+    bool http_only = 7;
+    // True if cookie is secure.
+    bool secure = 8;
+    // True in case of session cookie.
+    bool session = 9;
+    // Cookie SameSite type.
+    string same_site = 10;
 }
 
 message Screenshot {

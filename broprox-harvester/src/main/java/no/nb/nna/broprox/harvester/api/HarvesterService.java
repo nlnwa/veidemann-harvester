@@ -17,6 +17,8 @@ package no.nb.nna.broprox.harvester.api;
 
 import java.util.List;
 
+import com.google.protobuf.Empty;
+import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import io.opentracing.contrib.OpenTracingContextKey;
 import no.nb.nna.broprox.db.DbAdapter;
@@ -29,12 +31,14 @@ import no.nb.nna.broprox.harvester.BroproxHeaderConstants;
 import no.nb.nna.broprox.harvester.OpenTracingSpans;
 import no.nb.nna.broprox.harvester.browsercontroller.BrowserController;
 import no.nb.nna.broprox.harvester.proxy.RecordingProxy;
-import no.nb.nna.broprox.model.MessagesProto;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  *
  */
 public class HarvesterService extends HarvesterGrpc.HarvesterImplBase {
+    private static final Logger LOG = LoggerFactory.getLogger(HarvesterService.class);
 
     private final DbAdapter db;
 
@@ -66,15 +70,19 @@ public class HarvesterService extends HarvesterGrpc.HarvesterImplBase {
             respObserver.onNext(reply);
             respObserver.onCompleted();
         } catch (Exception ex) {
-            respObserver.onError(ex);
+            LOG.error(ex.getMessage(), ex);
+            Status status = Status.UNKNOWN.withDescription(ex.toString());
+            respObserver.onError(status.asException());
         } finally {
             OpenTracingSpans.remove(executionId);
         }
     }
 
     @Override
-    public void cleanupExecution(CleanupExecutionRequest request, StreamObserver<MessagesProto.Void> responseObserver) {
+    public void cleanupExecution(CleanupExecutionRequest request, StreamObserver<Empty> responseObserver) {
         proxy.cleanCache(request.getExecutionId());
+        responseObserver.onNext(Empty.getDefaultInstance());
+        responseObserver.onCompleted();
     }
 
 }

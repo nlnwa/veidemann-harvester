@@ -15,26 +15,42 @@
  */
 package no.nb.nna.broprox.db;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeoutException;
 
+import com.google.protobuf.Descriptors;
+import com.google.protobuf.Empty;
 import com.google.protobuf.Message;
 import com.rethinkdb.RethinkDB;
 import com.rethinkdb.gen.ast.Insert;
 import com.rethinkdb.gen.ast.ReqlExpr;
-import com.rethinkdb.gen.ast.Table;
 import com.rethinkdb.gen.exc.ReqlError;
 import com.rethinkdb.net.Connection;
-import com.rethinkdb.net.Cursor;
 import io.opentracing.tag.Tags;
+import no.nb.nna.broprox.api.ControllerProto.BrowserConfigListReply;
+import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListReply;
+import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListRequest;
+import no.nb.nna.broprox.api.ControllerProto.CrawlConfigListReply;
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;
-import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListRequest;
-import no.nb.nna.broprox.commons.OpenTracingWrapper;
+import no.nb.nna.broprox.api.ControllerProto.CrawlJobListReply;
+import no.nb.nna.broprox.api.ControllerProto.CrawlJobListRequest;
+import no.nb.nna.broprox.api.ControllerProto.CrawlScheduleConfigListReply;
+import no.nb.nna.broprox.api.ControllerProto.ListRequest;
+import no.nb.nna.broprox.api.ControllerProto.PolitenessConfigListReply;
+import no.nb.nna.broprox.api.ControllerProto.SeedListReply;
+import no.nb.nna.broprox.api.ControllerProto.SeedListRequest;
+import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
+import no.nb.nna.broprox.model.ConfigProto.BrowserConfig;
 import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
+import no.nb.nna.broprox.model.ConfigProto.CrawlConfig;
 import no.nb.nna.broprox.model.ConfigProto.CrawlEntity;
+import no.nb.nna.broprox.model.ConfigProto.CrawlJob;
+import no.nb.nna.broprox.model.ConfigProto.CrawlScheduleConfig;
+import no.nb.nna.broprox.model.ConfigProto.PolitenessConfig;
+import no.nb.nna.broprox.model.ConfigProto.Seed;
+import no.nb.nna.broprox.model.ConfigProto.Selector;
 import no.nb.nna.broprox.model.MessagesProto.CrawlExecutionStatus;
 import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
 import no.nb.nna.broprox.model.MessagesProto.CrawledContent;
@@ -47,35 +63,33 @@ import no.nb.nna.broprox.model.MessagesProto.Screenshot;
  */
 public class RethinkDbAdapter implements DbAdapter {
 
-    public static final String TABLE_SYSTEM = "system";
+    public static enum TABLES {
+        SYSTEM("system", null),
+        CRAWL_LOG("crawl_log", CrawlLog.getDefaultInstance()),
+        CRAWLED_CONTENT("crawled_content", CrawledContent.getDefaultInstance()),
+        EXTRACTED_TEXT("extracted_text", ExtractedText.getDefaultInstance()),
+        BROWSER_SCRIPTS("browser_scripts", BrowserScript.getDefaultInstance()),
+        URI_QUEUE("uri_queue", QueuedUri.getDefaultInstance()),
+        SCREENSHOT("screenshot", Screenshot.getDefaultInstance()),
+        EXECUTIONS("executions", CrawlExecutionStatus.getDefaultInstance()),
+        CRAWL_ENTITIES("crawl_entities", CrawlEntity.getDefaultInstance()),
+        SEEDS("seeds", Seed.getDefaultInstance()),
+        CRAWL_JOBS("crawl_jobs", CrawlJob.getDefaultInstance()),
+        CRAWL_CONFIGS("crawl_configs", CrawlConfig.getDefaultInstance()),
+        CRAWL_SCHEDULE_CONFIGS("crawl_schedule_configs", CrawlScheduleConfig.getDefaultInstance()),
+        BROWSER_CONFIGS("browser_configs", BrowserConfig.getDefaultInstance()),
+        POLITENESS_CONFIGS("politeness_configs", PolitenessConfig.getDefaultInstance());
 
-    public static final String TABLE_CRAWL_LOG = "crawl_log";
+        public final String name;
 
-    public static final String TABLE_CRAWLED_CONTENT = "crawled_content";
+        public final Message schema;
 
-    public static final String TABLE_EXTRACTED_TEXT = "extracted_text";
+        private TABLES(String name, Message schema) {
+            this.name = name;
+            this.schema = schema;
+        }
 
-    public static final String TABLE_BROWSER_SCRIPTS = "browser_scripts";
-
-    public static final String TABLE_URI_QUEUE = "uri_queue";
-
-    public static final String TABLE_SCREENSHOT = "screenshot";
-
-    public static final String TABLE_EXECUTIONS = "executions";
-
-    public static final String TABLE_CRAWL_ENTITIES = "crawl_entities";
-
-    public static final String TABLE_SEEDS = "seeds";
-
-    public static final String TABLE_CRAWL_JOBS = "crawl_jobs";
-
-    public static final String TABLE_CRAWL_CONFIGS = "crawl_configs";
-
-    public static final String TABLE_CRAWL_SCHEDULE_CONFIGS = "crawl_schedule_configs";
-
-    public static final String TABLE_BROWSER_CONFIGS = "browser_configs";
-
-    public static final String TABLE_POLITENESS_CONFIGS = "politeness_configs";
+    };
 
     static final RethinkDB r = RethinkDB.r;
 
@@ -98,7 +112,7 @@ public class RethinkDbAdapter implements DbAdapter {
     @Override
     public Optional<CrawledContent> isDuplicateContent(String digest) {
         Map<String, Object> response = otw.map("db-isDuplicateContent",
-                this::executeRequest, r.table(TABLE_CRAWLED_CONTENT).get(digest));
+                this::executeRequest, r.table(TABLES.CRAWLED_CONTENT.name).get(digest));
 
         if (response == null) {
             return Optional.empty();
@@ -109,7 +123,7 @@ public class RethinkDbAdapter implements DbAdapter {
 
     public void deleteCrawledContent(String digest) {
         otw.map("db-addExtractedText",
-                this::executeRequest, r.table(TABLE_CRAWLED_CONTENT).get(digest).delete());
+                this::executeRequest, r.table(TABLES.CRAWLED_CONTENT.name).get(digest).delete());
     }
 
     @Override
@@ -119,7 +133,7 @@ public class RethinkDbAdapter implements DbAdapter {
 
         Map rMap = ProtoUtils.protoToRethink(cc);
         Map<String, Object> response = otw.map("db-addCrawledContent",
-                this::executeRequest, r.table(TABLE_CRAWLED_CONTENT)
+                this::executeRequest, r.table(TABLES.CRAWLED_CONTENT.name)
                         .insert(rMap)
                         .optArg("conflict", "error"));
 
@@ -133,7 +147,7 @@ public class RethinkDbAdapter implements DbAdapter {
 
         Map rMap = ProtoUtils.protoToRethink(et);
         Map<String, Object> response = otw.map("db-addExtractedText",
-                this::executeRequest, r.table(TABLE_EXTRACTED_TEXT)
+                this::executeRequest, r.table(TABLES.EXTRACTED_TEXT.name)
                         .insert(rMap)
                         .optArg("conflict", "error"));
 
@@ -148,7 +162,7 @@ public class RethinkDbAdapter implements DbAdapter {
         }
 
         Map<String, Object> response = otw.map("db-addCrawlLog",
-                this::executeRequest, r.table(TABLE_CRAWL_LOG)
+                this::executeRequest, r.table(TABLES.CRAWL_LOG.name)
                         .insert(rMap)
                         .optArg("conflict", "error"));
 
@@ -167,7 +181,7 @@ public class RethinkDbAdapter implements DbAdapter {
         }
 
         Map<String, Object> response = otw.map("db-updateCrawlLog",
-                this::executeRequest, r.table(TABLE_CRAWL_LOG)
+                this::executeRequest, r.table(TABLES.CRAWL_LOG.name)
                         .get(cl.getWarcId())
                         .update(rMap)
                         .optArg("return_changes", "always"));
@@ -179,33 +193,19 @@ public class RethinkDbAdapter implements DbAdapter {
 
     @Override
     public BrowserScript saveBrowserScript(BrowserScript script) {
-        Map rMap = ProtoUtils.protoToRethink(script);
-
-        Map<String, Object> response = otw.map("db-saveBrowserScript",
-                this::executeRequest, r.table(TABLE_BROWSER_SCRIPTS)
-                        .insert(rMap)
-                        .optArg("conflict", "replace"));
-
-        String key = ((List<String>) response.get("generated_keys")).get(0);
-        script = script.toBuilder().setId(key).build();
-
-        return script;
+        return saveConfigMessage(script, TABLES.BROWSER_SCRIPTS);
     }
 
     @Override
-    public List<BrowserScript> getBrowserScripts(BrowserScript.Type type) {
-        try (Cursor<Map<String, Object>> cursor = otw.map("db-getBrowserScripts",
-                this::executeRequest, r.table(TABLE_BROWSER_SCRIPTS)
-                        .filter(r.hashMap("type", type.name())));) {
+    public Empty deleteBrowserScript(BrowserScript script) {
+        checkDependencies(script, TABLES.BROWSER_CONFIGS, BrowserConfig.getDefaultInstance(), "script_id");
+        return deleteConfigMessage(script, TABLES.BROWSER_SCRIPTS);
+    }
 
-            List<BrowserScript> result = new ArrayList<>();
-
-            for (Map<String, Object> m : cursor) {
-                result.add(ProtoUtils.rethinkToProto(m, BrowserScript.class));
-            }
-
-            return result;
-        }
+    @Override
+    public BrowserScriptListReply listBrowserScripts(BrowserScriptListRequest request) {
+        BrowserScriptListRequestQueryBuilder queryBuilder = new BrowserScriptListRequestQueryBuilder(request);
+        return queryBuilder.executeList(otw, this).build();
     }
 
     @Override
@@ -213,7 +213,7 @@ public class RethinkDbAdapter implements DbAdapter {
         Map rMap = ProtoUtils.protoToRethink(status);
 
         Map<String, Object> response = otw.map("db-addExecutionStatus",
-                this::executeRequest, r.table(TABLE_EXECUTIONS)
+                this::executeRequest, r.table(TABLES.EXECUTIONS.name)
                         .insert(rMap)
                         .optArg("conflict", "error"));
 
@@ -227,7 +227,7 @@ public class RethinkDbAdapter implements DbAdapter {
         Map rMap = ProtoUtils.protoToRethink(status);
 
         Map<String, Object> response = otw.map("db-updateExecutionStatus",
-                this::executeRequest, r.table(TABLE_EXECUTIONS)
+                this::executeRequest, r.table(TABLES.EXECUTIONS.name)
                         .get(status.getId())
                         .update(rMap));
 
@@ -239,7 +239,7 @@ public class RethinkDbAdapter implements DbAdapter {
         Map rMap = ProtoUtils.protoToRethink(qu);
 
         Map<String, Object> response = otw.map("db-addQueudUri",
-                this::executeRequest, r.table(TABLE_URI_QUEUE)
+                this::executeRequest, r.table(TABLES.URI_QUEUE.name)
                         .insert(rMap)
                         .optArg("conflict", "error"));
 
@@ -253,7 +253,7 @@ public class RethinkDbAdapter implements DbAdapter {
         Map rMap = ProtoUtils.protoToRethink(qu);
 
         Map<String, Object> response = otw.map("db-updateQueuedUri",
-                this::executeRequest, r.table(TABLE_URI_QUEUE)
+                this::executeRequest, r.table(TABLES.URI_QUEUE.name)
                         .get(qu.getId())
                         .update(rMap));
 
@@ -265,7 +265,7 @@ public class RethinkDbAdapter implements DbAdapter {
         Map rMap = ProtoUtils.protoToRethink(s);
 
         Map<String, Object> response = otw.map("db-addScreenshot",
-                this::executeRequest, r.table(TABLE_SCREENSHOT)
+                this::executeRequest, r.table(TABLES.SCREENSHOT.name)
                         .insert(rMap)
                         .optArg("conflict", "error"));
 
@@ -276,58 +276,238 @@ public class RethinkDbAdapter implements DbAdapter {
 
     @Override
     public CrawlEntity saveCrawlEntity(CrawlEntity entity) {
-        Map rMap = ProtoUtils.protoToRethink(entity);
-
-        rMap.put("meta", updateMeta((Map) rMap.get("meta"), null));
-
-        return otw.map("db-saveCrawlEntity",
-                this::executeInsert,
-                r.table(TABLE_CRAWL_ENTITIES)
-                        .insert(rMap)
-                        .optArg("conflict", "replace"),
-                CrawlEntity.class);
+        return saveConfigMessage(entity, TABLES.CRAWL_ENTITIES);
     }
 
     @Override
-    public CrawlEntityListReply listCrawlEntities(CrawlEntityListRequest request) {
-        ReqlExpr qry = r.table(TABLE_CRAWL_ENTITIES);
-        long count = 1;
-        switch (request.getQryCase()) {
-            case ID:
-                qry = ((Table) qry).get(request.getId());
+    public Empty deleteCrawlEntity(CrawlEntity entity) {
+        checkDependencies(entity, TABLES.SEEDS, Seed.getDefaultInstance(), "entity_id");
+        return deleteConfigMessage(entity, TABLES.CRAWL_ENTITIES);
+    }
+
+    @Override
+    public CrawlEntityListReply listCrawlEntities(ListRequest request) {
+        ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, TABLES.CRAWL_ENTITIES);
+        return queryBuilder.executeList(otw, this, CrawlEntityListReply.newBuilder()).build();
+    }
+
+    @Override
+    public SeedListReply listSeeds(SeedListRequest request) {
+        SeedListRequestQueryBuilder queryBuilder = new SeedListRequestQueryBuilder(request);
+        return queryBuilder.executeList(otw, this).build();
+    }
+
+    @Override
+    public Seed saveSeed(Seed seed) {
+        return saveConfigMessage(seed, TABLES.SEEDS);
+    }
+
+    @Override
+    public Empty deleteSeed(Seed seed) {
+        return deleteConfigMessage(seed, TABLES.SEEDS);
+    }
+
+    @Override
+    public CrawlJobListReply listCrawlJobs(CrawlJobListRequest request) {
+        CrawlJobListRequestQueryBuilder queryBuilder = new CrawlJobListRequestQueryBuilder(request);
+        return queryBuilder.executeList(otw, this).build();
+    }
+
+    @Override
+    public CrawlJob saveCrawlJob(CrawlJob crawlJob) {
+        CrawlJob.Builder builder = crawlJob.toBuilder();
+
+        switch (crawlJob.getSceduleConfigOrIdCase()) {
+            case SCHEDULE:
+                CrawlScheduleConfig schedule = crawlJob.getSchedule();
+                schedule = saveCrawlScheduleConfig(schedule);
+                builder.setScheduleId(schedule.getId());
                 break;
-            case NAME_PREFIX:
-                String prefix = request.getNamePrefix().toLowerCase();
-                qry = qry.between(prefix, prefix + Character.toString(Character.MAX_VALUE)).optArg("index", "name");
+            case SCHEDULE_SELECTOR:
+                Selector selector = crawlJob.getScheduleSelector();
+                CrawlScheduleConfigListReply res = listCrawlScheduleConfigs(
+                        ListRequest.newBuilder().setSelector(selector).build());
+                if (res.getCount() == 1) {
+                    builder.setScheduleId(res.getValue(0).getId());
+                } else {
+                    throw new IllegalArgumentException("Schedule selector should return exactly one match, was: "
+                            + res.getCount());
+                }
                 break;
         }
 
-        if (request.getQryCase() != CrawlEntityListRequest.QryCase.ID) {
-            count = otw.map("db-listCrawlEntities",
-                    this::executeRequest, qry.count());
-
-            qry = qry.orderBy().optArg("index", "name");
-            if (request.getPageSize() > 0) {
-                qry = qry.skip(request.getPage() * request.getPageSize()).limit(request.getPageSize());
-            }
+        switch (crawlJob.getCrawlConfigOrIdCase()) {
+            case CRAWL_CONFIG:
+                CrawlConfig crawlConfig = crawlJob.getCrawlConfig();
+                crawlConfig = saveCrawlConfig(crawlConfig);
+                builder.setCrawlConfigId(crawlConfig.getId());
+                break;
+            case CRAWL_CONFIG_SELECTOR:
+                Selector selector = crawlJob.getCrawlConfigSelector();
+                CrawlConfigListReply res = listCrawlConfigs(ListRequest.newBuilder().setSelector(selector).build());
+                if (res.getCount() == 1) {
+                    builder.setCrawlConfigId(res.getValue(0).getId());
+                } else {
+                    throw new IllegalArgumentException("CrawlConfig selector should return exactly one match, was: "
+                            + res.getCount());
+                }
+                break;
+            case CRAWLCONFIGORID_NOT_SET:
+                throw new IllegalArgumentException("A crawl config is required for crawl jobs");
         }
 
-        Object res = otw.map("db-listCrawlEntities",
-                this::executeRequest, qry);
-        CrawlEntityListReply.Builder reply = CrawlEntityListReply.newBuilder()
-                .setPageSize(request.getPageSize())
-                .setPage(request.getPage())
-                .setCount(count);
-        if (res instanceof Cursor) {
-            Cursor<Map<String, Object>> cursor = (Cursor) res;
-            for (Map<String, Object> entity : cursor) {
-                reply.addEntity(ProtoUtils.rethinkToProto(entity, CrawlEntity.class));
-            }
-        } else {
-            reply.addEntity(ProtoUtils.rethinkToProto((Map<String, Object>) res, CrawlEntity.class));
+        return saveConfigMessage(builder.build(), TABLES.CRAWL_JOBS);
+    }
+
+    @Override
+    public Empty deleteCrawlJob(CrawlJob crawlJob) {
+        checkDependencies(crawlJob, TABLES.SEEDS, Seed.getDefaultInstance(), "job_id");
+        return deleteConfigMessage(crawlJob, TABLES.CRAWL_JOBS);
+    }
+
+    @Override
+    public CrawlConfigListReply listCrawlConfigs(ListRequest request) {
+        ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, TABLES.CRAWL_CONFIGS);
+        return queryBuilder.executeList(otw, this, CrawlConfigListReply.newBuilder()).build();
+    }
+
+    @Override
+    public CrawlConfig saveCrawlConfig(CrawlConfig crawlConfig) {
+        CrawlConfig.Builder builder = crawlConfig.toBuilder();
+
+        switch (crawlConfig.getBrowserConfigOrIdCase()) {
+            case BROWSER_CONFIG:
+                BrowserConfig browserConfig = crawlConfig.getBrowserConfig();
+                browserConfig = saveBrowserConfig(browserConfig);
+                builder.setBrowserConfigId(browserConfig.getId());
+                break;
+            case BROWSER_CONFIG_SELECTOR:
+                Selector selector = crawlConfig.getBrowserConfigSelector();
+                BrowserConfigListReply res = listBrowserConfigs(ListRequest.newBuilder().setSelector(selector).build());
+                if (res.getCount() == 1) {
+                    builder.setBrowserConfigId(res.getValue(0).getId());
+                } else {
+                    throw new IllegalArgumentException("BrowserConfig selector should return exactly one match, was: "
+                            + res.getCount());
+                }
+                break;
         }
 
-        return reply.build();
+        switch (crawlConfig.getPolitenessOrIdCase()) {
+            case POLITENESS:
+                PolitenessConfig politenessConfig = crawlConfig.getPoliteness();
+                politenessConfig = savePolitenessConfig(politenessConfig);
+                builder.setPolitenessId(politenessConfig.getId());
+                break;
+            case POLITENESS_SELECTOR:
+                Selector selector = crawlConfig.getPolitenessSelector();
+                PolitenessConfigListReply res = listPolitenessConfigs(
+                        ListRequest.newBuilder().setSelector(selector).build());
+                if (res.getCount() == 1) {
+                    builder.setPolitenessId(res.getValue(0).getId());
+                } else {
+                    throw new IllegalArgumentException("Politeness selector should return exactly one match, was: "
+                            + res.getCount());
+                }
+                break;
+        }
+
+        return saveConfigMessage(builder.build(), TABLES.CRAWL_CONFIGS);
+    }
+
+    @Override
+    public Empty deleteCrawlConfig(CrawlConfig crawlConfig) {
+        checkDependencies(crawlConfig, TABLES.CRAWL_JOBS, CrawlJob.getDefaultInstance(), "crawl_config_id");
+        return deleteConfigMessage(crawlConfig, TABLES.CRAWL_CONFIGS);
+    }
+
+    @Override
+    public CrawlScheduleConfigListReply listCrawlScheduleConfigs(ListRequest request) {
+        ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, TABLES.CRAWL_SCHEDULE_CONFIGS);
+        return queryBuilder.executeList(otw, this, CrawlScheduleConfigListReply.newBuilder()).build();
+    }
+
+    @Override
+    public CrawlScheduleConfig saveCrawlScheduleConfig(CrawlScheduleConfig crawlScheduleConfig) {
+        return saveConfigMessage(crawlScheduleConfig, TABLES.CRAWL_SCHEDULE_CONFIGS);
+    }
+
+    @Override
+    public Empty deleteCrawlScheduleConfig(CrawlScheduleConfig crawlScheduleConfig) {
+        checkDependencies(crawlScheduleConfig, TABLES.CRAWL_JOBS, CrawlJob.getDefaultInstance(), "schedule_id");
+        return deleteConfigMessage(crawlScheduleConfig, TABLES.CRAWL_SCHEDULE_CONFIGS);
+    }
+
+    @Override
+    public PolitenessConfigListReply listPolitenessConfigs(ListRequest request) {
+        ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, TABLES.POLITENESS_CONFIGS);
+        return queryBuilder.executeList(otw, this, PolitenessConfigListReply.newBuilder()).build();
+    }
+
+    @Override
+    public PolitenessConfig savePolitenessConfig(PolitenessConfig politenessConfig) {
+        return saveConfigMessage(politenessConfig, TABLES.POLITENESS_CONFIGS);
+    }
+
+    @Override
+    public Empty deletePolitenessConfig(PolitenessConfig politenessConfig) {
+        checkDependencies(politenessConfig, TABLES.CRAWL_CONFIGS, CrawlConfig.getDefaultInstance(), "politeness_id");
+        return deleteConfigMessage(politenessConfig, TABLES.POLITENESS_CONFIGS);
+    }
+
+    @Override
+    public BrowserConfigListReply listBrowserConfigs(ListRequest request) {
+        ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, TABLES.BROWSER_CONFIGS);
+        return queryBuilder.executeList(otw, this, BrowserConfigListReply.newBuilder()).build();
+    }
+
+    @Override
+    public BrowserConfig saveBrowserConfig(BrowserConfig browserConfig) {
+        return saveConfigMessage(browserConfig, TABLES.BROWSER_CONFIGS);
+    }
+
+    @Override
+    public Empty deleteBrowserConfig(BrowserConfig browserConfig) {
+        checkDependencies(browserConfig, TABLES.CRAWL_CONFIGS, CrawlConfig.getDefaultInstance(), "browser_config_id");
+        return deleteConfigMessage(browserConfig, TABLES.BROWSER_CONFIGS);
+    }
+
+    public <T extends Message> T saveConfigMessage(T msg, TABLES table) {
+        Map rMap = ProtoUtils.protoToRethink(msg);
+
+        // Check that name is set if this is a new object
+        if (!rMap.containsKey("id") && (!rMap.containsKey("meta") || !((Map) rMap.get("meta")).containsKey("name"))) {
+            throw new IllegalArgumentException("Trying to store a new " + msg.getClass().getSimpleName()
+                    + " object, but meta.name is not set.");
+        }
+
+        rMap.put("meta", updateMeta((Map) rMap.get("meta"), null));
+
+        return otw.map("db-save" + msg.getClass().getSimpleName(),
+                this::executeInsert,
+                r.table(table.name)
+                        .insert(rMap)
+                        // A rethink function which copies created and createby from old doc,
+                        // and copies name if not existent in new doc
+                        .optArg("conflict", (id, old_doc, new_doc) -> new_doc.merge(
+                        r.hashMap("meta", r.hashMap()
+                                .with("name", r.branch(new_doc.g("meta").hasFields("name"),
+                                        new_doc.g("meta").g("name"), old_doc.g("meta").g("name")))
+                                .with("created", old_doc.g("meta").g("created"))
+                                .with("createdBy", old_doc.g("meta").g("createdBy"))
+                        ))),
+                (Class<T>) msg.getClass());
+    }
+
+    public <T extends Message> Empty deleteConfigMessage(T entity, TABLES table) {
+        Descriptors.FieldDescriptor idDescriptor = entity.getDescriptorForType().findFieldByName("id");
+
+        otw.map("db-delete" + entity.getClass().getSimpleName(),
+                this::executeRequest,
+                r.table(table.name)
+                        .get(entity.getField(idDescriptor))
+                        .delete());
+        return Empty.getDefaultInstance();
     }
 
     private Map updateMeta(Map meta, String user) {
@@ -345,7 +525,9 @@ public class RethinkDbAdapter implements DbAdapter {
         }
 
         meta.put("lastModified", r.now());
-        meta.put("lastModifiedBy", user);
+        if (!meta.containsKey("lastModifiedBy")) {
+            meta.put("lastModifiedBy", user);
+        }
 
         return meta;
     }
@@ -387,6 +569,39 @@ public class RethinkDbAdapter implements DbAdapter {
     @Override
     public void close() {
         conn.close();
+    }
+
+    /**
+     * Check references to Config object.
+     *
+     * @param messageToCheck the config message which other objects might refer.
+     * @param dependentTable the table containing objects which might have a dependency to the object to check.
+     * @param dependentMessage the object type in the table containing objects which might have a dependency to the
+     * object to check.
+     * @param dependentFieldName the field name in the dependent message which might contain reference to the id field
+     * in the object to check.
+     * @throws IllegalStateException if there are dependencies.
+     */
+    private void checkDependencies(Message messageToCheck, TABLES dependentTable,
+            Message dependentMessage, String dependentFieldName) {
+
+        Descriptors.FieldDescriptor messageIdField = messageToCheck.getDescriptorForType().findFieldByName("id");
+        Descriptors.FieldDescriptor dependentField = dependentMessage.getDescriptorForType()
+                .findFieldByName(dependentFieldName);
+
+        ListRequestQueryBuilder qry = new ListRequestQueryBuilder(ListRequest.getDefaultInstance(), dependentTable);
+        if (dependentField.isRepeated()) {
+            qry.addFilter(j -> j.g(dependentField.getJsonName()).contains(messageToCheck.getField(messageIdField)));
+        } else {
+            qry.addFilter(j -> j.g(dependentField.getJsonName()).eq(messageToCheck.getField(messageIdField)));
+        }
+
+        long dependencyCount = qry.executeCount(otw, this);
+        if (dependencyCount > 0) {
+            throw new IllegalStateException("Can't delete " + messageToCheck.getClass().getSimpleName()
+                    + ", there are " + dependencyCount + " " + dependentMessage.getClass().getSimpleName()
+                    + "(s) referring it");
+        }
     }
 
     private void ensureContainsValue(Message msg, String fieldName) {

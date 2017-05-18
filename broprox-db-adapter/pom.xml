@@ -95,6 +95,7 @@
                                                 </log>
                                                 <wait>
                                                     <tcp>
+                                                        <mode>mapped</mode>
                                                         <ports>
                                                             <port>28015</port>
                                                         </ports>
@@ -122,7 +123,7 @@
                                                 </log>
                                                 <wait>
                                                     <log>DB initialized</log>
-                                                    <time>20000</time>
+                                                    <time>60000</time>
                                                 </wait>
                                             </run>
                                         </image>
@@ -135,6 +136,9 @@
                                 <goals>
                                     <goal>stop</goal>
                                 </goals>
+                                <configuration>
+                                    <removeVolumes>true</removeVolumes>
+                                </configuration>
                             </execution>
                         </executions>
                     </plugin>

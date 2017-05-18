@@ -1,0 +1,12 @@
+user-agent : a
+disallow: /c
+
+
+user-agent:
+ googlebot
+disallow: /d
+foo: bar
+
+user-agent: e
+user-agent: fgh
+disallow: /g

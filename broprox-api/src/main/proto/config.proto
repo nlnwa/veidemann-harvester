@@ -71,6 +71,7 @@ message CrawlConfig {
         Selector politeness_selector = 19;
     }
     ExtraConfig extra = 9;
+    int32 minimum_dns_ttl_s = 10; // Not implemented
     bool depth_first = 20;
 }
 
@@ -85,9 +86,9 @@ message CrawlScope {
 }
 
 message CrawlLimitsConfig {
-    int32 depth = 1;
-    int64 max_duration_s = 2;
-    int64 max_bytes = 3;
+    int32 depth = 1; // Not implemented
+    int64 max_duration_s = 2; // Not implemented
+    int64 max_bytes = 3; // Not implemented
 }
 
 message BrowserConfig {
@@ -106,13 +107,14 @@ message BrowserConfig {
 message PolitenessConfig {
     string id = 1;
     Meta meta = 2;
-    bool ignore_robots = 3;
+    bool ignore_robots = 3; // Not implemented
+    int32 minimum_robots_validity_duration_s = 11; // Not implemented
     int64 min_time_between_page_load_ms = 4;
 }
 
 message ExtraConfig {
-    bool extract_text = 5;
-    bool create_snapshot = 6;
+    bool extract_text = 5; // Not implemented
+    bool create_snapshot = 6; // Not implemented
 }
 
 // Message containing a javascript to be run in a browser

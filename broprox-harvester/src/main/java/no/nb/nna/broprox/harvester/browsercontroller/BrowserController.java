@@ -17,6 +17,7 @@ package no.nb.nna.broprox.harvester.browsercontroller;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,8 +35,9 @@ import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
 import no.nb.nna.broprox.model.ConfigProto.CrawlConfig;
 import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
-import no.nb.nna.broprox.harvester.BroproxHeaderConstants;
+import no.nb.nna.broprox.commons.BroproxHeaderConstants;
 import no.nb.nna.broprox.harvester.OpenTracingSpans;
+import no.nb.nna.broprox.harvester.proxy.RobotsServiceClient;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
@@ -50,59 +52,69 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
 
     private final Map<String, BrowserScript> scriptCache = new HashMap<>();
 
-    public BrowserController(String chromeHost, int chromePort, DbAdapter db) throws IOException {
+    private final RobotsServiceClient robotsServiceClient;
+
+    public BrowserController(String chromeHost, int chromePort, DbAdapter db,
+            final RobotsServiceClient robotsServiceClient) throws IOException {
+
         this.chrome = new ChromeDebugProtocol(chromeHost, chromePort);
         this.db = db;
+        this.robotsServiceClient = robotsServiceClient;
     }
 
     public List<QueuedUri> render(String executionId, QueuedUri queuedUri, CrawlConfig config)
             throws ExecutionException, InterruptedException, IOException, TimeoutException {
-
+        List<QueuedUri> outlinks;
         System.out.println("RENDER " + executionId + " :: " + queuedUri.getUri());
         OpenTracingWrapper otw = new OpenTracingWrapper("BrowserController", Tags.SPAN_KIND_CLIENT)
                 .setParentSpan(OpenTracingSpans.get(executionId));
 
-        try (Session session = chrome.newSession(
-                config.getBrowserConfig().getWindowWidth(),
-                config.getBrowserConfig().getWindowHeight())) {
+        // Check robots.txt
+        if (robotsServiceClient.isAllowed(executionId, queuedUri.getUri(), config)) {
 
-            CompletableFuture.allOf(
-                    session.debugger.enable(),
-                    session.page.enable(),
-                    session.runtime.enable(),
-                    session.network.enable(null, null),
-                    session.network.setCacheDisabled(true),
-                    session.runtime
-                            .evaluate("navigator.userAgent;", null, false, false, null, false, false, false, false)
-                            .thenAccept(e -> {
-                                session.network.setUserAgentOverride(((String) e.result.value)
-                                        .replace("HeadlessChrome", session.version()));
-                            }),
-                    session.debugger
-                            .setBreakpointByUrl(1, null, "https?://www.google-analytics.com/analytics.js", null, null),
-                    session.debugger.setBreakpointByUrl(1, null, "https?://www.google-analytics.com/ga.js", null, null),
-                    session.page.setControlNavigations(Boolean.TRUE)
-            ).get(config.getBrowserConfig().getPageLoadTimeoutMs(), MILLISECONDS);
+            try (Session session = chrome.newSession(
+                    config.getBrowserConfig().getWindowWidth(),
+                    config.getBrowserConfig().getWindowHeight())) {
 
-            // set cookies
-            CompletableFuture.allOf(queuedUri.getCookiesList().stream()
-                    .map(c -> session.network.setCookie(queuedUri.getUri(), c.getName(), c.getValue(), c.getDomain(),
-                    c.getPath(), c.getSecure(), c.getHttpOnly(), c.getSameSite(), c.getExpires()))
-                    .collect(Collectors.toList()).toArray(new CompletableFuture[]{}))
-                    .get(config.getBrowserConfig().getPageLoadTimeoutMs(), MILLISECONDS);
+                CompletableFuture.allOf(
+                        session.debugger.enable(),
+                        session.page.enable(),
+                        session.runtime.enable(),
+                        session.network.enable(null, null),
+                        session.network.setCacheDisabled(true),
+                        session.runtime
+                                .evaluate("navigator.userAgent;", null, false, false, null, false, false, false, false)
+                                .thenAccept(e -> {
+                                    session.network.setUserAgentOverride(((String) e.result.value)
+                                            .replace("HeadlessChrome", session.version()));
+                                }),
+                        session.debugger
+                                .setBreakpointByUrl(1, null, "https?://www.google-analytics.com/analytics.js", null, null),
+                        session.debugger
+                                .setBreakpointByUrl(1, null, "https?://www.google-analytics.com/ga.js", null, null),
+                        session.page.setControlNavigations(Boolean.TRUE)
+                ).get(config.getBrowserConfig().getPageLoadTimeoutMs(), MILLISECONDS);
 
-            session.debugger.onPaused(p -> {
-                String scriptId = p.callFrames.get(0).location.scriptId;
-                System.out.println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>> SCRIPT BLE PAUSET: " + scriptId);
-                session.debugger.setScriptSource(scriptId, "console.log(\"google analytics is no more!\");", null);
-                session.debugger.resume();
-                System.out.println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>> SCRIPT RESUMED: " + scriptId);
-            });
+                // set cookies
+                CompletableFuture.allOf(queuedUri.getCookiesList().stream()
+                        .map(c -> session.network
+                        .setCookie(queuedUri.getUri(), c.getName(), c.getValue(), c.getDomain(),
+                                c.getPath(), c.getSecure(), c.getHttpOnly(), c.getSameSite(), c.getExpires()))
+                        .collect(Collectors.toList()).toArray(new CompletableFuture[]{}))
+                        .get(config.getBrowserConfig().getPageLoadTimeoutMs(), MILLISECONDS);
 
-            PageExecution pex = new PageExecution(executionId, queuedUri, session, config.getBrowserConfig()
-                    .getPageLoadTimeoutMs(), db, config.getBrowserConfig().getSleepAfterPageloadMs());
-            otw.run("navigatePage", pex::navigatePage);
-            otw.run("saveScreenshot", pex::saveScreenshot);
+                session.debugger.onPaused(p -> {
+                    String scriptId = p.callFrames.get(0).location.scriptId;
+                    System.out.println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>> SCRIPT BLE PAUSET: " + scriptId);
+                    session.debugger.setScriptSource(scriptId, "console.log(\"google analytics is no more!\");", null);
+                    session.debugger.resume();
+                    System.out.println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>> SCRIPT RESUMED: " + scriptId);
+                });
+
+                PageExecution pex = new PageExecution(executionId, queuedUri, session, config.getBrowserConfig()
+                        .getPageLoadTimeoutMs(), db, config.getBrowserConfig().getSleepAfterPageloadMs());
+                otw.run("navigatePage", pex::navigatePage);
+                otw.run("saveScreenshot", pex::saveScreenshot);
 
 //                System.out.println("LINKS >>>>>>");
 //                for (PageDomain.FrameResource fs : session.page.getResourceTree().get().frameTree.resources) {
@@ -112,12 +124,16 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
 //                    }
 //                }
 //                System.out.println("<<<<<<");
-            List<BrowserScript> scripts = getScripts(config);
-            List<QueuedUri> outlinks = otw.map("extractOutlinks", pex::extractOutlinks, scripts);
-            pex.getDocumentUrl();
-            pex.scrollToTop();
-            return outlinks;
+                List<BrowserScript> scripts = getScripts(config);
+                outlinks = otw.map("extractOutlinks", pex::extractOutlinks, scripts);
+                pex.getDocumentUrl();
+                pex.scrollToTop();
+            }
+        } else {
+            outlinks = Collections.EMPTY_LIST;
         }
+        return outlinks;
+
     }
 
     private List<BrowserScript> getScripts(CrawlConfig config) {

@@ -29,6 +29,7 @@
         <module>broprox-controller</module>
         <module>broprox-api</module>
         <module>broprox-commons</module>
+        <module>broprox-robotrules</module>
     </modules>
 
     <properties>
@@ -39,12 +40,14 @@
         <org.jwat.version>1.0.4</org.jwat.version>
         <org.glassfish.jersey.version>2.25.1</org.glassfish.jersey.version>
         <org.apache.tika.version>1.14</org.apache.tika.version>
-        <cache2k-version>1.0.0.CR2</cache2k-version>
+        <cache2k-version>1.0.0.CR4</cache2k-version>
         <io.opentracing.version>0.21.0</io.opentracing.version>
         <io.opentracing.brave.version>0.19.2</io.opentracing.brave.version>
         <io.grpc.version>1.2.0</io.grpc.version>
         <io.zipkin.reporter.version>0.6.13</io.zipkin.reporter.version>
         <io.zipkin.brave.version>4.1.1</io.zipkin.brave.version>
+        <antlr.version>4.7</antlr.version>
+        <antlr4test-maven-plugin.version>1.8</antlr4test-maven-plugin.version>
     </properties>
 
     <repositories>
@@ -186,6 +189,17 @@
                 <groupId>io.opentracing.brave</groupId>
                 <artifactId>brave-opentracing</artifactId>
                 <version>${io.opentracing.brave.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.squareup.okhttp3</groupId>
+                <artifactId>okhttp</artifactId>
+                <version>3.8.0</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.antlr</groupId>
+                <artifactId>antlr4-runtime</artifactId>
+                <version>${antlr.version}</version>
             </dependency>
 
             <dependency>
@@ -381,6 +395,16 @@
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-jar-plugin</artifactId>
                     <version>3.0.2</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.antlr</groupId>
+                    <artifactId>antlr4-maven-plugin</artifactId>
+                    <version>${antlr.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>com.khubla.antlr</groupId>
+                    <artifactId>antlr4test-maven-plugin</artifactId>
+                    <version>${antlr4test-maven-plugin.version}</version>
                 </plugin>
             </plugins>
         </pluginManagement>

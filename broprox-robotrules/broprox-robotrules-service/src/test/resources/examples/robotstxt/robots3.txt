@@ -1,0 +1,16 @@
+# /robots.txt file for http://www.nb.no/
+
+User-agent: *
+Allow: /
+Disallow: /cgi-bin/wa
+Disallow: /archives/
+Disallow: /sok/
+Disallow: /baser/
+Disallow: /emigrasjon/
+Disallow: /gallerinor/
+Disallow: /idtjeneste/
+Disallow: /test/
+
+Crawl-delay: 4
+
+Sitemap: http://www.nb.no/sitemapindex.xml

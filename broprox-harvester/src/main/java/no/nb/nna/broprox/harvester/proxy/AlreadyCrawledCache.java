@@ -27,7 +27,7 @@ import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import no.nb.nna.broprox.db.ProtoUtils;
-import no.nb.nna.broprox.harvester.BroproxHeaderConstants;
+import no.nb.nna.broprox.commons.BroproxHeaderConstants;
 import no.nb.nna.broprox.model.MessagesProto.QueuedUri.IdSeq;
 import org.cache2k.Cache;
 import org.cache2k.Cache2kBuilder;
@@ -46,9 +46,6 @@ public class AlreadyCrawledCache {
     private final Cache<CacheKey, FullHttpResponse> cache;
 
     private final ByteBuf headerPayloadSep = Unpooled.wrappedBuffer(new byte[]{'\r', '\n'}).asReadOnly();
-
-    private static final Type EID_TYPE = new TypeToken<List<List>>() {
-    }.getType();
 
     public AlreadyCrawledCache() {
         cache = new Cache2kBuilder<CacheKey, FullHttpResponse>() {

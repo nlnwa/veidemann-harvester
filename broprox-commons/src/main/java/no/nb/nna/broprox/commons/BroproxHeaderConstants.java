@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package no.nb.nna.broprox.harvester;
+package no.nb.nna.broprox.commons;
 
 /**
  *

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package no.nb.nna.robotsparser;
+package no.nb.nna.broprox.robotsparser;
 
 import org.junit.Test;
 import org.netpreserve.commons.uri.UriConfigs;

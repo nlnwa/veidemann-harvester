@@ -10,7 +10,7 @@
     <packaging>pom</packaging>
     <modules>
         <module>broprox-robotrules-codegen</module>
-        <module>broprox-robotsparser</module>
+        <module>broprox-robotrules-service</module>
     </modules>
     <name>broprox-robotrules</name>
 </project>

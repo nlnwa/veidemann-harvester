@@ -38,6 +38,10 @@ public class Settings extends CommonSettings {
 
     private int contentWriterPort;
 
+    private String robotsServiceHost;
+
+    private int robotsServicePort;
+
     private List<String> dnsServers;
 
     public int getProxyPort() {
@@ -94,6 +98,22 @@ public class Settings extends CommonSettings {
 
     public void setContentWriterPort(int contentWriterPort) {
         this.contentWriterPort = contentWriterPort;
+    }
+
+    public String getRobotsServiceHost() {
+        return robotsServiceHost;
+    }
+
+    public void setRobotsServiceHost(String robotsServiceHost) {
+        this.robotsServiceHost = robotsServiceHost;
+    }
+
+    public int getRobotsServicePort() {
+        return robotsServicePort;
+    }
+
+    public void setRobotsServicePort(int robotsServicePort) {
+        this.robotsServicePort = robotsServicePort;
     }
 
     public List<String> getDnsServers() {

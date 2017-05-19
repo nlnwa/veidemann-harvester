@@ -31,20 +31,20 @@ import io.netty.handler.codec.http.HttpHeaderNames;
 import no.nb.nna.broprox.chrome.client.PageDomain;
 import no.nb.nna.broprox.chrome.client.RuntimeDomain;
 import no.nb.nna.broprox.chrome.client.Session;
+import no.nb.nna.broprox.commons.BroproxHeaderConstants;
 import no.nb.nna.broprox.commons.util.ApiTools;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.db.ProtoUtils;
-import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
-import no.nb.nna.broprox.model.MessagesProto.Screenshot;
-import no.nb.nna.broprox.harvester.BroproxHeaderConstants;
 import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
 import no.nb.nna.broprox.model.ConfigProto.Label;
 import no.nb.nna.broprox.model.MessagesProto;
+import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
+import no.nb.nna.broprox.model.MessagesProto.Screenshot;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
-import static no.nb.nna.broprox.harvester.BroproxHeaderConstants.ALL_EXECUTION_IDS;
-import static no.nb.nna.broprox.harvester.BroproxHeaderConstants.DISCOVERY_PATH;
-import static no.nb.nna.broprox.harvester.BroproxHeaderConstants.EXECUTION_ID;
+import static no.nb.nna.broprox.commons.BroproxHeaderConstants.ALL_EXECUTION_IDS;
+import static no.nb.nna.broprox.commons.BroproxHeaderConstants.DISCOVERY_PATH;
+import static no.nb.nna.broprox.commons.BroproxHeaderConstants.EXECUTION_ID;
 
 /**
  *

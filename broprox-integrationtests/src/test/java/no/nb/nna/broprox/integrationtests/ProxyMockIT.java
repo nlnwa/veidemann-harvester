@@ -27,7 +27,7 @@ import no.nb.nna.broprox.chrome.client.PageDomain;
 import no.nb.nna.broprox.chrome.client.Session;
 import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
-import no.nb.nna.broprox.harvester.BroproxHeaderConstants;
+import no.nb.nna.broprox.commons.BroproxHeaderConstants;
 import org.junit.Ignore;
 import org.junit.Test;
 //import static org.junit.Assert.*;

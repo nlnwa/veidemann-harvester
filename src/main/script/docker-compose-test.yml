@@ -47,11 +47,14 @@ services:
             - content-writer
             - testsites
             - tracer
+            - robots
         environment:
             - "BROWSER_HOST=browser"
             - "DB_HOST=db"
             - "CONTENT_WRITER_HOST=content-writer"
             - "CONTENT_WRITER_PORT=8080"
+            - "ROBOTS_SERVICE_HOST=robots"
+            - "ROBOTS_SERVICE_PORT=50052"
             - "DNS_SERVER=testsites"
             - "TRACER_URI=http://tracer:9411/api/v1/spans"
 
@@ -103,6 +106,18 @@ services:
         environment:
             - "DB_HOST=db"
             - "FRONTIER_HOST=frontier"
+            - "TRACER_URI=http://tracer:9411/api/v1/spans"
+
+    # Broprox Robots honoring service
+    robots:
+        image: norsknettarkiv/broprox-robotrules-service
+        ports:
+            - "50052:50052"
+        depends_on:
+            - tracer
+        environment:
+            - "PROXY_HOST=harvester"
+            - "PROXY_PORT=8080"
             - "TRACER_URI=http://tracer:9411/api/v1/spans"
 
     # Zipkin

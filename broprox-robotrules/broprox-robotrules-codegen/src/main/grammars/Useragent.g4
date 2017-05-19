@@ -37,7 +37,7 @@ options {
 }
 
 @header {
-  package no.nb.nna.robots;
+  package no.nb.nna.broprox.robots;
 }
 
 prog

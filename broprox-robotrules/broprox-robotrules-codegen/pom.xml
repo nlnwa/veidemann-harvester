@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>no.nb.nna</groupId>
-        <artifactId>robotrules</artifactId>
+        <artifactId>broprox-robotrules</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
     <artifactId>broprox-robotrules-codegen</artifactId>
@@ -54,7 +54,7 @@
                             <showTree>false</showTree>
                             <entryPoint>prog</entryPoint>
                             <grammarName>Useragent</grammarName>
-                            <packageName>no.nb.nna.robots</packageName>
+                            <packageName>no.nb.nna.broprox.robots</packageName>
                             <exampleFiles>/src/test/examples/useragent/</exampleFiles>
                         </configuration>
                     </execution>
@@ -65,10 +65,10 @@
                         </goals>
                         <configuration>
                             <verbose>false</verbose>
-                            <showTree>true</showTree>
+                            <showTree>false</showTree>
                             <entryPoint>robotstxt</entryPoint>
                             <grammarName>Robotstxt</grammarName>
-                            <packageName>no.nb.nna.robots</packageName>
+                            <packageName>no.nb.nna.broprox.robots</packageName>
                             <exampleFiles>/src/test/examples/robotstxt/</exampleFiles>
                         </configuration>
                     </execution>

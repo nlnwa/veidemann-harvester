@@ -105,10 +105,16 @@ message BrowserConfig {
 }
 
 message PolitenessConfig {
+    enum RobotsPolicy {
+        OBEY_ROBOTS = 0;
+        IGNORE_ROBOTS = 1;
+        CUSTOM_ROBOTS = 2;
+    }
     string id = 1;
     Meta meta = 2;
-    bool ignore_robots = 3; // Not implemented
-    int32 minimum_robots_validity_duration_s = 11; // Not implemented
+    RobotsPolicy robots_policy = 3;
+    int32 minimum_robots_validity_duration_s = 11;
+    string custom_robots = 20;
     int64 min_time_between_page_load_ms = 4;
 }
 

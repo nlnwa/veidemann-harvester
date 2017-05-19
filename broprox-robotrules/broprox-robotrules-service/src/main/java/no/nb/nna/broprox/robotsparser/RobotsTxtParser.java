@@ -13,19 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package no.nb.nna.robotsparser;
+package no.nb.nna.broprox.robotsparser;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
+import java.io.Reader;
 
+import no.nb.nna.broprox.robotsparser.RobotsTxt.Directive;
+import no.nb.nna.broprox.robotsparser.RobotsTxt.DirectiveGroup;
+import no.nb.nna.broprox.robotsparser.RobotsTxt.DirectiveType;
+import no.nb.nna.broprox.robotsparser.RobotsTxt.NonGroupField;
 import no.nb.nna.robots.RobotstxtLexer;
 import no.nb.nna.robots.RobotstxtParser;
 import no.nb.nna.robots.RobotstxtParserBaseListener;
-import no.nb.nna.robotsparser.RobotsTxt.Directive;
-import no.nb.nna.robotsparser.RobotsTxt.DirectiveGroup;
-import no.nb.nna.robotsparser.RobotsTxt.DirectiveType;
-import no.nb.nna.robotsparser.RobotsTxt.NonGroupField;
+import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.TokenSource;
@@ -41,9 +41,16 @@ public class RobotsTxtParser {
     public RobotsTxtParser() {
     }
 
-    public RobotsTxt parse(InputStream robotsFile) throws IOException {
-        TokenSource tokenSource = new RobotstxtLexer(CharStreams
-                .fromStream(robotsFile, StandardCharsets.UTF_8, 500 * 1024));
+    public RobotsTxt parse(String robotsContent) throws IOException {
+        return parse(CharStreams.fromString(robotsContent));
+    }
+
+    public RobotsTxt parse(Reader robotsReader) throws IOException {
+        return parse(CharStreams.fromReader(robotsReader));
+    }
+
+    public RobotsTxt parse(CharStream robotsStream) throws IOException {
+        TokenSource tokenSource = new RobotstxtLexer(robotsStream);
         TokenStream tokens = new CommonTokenStream(tokenSource);
         RobotstxtParser parser = new RobotstxtParser(tokens);
         ParseTree p = parser.robotstxt();

@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package broprox;
+option java_package = "no.nb.nna.broprox.api";
+//option java_multiple_files = true;
+option java_outer_classname = "RobotsServiceProto";
+
+import "config.proto";
+import "messages.proto";
+
+// Service for controlling frontier.
+service RobotsService {
+    rpc isAllowed (IsAllowedRequest) returns (IsAllowedReply) {}
+}
+
+message IsAllowedRequest {
+    string execution_id = 1;
+    string uri = 2;
+    string user_agent = 3;
+    PolitenessConfig politeness = 4;
+}
+
+message IsAllowedReply {
+    bool is_allowed = 1;
+}

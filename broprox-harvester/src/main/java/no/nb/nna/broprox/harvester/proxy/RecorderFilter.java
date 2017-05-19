@@ -28,7 +28,7 @@ import io.netty.handler.codec.http.HttpVersion;
 import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.db.ProtoUtils;
-import no.nb.nna.broprox.harvester.BroproxHeaderConstants;
+import no.nb.nna.broprox.commons.BroproxHeaderConstants;
 import no.nb.nna.broprox.harvester.OpenTracingSpans;
 import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
 import org.littleshoot.proxy.HttpFiltersAdapter;

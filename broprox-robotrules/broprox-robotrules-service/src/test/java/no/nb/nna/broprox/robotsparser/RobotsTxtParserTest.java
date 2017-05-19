@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-package no.nb.nna.robotsparser;
+package no.nb.nna.broprox.robotsparser;
 
-import java.io.FileInputStream;
+import java.io.FileReader;
 import java.io.IOException;
 
 import org.junit.Test;
@@ -33,7 +33,7 @@ public class RobotsTxtParserTest {
     @Test
     public void testSomeMethod() throws IOException {
         RobotsTxtParser parser = new RobotsTxtParser();
-        RobotsTxt robots = parser.parse(new FileInputStream("src/test/resources/examples/robotstxt/robots1.txt"));
+        RobotsTxt robots = parser.parse(new FileReader("src/test/resources/examples/robotstxt/robots1.txt"));
 
         Uri denied = UriConfigs.WHATWG.buildUri("http://example.com/denied");
         Uri allowed = UriConfigs.WHATWG.buildUri("http://example.com/allowed");

@@ -5,7 +5,7 @@ options {
 }
 
 @header {
-  package no.nb.nna.robots;
+  package no.nb.nna.broprox.robots;
 }
 
 LWS : ((CR? LF)?(SP|HT)+) -> skip;

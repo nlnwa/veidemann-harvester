@@ -29,6 +29,7 @@ import no.nb.nna.broprox.harvester.api.HarvesterApiServer;
 import no.nb.nna.broprox.harvester.browsercontroller.BrowserController;
 import no.nb.nna.broprox.harvester.proxy.ContentWriterClient;
 import no.nb.nna.broprox.harvester.proxy.RecordingProxy;
+import no.nb.nna.broprox.harvester.proxy.RobotsServiceClient;
 import no.nb.nna.broprox.harvester.settings.Settings;
 import org.littleshoot.proxy.mitm.RootCertificateException;
 import org.slf4j.Logger;
@@ -65,8 +66,11 @@ public class Harvester {
     public Harvester start() {
         try (DbAdapter db = new RethinkDbAdapter(SETTINGS.getDbHost(), SETTINGS.getDbPort(), SETTINGS.getDbName());
 
+                RobotsServiceClient robotsServiceClient = new RobotsServiceClient(
+                        SETTINGS.getRobotsServiceHost(), SETTINGS.getRobotsServicePort());
+
                 BrowserController controller = new BrowserController(
-                        SETTINGS.getBrowserHost(), SETTINGS.getBrowserPort(), db);
+                        SETTINGS.getBrowserHost(), SETTINGS.getBrowserPort(), db, robotsServiceClient);
 
                 ContentWriterClient contentWriterClient = new ContentWriterClient(
                         SETTINGS.getContentWriterHost(), SETTINGS.getContentWriterPort());

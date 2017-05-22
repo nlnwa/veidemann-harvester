@@ -15,9 +15,9 @@
  */
 package no.nb.nna.broprox.robotsparser;
 
-import no.nb.nna.robots.UseragentBaseListener;
-import no.nb.nna.robots.UseragentLexer;
-import no.nb.nna.robots.UseragentParser;
+import no.nb.nna.broprox.robots.UseragentBaseListener;
+import no.nb.nna.broprox.robots.UseragentLexer;
+import no.nb.nna.broprox.robots.UseragentParser;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.TokenSource;

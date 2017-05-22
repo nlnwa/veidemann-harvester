@@ -12,7 +12,7 @@
     <dependencies>
         <dependency>
             <groupId>${project.groupId}</groupId>
-            <artifactId>robotrules-codegen</artifactId>
+            <artifactId>broprox-robotrules-codegen</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>

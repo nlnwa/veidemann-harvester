@@ -17,14 +17,13 @@ package no.nb.nna.broprox.robotsparser;
 
 import java.io.IOException;
 import java.io.Reader;
-
+import no.nb.nna.broprox.robots.RobotstxtLexer;
+import no.nb.nna.broprox.robots.RobotstxtParser;
+import no.nb.nna.broprox.robots.RobotstxtParserBaseListener;
 import no.nb.nna.broprox.robotsparser.RobotsTxt.Directive;
 import no.nb.nna.broprox.robotsparser.RobotsTxt.DirectiveGroup;
 import no.nb.nna.broprox.robotsparser.RobotsTxt.DirectiveType;
 import no.nb.nna.broprox.robotsparser.RobotsTxt.NonGroupField;
-import no.nb.nna.robots.RobotstxtLexer;
-import no.nb.nna.robots.RobotstxtParser;
-import no.nb.nna.robots.RobotstxtParserBaseListener;
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;

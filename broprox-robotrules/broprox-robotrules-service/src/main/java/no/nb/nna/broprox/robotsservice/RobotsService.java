@@ -16,7 +16,6 @@
 package no.nb.nna.broprox.robotsservice;
 
 import io.grpc.Status;
-import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
 import no.nb.nna.broprox.api.RobotsServiceGrpc;
 import no.nb.nna.broprox.api.RobotsServiceProto.IsAllowedReply;

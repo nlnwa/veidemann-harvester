@@ -34,17 +34,11 @@ public class RobotsApiServer implements AutoCloseable {
 
     private final Server server;
 
-    private final String proxyHost;
-
-    private final int proxyPort;
-
     public RobotsApiServer(int port, String proxyHost, int proxyPort) {
         this(ServerBuilder.forPort(port), proxyHost, proxyPort);
     }
 
     public RobotsApiServer(ServerBuilder<?> serverBuilder, String proxyHost, int proxyPort) {
-        this.proxyHost = proxyHost;
-        this.proxyPort = proxyPort;
 
         ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor.Builder(GlobalTracer.get())
                 .withTracedAttributes(ServerTracingInterceptor.ServerRequestAttribute.CALL_ATTRIBUTES,

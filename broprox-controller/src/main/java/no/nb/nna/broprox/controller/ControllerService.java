@@ -15,13 +15,15 @@
  */
 package no.nb.nna.broprox.controller;
 
+import java.time.OffsetDateTime;
+
 import com.google.protobuf.Empty;
+import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
-import no.nb.nna.broprox.db.DbAdapter;
+import it.sauronsoftware.cron4j.SchedulingPattern;
+import it.sauronsoftware.cron4j.Task;
 import no.nb.nna.broprox.api.ControllerGrpc;
 import no.nb.nna.broprox.api.ControllerProto;
-import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
-import no.nb.nna.broprox.model.ConfigProto.CrawlEntity;
 import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListReply;
 import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListRequest;
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;
@@ -29,19 +31,30 @@ import no.nb.nna.broprox.api.ControllerProto.CrawlJobListRequest;
 import no.nb.nna.broprox.api.ControllerProto.ListRequest;
 import no.nb.nna.broprox.api.ControllerProto.SeedListRequest;
 import no.nb.nna.broprox.commons.util.CrawlScopes;
+import no.nb.nna.broprox.controller.scheduler.FrontierClient;
+import no.nb.nna.broprox.controller.scheduler.ScheduledCrawlJob;
+import no.nb.nna.broprox.db.DbAdapter;
+import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.model.ConfigProto;
-import org.netpreserve.commons.uri.UriConfigs;
-import org.netpreserve.commons.uri.UriFormat;
+import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
+import no.nb.nna.broprox.model.ConfigProto.CrawlEntity;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  *
  */
 public class ControllerService extends ControllerGrpc.ControllerImplBase {
 
+    private static final Logger LOG = LoggerFactory.getLogger(ControllerService.class);
+
     private final DbAdapter db;
 
-    public ControllerService(DbAdapter db) {
+    final FrontierClient frontierClient;
+
+    public ControllerService(DbAdapter db, FrontierClient frontierClient) {
         this.db = db;
+        this.frontierClient = frontierClient;
     }
 
     @Override
@@ -49,8 +62,10 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
         try {
             respObserver.onNext(db.saveCrawlEntity(request));
             respObserver.onCompleted();
-        } catch (Exception e) {
-            respObserver.onError(e);
+        } catch (Exception ex) {
+            LOG.error(ex.getMessage(), ex);
+            Status status = Status.UNKNOWN.withDescription(ex.toString());
+            respObserver.onError(status.asException());
         }
     }
 
@@ -59,8 +74,10 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
         try {
             respObserver.onNext(db.listCrawlEntities(request));
             respObserver.onCompleted();
-        } catch (Exception e) {
-            respObserver.onError(e);
+        } catch (Exception ex) {
+            LOG.error(ex.getMessage(), ex);
+            Status status = Status.UNKNOWN.withDescription(ex.toString());
+            respObserver.onError(status.asException());
         }
     }
 
@@ -69,8 +86,10 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
         try {
             respObserver.onNext(db.deleteCrawlEntity(request));
             respObserver.onCompleted();
-        } catch (Exception e) {
-            respObserver.onError(e);
+        } catch (Exception ex) {
+            LOG.error(ex.getMessage(), ex);
+            Status status = Status.UNKNOWN.withDescription(ex.toString());
+            respObserver.onError(status.asException());
         }
     }
 
@@ -80,8 +99,10 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
             respObserver.onNext(db.deleteCrawlScheduleConfig(request));
             respObserver.onCompleted();
 
-        } catch (Exception e) {
-            respObserver.onError(e);
+        } catch (Exception ex) {
+            LOG.error(ex.getMessage(), ex);
+            Status status = Status.UNKNOWN.withDescription(ex.toString());
+            respObserver.onError(status.asException());
         }
     }
 
@@ -91,8 +112,10 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
         try {
             respObserver.onNext(db.saveCrawlScheduleConfig(request));
             respObserver.onCompleted();
-        } catch (Exception e) {
-            respObserver.onError(e);
+        } catch (Exception ex) {
+            LOG.error(ex.getMessage(), ex);
+            Status status = Status.UNKNOWN.withDescription(ex.toString());
+            respObserver.onError(status.asException());
         }
     }
 
@@ -102,8 +125,10 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
         try {
             respObserver.onNext(db.listCrawlScheduleConfigs(request));
             respObserver.onCompleted();
-        } catch (Exception e) {
-            respObserver.onError(e);
+        } catch (Exception ex) {
+            LOG.error(ex.getMessage(), ex);
+            Status status = Status.UNKNOWN.withDescription(ex.toString());
+            respObserver.onError(status.asException());
         }
     }
 
@@ -112,8 +137,10 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
         try {
             respObserver.onNext(db.deleteCrawlConfig(request));
             respObserver.onCompleted();
-        } catch (Exception e) {
-            respObserver.onError(e);
+        } catch (Exception ex) {
+            LOG.error(ex.getMessage(), ex);
+            Status status = Status.UNKNOWN.withDescription(ex.toString());
+            respObserver.onError(status.asException());
         }
     }
 
@@ -122,8 +149,10 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
         try {
             respObserver.onNext(db.saveCrawlConfig(request));
             respObserver.onCompleted();
-        } catch (Exception e) {
-            respObserver.onError(e);
+        } catch (Exception ex) {
+            LOG.error(ex.getMessage(), ex);
+            Status status = Status.UNKNOWN.withDescription(ex.toString());
+            respObserver.onError(status.asException());
         }
     }
 
@@ -133,8 +162,10 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
         try {
             respObserver.onNext(db.listCrawlConfigs(request));
             respObserver.onCompleted();
-        } catch (Exception e) {
-            respObserver.onError(e);
+        } catch (Exception ex) {
+            LOG.error(ex.getMessage(), ex);
+            Status status = Status.UNKNOWN.withDescription(ex.toString());
+            respObserver.onError(status.asException());
         }
     }
 
@@ -143,8 +174,10 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
         try {
             respObserver.onNext(db.deleteCrawlJob(request));
             respObserver.onCompleted();
-        } catch (Exception e) {
-            respObserver.onError(e);
+        } catch (Exception ex) {
+            LOG.error(ex.getMessage(), ex);
+            Status status = Status.UNKNOWN.withDescription(ex.toString());
+            respObserver.onError(status.asException());
         }
     }
 
@@ -153,8 +186,10 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
         try {
             respObserver.onNext(db.saveCrawlJob(request));
             respObserver.onCompleted();
-        } catch (Exception e) {
-            respObserver.onError(e);
+        } catch (Exception ex) {
+            LOG.error(ex.getMessage(), ex);
+            Status status = Status.UNKNOWN.withDescription(ex.toString());
+            respObserver.onError(status.asException());
         }
     }
 
@@ -163,8 +198,10 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
         try {
             respObserver.onNext(db.listCrawlJobs(request));
             respObserver.onCompleted();
-        } catch (Exception e) {
-            respObserver.onError(e);
+        } catch (Exception ex) {
+            LOG.error(ex.getMessage(), ex);
+            Status status = Status.UNKNOWN.withDescription(ex.toString());
+            respObserver.onError(status.asException());
         }
     }
 
@@ -173,8 +210,10 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
         try {
             respObserver.onNext(db.deleteSeed(request));
             respObserver.onCompleted();
-        } catch (Exception e) {
-            respObserver.onError(e);
+        } catch (Exception ex) {
+            LOG.error(ex.getMessage(), ex);
+            Status status = Status.UNKNOWN.withDescription(ex.toString());
+            respObserver.onError(status.asException());
         }
     }
 
@@ -189,8 +228,10 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
 
             respObserver.onNext(db.saveSeed(request));
             respObserver.onCompleted();
-        } catch (Exception e) {
-            respObserver.onError(e);
+        } catch (Exception ex) {
+            LOG.error(ex.getMessage(), ex);
+            Status status = Status.UNKNOWN.withDescription(ex.toString());
+            respObserver.onError(status.asException());
         }
     }
 
@@ -199,8 +240,10 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
         try {
             respObserver.onNext(db.listSeeds(request));
             respObserver.onCompleted();
-        } catch (Exception e) {
-            respObserver.onError(e);
+        } catch (Exception ex) {
+            LOG.error(ex.getMessage(), ex);
+            Status status = Status.UNKNOWN.withDescription(ex.toString());
+            respObserver.onError(status.asException());
         }
     }
 
@@ -209,8 +252,10 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
         try {
             respObserver.onNext(db.deleteBrowserConfig(request));
             respObserver.onCompleted();
-        } catch (Exception e) {
-            respObserver.onError(e);
+        } catch (Exception ex) {
+            LOG.error(ex.getMessage(), ex);
+            Status status = Status.UNKNOWN.withDescription(ex.toString());
+            respObserver.onError(status.asException());
         }
     }
 
@@ -220,8 +265,10 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
         try {
             respObserver.onNext(db.saveBrowserConfig(request));
             respObserver.onCompleted();
-        } catch (Exception e) {
-            respObserver.onError(e);
+        } catch (Exception ex) {
+            LOG.error(ex.getMessage(), ex);
+            Status status = Status.UNKNOWN.withDescription(ex.toString());
+            respObserver.onError(status.asException());
         }
     }
 
@@ -231,8 +278,10 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
         try {
             respObserver.onNext(db.listBrowserConfigs(request));
             respObserver.onCompleted();
-        } catch (Exception e) {
-            respObserver.onError(e);
+        } catch (Exception ex) {
+            LOG.error(ex.getMessage(), ex);
+            Status status = Status.UNKNOWN.withDescription(ex.toString());
+            respObserver.onError(status.asException());
         }
     }
 
@@ -241,8 +290,10 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
         try {
             respObserver.onNext(db.deletePolitenessConfig(request));
             respObserver.onCompleted();
-        } catch (Exception e) {
-            respObserver.onError(e);
+        } catch (Exception ex) {
+            LOG.error(ex.getMessage(), ex);
+            Status status = Status.UNKNOWN.withDescription(ex.toString());
+            respObserver.onError(status.asException());
         }
     }
 
@@ -252,8 +303,10 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
         try {
             respObserver.onNext(db.savePolitenessConfig(request));
             respObserver.onCompleted();
-        } catch (Exception e) {
-            respObserver.onError(e);
+        } catch (Exception ex) {
+            LOG.error(ex.getMessage(), ex);
+            Status status = Status.UNKNOWN.withDescription(ex.toString());
+            respObserver.onError(status.asException());
         }
     }
 
@@ -263,8 +316,10 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
         try {
             respObserver.onNext(db.listPolitenessConfigs(request));
             respObserver.onCompleted();
-        } catch (Exception e) {
-            respObserver.onError(e);
+        } catch (Exception ex) {
+            LOG.error(ex.getMessage(), ex);
+            Status status = Status.UNKNOWN.withDescription(ex.toString());
+            respObserver.onError(status.asException());
         }
     }
 
@@ -273,8 +328,10 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
         try {
             respObserver.onNext(db.saveBrowserScript(request));
             respObserver.onCompleted();
-        } catch (Exception e) {
-            respObserver.onError(e);
+        } catch (Exception ex) {
+            LOG.error(ex.getMessage(), ex);
+            Status status = Status.UNKNOWN.withDescription(ex.toString());
+            respObserver.onError(status.asException());
         }
     }
 
@@ -283,8 +340,64 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
         try {
             respObserver.onNext(db.listBrowserScripts(request));
             respObserver.onCompleted();
-        } catch (Exception e) {
-            respObserver.onError(e);
+        } catch (Exception ex) {
+            LOG.error(ex.getMessage(), ex);
+            Status status = Status.UNKNOWN.withDescription(ex.toString());
+            respObserver.onError(status.asException());
+        }
+    }
+
+    @Override
+    public void deleteBrowserScript(BrowserScript request, StreamObserver<Empty> respObserver) {
+        try {
+            respObserver.onNext(db.deleteBrowserScript(request));
+            respObserver.onCompleted();
+        } catch (Exception ex) {
+            LOG.error(ex.getMessage(), ex);
+            Status status = Status.UNKNOWN.withDescription(ex.toString());
+            respObserver.onError(status.asException());
+        }
+    }
+
+    @Override
+    public void runCrawl(ControllerProto.RunCrawlRequest request, StreamObserver<Empty> respObserver) {
+        try {
+            CrawlJobListRequest jobRequest = CrawlJobListRequest.newBuilder()
+                    .setId(request.getJobId())
+                    .setExpand(true)
+                    .build();
+            SeedListRequest seedRequest;
+
+            for (ConfigProto.CrawlJob job : db.listCrawlJobs(jobRequest).getValueList()) {
+                LOG.info("Job '{}' starting", job.getMeta().getName());
+
+                if (request.getSeedId().isEmpty()) {
+                    seedRequest = SeedListRequest.newBuilder()
+                            .setCrawlJobId(job.getId())
+                            .build();
+                } else {
+                    seedRequest = SeedListRequest.newBuilder()
+                            .setId(request.getSeedId())
+                            .build();
+                }
+
+                for (ConfigProto.Seed seed : db.listSeeds(seedRequest).getValueList()) {
+                    if (!seed.getDisabled()) {
+                        if (LOG.isInfoEnabled()) {
+                            LOG.info("Start harvest of: {}", seed.getMeta().getName());
+                            frontierClient.crawlSeed(job, seed);
+                        }
+                    }
+                }
+                LOG.info("All seeds for job '{}' started", job.getMeta().getName());
+            }
+
+            respObserver.onNext(Empty.getDefaultInstance());
+            respObserver.onCompleted();
+        } catch (Exception ex) {
+            LOG.error(ex.getMessage(), ex);
+            Status status = Status.UNKNOWN.withDescription(ex.toString());
+            respObserver.onError(status.asException());
         }
     }
 

@@ -15,12 +15,16 @@
  */
 package no.nb.nna.broprox.controller.scheduler;
 
+import java.time.OffsetDateTime;
+
 import it.sauronsoftware.cron4j.SchedulingPattern;
 import it.sauronsoftware.cron4j.Task;
 import it.sauronsoftware.cron4j.TaskCollector;
 import it.sauronsoftware.cron4j.TaskTable;
 import no.nb.nna.broprox.api.ControllerProto.CrawlJobListRequest;
 import no.nb.nna.broprox.db.DbAdapter;
+import no.nb.nna.broprox.db.ProtoUtils;
+import no.nb.nna.broprox.model.ConfigProto.CrawlScheduleConfig;
 import no.nb.nna.broprox.model.ConfigProto.CrawlJob;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,6 +33,7 @@ import org.slf4j.LoggerFactory;
  *
  */
 public class CrawlJobCollector implements TaskCollector {
+
     private static final Logger LOG = LoggerFactory.getLogger(CrawlJobCollector.class);
 
     final DbAdapter db;
@@ -48,14 +53,25 @@ public class CrawlJobCollector implements TaskCollector {
         TaskTable tasks = new TaskTable();
 
         for (CrawlJob job : db.listCrawlJobs(listRequest).getValueList()) {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Read Job: '{}' with cron expression '{}'",
-                        job.getMeta().getName(), job.getSchedule().getCronExpression());
-            }
+            // Check if job is disabled
+            if (!job.getDisabled()) {
+                CrawlScheduleConfig schedule = job.getSchedule();
 
-            SchedulingPattern pattern = new SchedulingPattern(job.getSchedule().getCronExpression());
-            Task task = new ScheduledCrawlJob(db, frontierClient, job);
-            tasks.add(pattern, task);
+                // Check if job is valid for current date
+                OffsetDateTime now = ProtoUtils.getNowOdt();
+                if ((!schedule.hasValidFrom() || ProtoUtils.tsToOdt(schedule.getValidFrom()).isBefore(now))
+                        && (!schedule.hasValidTo() || ProtoUtils.tsToOdt(schedule.getValidTo()).isAfter(now))) {
+
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Read Job: '{}' with cron expression '{}'",
+                                job.getMeta().getName(), schedule.getCronExpression());
+                    }
+
+                    SchedulingPattern pattern = new SchedulingPattern(schedule.getCronExpression());
+                    Task task = new ScheduledCrawlJob(db, frontierClient, job);
+                    tasks.add(pattern, task);
+                }
+            }
         }
 
         return tasks;

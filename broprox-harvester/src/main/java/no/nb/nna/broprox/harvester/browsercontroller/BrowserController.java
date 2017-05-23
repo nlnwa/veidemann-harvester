@@ -36,8 +36,13 @@ import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
 import no.nb.nna.broprox.model.ConfigProto.CrawlConfig;
 import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
 import no.nb.nna.broprox.commons.BroproxHeaderConstants;
+import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.harvester.OpenTracingSpans;
 import no.nb.nna.broprox.harvester.proxy.RobotsServiceClient;
+import no.nb.nna.broprox.model.MessagesProto;
+import org.netpreserve.commons.uri.UriConfigs;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
@@ -45,6 +50,8 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
  *
  */
 public class BrowserController implements AutoCloseable, BroproxHeaderConstants {
+
+    private static final Logger LOG = LoggerFactory.getLogger(BrowserController.class);
 
     private final ChromeDebugProtocol chrome;
 
@@ -130,6 +137,22 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
                 pex.scrollToTop();
             }
         } else {
+            // Precluded by robots.txt
+            if (db != null) {
+                MessagesProto.CrawlLog crawlLog = MessagesProto.CrawlLog.newBuilder()
+                        .setRequestedUri(queuedUri.getUri())
+                        .setSurt(queuedUri.getSurt())
+                        .setRecordType("response")
+                        .setStatusCode(-9998)
+                        .setFetchTimeStamp(ProtoUtils.getNowTs())
+                        .build();
+                db.addCrawlLog(crawlLog);
+            }
+
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Uri {} precluded by robots.txt", queuedUri.getUri());
+            }
+
             outlinks = Collections.EMPTY_LIST;
         }
         return outlinks;

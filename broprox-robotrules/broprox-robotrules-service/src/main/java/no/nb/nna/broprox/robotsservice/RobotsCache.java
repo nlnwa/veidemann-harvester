@@ -88,15 +88,16 @@ public class RobotsCache {
                                 .addHeader(DISCOVERY_PATH, "P")
                                 .build();
 
-                        Response response = client.newCall(request).execute();
-                        if (response.isSuccessful()) {
-                            LOG.debug("Found '{}'", url);
-                            try {
+                        try (Response response = client.newCall(request).execute();) {
+                            if (response.isSuccessful()) {
+                                LOG.debug("Found '{}'", url);
                                 return ROBOTS_TXT_PARSER.parse(response.body().charStream());
-                            } finally {
-                                response.close();
+                            } else {
+                                LOG.debug("No '{}' found", url);
                             }
-                        } else {
+                        } catch (Exception e) {
+                            System.out.println("---------------");
+                            e.printStackTrace();
                             LOG.debug("No '{}' found", url);
                         }
                         return EMPTY_ROBOTS;

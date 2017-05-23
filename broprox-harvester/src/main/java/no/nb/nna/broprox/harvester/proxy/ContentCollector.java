@@ -45,9 +45,9 @@ import static io.netty.util.AsciiString.c2b;
 /**
  *
  */
-public class ContentInterceptor {
+public class ContentCollector {
 
-    private static final Logger LOG = LoggerFactory.getLogger(ContentInterceptor.class);
+    private static final Logger LOG = LoggerFactory.getLogger(ContentCollector.class);
 
     static final byte[] CRLF = {CR, LF};
 
@@ -71,7 +71,7 @@ public class ContentInterceptor {
 
     private CompositeByteBuf payloadBuf;
 
-    public ContentInterceptor(final DbAdapter db, final ChannelHandlerContext ctx,
+    public ContentCollector(final DbAdapter db, final ChannelHandlerContext ctx,
             final ContentWriterClient contentWriterClient) {
         this.db = db;
         this.ctx = ctx;
@@ -90,7 +90,7 @@ public class ContentInterceptor {
         Iterator<Map.Entry<CharSequence, CharSequence>> iter = headers.iteratorCharSequence();
         while (iter.hasNext()) {
             Map.Entry<CharSequence, CharSequence> header = iter.next();
-            encoderHeader(header.getKey(), header.getValue(), headerBuf);
+            encodeHeader(header.getKey(), header.getValue(), headerBuf);
         }
         headerSize = headerBuf.readableBytes();
         updateDigest(headerBuf, blockDigest);
@@ -151,51 +151,83 @@ public class ContentInterceptor {
         return headerSize;
     }
 
-    public void writeData(CrawlLog.Builder logEntryBuilder) {
-        String payloadDigestString = getPayloadDigest();
-        logEntryBuilder.setFetchTimeMillis(Duration.between(ProtoUtils.tsToOdt(
-                logEntryBuilder.getFetchTimeStamp()), OffsetDateTime.now(ZoneOffset.UTC)).toMillis());
-
-        Optional<CrawledContent> isDuplicate = db.isDuplicateContent(payloadDigestString);
-
-        CrawlLog logEntry;
-        if (isDuplicate.isPresent()) {
-            logEntryBuilder.setRecordType("revisit")
-                    .setBlockDigest(getHeaderDigest())
-                    .setSize(headerSize)
-                    .setWarcRefersTo(isDuplicate.get().getWarcId());
-
+    public void writeRequest(CrawlLog logEntry) {
+        try {
+            CrawlLog.Builder logEntryBuilder = logEntry.toBuilder();
+            String payloadDigestString = getPayloadDigest();
+            if (payloadSize == 0L) {
+                logEntryBuilder.setRecordType("request")
+                        .setBlockDigest(getHeaderDigest())
+                        .setSize(headerSize);
+            } else {
+                logEntryBuilder.setRecordType("request")
+                        .setBlockDigest(getBlockDigest())
+                        .setPayloadDigest(payloadDigestString)
+                        .setSize(headerSize + 2 + payloadSize);
+            }
             logEntry = db.addCrawlLog(logEntryBuilder.build());
             if (LOG.isDebugEnabled()) {
-                LOG.debug("Writing {} as a revisit of {}", logEntryBuilder.getRequestedUri(), logEntryBuilder.getWarcRefersTo());
+                LOG.debug("Writing request {}", logEntryBuilder.getRequestedUri());
             }
             contentWriterClient.writeRecord(logEntry, headerBuf, null);
-        } else {
-            logEntryBuilder.setRecordType("response")
-                    .setBlockDigest(getBlockDigest())
-                    .setPayloadDigest(payloadDigestString)
-                    .setSize(headerSize + 2 + payloadSize);
-
-            logEntry = db.addCrawlLog(logEntryBuilder.build());
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Writing {}", logEntryBuilder.getRequestedUri());
-            }
-            contentWriterClient.writeRecord(logEntry, headerBuf, payloadBuf);
+        } finally {
+            release();
         }
 
-//        headerBuf.release();
-//        payloadBuf.release();
-        if (!isDuplicate.isPresent()) {
-            db.addCrawledContent(CrawledContent.newBuilder()
-                    .setDigest(payloadDigestString)
-                    .setWarcId(logEntry.getWarcId())
-                    .build());
+    }
+
+    public void writeResponse(CrawlLog logEntry) {
+        try {
+            CrawlLog.Builder logEntryBuilder = logEntry.toBuilder();
+            String payloadDigestString = getPayloadDigest();
+            logEntryBuilder.setFetchTimeMillis(Duration.between(ProtoUtils.tsToOdt(
+                    logEntryBuilder.getFetchTimeStamp()), OffsetDateTime.now(ZoneOffset.UTC)).toMillis());
+
+            Optional<CrawledContent> isDuplicate = db.isDuplicateContent(payloadDigestString);
+
+            if (isDuplicate.isPresent()) {
+                logEntryBuilder.setRecordType("revisit")
+                        .setBlockDigest(getHeaderDigest())
+                        .setSize(headerSize)
+                        .setWarcRefersTo(isDuplicate.get().getWarcId());
+
+                logEntry = db.addCrawlLog(logEntryBuilder.build());
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Writing {} as a revisit of {}",
+                            logEntryBuilder.getRequestedUri(), logEntryBuilder.getWarcRefersTo());
+                }
+                contentWriterClient.writeRecord(logEntry, headerBuf, null);
+            } else {
+                logEntryBuilder.setRecordType("response")
+                        .setBlockDigest(getBlockDigest())
+                        .setPayloadDigest(payloadDigestString)
+                        .setSize(headerSize + 2 + payloadSize);
+
+                logEntry = db.addCrawlLog(logEntryBuilder.build());
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Writing {}", logEntryBuilder.getRequestedUri());
+                }
+                contentWriterClient.writeRecord(logEntry, headerBuf, payloadBuf);
+            }
+
+            if (!isDuplicate.isPresent()) {
+                db.addCrawledContent(CrawledContent.newBuilder()
+                        .setDigest(payloadDigestString)
+                        .setWarcId(logEntry.getWarcId())
+                        .build());
+            }
+        } finally {
+            release();
         }
     }
 
-    public void release() {
-        headerBuf.release();
-        payloadBuf.release();
+    private void release() {
+        if (headerBuf != null) {
+            headerBuf.release();
+        }
+        if (payloadBuf != null) {
+            payloadBuf.release();
+        }
     }
 
     public ByteBuf getHeaderBuf() {
@@ -206,7 +238,7 @@ public class ContentInterceptor {
         return payloadBuf;
     }
 
-    private static void encoderHeader(CharSequence name, CharSequence value, ByteBuf buf) {
+    private static void encodeHeader(CharSequence name, CharSequence value, ByteBuf buf) {
         final int nameLen = name.length();
         final int valueLen = value.length();
         final int entryLen = nameLen + valueLen + 4;

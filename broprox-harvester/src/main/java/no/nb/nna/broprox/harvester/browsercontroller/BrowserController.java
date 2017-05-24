@@ -121,7 +121,9 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
                 PageExecution pex = new PageExecution(executionId, queuedUri, session, config.getBrowserConfig()
                         .getPageLoadTimeoutMs(), db, config.getBrowserConfig().getSleepAfterPageloadMs());
                 otw.run("navigatePage", pex::navigatePage);
-                otw.run("saveScreenshot", pex::saveScreenshot);
+                if (config.getExtra().getCreateSnapshot()) {
+                    otw.run("saveScreenshot", pex::saveScreenshot);
+                }
 
 //                System.out.println("LINKS >>>>>>");
 //                for (PageDomain.FrameResource fs : session.page.getResourceTree().get().frameTree.resources) {

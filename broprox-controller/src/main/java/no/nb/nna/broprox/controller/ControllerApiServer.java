@@ -22,6 +22,7 @@ import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.opentracing.contrib.ServerTracingInterceptor;
 import io.opentracing.util.GlobalTracer;
+import no.nb.nna.broprox.controller.scheduler.FrontierClient;
 import no.nb.nna.broprox.db.DbAdapter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,21 +36,18 @@ public class ControllerApiServer implements AutoCloseable {
 
     private final Server server;
 
-    private final DbAdapter db;
-
-    public ControllerApiServer(int port, DbAdapter db) {
-        this(ServerBuilder.forPort(port), db);
+    public ControllerApiServer(int port, DbAdapter db, FrontierClient frontierClient) {
+        this(ServerBuilder.forPort(port), db, frontierClient);
     }
 
-    public ControllerApiServer(ServerBuilder<?> serverBuilder, DbAdapter db) {
-        this.db = db;
-
+    public ControllerApiServer(ServerBuilder<?> serverBuilder, DbAdapter db, FrontierClient frontierClient) {
         ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor.Builder(GlobalTracer.get())
                 .withTracedAttributes(ServerTracingInterceptor.ServerRequestAttribute.CALL_ATTRIBUTES,
                         ServerTracingInterceptor.ServerRequestAttribute.METHOD_TYPE)
                 .build();
 
-        server = serverBuilder.addService(tracingInterceptor.intercept(new ControllerService(db))).build();
+        server = serverBuilder.addService(tracingInterceptor.intercept(new ControllerService(db, frontierClient)))
+                .build();
     }
 
     public ControllerApiServer start() {
@@ -79,9 +77,6 @@ public class ControllerApiServer implements AutoCloseable {
     public void close() {
         if (server != null) {
             server.shutdown();
-        }
-        if (db != null) {
-            db.close();
         }
         System.err.println("*** server shut down");
     }

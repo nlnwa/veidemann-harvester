@@ -72,7 +72,7 @@ public class ControllerApiServerTest {
     @Test
     public void testSaveEntity() throws InterruptedException {
         DbAdapter dbMock = mock(DbAdapter.class);
-        inProcessServer = new ControllerApiServer(inProcessServerBuilder, dbMock).start();
+        inProcessServer = new ControllerApiServer(inProcessServerBuilder, dbMock, null).start();
 
         CrawlEntity request = CrawlEntity.newBuilder()
                 .setMeta(ConfigProto.Meta.newBuilder()
@@ -132,7 +132,7 @@ public class ControllerApiServerTest {
     @Test
     public void testListCrawlEntities() throws InterruptedException {
         DbAdapter dbMock = mock(DbAdapter.class);
-        inProcessServer = new ControllerApiServer(inProcessServerBuilder, dbMock).start();
+        inProcessServer = new ControllerApiServer(inProcessServerBuilder, dbMock, null).start();
 
         ListRequest request = ListRequest.newBuilder().build();
         CrawlEntityListReply reply = CrawlEntityListReply.newBuilder().build();

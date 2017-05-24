@@ -58,7 +58,9 @@ public class Controller {
         try (DbAdapter db = new RethinkDbAdapter(SETTINGS.getDbHost(), SETTINGS.getDbPort(), SETTINGS.getDbName());
                 FrontierClient frontierClient = new FrontierClient(SETTINGS.getFrontierHost(), SETTINGS
                         .getFrontierPort());
-                ControllerApiServer apiServer = new ControllerApiServer(SETTINGS.getApiPort(), db).start();
+                ControllerApiServer apiServer = new ControllerApiServer(SETTINGS.getApiPort(), db, frontierClient)
+                        .start();
+                
                 CrawlJobScheduler scheduler = new CrawlJobScheduler(db, frontierClient).start();) {
 
             LOG.info("Broprox Controller (v. {}) started", Controller.class.getPackage().getImplementationVersion());

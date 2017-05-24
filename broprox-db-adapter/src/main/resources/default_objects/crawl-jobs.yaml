@@ -37,7 +37,7 @@ crawlConfig:
         meta:
             name: "Default"
             description: "Default politeness configuration"
-        ignoreRobots: false
+        robotsPolicy: OBEY_ROBOTS
         minTimeBetweenPageLoadMs: 1000
     extra:
         extractText: true
@@ -55,6 +55,19 @@ schedule:
         name: "Every day"
         description: "A schedule which triggers every day"
     cronExpression: "0 6 * * *"
+limits:
+    maxDurationS: 86400
+crawlConfigSelector:
+    label:
+    - key: "type"
+      value: "default"
+---
+meta:
+    name: "Unscheduled"
+    description: "A job which will never trigger. Suitable for manual runs"
+    label:
+        - key: "type"
+          value: "default"
 limits:
     maxDurationS: 86400
 crawlConfigSelector:

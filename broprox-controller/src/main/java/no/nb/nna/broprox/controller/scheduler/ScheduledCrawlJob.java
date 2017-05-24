@@ -51,9 +51,11 @@ public class ScheduledCrawlJob extends Task {
                 .build();
 
         for (Seed seed : db.listSeeds(request).getValueList()) {
-            if (LOG.isInfoEnabled()) {
-                LOG.info("Start harvest of: {}", seed.getMeta().getName());
-                frontierClient.crawlSeed(job, seed);
+            if (!seed.getDisabled()) {
+                if (LOG.isInfoEnabled()) {
+                    LOG.info("Start harvest of: {}", seed.getMeta().getName());
+                    frontierClient.crawlSeed(job, seed);
+                }
             }
         }
         LOG.info("All seeds for job '{}' started", job.getMeta().getName());

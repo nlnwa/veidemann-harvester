@@ -48,6 +48,8 @@ service Controller {
     rpc ListBrowserScripts (BrowserScriptListRequest) returns (BrowserScriptListReply) {}
     rpc SaveBrowserScript (BrowserScript) returns (BrowserScript) {}
     rpc DeleteBrowserScript (BrowserScript) returns (google.protobuf.Empty) {}
+
+    rpc RunCrawl (RunCrawlRequest) returns (google.protobuf.Empty) {}
 }
 
 // Specification of wich entities to get.
@@ -152,4 +154,12 @@ message BrowserScriptListReply {
     int64 count = 2;
     int32 page_size = 14;
     int32 page = 15;
+}
+
+// Cick of a crawl job immediately
+message RunCrawlRequest {
+    string job_id = 5;
+    // If seed id is submitted, only this seed will be harvested.
+    // If empty, all seeds configured with the submitted job id will be harvested.
+    string seed_id = 6;
 }

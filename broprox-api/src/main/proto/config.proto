@@ -38,6 +38,7 @@ message Seed {
     string entity_id = 3;
     CrawlScope scope = 5;
     repeated string job_id = 6;
+    bool disabled = 18;
 }
 
 message CrawlJob {
@@ -79,6 +80,8 @@ message CrawlScheduleConfig {
     string id = 1;
     Meta meta = 2;
     string cron_expression = 3;
+    google.protobuf.Timestamp valid_from = 4;
+    google.protobuf.Timestamp valid_to = 5;
 }
 
 message CrawlScope {
@@ -120,7 +123,7 @@ message PolitenessConfig {
 
 message ExtraConfig {
     bool extract_text = 5; // Not implemented
-    bool create_snapshot = 6; // Not implemented
+    bool create_snapshot = 6;
 }
 
 // Message containing a javascript to be run in a browser

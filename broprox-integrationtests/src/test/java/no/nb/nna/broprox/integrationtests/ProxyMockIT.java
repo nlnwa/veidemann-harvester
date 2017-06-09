@@ -15,8 +15,11 @@
  */
 package no.nb.nna.broprox.integrationtests;
 
+import java.io.IOException;
 import java.util.Map;
+import java.util.stream.Stream;
 
+import com.google.common.io.ByteStreams;
 import com.rethinkdb.RethinkDB;
 import com.rethinkdb.net.Cursor;
 import io.grpc.ManagedChannel;
@@ -29,6 +32,7 @@ import no.nb.nna.broprox.model.ConfigProto;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.jwat.warc.WarcRecord;
 
 import static org.assertj.core.api.Assertions.*;
 
@@ -36,8 +40,6 @@ import static org.assertj.core.api.Assertions.*;
  *
  */
 public class ProxyMockIT implements BroproxHeaderConstants {
-
-    private long timeout = 1000;
 
     static ManagedChannel channel;
 
@@ -48,7 +50,10 @@ public class ProxyMockIT implements BroproxHeaderConstants {
     static RethinkDB r = RethinkDB.r;
 
     @BeforeClass
-    public static void init() {
+    public static void init() throws InterruptedException {
+        // Sleep a little to let docker routing complete
+        Thread.sleep(500);
+
         String controllerHost = System.getProperty("controller.host");
         int controllerPort = Integer.parseInt(System.getProperty("controller.port"));
         String dbHost = System.getProperty("db.host");
@@ -102,7 +107,22 @@ public class ProxyMockIT implements BroproxHeaderConstants {
             }
         }
 
-        fail("This is a prototype");
+        WarcInspector.listWarcFiles().forEach(w -> {
+            System.out.println("W: " + w);
+            try (Stream<WarcRecord> records = w.getContent()) {
+                records.forEach(r -> {
+                    System.out.println("  TYPE: " + r.header.warcTypeStr + ", URI: " + r.header.warcTargetUriStr);
+                    if (r.hasPayload()) {
+                        try {
+                            System.out.println("    PL: " + new String(ByteStreams.toByteArray(r.getPayloadContent())));
+                        } catch (IOException ex) {
+                            ex.printStackTrace();
+                        }
+                    }
+                });
+            }
+        });
+
     }
 
 }

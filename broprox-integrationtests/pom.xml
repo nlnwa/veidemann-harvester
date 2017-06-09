@@ -45,6 +45,24 @@
             <artifactId>broprox-robotrules-service</artifactId>
             <version>${project.version}</version>
         </dependency>
+
+        <!-- ARC/WARC libraries -->
+        <dependency>
+            <groupId>org.jwat</groupId>
+            <artifactId>jwat-common</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.jwat</groupId>
+            <artifactId>jwat-gzip</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.jwat</groupId>
+            <artifactId>jwat-warc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.jwat</groupId>
+            <artifactId>jwat-archive</artifactId>
+        </dependency>
     </dependencies>
 
     <profiles>

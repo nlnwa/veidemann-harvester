@@ -38,6 +38,7 @@ crawlConfig:
             name: "Default"
             description: "Default politeness configuration"
         robotsPolicy: OBEY_ROBOTS
+        minimumRobotsValidityDurationS: 86400
         minTimeBetweenPageLoadMs: 1000
     extra:
         extractText: true

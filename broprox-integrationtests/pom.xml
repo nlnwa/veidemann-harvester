@@ -246,6 +246,7 @@
                                                             <port>9090</port>
                                                         </ports>
                                                     </tcp>
+                                                    <log>Broprox Harvester .* started</log>
                                                     <time>20000</time>
                                                 </wait>
                                             </run>
@@ -322,6 +323,7 @@
                                                             <port>7700</port>
                                                         </ports>
                                                     </tcp>
+                                                    <log>Broprox Frontier .* started</log>
                                                     <time>20000</time>
                                                 </wait>
                                             </run>
@@ -363,6 +365,7 @@
                                                             <port>50051</port>
                                                         </ports>
                                                     </tcp>
+                                                    <log>Broprox Controller .* started</log>
                                                     <time>20000</time>
                                                 </wait>
                                             </run>

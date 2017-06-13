@@ -58,8 +58,6 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
 
     private final DbAdapter db;
 
-    private long payloadSizeField;
-
     private String executionId;
 
     private boolean toBeCached = false;
@@ -150,12 +148,6 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
                 crawlLog.setStatusCode(responseStatus.code())
                         .setContentType(res.headers().get("Content-Type"));
                 responseCollector.setResponseHeaders(res);
-
-                try {
-                    payloadSizeField = res.headers().getInt("Content-Length");
-                } catch (NullPointerException ex) {
-                    payloadSizeField = 0L;
-                }
 
             } else if (response instanceof HttpContent) {
                 HttpContent res = (HttpContent) response;

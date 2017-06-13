@@ -30,6 +30,8 @@ import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpHeaders;
+import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.HttpResponse;
 import io.netty.util.AsciiString;
 import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.db.ProtoUtils;
@@ -85,8 +87,30 @@ public class ContentCollector {
         }
     }
 
-    public void addHeader(HttpHeaders headers) {
+    public void setRequestHeaders(HttpRequest request) {
         headerBuf = ctx.alloc().buffer();
+
+        String requestLine = request.method().toString() + " "
+                + request.uri() + " "
+                + request.protocolVersion().text() + "\r\n";
+
+        appendAscii(headerBuf, requestLine);
+
+        setHeaders(request.headers());
+    }
+
+    public void setResponseHeaders(HttpResponse response) {
+        headerBuf = ctx.alloc().buffer();
+
+        String requestLine = response.protocolVersion().text() + " "
+                + response.status().toString() + "\r\n";
+
+        appendAscii(headerBuf, requestLine);
+
+        setHeaders(response.headers());
+    }
+
+    private void setHeaders(HttpHeaders headers) {
         Iterator<Map.Entry<CharSequence, CharSequence>> iter = headers.iteratorCharSequence();
         while (iter.hasNext()) {
             Map.Entry<CharSequence, CharSequence> header = iter.next();
@@ -253,6 +277,14 @@ public class ContentCollector {
         buf.setByte(offset++, '\r');
         buf.setByte(offset++, '\n');
         buf.writerIndex(offset);
+    }
+
+    private static void appendAscii(ByteBuf buf, CharSequence value) {
+        final int offset = buf.writerIndex();
+        final int valueLen = value.length();
+        buf.ensureWritable(valueLen);
+        writeAscii(buf, offset, value, valueLen);
+        buf.writerIndex(offset + valueLen);
     }
 
     private static void writeAscii(ByteBuf buf, int offset, CharSequence value, int valueLen) {

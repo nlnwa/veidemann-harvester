@@ -15,11 +15,16 @@
  */
 package no.nb.nna.broprox.integrationtests;
 
-import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.stream.Stream;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinTask;
+import java.util.concurrent.RunnableFuture;
+import java.util.stream.StreamSupport;
 
-import com.google.common.io.ByteStreams;
 import com.rethinkdb.RethinkDB;
 import com.rethinkdb.net.Cursor;
 import io.grpc.ManagedChannel;
@@ -27,12 +32,13 @@ import io.grpc.ManagedChannelBuilder;
 import no.nb.nna.broprox.api.ControllerGrpc;
 import no.nb.nna.broprox.api.ControllerProto;
 import no.nb.nna.broprox.commons.BroproxHeaderConstants;
+import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
 import no.nb.nna.broprox.model.ConfigProto;
+import no.nb.nna.broprox.model.MessagesProto.CrawlExecutionStatus;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.jwat.warc.WarcRecord;
 
 import static org.assertj.core.api.Assertions.*;
 
@@ -52,7 +58,7 @@ public class ProxyMockIT implements BroproxHeaderConstants {
     @BeforeClass
     public static void init() throws InterruptedException {
         // Sleep a little to let docker routing complete
-        Thread.sleep(500);
+        Thread.sleep(2000);
 
         String controllerHost = System.getProperty("controller.host");
         int controllerPort = Integer.parseInt(System.getProperty("controller.port"));
@@ -76,7 +82,7 @@ public class ProxyMockIT implements BroproxHeaderConstants {
     }
 
     @Test
-    public void testHarvest() {
+    public void testHarvest() throws InterruptedException, ExecutionException {
         String jobId = controllerClient.listCrawlJobs(ControllerProto.CrawlJobListRequest.newBuilder()
                 .setNamePrefix("default").build())
                 .getValue(0).getId();
@@ -95,33 +101,88 @@ public class ProxyMockIT implements BroproxHeaderConstants {
                 .setJobId(jobId)
                 .setSeedId(seed.getId())
                 .build();
-        controllerClient.runCrawl(request);
 
-        Cursor<Map<String, Object>> cursor = db.executeRequest(r.table(RethinkDbAdapter.TABLES.EXECUTIONS.name)
-                .changes());
-        for (Map<String, Object> exec : cursor) {
-            System.out.println(">>> " + exec);
-            if (exec.containsKey("new_val") && "FINISHED".equals(((Map) exec.get("new_val")).get("state"))) {
-                System.out.println("HEPP");
-                break;
+        executeJob(request).get();
+
+        assertThat(WarcInspector.getWarcFiles().getRecordCount()).isEqualTo(15);
+        WarcInspector.getWarcFiles().getTargetUris();
+    }
+
+    JobCompletion executeJob(ControllerProto.RunCrawlRequest crawlRequest) {
+        return (JobCompletion) ForkJoinPool.commonPool().submit((ForkJoinTask) new JobCompletion(crawlRequest));
+    }
+
+    public class JobCompletion extends ForkJoinTask<Void> implements RunnableFuture<Void> {
+
+        final List<String> eIds;
+
+        final Map<String, CrawlExecutionStatus> executions;
+
+        Void result;
+
+        JobCompletion(ControllerProto.RunCrawlRequest request) {
+            ControllerProto.RunCrawlReply crawlReply = controllerClient.runCrawl(request);
+            executions = new HashMap<>();
+            eIds = new ArrayList<>(crawlReply.getSeedExecutionIdList());
+        }
+
+        @Override
+        public Void getRawResult() {
+            return result;
+        }
+
+        @Override
+        protected void setRawResult(Void value) {
+            result = value;
+        }
+
+        @Override
+        public void run() {
+            invoke();
+        }
+
+        @Override
+        protected boolean exec() {
+            try {
+                Cursor<Map<String, Object>> cursor = db.executeRequest(r.table(RethinkDbAdapter.TABLES.EXECUTIONS.name)
+                        .getAll(eIds.toArray())
+                        .changes());
+
+                StreamSupport.stream(cursor.spliterator(), false)
+                        .filter(e -> e.containsKey("new_val"))
+                        .map(e -> ProtoUtils
+                        .rethinkToProto((Map<String, Object>) e.get("new_val"), CrawlExecutionStatus.class))
+                        .forEach(e -> {
+                            executions.put(e.getId(), e);
+                            if (isEnded(e)) {
+                                eIds.remove(e.getId());
+                                if (eIds.isEmpty()) {
+                                    System.out.println("Job completed");
+                                    cursor.close();
+                                }
+                            }
+                        });
+
+                result = null;
+                return true;
+            } catch (Error err) {
+                throw err;
+            } catch (RuntimeException rex) {
+                throw rex;
+            } catch (Exception ex) {
+                throw new RuntimeException(ex);
             }
         }
 
-        WarcInspector.listWarcFiles().forEach(w -> {
-            System.out.println("W: " + w);
-            try (Stream<WarcRecord> records = w.getContent()) {
-                records.forEach(r -> {
-                    System.out.println("  TYPE: " + r.header.warcTypeStr + ", URI: " + r.header.warcTargetUriStr);
-                    if (r.hasPayload()) {
-                        try {
-                            System.out.println("    PL: " + new String(ByteStreams.toByteArray(r.getPayloadContent())));
-                        } catch (IOException ex) {
-                            ex.printStackTrace();
-                        }
-                    }
-                });
+        private boolean isEnded(CrawlExecutionStatus execution) {
+            switch (execution.getState()) {
+                case CREATED:
+                case RUNNING:
+                    return false;
+                default:
+                    return true;
             }
-        });
+        }
 
     }
 

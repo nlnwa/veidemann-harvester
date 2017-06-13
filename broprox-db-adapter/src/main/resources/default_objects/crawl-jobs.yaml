@@ -23,7 +23,7 @@ crawlConfig:
         meta:
             name: "Default"
             description: "Default browser configuration"
-        userAgent: ""
+        userAgent: "broprox/1.0"
         windowWidth: 900
         windowHeight: 900
         pageLoadTimeoutMs: 10000

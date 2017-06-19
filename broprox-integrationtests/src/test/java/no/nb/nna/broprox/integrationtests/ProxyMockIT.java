@@ -96,7 +96,7 @@ public class ProxyMockIT implements BroproxHeaderConstants {
     @Test
     public void testHarvest() throws InterruptedException, ExecutionException {
         String jobId = controllerClient.listCrawlJobs(ControllerProto.CrawlJobListRequest.newBuilder()
-                .setNamePrefix("default").build())
+                .setNamePrefix("unscheduled").build())
                 .getValue(0).getId();
 
         ConfigProto.CrawlEntity entity = ConfigProto.CrawlEntity.newBuilder().setMeta(ConfigProto.Meta.newBuilder()

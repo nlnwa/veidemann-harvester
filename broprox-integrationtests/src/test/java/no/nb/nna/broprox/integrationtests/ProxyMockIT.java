@@ -36,6 +36,7 @@ import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
 import no.nb.nna.broprox.model.ConfigProto;
 import no.nb.nna.broprox.model.MessagesProto.CrawlExecutionStatus;
+import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -58,7 +59,7 @@ public class ProxyMockIT implements BroproxHeaderConstants {
     @BeforeClass
     public static void init() throws InterruptedException {
         // Sleep a little to let docker routing complete
-        Thread.sleep(2000);
+//        Thread.sleep(2000);
 
         String controllerHost = System.getProperty("controller.host");
         int controllerPort = Integer.parseInt(System.getProperty("controller.port"));
@@ -79,6 +80,17 @@ public class ProxyMockIT implements BroproxHeaderConstants {
         if (db != null) {
             db.close();
         }
+    }
+
+    @After
+    public void cleanup() {
+        WarcInspector.deleteWarcFiles();
+        db.executeRequest(r.table(RethinkDbAdapter.TABLES.CRAWLED_CONTENT.name).delete());
+        db.executeRequest(r.table(RethinkDbAdapter.TABLES.CRAWL_LOG.name).delete());
+        db.executeRequest(r.table(RethinkDbAdapter.TABLES.EXECUTIONS.name).delete());
+        db.executeRequest(r.table(RethinkDbAdapter.TABLES.EXTRACTED_TEXT.name).delete());
+        db.executeRequest(r.table(RethinkDbAdapter.TABLES.SCREENSHOT.name).delete());
+        db.executeRequest(r.table(RethinkDbAdapter.TABLES.URI_QUEUE.name).delete());
     }
 
     @Test
@@ -106,6 +118,10 @@ public class ProxyMockIT implements BroproxHeaderConstants {
 
         assertThat(WarcInspector.getWarcFiles().getRecordCount()).isEqualTo(15);
         WarcInspector.getWarcFiles().getTargetUris();
+
+        Cursor c = db.executeRequest(r.table(RethinkDbAdapter.TABLES.CRAWL_LOG.name));
+//        c.toList().stream().forEach(r -> System.out.println("CC:: " + r));
+        assertThat(c.toList().size()).isEqualTo(15);
     }
 
     JobCompletion executeJob(ControllerProto.RunCrawlRequest crawlRequest) {

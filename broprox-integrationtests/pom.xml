@@ -109,7 +109,7 @@
                                 <configuration>
                                     <autoCreateCustomNetworks>true</autoCreateCustomNetworks>
                                     <verbose>false</verbose>
-                                    <startParallel>true</startParallel>
+                                    <startParallel>false</startParallel>
 
                                     <images>
                                         <image>
@@ -276,6 +276,7 @@
                                                 <env>
                                                     <DB_HOST>db</DB_HOST>
                                                     <TRACER_URI>http://tracer:9411/api/v1/spans</TRACER_URI>
+                                                    <UNSAFE>true</UNSAFE>
                                                 </env>
                                                 <log>
                                                     <enabled>true</enabled>
@@ -461,76 +462,6 @@
                                                 </wait>
                                             </run>
                                         </image>
-
-                                        <image>
-                                            <name>warcserver</name>
-                                            <alias>warcserver</alias>
-                                            <build>
-                                                <from>nginx:1.13-alpine</from>
-                                                <runCmds>
-                                                    <runCmd>rm /usr/share/nginx/html/index.html</runCmd>
-                                                    <runCmd>mkdir /usr/share/nginx/html/warcs</runCmd>
-                                                </runCmds>
-                                                <volumes>
-                                                    <volume>/usr/share/nginx/html/warcs</volume>
-                                                </volumes>
-                                                <assembly>
-                                                    <targetDir>/etc/nginx</targetDir>
-                                                    <inline xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                                                            xmlns="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/1.1.2"
-                                                            xsi:schemaLocation="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/1.1.2 http://maven.apache.org/xsd/assembly-1.1.2.xsd">
-                                                        <fileSets>
-                                                            <fileSet>
-                                                                <directory>${project.basedir}/src/main/docker</directory>
-                                                                <outputDirectory>/</outputDirectory>
-                                                                <filtered>true</filtered>
-                                                                <includes>
-                                                                    <include>nginx.conf</include>
-                                                                </includes>
-                                                                <fileMode>755</fileMode>
-                                                            </fileSet>
-                                                            <fileSet>
-                                                                <directory>${project.basedir}/src/main/docker</directory>
-                                                                <outputDirectory>/conf.d/</outputDirectory>
-                                                                <filtered>true</filtered>
-                                                                <includes>
-                                                                    <include>default.conf</include>
-                                                                </includes>
-                                                                <fileMode>755</fileMode>
-                                                            </fileSet>
-                                                        </fileSets>
-                                                    </inline>
-                                                </assembly>
-                                            </build>
-
-                                            <run>
-                                                <network>
-                                                    <mode>custom</mode>
-                                                    <name>integration-test-net</name>
-                                                    <alias>warcserver</alias>
-                                                </network>
-                                                <volumes>
-                                                    <bind>
-                                                        <volume>contentwriter-warcs:/usr/share/nginx/html/warcs:ro</volume>
-                                                    </bind>
-                                                </volumes>
-                                                <ports>
-                                                    <port>+warcserver.host:warcserver.port:80</port>
-                                                </ports>
-                                                <log>
-                                                    <enabled>true</enabled>
-                                                </log>
-                                                <wait>
-                                                    <tcp>
-                                                        <mode>mapped</mode>
-                                                        <ports>
-                                                            <port>80</port>
-                                                        </ports>
-                                                    </tcp>
-                                                    <time>20000</time>
-                                                </wait>
-                                            </run>
-                                        </image>
                                     </images>
                                 </configuration>
                             </execution>
@@ -574,8 +505,6 @@
                                 <frontier.port>${frontier.port}</frontier.port>
                                 <contentwriter.host>${contentwriter.host}</contentwriter.host>
                                 <contentwriter.port>${contentwriter.port}</contentwriter.port>
-                                <warcserver.host>${warcserver.host}</warcserver.host>
-                                <warcserver.port>${warcserver.port}</warcserver.port>
                             </systemPropertyVariables>
                         </configuration>
                     </plugin>

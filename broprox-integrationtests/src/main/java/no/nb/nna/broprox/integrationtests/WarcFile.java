@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package no.nb.nna.broprox.integrationtests;
 
 import java.io.IOException;
@@ -38,16 +37,16 @@ public class WarcFile {
 
     private String name;
 
-    private OffsetDateTime mTime;
-
     private long size;
+
+    private String uri;
 
     WarcFile(Object o) {
         if (o instanceof Map) {
             Map m = (Map) o;
             name = (String) m.get("name");
-            mTime = OffsetDateTime.parse((String) m.get("mtime"), DateTimeFormatter.RFC_1123_DATE_TIME);
             size = ((Double) m.get("size")).longValue();
+            uri = (String) m.get("uri");
         } else {
             throw new IllegalArgumentException("expected java.util.Map, found " + o.getClass());
         }
@@ -55,10 +54,6 @@ public class WarcFile {
 
     public String getName() {
         return name;
-    }
-
-    public OffsetDateTime getmTime() {
-        return mTime;
     }
 
     public long getSize() {
@@ -76,7 +71,7 @@ public class WarcFile {
                         .onClose(() -> {
                             warcReader.close();
                             response.close();
-                });
+                        });
             } else {
                 throw new IOException("Unexpected code " + response);
             }
@@ -89,7 +84,7 @@ public class WarcFile {
 
     @Override
     public String toString() {
-        return "WarcFile{" + "name=" + name + ", mTime=" + mTime + ", size=" + size + '}';
+        return "WarcFile{" + "name=" + name + ", uri=" + uri + ", size=" + size + '}';
     }
 
 }

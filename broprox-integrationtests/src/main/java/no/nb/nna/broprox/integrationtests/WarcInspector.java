@@ -37,8 +37,8 @@ public class WarcInspector {
     final static HttpUrl WARC_SERVER_URL;
 
     static {
-        String warcServerHost = System.getProperty("warcserver.host");
-        int warcServerPort = Integer.parseInt(System.getProperty("warcserver.port"));
+        String warcServerHost = System.getProperty("contentwriter.host");
+        int warcServerPort = Integer.parseInt(System.getProperty("contentwriter.port"));
 
         WARC_SERVER_URL = new HttpUrl.Builder()
                 .scheme("http")
@@ -69,4 +69,20 @@ public class WarcInspector {
         }
     }
 
+    public static void deleteWarcFiles() {
+        HttpUrl url = WARC_SERVER_URL.resolve("warcs");
+
+        Request request = new Request.Builder()
+                .delete()
+                .url(url)
+                .build();
+
+        try (Response response = CLIENT.newCall(request).execute();) {
+            if (!response.isSuccessful()) {
+                throw new IOException("Unexpected code " + response);
+            }
+        } catch(IOException ex) {
+            throw new UncheckedIOException(ex);
+        }
+    }
 }

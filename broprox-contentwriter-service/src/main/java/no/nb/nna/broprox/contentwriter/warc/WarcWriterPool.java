@@ -16,6 +16,7 @@
 package no.nb.nna.broprox.contentwriter.warc;
 
 import java.io.File;
+import java.util.Arrays;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -34,7 +35,7 @@ public class WarcWriterPool implements AutoCloseable {
 
     private LinkedBlockingDeque<PooledWarcWriter> pool;
 
-    private final AtomicBoolean closed = new AtomicBoolean(false);
+    private final AtomicBoolean closed = new AtomicBoolean(true);
 
     private final AtomicInteger poolSize;
 
@@ -53,23 +54,26 @@ public class WarcWriterPool implements AutoCloseable {
     }
 
     /**
-     * Gets the next free object from the pool. If the pool doesn't contain any objects, a new object will be created
-     * and given to the caller of this method back.
+     * Gets the next free object from the pool.
      * <p>
      * @return T borrowed object
      */
     public PooledWarcWriter borrow() throws InterruptedException {
-        if (closed.get()) {
-            throw new IllegalStateException("The WarcWriter pool is closed");
+        synchronized (closed) {
+            if (closed.get()) {
+                throw new IllegalStateException("The WarcWriter pool is closed");
+            }
+            return pool.takeFirst();
         }
-        return pool.takeFirst();
     }
 
     public PooledWarcWriter borrow(long timeout, TimeUnit unit) throws InterruptedException {
-        if (closed.get()) {
-            throw new IllegalStateException("The WarcWriter pool is closed");
+        synchronized (closed) {
+            if (closed.get()) {
+                throw new IllegalStateException("The WarcWriter pool is closed");
+            }
+            return pool.pollFirst(timeout, unit);
         }
-        return pool.pollFirst(timeout, unit);
     }
 
     /**
@@ -79,17 +83,24 @@ public class WarcWriterPool implements AutoCloseable {
      */
     public void release(PooledWarcWriter object) {
         if (object != null) {
-            pool.addFirst(object);
+            pool.addLast(object);
         }
     }
 
-    private void initialize() {
-        targetDir.mkdirs();
+    public final void initialize() {
+        synchronized (closed) {
+            if (closed.get()) {
+                targetDir.mkdirs();
 
-        pool = new LinkedBlockingDeque<>();
+                pool = new LinkedBlockingDeque<>();
 
-        for (int i = 0; i < poolSize.get(); i++) {
-            pool.add(new PooledWarcWriter(new SingleWarcWriter(targetDir, maxFileSize, compress, i)));
+                for (int i = 0; i < poolSize.get(); i++) {
+                    pool.add(new PooledWarcWriter(new SingleWarcWriter(targetDir, maxFileSize, compress, i)));
+                }
+                closed.set(false);
+            } else {
+                throw new IllegalStateException("Can't initialize an open WarcWriterPool");
+            }
         }
     }
 
@@ -99,12 +110,41 @@ public class WarcWriterPool implements AutoCloseable {
 
     @Override
     public void close() throws Exception {
-        if (closed.compareAndSet(false, true)) {
-            while (poolSize.get() > 0) {
-                pool.takeFirst().close();
-                poolSize.decrementAndGet();
+        synchronized (closed) {
+            if (closed.compareAndSet(false, true)) {
+                int s = poolSize.get();
+                for (int i = 0; i < s; i++) {
+                    pool.takeFirst().close();
+                }
             }
         }
+    }
+
+    /**
+     * Closes WARC files and opens new ones.
+     *
+     * @throws Exception
+     */
+    public void restart(boolean delete) throws Exception {
+        synchronized (closed) {
+            close();
+            if (delete) {
+                Arrays.stream(getTargetDir().listFiles()).forEach(f -> f.delete());
+            }
+            initialize();
+        }
+    }
+
+    public File getTargetDir() {
+        return targetDir;
+    }
+
+    public long getMaxFileSize() {
+        return maxFileSize;
+    }
+
+    public boolean isCompress() {
+        return compress;
     }
 
     public class PooledWarcWriter implements AutoCloseable {

@@ -34,6 +34,8 @@ public class Settings extends CommonSettings {
 
     private String workDir;
 
+    private boolean unsafe;
+
     public int getApiPort() {
         return apiPort;
     }
@@ -80,6 +82,14 @@ public class Settings extends CommonSettings {
 
     public void setWorkDir(String workDir) {
         this.workDir = workDir;
+    }
+
+    public boolean isUnsafe() {
+        return unsafe;
+    }
+
+    public void setUnsafe(boolean unsafe) {
+        this.unsafe = unsafe;
     }
 
 }

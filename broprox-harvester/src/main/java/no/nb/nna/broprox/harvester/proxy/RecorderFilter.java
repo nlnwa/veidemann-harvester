@@ -58,8 +58,6 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
 
     private final DbAdapter db;
 
-    private long payloadSizeField;
-
     private String executionId;
 
     private boolean toBeCached = false;
@@ -71,7 +69,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
     public RecorderFilter(final String uri, final HttpRequest originalRequest, final ChannelHandlerContext ctx,
             final DbAdapter db, final ContentWriterClient contentWriterClient, final AlreadyCrawledCache cache) {
 
-        super(originalRequest.setUri(uri), ctx);
+        super(originalRequest, ctx);
         this.db = db;
         this.uri = uri;
         this.contentWriterClient = contentWriterClient;
@@ -85,7 +83,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
     }
 
     @Override
-    public HttpResponse clientToProxyRequest(HttpObject httpObject) {
+    public HttpResponse proxyToServerRequest(HttpObject httpObject) {
         if (httpObject instanceof HttpRequest) {
             HttpRequest request = (HttpRequest) httpObject;
 
@@ -125,7 +123,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
                         .remove(ALL_EXECUTION_IDS);
 
                 // Store request
-                requestCollector.addHeader(req.headers());
+                requestCollector.setRequestHeaders(req);
                 requestCollector.writeRequest(crawlLog.build());
 
                 return null;
@@ -149,13 +147,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
 
                 crawlLog.setStatusCode(responseStatus.code())
                         .setContentType(res.headers().get("Content-Type"));
-                responseCollector.addHeader(res.headers());
-
-                try {
-                    payloadSizeField = res.headers().getInt("Content-Length");
-                } catch (NullPointerException ex) {
-                    payloadSizeField = 0L;
-                }
+                responseCollector.setResponseHeaders(res);
 
             } else if (response instanceof HttpContent) {
                 HttpContent res = (HttpContent) response;

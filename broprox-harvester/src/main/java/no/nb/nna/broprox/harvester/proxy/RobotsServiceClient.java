@@ -26,7 +26,6 @@ import io.opentracing.util.GlobalTracer;
 import no.nb.nna.broprox.api.RobotsServiceGrpc;
 import no.nb.nna.broprox.api.RobotsServiceProto;
 import no.nb.nna.broprox.model.ConfigProto;
-import no.nb.nna.broprox.model.MessagesProto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

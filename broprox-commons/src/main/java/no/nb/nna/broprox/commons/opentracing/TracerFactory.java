@@ -17,7 +17,7 @@ package no.nb.nna.broprox.commons.opentracing;
 
 import java.io.IOException;
 
-import brave.Tracer;
+import brave.Tracing;
 import brave.opentracing.BraveTracer;
 import io.opentracing.util.GlobalTracer;
 import zipkin.reporter.AsyncReporter;
@@ -43,13 +43,13 @@ public class TracerFactory {
         AsyncReporter reporter = AsyncReporter.builder(sender).build();
 
         // Create a Zipkin tracer.
-        Tracer tracer = Tracer.newBuilder()
+        Tracing tracer = Tracing.newBuilder()
                 .localServiceName(serviceName)
                 .reporter(reporter)
                 .build();
 
         // Wrap the Zipkin tracer as an OpenTracing tracer and register it as a global tracer
-        GlobalTracer.register(BraveTracer.wrap(tracer));
+        GlobalTracer.register(BraveTracer.create(tracer));
 
             Runtime.getRuntime().addShutdownHook(new Thread() {
                 @Override

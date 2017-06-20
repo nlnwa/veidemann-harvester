@@ -143,6 +143,9 @@ public class RobotsTxtTest {
     public void testIsAllowed() {
         RobotsTxt robots = new RobotsTxt();
 
+        // Test that empty robots.txt allows all
+        assertThat(robots.isAllowed("googlebot-news", UriConfigs.WHATWG.buildUri("http://example.com/page"))).isTrue();
+
         RobotsTxt.DirectiveGroup directiveGroup;
         directiveGroup = new RobotsTxt.DirectiveGroup();
         directiveGroup.userAgents.add("googlebot-news");

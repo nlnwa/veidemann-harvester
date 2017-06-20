@@ -42,10 +42,10 @@
         <org.apache.tika.version>1.14</org.apache.tika.version>
         <cache2k-version>1.0.0.CR4</cache2k-version>
         <io.opentracing.version>0.21.0</io.opentracing.version>
-        <io.opentracing.brave.version>0.19.2</io.opentracing.brave.version>
-        <io.grpc.version>1.2.0</io.grpc.version>
-        <io.zipkin.reporter.version>0.6.13</io.zipkin.reporter.version>
-        <io.zipkin.brave.version>4.1.1</io.zipkin.brave.version>
+        <io.opentracing.brave.version>0.20.0</io.opentracing.brave.version>
+        <io.grpc.version>1.4.0</io.grpc.version>
+        <io.zipkin.reporter.version>0.10.0</io.zipkin.reporter.version>
+        <io.zipkin.brave.version>4.3.4</io.zipkin.brave.version>
         <antlr.version>4.7</antlr.version>
         <antlr4test-maven-plugin.version>1.8</antlr4test-maven-plugin.version>
     </properties>
@@ -384,7 +384,7 @@
                 <plugin>
                     <groupId>io.fabric8</groupId>
                     <artifactId>docker-maven-plugin</artifactId>
-                    <version>0.20.1</version>
+                    <version>0.21.0</version>
                 </plugin>
                 <plugin>
                     <groupId>org.codehaus.mojo</groupId>

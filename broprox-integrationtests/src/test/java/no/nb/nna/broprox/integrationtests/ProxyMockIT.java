@@ -15,24 +15,32 @@
  */
 package no.nb.nna.broprox.integrationtests;
 
-import java.io.IOException;
-import java.util.Collections;
-import java.util.concurrent.CompletableFuture;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinTask;
+import java.util.concurrent.RunnableFuture;
+import java.util.stream.StreamSupport;
 
-import com.google.gson.Gson;
-import no.nb.nna.broprox.chrome.client.ChromeDebugProtocol;
-import no.nb.nna.broprox.chrome.client.PageDomain;
-import no.nb.nna.broprox.chrome.client.Session;
-import no.nb.nna.broprox.db.ProtoUtils;
-import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
+import com.rethinkdb.RethinkDB;
+import com.rethinkdb.net.Cursor;
+import io.grpc.ManagedChannel;
+import io.grpc.ManagedChannelBuilder;
+import no.nb.nna.broprox.api.ControllerGrpc;
+import no.nb.nna.broprox.api.ControllerProto;
 import no.nb.nna.broprox.commons.BroproxHeaderConstants;
-import org.junit.Ignore;
+import no.nb.nna.broprox.db.ProtoUtils;
+import no.nb.nna.broprox.db.RethinkDbAdapter;
+import no.nb.nna.broprox.model.ConfigProto;
+import no.nb.nna.broprox.model.MessagesProto.CrawlExecutionStatus;
+import org.junit.After;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
 import org.junit.Test;
-//import static org.junit.Assert.*;
 
-import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.assertj.core.api.Assertions.*;
 
 /**
@@ -40,101 +48,158 @@ import static org.assertj.core.api.Assertions.*;
  */
 public class ProxyMockIT implements BroproxHeaderConstants {
 
-    private long timeout = 1000;
+    static ManagedChannel channel;
 
-    @Test
-    @Ignore
-    public void testSomeMethod() throws IOException, InterruptedException, ExecutionException, TimeoutException {
-        ProxyMock pm = new ProxyMock(9211);
-        System.out.println("THIS HOST: " + System.getProperty("this.host"));
-        String chromeHost = System.getProperty("chrome-debug.host");
-        int chromePort = Integer.parseInt(System.getProperty("chrome-debug.port"));
-        System.out.println("Chrome host: " + chromeHost);
-        System.out.println("Chrome port: " + chromePort);
-        ChromeDebugProtocol chrome = new ChromeDebugProtocol(chromeHost, chromePort);
+    static ControllerGrpc.ControllerBlockingStub controllerClient;
 
-        QueuedUri qUri = QueuedUri.newBuilder()
-                .addExecutionIds(QueuedUri.IdSeq.newBuilder().setId("foo").setSeq(1))
-                .addExecutionIds(QueuedUri.IdSeq.newBuilder().setId("bar").setSeq(2))
-                .build();
+    static RethinkDbAdapter db;
 
-//        List<String> l = new ArrayList<>();
-//        l.add("foo");
-//        l.add("bar");
-        Gson gson = new Gson();
-        try (Session session = chrome.newSession(900, 900)) {
-            CompletableFuture.allOf(
-                    session.debugger.enable(),
-                    session.page.enable(),
-                    session.runtime.enable(),
-                    session.network.enable(null, null),
-                    session.network.setCacheDisabled(true),
-                    session.runtime
-                            .evaluate("navigator.userAgent;", null, false, false, null, false, false, false, false)
-                            .thenAccept(e -> {
-                                session.network.setUserAgentOverride(((String) e.result.value)
-                                        .replace("HeadlessChrome", session.version()));
-                            }),
-                    session.debugger
-                            .setBreakpointByUrl(1, null, "https?://www.google-analytics.com/analytics.js", null, null),
-                    session.debugger.setBreakpointByUrl(1, null, "https?://www.google-analytics.com/ga.js", null, null),
-                    session.network.setExtraHTTPHeaders(Collections.singletonMap(ALL_EXECUTION_IDS,
-                            ProtoUtils.protoListToJson(qUri.getExecutionIdsList()))),
-                    session.page.setControlNavigations(Boolean.TRUE)
-            ).get(timeout, MILLISECONDS);
+    static RethinkDB r = RethinkDB.r;
 
-            session.debugger.onPaused(p -> {
-                String scriptId = p.callFrames.get(0).location.scriptId;
-                session.debugger.setScriptSource(scriptId, "console.log(\"google analytics is no more!\");", null);
-                session.debugger.resume();
-            });
+    @BeforeClass
+    public static void init() throws InterruptedException {
+        // Sleep a little to let docker routing complete
+//        Thread.sleep(2000);
 
-            navigatePage(session, "http://test.foo");
-            navigatePage(session, "http://test2.foo");
+        String controllerHost = System.getProperty("controller.host");
+        int controllerPort = Integer.parseInt(System.getProperty("controller.port"));
+        String dbHost = System.getProperty("db.host");
+        int dbPort = Integer.parseInt(System.getProperty("db.port"));
 
-//                System.out.println("LINKS >>>>>>");
-//                for (PageDomain.FrameResource fs : session.page.getResourceTree().get().frameTree.resources) {
-//                    System.out.println("T: " + fs);
-//                    if ("Script".equals(fs.type)) {
-//                        System.out.println(">: " + fs.toString());
-//                    }
-//                }
-//                System.out.println("<<<<<<");
-        }
+        channel = ManagedChannelBuilder.forAddress(controllerHost, controllerPort).usePlaintext(true).build();
+        controllerClient = ControllerGrpc.newBlockingStub(channel);
 
-//        Thread.sleep(30000);
-        fail("The test case is a prototype.");
+        db = new RethinkDbAdapter(dbHost, dbPort, "broprox");
     }
 
-    public void navigatePage(Session session, String url) throws InterruptedException, ExecutionException, TimeoutException {
-        CompletableFuture<PageDomain.FrameStoppedLoading> loaded = session.page.onFrameStoppedLoading();
+    @AfterClass
+    public static void shutdown() {
+        if (channel != null) {
+            channel.shutdown();
+        }
+        if (db != null) {
+            db.close();
+        }
+    }
 
-        String discoveryPath = "";
-        session.page.onNavigationRequested(nr -> {
-            session.network.setExtraHTTPHeaders(Collections.singletonMap("Discovery-Path", discoveryPath + "E"));
-            session.page.processNavigation("Proceed", nr.navigationId);
-        });
+    @After
+    public void cleanup() {
+        WarcInspector.deleteWarcFiles();
+        db.executeRequest(r.table(RethinkDbAdapter.TABLES.CRAWLED_CONTENT.name).delete());
+        db.executeRequest(r.table(RethinkDbAdapter.TABLES.CRAWL_LOG.name).delete());
+        db.executeRequest(r.table(RethinkDbAdapter.TABLES.EXECUTIONS.name).delete());
+        db.executeRequest(r.table(RethinkDbAdapter.TABLES.EXTRACTED_TEXT.name).delete());
+        db.executeRequest(r.table(RethinkDbAdapter.TABLES.SCREENSHOT.name).delete());
+        db.executeRequest(r.table(RethinkDbAdapter.TABLES.URI_QUEUE.name).delete());
+    }
 
-        session.page.onJavascriptDialogOpening(js -> {
-            System.out.println("JS DIALOG: " + js.type + " :: " + js.message);
-            boolean accept = false;
-            if ("alert".equals(js.type)) {
-                accept = true;
+    @Test
+    public void testHarvest() throws InterruptedException, ExecutionException {
+        String jobId = controllerClient.listCrawlJobs(ControllerProto.CrawlJobListRequest.newBuilder()
+                .setNamePrefix("unscheduled").build())
+                .getValue(0).getId();
+
+        ConfigProto.CrawlEntity entity = ConfigProto.CrawlEntity.newBuilder().setMeta(ConfigProto.Meta.newBuilder()
+                .setName("Test entity 1")).build();
+        entity = controllerClient.saveEntity(entity);
+        ConfigProto.Seed seed = ConfigProto.Seed.newBuilder()
+                .setMeta(ConfigProto.Meta.newBuilder().setName("http://a1.dev"))
+                .setEntityId(entity.getId())
+                .addJobId(jobId)
+                .build();
+        seed = controllerClient.saveSeed(seed);
+
+        ControllerProto.RunCrawlRequest request = ControllerProto.RunCrawlRequest.newBuilder()
+                .setJobId(jobId)
+                .setSeedId(seed.getId())
+                .build();
+
+        executeJob(request).get();
+
+        assertThat(WarcInspector.getWarcFiles().getRecordCount()).isEqualTo(15);
+        WarcInspector.getWarcFiles().getTargetUris();
+
+        Cursor c = db.executeRequest(r.table(RethinkDbAdapter.TABLES.CRAWL_LOG.name));
+//        c.toList().stream().forEach(r -> System.out.println("CC:: " + r));
+        assertThat(c.toList().size()).isEqualTo(15);
+    }
+
+    JobCompletion executeJob(ControllerProto.RunCrawlRequest crawlRequest) {
+        return (JobCompletion) ForkJoinPool.commonPool().submit((ForkJoinTask) new JobCompletion(crawlRequest));
+    }
+
+    public class JobCompletion extends ForkJoinTask<Void> implements RunnableFuture<Void> {
+
+        final List<String> eIds;
+
+        final Map<String, CrawlExecutionStatus> executions;
+
+        Void result;
+
+        JobCompletion(ControllerProto.RunCrawlRequest request) {
+            ControllerProto.RunCrawlReply crawlReply = controllerClient.runCrawl(request);
+            executions = new HashMap<>();
+            eIds = new ArrayList<>(crawlReply.getSeedExecutionIdList());
+        }
+
+        @Override
+        public Void getRawResult() {
+            return result;
+        }
+
+        @Override
+        protected void setRawResult(Void value) {
+            result = value;
+        }
+
+        @Override
+        public void run() {
+            invoke();
+        }
+
+        @Override
+        protected boolean exec() {
+            try {
+                Cursor<Map<String, Object>> cursor = db.executeRequest(r.table(RethinkDbAdapter.TABLES.EXECUTIONS.name)
+                        .getAll(eIds.toArray())
+                        .changes());
+
+                StreamSupport.stream(cursor.spliterator(), false)
+                        .filter(e -> e.containsKey("new_val"))
+                        .map(e -> ProtoUtils
+                        .rethinkToProto((Map<String, Object>) e.get("new_val"), CrawlExecutionStatus.class))
+                        .forEach(e -> {
+                            executions.put(e.getId(), e);
+                            if (isEnded(e)) {
+                                eIds.remove(e.getId());
+                                if (eIds.isEmpty()) {
+                                    System.out.println("Job completed");
+                                    cursor.close();
+                                }
+                            }
+                        });
+
+                result = null;
+                return true;
+            } catch (Error err) {
+                throw err;
+            } catch (RuntimeException rex) {
+                throw rex;
+            } catch (Exception ex) {
+                throw new RuntimeException(ex);
             }
-            session.page.handleJavaScriptDialog(accept, null);
-        });
+        }
 
-        System.out.println("NAV");
-        System.out.println(session.page.navigate(url).get(timeout, MILLISECONDS));
+        private boolean isEnded(CrawlExecutionStatus execution) {
+            switch (execution.getState()) {
+                case CREATED:
+                case RUNNING:
+                    return false;
+                default:
+                    return true;
+            }
+        }
 
-        loaded.get(timeout, MILLISECONDS);
-        // disable scrollbars
-        session.runtime.evaluate("document.getElementsByTagName('body')[0].style.overflow='hidden'",
-                null, null, null, null, null, null, null, null)
-                .get(timeout, MILLISECONDS);
-
-        // wait a little for any onload javascript to fire
-//            Thread.sleep(500);
     }
 
 }

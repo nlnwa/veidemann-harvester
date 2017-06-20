@@ -6,6 +6,7 @@ option java_package = "no.nb.nna.broprox.api";
 option java_outer_classname = "ControllerProto";
 
 import "config.proto";
+import "messages.proto";
 import "google/protobuf/empty.proto";
 
 // Service for communicating with controller.
@@ -49,7 +50,7 @@ service Controller {
     rpc SaveBrowserScript (BrowserScript) returns (BrowserScript) {}
     rpc DeleteBrowserScript (BrowserScript) returns (google.protobuf.Empty) {}
 
-    rpc RunCrawl (RunCrawlRequest) returns (google.protobuf.Empty) {}
+    rpc RunCrawl (RunCrawlRequest) returns (RunCrawlReply) {}
 }
 
 // Specification of wich entities to get.
@@ -162,4 +163,8 @@ message RunCrawlRequest {
     // If seed id is submitted, only this seed will be harvested.
     // If empty, all seeds configured with the submitted job id will be harvested.
     string seed_id = 6;
+}
+
+message RunCrawlReply {
+    repeated string seed_execution_id = 1;
 }

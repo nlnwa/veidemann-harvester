@@ -15,24 +15,36 @@
  */
 package no.nb.nna.broprox.contentwriter;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinTask;
+import java.util.stream.Collectors;
 
+import com.google.gson.Gson;
 import com.google.protobuf.util.JsonFormat;
 import io.opentracing.SpanContext;
 import io.opentracing.tag.Tags;
 import javax.ws.rs.Consumes;
+import javax.ws.rs.DELETE;
+import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.UriInfo;
 import no.nb.nna.broprox.commons.opentracing.OpenTracingJersey;
 import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
 import no.nb.nna.broprox.contentwriter.text.TextExtracter;
@@ -65,6 +77,9 @@ public class FileUploadResource {
 
     @Context
     HttpHeaders httpHeaders;
+
+    @Context
+    UriInfo uriInfo;
 
     public FileUploadResource() {
     }
@@ -144,6 +159,39 @@ public class FileUploadResource {
                 }
 
             });
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            throw new WebApplicationException(ex.getMessage(), ex);
+        }
+    }
+
+    @GET
+    @Path("warcs")
+    public String getFiles() {
+        List<WarcFileDescriptor> files = Arrays.stream(warcWriterPool.getTargetDir().listFiles())
+                .map(f -> new WarcFileDescriptor(f.getName(),
+                f.length(), uriInfo.getPath() + "/" + f.getName()))
+                .collect(Collectors.toList());
+        Gson gson = new Gson();
+        return gson.toJson(files);
+    }
+
+    @GET
+    @Path("warcs/{fileName}")
+    public File getFile(@PathParam("fileName") String fileName) {
+        return new File(warcWriterPool.getTargetDir(), fileName);
+    }
+
+    @DELETE
+    @Path("warcs")
+    public Response deleteWarcs() {
+        try {
+            if (ContentWriter.getSettings().isUnsafe()) {
+                warcWriterPool.restart(true);
+                return Response.ok().build();
+            } else {
+                return Response.status(Response.Status.METHOD_NOT_ALLOWED).build();
+            }
         } catch (Exception ex) {
             ex.printStackTrace();
             throw new WebApplicationException(ex.getMessage(), ex);

@@ -23,7 +23,7 @@ crawlConfig:
         meta:
             name: "Default"
             description: "Default browser configuration"
-        userAgent: ""
+        userAgent: "broprox/1.0"
         windowWidth: 900
         windowHeight: 900
         pageLoadTimeoutMs: 10000
@@ -37,7 +37,8 @@ crawlConfig:
         meta:
             name: "Default"
             description: "Default politeness configuration"
-        ignoreRobots: false
+        robotsPolicy: OBEY_ROBOTS
+        minimumRobotsValidityDurationS: 86400
         minTimeBetweenPageLoadMs: 1000
     extra:
         extractText: true
@@ -55,6 +56,19 @@ schedule:
         name: "Every day"
         description: "A schedule which triggers every day"
     cronExpression: "0 6 * * *"
+limits:
+    maxDurationS: 86400
+crawlConfigSelector:
+    label:
+    - key: "type"
+      value: "default"
+---
+meta:
+    name: "Unscheduled"
+    description: "A job which will never trigger. Suitable for manual runs"
+    label:
+        - key: "type"
+          value: "default"
 limits:
     maxDurationS: 86400
 crawlConfigSelector:

@@ -15,24 +15,35 @@
  */
 package no.nb.nna.broprox.controller;
 
-
 import com.google.protobuf.Empty;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import no.nb.nna.broprox.api.ControllerGrpc;
-import no.nb.nna.broprox.api.ControllerProto;
+import no.nb.nna.broprox.api.ControllerProto.BrowserConfigListReply;
 import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListReply;
 import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListRequest;
+import no.nb.nna.broprox.api.ControllerProto.CrawlConfigListReply;
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;
+import no.nb.nna.broprox.api.ControllerProto.CrawlJobListReply;
 import no.nb.nna.broprox.api.ControllerProto.CrawlJobListRequest;
+import no.nb.nna.broprox.api.ControllerProto.CrawlScheduleConfigListReply;
 import no.nb.nna.broprox.api.ControllerProto.ListRequest;
+import no.nb.nna.broprox.api.ControllerProto.PolitenessConfigListReply;
+import no.nb.nna.broprox.api.ControllerProto.RunCrawlReply;
+import no.nb.nna.broprox.api.ControllerProto.RunCrawlRequest;
+import no.nb.nna.broprox.api.ControllerProto.SeedListReply;
 import no.nb.nna.broprox.api.ControllerProto.SeedListRequest;
 import no.nb.nna.broprox.commons.util.CrawlScopes;
 import no.nb.nna.broprox.controller.scheduler.FrontierClient;
 import no.nb.nna.broprox.db.DbAdapter;
-import no.nb.nna.broprox.model.ConfigProto;
+import no.nb.nna.broprox.model.ConfigProto.BrowserConfig;
 import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
+import no.nb.nna.broprox.model.ConfigProto.CrawlConfig;
 import no.nb.nna.broprox.model.ConfigProto.CrawlEntity;
+import no.nb.nna.broprox.model.ConfigProto.CrawlJob;
+import no.nb.nna.broprox.model.ConfigProto.CrawlScheduleConfig;
+import no.nb.nna.broprox.model.ConfigProto.PolitenessConfig;
+import no.nb.nna.broprox.model.ConfigProto.Seed;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -89,7 +100,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
-    public void deleteCrawlScheduleConfig(ConfigProto.CrawlScheduleConfig request, StreamObserver<Empty> respObserver) {
+    public void deleteCrawlScheduleConfig(CrawlScheduleConfig request, StreamObserver<Empty> respObserver) {
         try {
             respObserver.onNext(db.deleteCrawlScheduleConfig(request));
             respObserver.onCompleted();
@@ -102,8 +113,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
-    public void saveCrawlScheduleConfig(ConfigProto.CrawlScheduleConfig request,
-            StreamObserver<ConfigProto.CrawlScheduleConfig> respObserver) {
+    public void saveCrawlScheduleConfig(CrawlScheduleConfig request, StreamObserver<CrawlScheduleConfig> respObserver) {
         try {
             respObserver.onNext(db.saveCrawlScheduleConfig(request));
             respObserver.onCompleted();
@@ -116,7 +126,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
 
     @Override
     public void listCrawlScheduleConfigs(ListRequest request,
-            StreamObserver<ControllerProto.CrawlScheduleConfigListReply> respObserver) {
+            StreamObserver<CrawlScheduleConfigListReply> respObserver) {
         try {
             respObserver.onNext(db.listCrawlScheduleConfigs(request));
             respObserver.onCompleted();
@@ -128,7 +138,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
-    public void deleteCrawlConfig(ConfigProto.CrawlConfig request, StreamObserver<Empty> respObserver) {
+    public void deleteCrawlConfig(CrawlConfig request, StreamObserver<Empty> respObserver) {
         try {
             respObserver.onNext(db.deleteCrawlConfig(request));
             respObserver.onCompleted();
@@ -140,7 +150,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
-    public void saveCrawlConfig(ConfigProto.CrawlConfig request, StreamObserver<ConfigProto.CrawlConfig> respObserver) {
+    public void saveCrawlConfig(CrawlConfig request, StreamObserver<CrawlConfig> respObserver) {
         try {
             respObserver.onNext(db.saveCrawlConfig(request));
             respObserver.onCompleted();
@@ -152,8 +162,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
-    public void listCrawlConfigs(ListRequest request,
-            StreamObserver<ControllerProto.CrawlConfigListReply> respObserver) {
+    public void listCrawlConfigs(ListRequest request, StreamObserver<CrawlConfigListReply> respObserver) {
         try {
             respObserver.onNext(db.listCrawlConfigs(request));
             respObserver.onCompleted();
@@ -165,7 +174,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
-    public void deleteCrawlJob(ConfigProto.CrawlJob request, StreamObserver<Empty> respObserver) {
+    public void deleteCrawlJob(CrawlJob request, StreamObserver<Empty> respObserver) {
         try {
             respObserver.onNext(db.deleteCrawlJob(request));
             respObserver.onCompleted();
@@ -177,7 +186,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
-    public void saveCrawlJob(ConfigProto.CrawlJob request, StreamObserver<ConfigProto.CrawlJob> respObserver) {
+    public void saveCrawlJob(CrawlJob request, StreamObserver<CrawlJob> respObserver) {
         try {
             respObserver.onNext(db.saveCrawlJob(request));
             respObserver.onCompleted();
@@ -189,7 +198,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
-    public void listCrawlJobs(CrawlJobListRequest request, StreamObserver<ControllerProto.CrawlJobListReply> respObserver) {
+    public void listCrawlJobs(CrawlJobListRequest request, StreamObserver<CrawlJobListReply> respObserver) {
         try {
             respObserver.onNext(db.listCrawlJobs(request));
             respObserver.onCompleted();
@@ -201,7 +210,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
-    public void deleteSeed(ConfigProto.Seed request, StreamObserver<Empty> respObserver) {
+    public void deleteSeed(Seed request, StreamObserver<Empty> respObserver) {
         try {
             respObserver.onNext(db.deleteSeed(request));
             respObserver.onCompleted();
@@ -213,7 +222,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
-    public void saveSeed(ConfigProto.Seed request, StreamObserver<ConfigProto.Seed> respObserver) {
+    public void saveSeed(Seed request, StreamObserver<Seed> respObserver) {
         try {
             // If scope is not set, apply default scope
             if (request.getScope().getSurtPrefix().isEmpty()) {
@@ -231,7 +240,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
-    public void listSeeds(SeedListRequest request, StreamObserver<ControllerProto.SeedListReply> respObserver) {
+    public void listSeeds(SeedListRequest request, StreamObserver<SeedListReply> respObserver) {
         try {
             respObserver.onNext(db.listSeeds(request));
             respObserver.onCompleted();
@@ -243,7 +252,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
-    public void deleteBrowserConfig(ConfigProto.BrowserConfig request, StreamObserver<Empty> respObserver) {
+    public void deleteBrowserConfig(BrowserConfig request, StreamObserver<Empty> respObserver) {
         try {
             respObserver.onNext(db.deleteBrowserConfig(request));
             respObserver.onCompleted();
@@ -255,8 +264,8 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
-    public void saveBrowserConfig(ConfigProto.BrowserConfig request,
-            StreamObserver<ConfigProto.BrowserConfig> respObserver) {
+    public void saveBrowserConfig(BrowserConfig request,
+            StreamObserver<BrowserConfig> respObserver) {
         try {
             respObserver.onNext(db.saveBrowserConfig(request));
             respObserver.onCompleted();
@@ -269,7 +278,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
 
     @Override
     public void listBrowserConfigs(ListRequest request,
-            StreamObserver<ControllerProto.BrowserConfigListReply> respObserver) {
+            StreamObserver<BrowserConfigListReply> respObserver) {
         try {
             respObserver.onNext(db.listBrowserConfigs(request));
             respObserver.onCompleted();
@@ -281,7 +290,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
-    public void deletePolitenessConfig(ConfigProto.PolitenessConfig request, StreamObserver<Empty> respObserver) {
+    public void deletePolitenessConfig(PolitenessConfig request, StreamObserver<Empty> respObserver) {
         try {
             respObserver.onNext(db.deletePolitenessConfig(request));
             respObserver.onCompleted();
@@ -293,8 +302,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
-    public void savePolitenessConfig(ConfigProto.PolitenessConfig request,
-            StreamObserver<ConfigProto.PolitenessConfig> respObserver) {
+    public void savePolitenessConfig(PolitenessConfig request, StreamObserver<PolitenessConfig> respObserver) {
         try {
             respObserver.onNext(db.savePolitenessConfig(request));
             respObserver.onCompleted();
@@ -306,8 +314,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
-    public void listPolitenessConfigs(ListRequest request,
-            StreamObserver<ControllerProto.PolitenessConfigListReply> respObserver) {
+    public void listPolitenessConfigs(ListRequest request, StreamObserver<PolitenessConfigListReply> respObserver) {
         try {
             respObserver.onNext(db.listPolitenessConfigs(request));
             respObserver.onCompleted();
@@ -331,7 +338,8 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
-    public void listBrowserScripts(BrowserScriptListRequest request, StreamObserver<BrowserScriptListReply> respObserver) {
+    public void listBrowserScripts(BrowserScriptListRequest request,
+            StreamObserver<BrowserScriptListReply> respObserver) {
         try {
             respObserver.onNext(db.listBrowserScripts(request));
             respObserver.onCompleted();
@@ -355,15 +363,17 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
-    public void runCrawl(ControllerProto.RunCrawlRequest request, StreamObserver<Empty> respObserver) {
+    public void runCrawl(RunCrawlRequest request, StreamObserver<RunCrawlReply> respObserver) {
         try {
+            RunCrawlReply.Builder reply = RunCrawlReply.newBuilder();
+
             CrawlJobListRequest jobRequest = CrawlJobListRequest.newBuilder()
                     .setId(request.getJobId())
                     .setExpand(true)
                     .build();
             SeedListRequest seedRequest;
 
-            for (ConfigProto.CrawlJob job : db.listCrawlJobs(jobRequest).getValueList()) {
+            for (CrawlJob job : db.listCrawlJobs(jobRequest).getValueList()) {
                 LOG.info("Job '{}' starting", job.getMeta().getName());
 
                 if (request.getSeedId().isEmpty()) {
@@ -376,18 +386,18 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
                             .build();
                 }
 
-                for (ConfigProto.Seed seed : db.listSeeds(seedRequest).getValueList()) {
+                for (Seed seed : db.listSeeds(seedRequest).getValueList()) {
                     if (!seed.getDisabled()) {
                         if (LOG.isInfoEnabled()) {
                             LOG.info("Start harvest of: {}", seed.getMeta().getName());
-                            frontierClient.crawlSeed(job, seed);
+                            reply.addSeedExecutionId(frontierClient.crawlSeed(job, seed).getId());
                         }
                     }
                 }
                 LOG.info("All seeds for job '{}' started", job.getMeta().getName());
             }
 
-            respObserver.onNext(Empty.getDefaultInstance());
+            respObserver.onNext(reply.build());
             respObserver.onCompleted();
         } catch (Exception ex) {
             LOG.error(ex.getMessage(), ex);

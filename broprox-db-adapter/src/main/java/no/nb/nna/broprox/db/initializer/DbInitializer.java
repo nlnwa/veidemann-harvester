@@ -211,7 +211,7 @@ public class DbInitializer {
 
         // Insert test seeds.
         // TODO: Should be removed
-        String jobId = db.listCrawlJobs(CrawlJobListRequest.newBuilder().setNamePrefix("default").build())
+        String jobId = db.listCrawlJobs(CrawlJobListRequest.newBuilder().setNamePrefix("unscheduled").build())
                 .getValue(0).getId();
 
         CrawlEntity entity = CrawlEntity.newBuilder().setMeta(Meta.newBuilder().setName("Entity1")).build();

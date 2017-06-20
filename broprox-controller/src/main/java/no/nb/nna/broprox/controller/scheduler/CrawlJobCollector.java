@@ -59,7 +59,8 @@ public class CrawlJobCollector implements TaskCollector {
 
                 // Check if job is valid for current date
                 OffsetDateTime now = ProtoUtils.getNowOdt();
-                if ((!schedule.hasValidFrom() || ProtoUtils.tsToOdt(schedule.getValidFrom()).isBefore(now))
+                if (!schedule.getCronExpression().isEmpty()
+                        && (!schedule.hasValidFrom() || ProtoUtils.tsToOdt(schedule.getValidFrom()).isBefore(now))
                         && (!schedule.hasValidTo() || ProtoUtils.tsToOdt(schedule.getValidTo()).isAfter(now))) {
 
                     if (LOG.isDebugEnabled()) {

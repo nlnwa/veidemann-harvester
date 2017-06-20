@@ -12,6 +12,16 @@
     <dependencies>
         <dependency>
             <groupId>${project.groupId}</groupId>
+            <artifactId>broprox-api</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>broprox-commons</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>${project.groupId}</groupId>
             <artifactId>broprox-harvester</artifactId>
             <version>${project.version}</version>
         </dependency>
@@ -21,31 +31,37 @@
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.littleshoot</groupId>
-            <artifactId>littleproxy</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.github.ganskef</groupId>
-            <artifactId>littleproxy-mitm</artifactId>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.slf4j</groupId>
-                    <artifactId>slf4j-log4j12</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.commons</groupId>
-            <artifactId>commons-io</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-all</artifactId>
-        </dependency>
-        <dependency>
             <groupId>${project.groupId}</groupId>
             <artifactId>broprox-chrome-client</artifactId>
             <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>broprox-controller</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>broprox-robotrules-service</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- ARC/WARC libraries -->
+        <dependency>
+            <groupId>org.jwat</groupId>
+            <artifactId>jwat-common</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.jwat</groupId>
+            <artifactId>jwat-gzip</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.jwat</groupId>
+            <artifactId>jwat-warc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.jwat</groupId>
+            <artifactId>jwat-archive</artifactId>
         </dependency>
     </dependencies>
 
@@ -54,57 +70,392 @@
             <id>integration-tests</id>
             <build>
                 <plugins>
-                    <!-- Set the hostname of this host in a property -->
-                    <plugin>
-                        <groupId>org.codehaus.groovy.maven</groupId>
-                        <artifactId>gmaven-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <phase>generate-resources</phase>
-                                <goals>
-                                    <goal>execute</goal>
-                                </goals>
-                                <configuration>
-                                    <source>
-                                        project.properties["hostname"] = InetAddress.getLocalHost().getHostName()
-                                    </source>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-
                     <plugin>
                         <groupId>io.fabric8</groupId>
                         <artifactId>docker-maven-plugin</artifactId>
+                        <configuration>
+                            <volumes>
+                                <volume>
+                                    <name>harvester-workdir</name>
+                                </volume>
+                                <volume>
+                                    <name>rethink-data</name>
+                                </volume>
+                                <volume>
+                                    <name>contentwriter-workdir</name>
+                                </volume>
+                                <volume>
+                                    <name>contentwriter-warcs</name>
+                                    <driver>local</driver>
+                                    <opts>
+                                        <type>tmpfs</type>
+                                        <device>tmpfs</device>
+                                    </opts>
+                                    <labels>
+                                        <volatileData>true</volatileData>
+                                    </labels>
+                                </volume>
+                            </volumes>
+                        </configuration>
                         <executions>
                             <execution>
                                 <id>prepare-proxy-tests</id>
                                 <phase>pre-integration-test</phase>
                                 <goals>
+                                    <goal>build</goal>
+                                    <goal>volume-create</goal>
                                     <goal>start</goal>
                                 </goals>
                                 <configuration>
+                                    <autoCreateCustomNetworks>true</autoCreateCustomNetworks>
+                                    <verbose>false</verbose>
+                                    <startParallel>false</startParallel>
+
                                     <images>
+                                        <image>
+                                            <name>rethinkdb:2.3</name>
+                                            <alias>db</alias>
+                                            <run>
+                                                <network>
+                                                    <mode>custom</mode>
+                                                    <name>integration-test-net</name>
+                                                    <alias>db</alias>
+                                                </network>
+                                                <ports>
+                                                    <port>+db.host:db.port:28015</port>
+                                                </ports>
+                                                <volumes>
+                                                    <bind>
+                                                        <volume>rethink-data:/data</volume>
+                                                    </bind>
+                                                </volumes>
+                                                <log>
+                                                    <enabled>true</enabled>
+                                                </log>
+                                                <wait>
+                                                    <tcp>
+                                                        <mode>mapped</mode>
+                                                        <ports>
+                                                            <port>28015</port>
+                                                        </ports>
+                                                    </tcp>
+                                                    <time>20000</time>
+                                                </wait>
+                                            </run>
+                                        </image>
+                                        <image>
+                                            <name>norsknettarkiv/broprox-db-initializer</name>
+                                            <alias>db-initializer</alias>
+                                            <run>
+                                                <network>
+                                                    <mode>custom</mode>
+                                                    <name>integration-test-net</name>
+                                                    <alias>db-initializer</alias>
+                                                </network>
+                                                <dependsOn>
+                                                    <container>db</container>
+                                                </dependsOn>
+                                                <env>
+                                                    <DB_HOST>db</DB_HOST>
+                                                </env>
+                                                <log>
+                                                    <enabled>true</enabled>
+                                                </log>
+                                                <wait>
+                                                    <log>DB initialized</log>
+                                                    <time>60000</time>
+                                                </wait>
+                                            </run>
+                                        </image>
                                         <image>
                                             <name>norsknettarkiv/chrome-headless</name>
                                             <alias>browser</alias>
                                             <run>
-                                                <extraHosts>
-                                                    <host>this:${hostname}</host>
-                                                </extraHosts>
+                                                <network>
+                                                    <mode>custom</mode>
+                                                    <name>integration-test-net</name>
+                                                    <alias>browser</alias>
+                                                </network>
                                                 <ports>
-                                                    <port>+chrome-debug.host:chrome-debug.port:9222</port>
+                                                    <port>+browser.host:browser.port:9222</port>
                                                 </ports>
                                                 <env>
-                                                    <CHROME_OPTS>--ignore-certificate-errors --disable-web-security --allow-running-insecure-content --proxy-server=this:9211</CHROME_OPTS>
+                                                    <CHROME_OPTS>--ignore-certificate-errors --disable-web-security --allow-running-insecure-content --proxy-server=harvester:8080</CHROME_OPTS>
+                                                </env>
+                                                <volumes>
+                                                    <bind>
+                                                        <volume>harvester-workdir:/data</volume>
+                                                    </bind>
+                                                </volumes>
+                                                <log>
+                                                    <enabled>true</enabled>
+                                                </log>
+                                                <wait>
+                                                    <tcp>
+                                                        <mode>mapped</mode>
+                                                        <ports>
+                                                            <port>9222</port>
+                                                        </ports>
+                                                    </tcp>
+                                                    <time>20000</time>
+                                                </wait>
+                                            </run>
+                                        </image>
+                                        <image>
+                                            <name>norsknettarkiv/broprox-harvester</name>
+                                            <alias>harvester</alias>
+                                            <run>
+                                                <network>
+                                                    <mode>custom</mode>
+                                                    <name>integration-test-net</name>
+                                                    <alias>harvester</alias>
+                                                </network>
+                                                <ports>
+                                                    <port>+harvester.host:harvester.port:9090</port>
+                                                </ports>
+                                                <dependsOn>
+                                                    <container>db-initializer</container>
+                                                    <container>browser</container>
+                                                    <container>content-writer</container>
+                                                    <container>testsites</container>
+                                                    <container>tracer</container>
+                                                    <container>robots</container>
+                                                </dependsOn>
+                                                <volumes>
+                                                    <bind>
+                                                        <volume>harvester-workdir:/workdir</volume>
+                                                    </bind>
+                                                </volumes>
+                                                <env>
+                                                    <BROWSER_HOST>browser</BROWSER_HOST>
+                                                    <DB_HOST>db</DB_HOST>
+                                                    <CONTENT_WRITER_HOST>content-writer</CONTENT_WRITER_HOST>
+                                                    <CONTENT_WRITER_PORT>8080</CONTENT_WRITER_PORT>
+                                                    <ROBOTS_SERVICE_PORT>50052</ROBOTS_SERVICE_PORT>
+                                                    <ROBOTS_SERVICE_HOST>robots</ROBOTS_SERVICE_HOST>
+                                                    <DNS_SERVER>testsites</DNS_SERVER>
+                                                    <TRACER_URI>http://tracer:9411/api/v1/spans</TRACER_URI>
                                                 </env>
                                                 <log>
                                                     <enabled>true</enabled>
                                                 </log>
                                                 <wait>
                                                     <tcp>
+                                                        <mode>mapped</mode>
                                                         <ports>
-                                                            <port>9222</port>
+                                                            <port>9090</port>
+                                                        </ports>
+                                                    </tcp>
+                                                    <log>Broprox Harvester .* started</log>
+                                                    <time>20000</time>
+                                                </wait>
+                                            </run>
+                                        </image>
+                                        <image>
+                                            <name>norsknettarkiv/broprox-contentwriter-service</name>
+                                            <alias>content-writer</alias>
+                                            <run>
+                                                <network>
+                                                    <mode>custom</mode>
+                                                    <name>integration-test-net</name>
+                                                    <alias>content-writer</alias>
+                                                </network>
+                                                <ports>
+                                                    <port>+contentwriter.host:contentwriter.port:8080</port>
+                                                </ports>
+                                                <dependsOn>
+                                                    <container>db-initializer</container>
+                                                    <container>tracer</container>
+                                                </dependsOn>
+                                                <volumes>
+                                                    <bind>
+                                                        <volume>contentwriter-warcs:/warcs</volume>
+                                                        <volume>contentwriter-workdir:/workdir</volume>
+                                                    </bind>
+                                                </volumes>
+                                                <env>
+                                                    <DB_HOST>db</DB_HOST>
+                                                    <TRACER_URI>http://tracer:9411/api/v1/spans</TRACER_URI>
+                                                    <UNSAFE>true</UNSAFE>
+                                                </env>
+                                                <log>
+                                                    <enabled>true</enabled>
+                                                </log>
+                                                <wait>
+                                                    <tcp>
+                                                        <mode>mapped</mode>
+                                                        <ports>
+                                                            <port>8080</port>
+                                                        </ports>
+                                                    </tcp>
+                                                    <time>20000</time>
+                                                </wait>
+                                            </run>
+                                        </image>
+                                        <image>
+                                            <name>norsknettarkiv/broprox-frontier</name>
+                                            <alias>frontier</alias>
+                                            <run>
+                                                <network>
+                                                    <mode>custom</mode>
+                                                    <name>integration-test-net</name>
+                                                    <alias>frontier</alias>
+                                                </network>
+                                                <ports>
+                                                    <port>+frontier.host:frontier.port:7700</port>
+                                                </ports>
+                                                <dependsOn>
+                                                    <container>db-initializer</container>
+                                                    <container>harvester</container>
+                                                    <container>tracer</container>
+                                                </dependsOn>
+                                                <env>
+                                                    <DB_HOST>db</DB_HOST>
+                                                    <HARVESTER_HOST>harvester</HARVESTER_HOST>
+                                                    <TRACER_URI>http://tracer:9411/api/v1/spans</TRACER_URI>
+                                                </env>
+                                                <log>
+                                                    <enabled>true</enabled>
+                                                </log>
+                                                <wait>
+                                                    <tcp>
+                                                        <mode>mapped</mode>
+                                                        <ports>
+                                                            <port>7700</port>
+                                                        </ports>
+                                                    </tcp>
+                                                    <log>Broprox Frontier .* started</log>
+                                                    <time>20000</time>
+                                                </wait>
+                                            </run>
+                                        </image>
+                                        <image>
+                                            <name>norsknettarkiv/broprox-controller</name>
+                                            <alias>controller</alias>
+                                            <run>
+                                                <network>
+                                                    <mode>custom</mode>
+                                                    <name>integration-test-net</name>
+                                                    <alias>controller</alias>
+                                                </network>
+                                                <ports>
+                                                    <port>+controller.host:controller.port:50051</port>
+                                                </ports>
+                                                <dependsOn>
+                                                    <container>db-initializer</container>
+                                                    <container>robots</container>
+                                                    <container>frontier</container>
+                                                    <container>tracer</container>
+                                                    <container>browser</container>
+                                                    <container>content-writer</container>
+                                                    <container>harvester</container>
+                                                    <container>testsites</container>
+                                                </dependsOn>
+                                                <env>
+                                                    <DB_HOST>db</DB_HOST>
+                                                    <FRONTIER_HOST>frontier</FRONTIER_HOST>
+                                                    <TRACER_URI>http://tracer:9411/api/v1/spans</TRACER_URI>
+                                                </env>
+                                                <log>
+                                                    <enabled>true</enabled>
+                                                </log>
+                                                <wait>
+                                                    <tcp>
+                                                        <mode>mapped</mode>
+                                                        <ports>
+                                                            <port>50051</port>
+                                                        </ports>
+                                                    </tcp>
+                                                    <log>Broprox Controller .* started</log>
+                                                    <time>20000</time>
+                                                </wait>
+                                            </run>
+                                        </image>
+                                        <image>
+                                            <name>norsknettarkiv/broprox-robotrules-service</name>
+                                            <alias>robots</alias>
+                                            <run>
+                                                <network>
+                                                    <mode>custom</mode>
+                                                    <name>integration-test-net</name>
+                                                    <alias>robots</alias>
+                                                </network>
+                                                <ports>
+                                                    <port>+robots.host:robots.port:50052</port>
+                                                </ports>
+                                                <dependsOn>
+                                                    <container>db-initializer</container>
+                                                    <container>tracer</container>
+                                                </dependsOn>
+                                                <env>
+                                                    <PROXY_HOST>harvester</PROXY_HOST>
+                                                    <PROXY_PORT>8080</PROXY_PORT>
+                                                    <TRACER_URI>http://tracer:9411/api/v1/spans</TRACER_URI>
+                                                </env>
+                                                <log>
+                                                    <enabled>true</enabled>
+                                                </log>
+                                                <wait>
+                                                    <tcp>
+                                                        <mode>mapped</mode>
+                                                        <ports>
+                                                            <port>50052</port>
+                                                        </ports>
+                                                    </tcp>
+                                                    <time>20000</time>
+                                                </wait>
+                                            </run>
+                                        </image>
+
+                                        <image>
+                                            <name>openzipkin/zipkin</name>
+                                            <alias>tracer</alias>
+                                            <run>
+                                                <network>
+                                                    <mode>custom</mode>
+                                                    <name>integration-test-net</name>
+                                                    <alias>tracer</alias>
+                                                </network>
+                                                <ports>
+                                                    <port>+tracer.host:tracer.port:9411</port>
+                                                </ports>
+                                                <log>
+                                                    <enabled>false</enabled>
+                                                </log>
+                                                <wait>
+                                                    <tcp>
+                                                        <mode>mapped</mode>
+                                                        <ports>
+                                                            <port>9411</port>
+                                                        </ports>
+                                                    </tcp>
+                                                    <time>20000</time>
+                                                </wait>
+                                            </run>
+                                        </image>
+
+                                        <image>
+                                            <name>testsites</name>
+                                            <alias>testsites</alias>
+                                            <run>
+                                                <network>
+                                                    <mode>custom</mode>
+                                                    <name>integration-test-net</name>
+                                                    <alias>testsites</alias>
+                                                </network>
+                                                <ports>
+                                                    <port>+test.http.host:test.http.port:80</port>
+                                                    <port>+test.dns.host:test.dns.port:53</port>
+                                                </ports>
+                                                <log>
+                                                    <enabled>false</enabled>
+                                                </log>
+                                                <wait>
+                                                    <tcp>
+                                                        <mode>mapped</mode>
+                                                        <ports>
+                                                            <port>80</port>
+                                                            <port>53</port>
                                                         </ports>
                                                     </tcp>
                                                     <time>20000</time>
@@ -119,7 +470,11 @@
                                 <phase>post-integration-test</phase>
                                 <goals>
                                     <goal>stop</goal>
+                                    <goal>volume-remove</goal>
                                 </goals>
+                                <configuration>
+                                    <removeVolumes>true</removeVolumes>
+                                </configuration>
                             </execution>
                         </executions>
                     </plugin>
@@ -136,9 +491,20 @@
                         </executions>
                         <configuration>
                             <systemPropertyVariables>
-                                <chrome-debug.host>${chrome-debug.host}</chrome-debug.host>
-                                <chrome-debug.port>${chrome-debug.port}</chrome-debug.port>
-                                <this.host>${hostname}</this.host>
+                                <browser.host>${browser.host}</browser.host>
+                                <browser.port>${browser.port}</browser.port>
+                                <db.host>${db.host}</db.host>
+                                <db.port>${db.port}</db.port>
+                                <harvester.host>${harvester.host}</harvester.host>
+                                <harvester.port>${harvester.port}</harvester.port>
+                                <controller.host>${controller.host}</controller.host>
+                                <controller.port>${controller.port}</controller.port>
+                                <robots.host>${robots.host}</robots.host>
+                                <robots.port>${robots.port}</robots.port>
+                                <frontier.host>${frontier.host}</frontier.host>
+                                <frontier.port>${frontier.port}</frontier.port>
+                                <contentwriter.host>${contentwriter.host}</contentwriter.host>
+                                <contentwriter.port>${contentwriter.port}</contentwriter.port>
                             </systemPropertyVariables>
                         </configuration>
                     </plugin>

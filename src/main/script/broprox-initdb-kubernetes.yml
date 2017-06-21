@@ -1,0 +1,19 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: initdb
+spec:
+  template:
+    metadata:
+      name: initdb
+    spec:
+      containers:
+      - name: initdb
+        image: norsknettarkiv/broprox-db-initializer
+        env:
+        - name: DB_HOST
+          value: "db"
+        - name: DB_PORT
+          value: "28015"
+      restartPolicy: Never
+      

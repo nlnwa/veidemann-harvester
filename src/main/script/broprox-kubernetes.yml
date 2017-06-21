@@ -1,19 +1,22 @@
 # Broprox app for Kubernetes
 
+# Rethink DB
 apiVersion: v1
 kind: Service
 metadata:
-  name: rethinkdb
+  name: db
   labels:
     app: rethinkdb
     tier: backend
     role: master
 spec:
   ports:
-    # the port that this service should serve on
   - port: 28015
     targetPort: 28015
     name: api
+  - port: 29015
+    targetPort: 29015
+    name: intracluster
   - port: 8888
     targetPort: 8080
     nodePort: 30888
@@ -27,7 +30,7 @@ spec:
 apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
-  name: rethinkdb
+  name: db
 spec:
   replicas: 1
   template:
@@ -44,7 +47,9 @@ spec:
         - containerPort: 28015
         - containerPort: 29015
         - containerPort: 8080
+
 ---
+# Harvester (proxy and browser)
 apiVersion: v1
 kind: Service
 metadata:
@@ -100,6 +105,22 @@ spec:
         env:
         - name: BROWSER_HOST
           value: "localhost"
+        - name: DB_HOST
+          value: "db"
+        - name: DB_PORT
+          value: "28015"
+        - name: CONTENT_WRITER_HOST
+          value: "content-writer"
+        - name: CONTENT_WRITER_PORT
+          value: "8080"
+        - name: ROBOTS_SERVICE_HOST
+          value: "robots"
+        - name: ROBOTS_SERVICE_PORT
+          value: "50052"
+        - name: DNS_SERVER
+          value: "testsites"
+        - name: TRACER_URI
+          value: "http://tracer:9411/api/v1/spans"
         volumeMounts:
         - mountPath: /workdir
           name: workdir
@@ -108,3 +129,358 @@ spec:
       volumes:
       - emptyDir: {}
         name: workdir
+
+---
+# Content writer
+apiVersion: v1
+kind: Service
+metadata:
+  name: content-writer
+  labels:
+    app: content-writer
+    tier: backend
+    role: worker
+spec:
+  ports:
+  - port: 8080
+    targetPort: 8080
+    name: api
+  selector:
+    app: content-writer
+    tier: backend
+    role: worker
+  type: NodePort
+---
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: content-writer
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: content-writer
+        tier: backend
+        role: worker
+    spec:
+      containers:
+      - name: content-writer
+        image: norsknettarkiv/broprox-contentwriter-service
+        ports:
+        - containerPort: 8080
+        env:
+        - name: DB_HOST
+          value: "db"
+        - name: DB_PORT
+          value: "28015"
+        - name: TRACER_URI
+          value: "http://tracer:9411/api/v1/spans"
+        volumeMounts:
+        - mountPath: /workdir
+          name: workdir
+        - mountPath: /warcs
+          name: warcs
+      restartPolicy: Always
+      dnsPolicy: ClusterFirst
+      volumes:
+      - emptyDir: {}
+        name: workdir
+      - emptyDir: {}
+        name: warcs
+
+---
+# Frontier
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontier
+  labels:
+    app: frontier
+    tier: backend
+    role: worker
+spec:
+  ports:
+  - port: 7700
+    targetPort: 7700
+    name: api
+  selector:
+    app: frontier
+    tier: backend
+    role: worker
+  type: NodePort
+---
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: frontier
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: frontier
+        tier: backend
+        role: worker
+    spec:
+      containers:
+      - name: frontier
+        image: norsknettarkiv/broprox-frontier
+        ports:
+        - containerPort: 7700
+        env:
+        - name: DB_HOST
+          value: "db"
+        - name: DB_PORT
+          value: "28015"
+        - name: HARVESTER_HOST
+          value: "harvester"
+        - name: TRACER_URI
+          value: "http://tracer:9411/api/v1/spans"
+        volumeMounts:
+        - mountPath: /workdir
+          name: workdir
+      restartPolicy: Always
+      dnsPolicy: ClusterFirst
+      volumes:
+      - emptyDir: {}
+        name: workdir
+
+---
+# Controller
+apiVersion: v1
+kind: Service
+metadata:
+  name: controller
+  labels:
+    app: controller
+    tier: backend
+    role: master
+spec:
+  ports:
+  - port: 50051
+    targetPort: 50051
+    name: api
+  selector:
+    app: controller
+    tier: backend
+    role: master
+  type: NodePort
+---
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: controller
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: controller
+        tier: backend
+        role: master
+    spec:
+      containers:
+      - name: controller
+        image: norsknettarkiv/broprox-controller
+        ports:
+        - containerPort: 50051
+        env:
+        - name: DB_HOST
+          value: "db"
+        - name: DB_PORT
+          value: "28015"
+        - name: FRONTIER_HOST
+          value: "frontier"
+        - name: FRONTIER_PORT
+          value: "7700"
+        - name: TRACER_URI
+          value: "http://tracer:9411/api/v1/spans"
+      restartPolicy: Always
+      dnsPolicy: ClusterFirst
+
+---
+# Broprox Robots honoring service
+apiVersion: v1
+kind: Service
+metadata:
+  name: robots
+  labels:
+    app: robots
+    tier: backend
+    role: worker
+spec:
+  ports:
+  - port: 50052
+    targetPort: 50052
+    name: api
+  selector:
+    app: robots
+    tier: backend
+    role: worker
+  type: NodePort
+---
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: robots
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: robots
+        tier: backend
+        role: worker
+    spec:
+      containers:
+      - name: robots
+        image: norsknettarkiv/broprox-robotrules-service
+        ports:
+        - containerPort: 50052
+        env:
+        - name: DB_HOST
+          value: "db"
+        - name: DB_PORT
+          value: "28015"
+        - name: PROXY_HOST
+          value: "harvester"
+        - name: PROXY_PORT
+          value: "8080"
+        - name: TRACER_URI
+          value: "http://tracer:9411/api/v1/spans"
+      restartPolicy: Always
+      dnsPolicy: ClusterFirst
+
+---
+# Zipkin log trace server
+apiVersion: v1
+kind: Service
+metadata:
+  name: tracer
+  labels:
+    app: tracer
+    tier: backend
+    role: log
+spec:
+  ports:
+  - port: 9411
+    targetPort: 9411
+    name: api
+  selector:
+    app: tracer
+    tier: backend
+    role: log
+  type: NodePort
+---
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: tracer
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: tracer
+        tier: backend
+        role: log
+    spec:
+      containers:
+      - name: tracer
+        image: openzipkin/zipkin
+        ports:
+        - containerPort: 9411
+      restartPolicy: Always
+      dnsPolicy: ClusterFirst
+
+---
+# Admin GUI
+apiVersion: v1
+kind: Service
+metadata:
+  name: admin
+  labels:
+    app: admin
+    tier: frontend
+    role: admin
+spec:
+  ports:
+  - port: 80
+    targetPort: 3010
+    name: gui
+  selector:
+    app: admin
+    tier: frontend
+    role: admin
+  type: NodePort
+---
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: admin
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: admin
+        tier: frontend
+        role: admin
+    spec:
+      containers:
+      - name: admin
+        image: norsknettarkiv/broprox-gui
+        ports:
+        - containerPort: 3010
+        env:
+        - name: grpc_controller
+          value: "controller:50051"
+      restartPolicy: Always
+      dnsPolicy: ClusterFirst
+
+---
+# Test web server and dns
+apiVersion: v1
+kind: Service
+metadata:
+  name: testsites
+  labels:
+    app: testsites
+    tier: backend
+    role: test
+spec:
+  ports:
+  - port: 80
+    targetPort: 80
+    name: http
+  - port: 53
+    targetPort: 53
+    name: dns
+  selector:
+    app: testsites
+    tier: backend
+    role: test
+  type: NodePort
+---
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: testsites
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: testsites
+        tier: backend
+        role: test
+    spec:
+      containers:
+      - name: testsites
+        image: norsknettarkiv/testsites
+        ports:
+        - containerPort: 80
+        - containerPort: 53
+      restartPolicy: Always
+      dnsPolicy: ClusterFirst

@@ -90,7 +90,7 @@ services:
             - "TRACER_URI=http://tracer:9411/api/v1/spans"
 
     testsites:
-        image: testsites
+        image: norsknettarkiv/testsites
 #        ports:
 #            - "80:80"
 #            - "53:53"

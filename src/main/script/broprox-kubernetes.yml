@@ -53,7 +53,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: broprox-harvester
+  name: harvester
   labels:
     app: harvester
     tier: backend
@@ -72,12 +72,12 @@ spec:
   selector:
     app: harvester
     tier: backend
-    role: master
+    role: worker
 ---
 apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
-  name: broprox-harvester
+  name: harvester
 spec:
   template:
     metadata:
@@ -87,7 +87,7 @@ spec:
         role: worker
     spec:
       containers:
-      - name: broprox-browser
+      - name: browser
         image: norsknettarkiv/chrome-headless
         ports:
         - containerPort: 9222
@@ -97,7 +97,7 @@ spec:
         volumeMounts:
         - mountPath: /data
           name: workdir
-      - name: broprox-harvester
+      - name: harvester
         image: norsknettarkiv/broprox-harvester
         ports:
         - containerPort: 8080
@@ -235,6 +235,8 @@ spec:
           value: "28015"
         - name: HARVESTER_HOST
           value: "harvester"
+        - name: HARVESTER_PORT
+          value: "9090"
         - name: TRACER_URI
           value: "http://tracer:9411/api/v1/spans"
         volumeMounts:

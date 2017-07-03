@@ -222,7 +222,7 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker, Delayed {
     }
 
     boolean shouldInclude(MessagesProto.QueuedUriOrBuilder outlink) {
-        if (limits.getDepth() > 0 && limits.getDepth() < calculateDepth(outlink)) {
+        if (limits.getDepth() > 0 && limits.getDepth() <= calculateDepth(outlink)) {
             return false;
         }
 

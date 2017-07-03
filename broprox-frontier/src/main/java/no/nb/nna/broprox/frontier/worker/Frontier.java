@@ -101,7 +101,7 @@ public class Frontier implements AutoCloseable {
 
         status = db.addExecutionStatus(status);
         CrawlExecution exe = new CrawlExecution(
-                OpenTracingParentContextKey.parentSpan(), this, status, job.getCrawlConfig(), seed.getScope());
+                OpenTracingParentContextKey.parentSpan(), this, status, job, seed.getScope());
         runningExecutions.put(status.getId(), exe);
 
         status = status.toBuilder().setState(CrawlExecutionStatus.State.RUNNING)

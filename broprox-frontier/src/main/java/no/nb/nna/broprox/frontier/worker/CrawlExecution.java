@@ -30,6 +30,8 @@ import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
 import no.nb.nna.broprox.model.MessagesProto;
 import no.nb.nna.broprox.model.ConfigProto.CrawlConfig;
+import no.nb.nna.broprox.model.ConfigProto.CrawlJob;
+import no.nb.nna.broprox.model.ConfigProto.CrawlLimitsConfig;
 import no.nb.nna.broprox.model.ConfigProto.CrawlScope;
 import no.nb.nna.broprox.model.MessagesProto.CrawlExecutionStatus;
 import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
@@ -53,6 +55,8 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker, Delayed {
 
     private final CrawlScope scope;
 
+    private final CrawlLimitsConfig limits;
+
     private QueuedUri currentUri;
 
     private volatile List<QueuedUri> outlinks;
@@ -65,13 +69,14 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker, Delayed {
 
     private final Span parentSpan;
 
-    public CrawlExecution(Span span, Frontier frontier, CrawlExecutionStatus status, CrawlConfig config, CrawlScope scope) {
+    public CrawlExecution(Span span, Frontier frontier, CrawlExecutionStatus status, CrawlJob job, CrawlScope scope) {
         System.out.println("NEW CRAWL EXECUTION: " + status.getId());
         this.frontier = frontier;
         this.status = status;
-        this.config = config;
+        this.config = job.getCrawlConfig();
         this.parentSpan = span;
         this.scope = scope;
+        this.limits = job.getLimits();
     }
 
     public String getId() {
@@ -217,6 +222,14 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker, Delayed {
     }
 
     boolean shouldInclude(MessagesProto.QueuedUriOrBuilder outlink) {
+        if (limits.getDepth() > 0 && limits.getDepth() < calculateDepth(outlink)) {
+            return false;
+        }
+
+        if (!outlink.getSurt().startsWith(scope.getSurtPrefix())) {
+            return false;
+        }
+
         RethinkDB r = RethinkDB.r;
         boolean notSeen = frontier.getDb().executeRequest(
                 r.table(RethinkDbAdapter.TABLES.CRAWL_LOG.name)
@@ -230,10 +243,14 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker, Delayed {
                                         .limit(1)
                         ).isEmpty());
 
-        if (notSeen && outlink.getSurt().startsWith(scope.getSurtPrefix())) {
+        if (notSeen) {
             return true;
         }
         return false;
+    }
+
+    public int calculateDepth(MessagesProto.QueuedUriOrBuilder uri) {
+        return uri.getDiscoveryPath().length();
     }
 
     public long objectSize() {

@@ -111,7 +111,12 @@ public class DnsLookup implements HostResolver {
             resolvers = new SimpleResolver[dnsServers.size()];
             for (int i = 0; i < dnsServers.size(); i++) {
                 LOG.info("Initializing DNS server: " + dnsServers.get(i));
-                resolvers[i] = new SimpleResolver(dnsServers.get(i));
+                String[] dnsServer = dnsServers.get(i).split(":");
+                resolvers[i] = new SimpleResolver(dnsServer[0]);
+                if (dnsServer.length == 2) {
+                    int dnsPort = Integer.parseInt(dnsServer[1]);
+                    resolvers[i].setPort(dnsPort);
+                }
             }
         } catch (UnknownHostException ex) {
             throw new RuntimeException(ex);

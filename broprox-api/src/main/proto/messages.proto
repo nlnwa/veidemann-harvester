@@ -82,16 +82,13 @@ message ExtractedText {
 }
 
 message QueuedUri {
-    message IdSeq {
-        string id = 1;
-        int64 seq = 2;
-    }
-
     string id = 1;
-    repeated IdSeq execution_ids = 2;
+    string execution_id = 2;
     google.protobuf.Timestamp time_stamp = 3;
-    string surt = 4;
+    // Sequence number to order the fetch of uris from a seed
+    int64 sequence = 4;
     string uri = 5;
+    string surt = 6;
 
     /**
      * Get the discoveryPath,
@@ -106,10 +103,10 @@ message QueuedUri {
      * <p>
      * @return the discovery path
      */
-    string discovery_path = 6;
-    string referrer = 7;
-    CrawlScope scope = 8;
-    repeated Cookie cookies = 9;
+    string discovery_path = 7;
+    string referrer = 8;
+    CrawlScope scope = 9;
+    repeated Cookie cookies = 10;
 }
 
 message Cookie {

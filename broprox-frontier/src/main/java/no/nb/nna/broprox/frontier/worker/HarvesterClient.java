@@ -60,10 +60,13 @@ public class HarvesterClient implements AutoCloseable {
         asyncStub = HarvesterGrpc.newStub(channel);
     }
 
-    public List<QueuedUri> fetchPage(String executionId, QueuedUri qUri, CrawlConfig config) {
+    public List<QueuedUri> fetchPage(QueuedUri qUri, CrawlConfig config) {
+        if (qUri.getExecutionId().isEmpty()) {
+            throw new IllegalArgumentException("A queued URI must have the execution ID set.");
+        }
+
         try {
             HarvestPageRequest request = HarvestPageRequest.newBuilder()
-                    .setExecutionId(executionId)
                     .setQueuedUri(qUri)
                     .setCrawlConfig(config)
                     .build();

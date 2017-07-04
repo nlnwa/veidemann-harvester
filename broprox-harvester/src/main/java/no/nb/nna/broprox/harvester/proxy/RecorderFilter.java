@@ -98,8 +98,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
             return otw.map("clientToProxyRequest", req -> {
 
                 if (req.headers().get(DISCOVERY_PATH).endsWith("E")) {
-                    FullHttpResponse cachedResponse = cache.get(uri, req.headers().get(EXECUTION_ID), req.headers()
-                            .get(ALL_EXECUTION_IDS));
+                    FullHttpResponse cachedResponse = cache.get(uri, req.headers().get(EXECUTION_ID));
                     if (cachedResponse != null) {
                         if (LOG.isTraceEnabled()) {
                             LOG.trace("Found {} in cache", uri);
@@ -119,8 +118,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
 
                 req.headers()
                         .remove(DISCOVERY_PATH)
-                        .remove(EXECUTION_ID)
-                        .remove(ALL_EXECUTION_IDS);
+                        .remove(EXECUTION_ID);
 
                 // Store request
                 requestCollector.setRequestHeaders(req);

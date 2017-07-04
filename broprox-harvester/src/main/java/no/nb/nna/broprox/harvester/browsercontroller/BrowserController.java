@@ -40,7 +40,6 @@ import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.harvester.OpenTracingSpans;
 import no.nb.nna.broprox.harvester.proxy.RobotsServiceClient;
 import no.nb.nna.broprox.model.MessagesProto;
-import org.netpreserve.commons.uri.UriConfigs;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,15 +68,15 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
         this.robotsServiceClient = robotsServiceClient;
     }
 
-    public List<QueuedUri> render(String executionId, QueuedUri queuedUri, CrawlConfig config)
+    public List<QueuedUri> render(QueuedUri queuedUri, CrawlConfig config)
             throws ExecutionException, InterruptedException, IOException, TimeoutException {
         List<QueuedUri> outlinks;
-        System.out.println("RENDER " + executionId + " :: " + queuedUri.getUri());
+        System.out.println("RENDER " + queuedUri.getExecutionId() + " :: " + queuedUri.getUri());
         OpenTracingWrapper otw = new OpenTracingWrapper("BrowserController", Tags.SPAN_KIND_CLIENT)
-                .setParentSpan(OpenTracingSpans.get(executionId));
+                .setParentSpan(OpenTracingSpans.get(queuedUri.getExecutionId()));
 
         // Check robots.txt
-        if (robotsServiceClient.isAllowed(executionId, queuedUri.getUri(), config)) {
+        if (robotsServiceClient.isAllowed(queuedUri, config)) {
 
             try (Session session = chrome.newSession(
                     config.getBrowserConfig().getWindowWidth(),
@@ -118,7 +117,7 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
                     System.out.println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>> SCRIPT RESUMED: " + scriptId);
                 });
 
-                PageExecution pex = new PageExecution(executionId, queuedUri, session, config.getBrowserConfig()
+                PageExecution pex = new PageExecution(queuedUri, session, config.getBrowserConfig()
                         .getPageLoadTimeoutMs(), db, config.getBrowserConfig().getSleepAfterPageloadMs());
                 otw.run("navigatePage", pex::navigatePage);
                 if (config.getExtra().getCreateSnapshot()) {

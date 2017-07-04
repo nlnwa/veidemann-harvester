@@ -18,9 +18,8 @@ service Harvester {
 
 // A request telling which page to harves.
 message HarvestPageRequest {
-    string execution_id = 1;
-    QueuedUri queued_uri = 2;
-    CrawlConfig crawl_config = 3;
+    QueuedUri queued_uri = 1;
+    CrawlConfig crawl_config = 2;
 }
 
 message HarvestPageReply {

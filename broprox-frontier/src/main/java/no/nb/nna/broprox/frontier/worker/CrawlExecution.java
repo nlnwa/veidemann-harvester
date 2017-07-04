@@ -113,7 +113,7 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker, Delayed {
 
         try {
             try {
-                outlinks = frontier.getHarvesterClient().fetchPage(status.getId(), currentUri, config);
+                outlinks = frontier.getHarvesterClient().fetchPage(currentUri, config);
                 seedResolved = true;
 
                 status = status.toBuilder()
@@ -148,47 +148,11 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker, Delayed {
     }
 
     void queueOutlinks() {
-        QueuedUri.IdSeq currentId = QueuedUri.IdSeq.newBuilder()
-                .setId(getId())
-                .setSeq(1L)
-                .build();
-
-        long nextSequenceNum = 1;
+        long nextSequenceNum = 1L;
         if (!config.getDepthFirst()) {
             nextSequenceNum = getNextSequenceNum();
         }
 
-//        outlinks.stream().map(uri -> {
-//            return uri.toBuilder();
-//        }).forEach(outUriBuilder -> {
-//            try {
-//                outUriBuilder.setSurt(UriConfigs.SURT_KEY.buildUri(outUriBuilder.getUri()).toString());
-//            } catch (Exception e) {
-//                System.out.println("Strange error with outlink (" + outUriBuilder + "): " + e);
-//                e.printStackTrace();
-//                return;
-//            }
-//
-//            if (shouldInclude(outUriBuilder)) {
-//                LOG.debug("Found new URI: {}, queueing.", outUriBuilder.getSurt());
-//                List<QueuedUri.IdSeq> eIds = outUriBuilder.getExecutionIdsList();
-//
-//                if (!eIds.contains(currentId)) {
-//                    if (config.getDepthFirst()) {
-//                        nextSequenceNum = getNextSequenceNum();
-//                    }
-//
-//                    outUriBuilder.addExecutionIds(currentId.toBuilder().setSeq(nextSequenceNum).build());
-//                }
-//                try {
-//                    frontier.getDb().addQueuedUri(outUriBuilder.build());
-//                } catch (Exception e) {
-//                    e.printStackTrace();
-//                }
-//            } else {
-//                LOG.debug("Found already included URI: {}, skipping.", outUriBuilder.getSurt());
-//            }
-//        });
         for (QueuedUri outUri : outlinks) {
             QueuedUri.Builder outUriBuilder = outUri.toBuilder();
             try {
@@ -201,32 +165,31 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker, Delayed {
 
             if (shouldInclude(outUriBuilder)) {
                 LOG.debug("Found new URI: {}, queueing.", outUriBuilder.getSurt());
-                List<QueuedUri.IdSeq> eIds = outUriBuilder.getExecutionIdsList();
 
-                if (!eIds.contains(currentId)) {
+                if (outUriBuilder.getSequence() != 1L) {
                     if (config.getDepthFirst()) {
                         nextSequenceNum = getNextSequenceNum();
                     }
 
-                    outUriBuilder.addExecutionIds(currentId.toBuilder().setSeq(nextSequenceNum).build());
+                    outUriBuilder.setSequence(nextSequenceNum);
                 }
                 try {
                     frontier.getDb().addQueuedUri(outUriBuilder.build());
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
-            } else {
-                LOG.debug("Found already included URI: {}, skipping.", outUriBuilder.getSurt());
             }
         }
     }
 
     boolean shouldInclude(MessagesProto.QueuedUriOrBuilder outlink) {
         if (limits.getDepth() > 0 && limits.getDepth() <= calculateDepth(outlink)) {
+            LOG.debug("Maximum configured depth reached for: {}, skipping.", outlink.getSurt());
             return false;
         }
 
         if (!outlink.getSurt().startsWith(scope.getSurtPrefix())) {
+            LOG.debug("URI '{}' is out of scope, skipping.", outlink.getSurt());
             return false;
         }
 
@@ -246,6 +209,7 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker, Delayed {
         if (notSeen) {
             return true;
         }
+        LOG.debug("Found already included URI: {}, skipping.", outlink.getSurt());
         return false;
     }
 

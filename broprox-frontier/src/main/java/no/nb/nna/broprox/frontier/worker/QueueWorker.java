@@ -107,7 +107,7 @@ public class QueueWorker extends RecursiveAction {
         try (Cursor<Map<String, Object>> cursor = frontier.getDb().executeRequest(
                 r.table(TABLES.URI_QUEUE.name)
                         .between(r.array(executionId, r.minval()), r.array(executionId, r.maxval()))
-                        .optArg("index", "executionIds").orderBy().optArg("index", "executionIds")
+                        .optArg("index", "executionId").orderBy().optArg("index", "executionId")
                         .limit(1));) {
             if (cursor.hasNext()) {
                 return ProtoUtils.rethinkToProto(cursor.next(), QueuedUri.class);

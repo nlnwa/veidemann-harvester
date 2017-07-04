@@ -216,7 +216,7 @@ public class ProtoUtils {
             try {
                 JSON_PARSER.merge(msg, protoBuilder);
             } catch (InvalidProtocolBufferException ex) {
-                throw new RuntimeException(ex);
+                throw new IllegalArgumentException("Could not construct '" + type + "' from json: '" + msg + "'", ex);
             }
             return (T) protoBuilder.build();
         } catch (NoSuchMethodException | SecurityException | IllegalAccessException
@@ -228,11 +228,15 @@ public class ProtoUtils {
     public static <T extends Message> List<T> jsonListToProto(String msg, Class<T> type) {
         if (msg.startsWith("[") && msg.endsWith("]")) {
             String[] msgs = msg.substring(1, msg.length() - 1).split(",");
-            return Arrays.stream(msgs)
-                    .map(s -> jsonToProto(s, type))
-                    .collect(Collectors.toList());
+            try {
+                return Arrays.stream(msgs)
+                        .map(s -> jsonToProto(s, type))
+                        .collect(Collectors.toList());
+            } catch (IllegalArgumentException ex) {
+                throw new IllegalArgumentException("Input is not an JSON array: '" + msg + "'", ex);
+            }
         } else {
-            throw new IllegalArgumentException("Input is not an JSON array: " + msg);
+            throw new IllegalArgumentException("Input is not an JSON array: '" + msg + "'");
         }
     }
 

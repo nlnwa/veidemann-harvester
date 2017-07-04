@@ -89,7 +89,8 @@ message CrawlScope {
 }
 
 message CrawlLimitsConfig {
-    int32 depth = 1; // Not implemented
+    // How deep from a seed to crawl
+    int32 depth = 1;
     int64 max_duration_s = 2; // Not implemented
     int64 max_bytes = 3; // Not implemented
 }

@@ -17,13 +17,17 @@ package no.nb.nna.broprox.harvester.proxy;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.util.Date;
 import java.util.List;
 
+import net.lightbody.bmp.mitm.CertificateInfo;
+import net.lightbody.bmp.mitm.RootCertificateGenerator;
+import net.lightbody.bmp.mitm.keys.ECKeyGenerator;
+import net.lightbody.bmp.mitm.manager.ImpersonatingMitmManager;
 import no.nb.nna.broprox.db.DbAdapter;
 import org.littleshoot.proxy.HttpProxyServer;
 import org.littleshoot.proxy.impl.DefaultHttpProxyServer;
-import org.littleshoot.proxy.mitm.CertificateSniffingMitmManager;
-import org.littleshoot.proxy.mitm.RootCertificateException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,11 +51,35 @@ public class RecordingProxy implements AutoCloseable {
      * @throws IOException is thrown if certificate directory could not be created
      */
     public RecordingProxy(File workDir, int port, DbAdapter db, final ContentWriterClient contentWriterClient,
-            final List<String> dnsServers) throws RootCertificateException, IOException {
+            final List<String> dnsServers) throws IOException {
 
         LOG.info("Starting recording proxy listening on port {}.", port);
 
         File certificateDir = new File(workDir, "certificates");
+        Files.createDirectories(certificateDir.toPath());
+
+        CertificateInfo certInfo = new CertificateInfo()
+                .commonName("Broprox Web Traffic Recorder")
+                .organization("Broprox")
+                .organizationalUnit("Certificate Authority")
+                .notBefore(new Date(System.currentTimeMillis() - 365L * 24L * 60L * 60L * 1000L))
+                .notAfter(new Date(System.currentTimeMillis() + 365L * 24L * 60L * 60L * 1000L));
+
+        // create a dyamic CA root certificate generator using Elliptic Curve keys
+        RootCertificateGenerator ecRootCertificateGenerator = RootCertificateGenerator.builder()
+                .certificateInfo(certInfo)
+                .keyGenerator(new ECKeyGenerator())     // use EC keys, instead of the default RSA
+                .build();
+
+        // save the dynamically-generated CA root certificate for installation in a browser
+        ecRootCertificateGenerator.saveRootCertificateAsPemFile(new File(certificateDir, "BroproxCA.pem"));
+
+        // tell the MitmManager to use the root certificate we just generated, and to use EC keys when
+        // creating impersonated server certs
+        ImpersonatingMitmManager mitmManager = ImpersonatingMitmManager.builder()
+                .rootCertificateSource(ecRootCertificateGenerator)
+                .serverKeyGenerator(new ECKeyGenerator())
+                .build();
 
         cache = new AlreadyCrawledCache();
 
@@ -60,7 +88,7 @@ public class RecordingProxy implements AutoCloseable {
                 .withPort(port)
                 .withTransparent(true)
                 .withServerResolver(new DnsLookup(db, contentWriterClient, dnsServers))
-                .withManInTheMiddle(new CertificateSniffingMitmManager(new SelfSignedAuthority(certificateDir)))
+                .withManInTheMiddle(mitmManager)
                 .withFiltersSource(new RecorderFilterSourceAdapter(db, contentWriterClient, cache))
                 .start();
     }

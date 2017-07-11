@@ -36,6 +36,7 @@ import org.littleshoot.proxy.impl.ProxyUtils;
 import org.netpreserve.commons.uri.UriConfigs;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 /**
  *
@@ -54,8 +55,6 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
 
     private final ContentCollector responseCollector;
 
-    private final ContentWriterClient contentWriterClient;
-
     private final DbAdapter db;
 
     private String executionId;
@@ -72,7 +71,6 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
         super(originalRequest, ctx);
         this.db = db;
         this.uri = uri;
-        this.contentWriterClient = contentWriterClient;
 
         this.crawlLog = CrawlLog.newBuilder()
                 .setRequestedUri(uri)
@@ -88,9 +86,11 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
             HttpRequest request = (HttpRequest) httpObject;
 
             executionId = request.headers().get(EXECUTION_ID);
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Proxy got request for {} from execution {}", uri, executionId);
-            }
+
+            MDC.put("eid", executionId);
+            MDC.put("uri", uri);
+
+            LOG.debug("Proxy got request");
 
             OpenTracingWrapper otw = new OpenTracingWrapper("RecorderFilter").setParentSpan(OpenTracingSpans
                     .get(executionId));
@@ -98,12 +98,9 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
             return otw.map("clientToProxyRequest", req -> {
 
                 if (req.headers().get(DISCOVERY_PATH).endsWith("E")) {
-                    FullHttpResponse cachedResponse = cache.get(uri, req.headers().get(EXECUTION_ID), req.headers()
-                            .get(ALL_EXECUTION_IDS));
+                    FullHttpResponse cachedResponse = cache.get(uri, req.headers().get(EXECUTION_ID));
                     if (cachedResponse != null) {
-                        if (LOG.isTraceEnabled()) {
-                            LOG.trace("Found {} in cache", uri);
-                        }
+                        LOG.debug("Found in cache");
                         cachedResponse.headers().add("Connection", "close");
                         return cachedResponse;
                     } else {
@@ -119,13 +116,13 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
 
                 req.headers()
                         .remove(DISCOVERY_PATH)
-                        .remove(EXECUTION_ID)
-                        .remove(ALL_EXECUTION_IDS);
+                        .remove(EXECUTION_ID);
 
                 // Store request
                 requestCollector.setRequestHeaders(req);
                 requestCollector.writeRequest(crawlLog.build());
 
+                LOG.debug("Proxy is sending request to final destination.");
                 return null;
             }, request);
         }
@@ -138,9 +135,14 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
         OpenTracingWrapper otw = new OpenTracingWrapper("RecorderFilter").setParentSpan(OpenTracingSpans
                 .get(executionId));
 
+        MDC.put("eid", executionId);
+        MDC.put("uri", uri);
+
         return otw.map("serverToProxyResponse", response -> {
 
             if (response instanceof HttpResponse) {
+                LOG.debug("Got http response");
+
                 HttpResponse res = (HttpResponse) response;
                 responseStatus = res.status();
                 httpVersion = res.protocolVersion();
@@ -150,6 +152,8 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
                 responseCollector.setResponseHeaders(res);
 
             } else if (response instanceof HttpContent) {
+                LOG.debug("Got http content");
+
                 HttpContent res = (HttpContent) response;
                 responseCollector.addPayload(res.content());
 
@@ -174,11 +178,18 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
 
     @Override
     public void proxyToServerResolutionSucceeded(String serverHostAndPort, InetSocketAddress resolvedRemoteAddress) {
+        MDC.put("eid", executionId);
+        MDC.put("uri", uri);
+
+        LOG.debug("Resolved {} to {}", serverHostAndPort, resolvedRemoteAddress);
         crawlLog.setIpAddress(resolvedRemoteAddress.getAddress().getHostAddress());
     }
 
     @Override
     public void proxyToServerResolutionFailed(String hostAndPort) {
+        MDC.put("eid", executionId);
+        MDC.put("uri", uri);
+
         crawlLog.setRecordType("response")
                 .setStatusCode(-1)
                 .setFetchTimeStamp(ProtoUtils.getNowTs());
@@ -187,13 +198,14 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
             db.addCrawlLog(crawlLog.build());
         }
 
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("DNS lookup failed for {}", hostAndPort);
-        }
+        LOG.debug("DNS lookup failed for {}", hostAndPort);
     }
 
     @Override
     public void proxyToServerConnectionFailed() {
+        MDC.put("eid", executionId);
+        MDC.put("uri", uri);
+
         crawlLog.setRecordType("response")
                 .setStatusCode(-2)
                 .setFetchTimeStamp(ProtoUtils.getNowTs());
@@ -202,13 +214,14 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
             db.addCrawlLog(crawlLog.build());
         }
 
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("Http connect failed for {}", uri);
-        }
+        LOG.debug("Http connect failed");
     }
 
     @Override
     public void serverToProxyResponseTimedOut() {
+        MDC.put("eid", executionId);
+        MDC.put("uri", uri);
+
         crawlLog.setRecordType("response")
                 .setStatusCode(-4)
                 .setFetchTimeStamp(ProtoUtils.getNowTs());
@@ -217,9 +230,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
             db.addCrawlLog(crawlLog.build());
         }
 
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("Http connect timed out for {}", uri);
-        }
+        LOG.debug("Http connect timed out");
     }
 
 }

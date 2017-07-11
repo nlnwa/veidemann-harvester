@@ -26,6 +26,7 @@ import io.opentracing.util.GlobalTracer;
 import no.nb.nna.broprox.api.RobotsServiceGrpc;
 import no.nb.nna.broprox.api.RobotsServiceProto;
 import no.nb.nna.broprox.model.ConfigProto;
+import no.nb.nna.broprox.model.MessagesProto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,11 +56,11 @@ public class RobotsServiceClient implements AutoCloseable {
         asyncStub = RobotsServiceGrpc.newStub(channel);
     }
 
-    public boolean isAllowed(String executionId, String uri, ConfigProto.CrawlConfig config) {
+    public boolean isAllowed(MessagesProto.QueuedUri queuedUri, ConfigProto.CrawlConfig config) {
         try {
             RobotsServiceProto.IsAllowedRequest request = RobotsServiceProto.IsAllowedRequest.newBuilder()
-                    .setExecutionId(executionId)
-                    .setUri(uri)
+                    .setExecutionId(queuedUri.getExecutionId())
+                    .setUri(queuedUri.getUri())
                     .setUserAgent(config.getBrowserConfig().getUserAgent())
                     .setPoliteness(config.getPoliteness())
                     .build();

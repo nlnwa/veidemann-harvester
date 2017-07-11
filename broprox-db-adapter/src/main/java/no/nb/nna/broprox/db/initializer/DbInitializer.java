@@ -133,9 +133,8 @@ public class DbInitializer {
 
         r.tableCreate(TABLES.URI_QUEUE.name).run(conn);
         r.table(TABLES.URI_QUEUE.name).indexCreate("surt").run(conn);
-        r.table(TABLES.URI_QUEUE.name).indexCreate("executionIds", uri -> uri.g("executionIds")
-                .map(eid -> r.array(eid.g("id"), eid.g("seq")))
-        ).optArg("multi", true).run(conn);
+        r.table(TABLES.URI_QUEUE.name).indexCreate("executionId",
+                uri -> r.array(uri.g("executionId"), uri.g("sequence"))).run(conn);
 
         r.tableCreate(TABLES.EXECUTIONS.name).run(conn);
 
@@ -166,7 +165,7 @@ public class DbInitializer {
                 TABLES.POLITENESS_CONFIGS
         );
 
-        r.table(TABLES.URI_QUEUE.name).indexWait("surt", "executionIds").run(conn);
+        r.table(TABLES.URI_QUEUE.name).indexWait("surt", "executionId").run(conn);
         r.table(TABLES.CRAWL_LOG.name).indexWait("surt_time").run(conn);
         r.table(TABLES.SEEDS.name).indexWait("jobId").run(conn);
     }

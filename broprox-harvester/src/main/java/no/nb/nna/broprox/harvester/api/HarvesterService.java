@@ -21,13 +21,11 @@ import com.google.protobuf.Empty;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import io.opentracing.contrib.OpenTracingContextKey;
-import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.api.HarvesterGrpc;
 import no.nb.nna.broprox.api.HarvesterProto.CleanupExecutionRequest;
 import no.nb.nna.broprox.api.HarvesterProto.HarvestPageReply;
 import no.nb.nna.broprox.api.HarvesterProto.HarvestPageRequest;
 import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
-import no.nb.nna.broprox.commons.BroproxHeaderConstants;
 import no.nb.nna.broprox.harvester.OpenTracingSpans;
 import no.nb.nna.broprox.harvester.browsercontroller.BrowserController;
 import no.nb.nna.broprox.harvester.proxy.RecordingProxy;
@@ -40,31 +38,22 @@ import org.slf4j.LoggerFactory;
 public class HarvesterService extends HarvesterGrpc.HarvesterImplBase {
     private static final Logger LOG = LoggerFactory.getLogger(HarvesterService.class);
 
-    private final DbAdapter db;
-
     private final BrowserController controller;
 
     private final RecordingProxy proxy;
 
-    public HarvesterService(DbAdapter db, BrowserController controller, RecordingProxy proxy) {
-        this.db = db;
+    public HarvesterService(BrowserController controller, RecordingProxy proxy) {
         this.controller = controller;
         this.proxy = proxy;
     }
 
     @Override
     public void harvestPage(HarvestPageRequest request, StreamObserver<HarvestPageReply> respObserver) {
-        String executionId = null;
+        QueuedUri fetchUri = request.getQueuedUri();
         try {
-            executionId = request.getExecutionId();
-            if (executionId.isEmpty()) {
-                executionId = BroproxHeaderConstants.MANUAL_EXID;
-            }
+            OpenTracingSpans.register(fetchUri.getExecutionId(), OpenTracingContextKey.activeSpan());
 
-            OpenTracingSpans.register(executionId, OpenTracingContextKey.activeSpan());
-
-            QueuedUri fetchUri = request.getQueuedUri();
-            List<QueuedUri> outlinks = controller.render(executionId, fetchUri, request.getCrawlConfig());
+            List<QueuedUri> outlinks = controller.render(fetchUri, request.getCrawlConfig());
             HarvestPageReply reply = HarvestPageReply.newBuilder().addAllOutlinks(outlinks).build();
 
             respObserver.onNext(reply);
@@ -74,7 +63,7 @@ public class HarvesterService extends HarvesterGrpc.HarvesterImplBase {
             Status status = Status.UNKNOWN.withDescription(ex.toString());
             respObserver.onError(status.asException());
         } finally {
-            OpenTracingSpans.remove(executionId);
+            OpenTracingSpans.remove(fetchUri.getExecutionId());
         }
     }
 

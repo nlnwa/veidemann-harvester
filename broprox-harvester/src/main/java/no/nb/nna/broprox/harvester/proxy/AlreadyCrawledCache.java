@@ -15,20 +15,15 @@
  */
 package no.nb.nna.broprox.harvester.proxy;
 
-import java.lang.reflect.Type;
-import java.util.List;
 import java.util.Objects;
 
-import com.google.common.reflect.TypeToken;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
-import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.commons.BroproxHeaderConstants;
-import no.nb.nna.broprox.model.MessagesProto.QueuedUri.IdSeq;
 import org.cache2k.Cache;
 import org.cache2k.Cache2kBuilder;
 import org.cache2k.CacheEntry;
@@ -72,27 +67,13 @@ public class AlreadyCrawledCache {
                 .build();
     }
 
-    public FullHttpResponse get(String uri, String exIdHeader, String allExIdHeader) {
+    public FullHttpResponse get(String uri, String exIdHeader) {
         if (exIdHeader == null || BroproxHeaderConstants.MANUAL_EXID.equals(exIdHeader)) {
             return null;
         }
 
         CacheKey key = new CacheKey(uri, exIdHeader);
         FullHttpResponse cacheValue = cache.peek(key);
-
-        if (cacheValue == null) {
-            List<IdSeq> allExId = ProtoUtils.jsonListToProto(allExIdHeader, IdSeq.class);
-            for (IdSeq eId : allExId) {
-                if (!exIdHeader.equals(eId.getId())) {
-                    CacheKey altKey = new CacheKey(uri, (String) eId.getId());
-                    cacheValue = cache.peek(altKey);
-                    if (cacheValue != null) {
-                        cache.put(key, cacheValue);
-                        break;
-                    }
-                }
-            }
-        }
 
         if (cacheValue != null) {
             return cacheValue.retainedDuplicate();

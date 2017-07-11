@@ -16,7 +16,6 @@
 package no.nb.nna.broprox.harvester;
 
 import java.io.File;
-import java.io.IOException;
 
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigBeanFactory;
@@ -31,7 +30,6 @@ import no.nb.nna.broprox.harvester.proxy.ContentWriterClient;
 import no.nb.nna.broprox.harvester.proxy.RecordingProxy;
 import no.nb.nna.broprox.harvester.proxy.RobotsServiceClient;
 import no.nb.nna.broprox.harvester.settings.Settings;
-import org.littleshoot.proxy.mitm.RootCertificateException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -79,7 +77,7 @@ public class Harvester {
                         new File(SETTINGS.getWorkDir()),
                         SETTINGS.getProxyPort(), db, contentWriterClient, SETTINGS.getDnsServers());
 
-                HarvesterApiServer apiServer = new HarvesterApiServer(db, controller, proxy).start();) {
+                HarvesterApiServer apiServer = new HarvesterApiServer(controller, proxy).start();) {
 
             LOG.info("Broprox harvester (v. {}) started", Harvester.class.getPackage().getImplementationVersion());
 
@@ -91,8 +89,9 @@ public class Harvester {
         } catch (ConfigException ex) {
             System.err.println("Configuration error: " + ex.getLocalizedMessage());
             System.exit(1);
-        } catch (RootCertificateException | IOException ex) {
+        } catch (Exception ex) {
             LOG.error("Could not start service", ex);
+            throw new RuntimeException(ex);
         }
 
         return this;

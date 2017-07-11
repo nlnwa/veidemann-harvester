@@ -1,7 +1,17 @@
 /*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
+ * Copyright 2017 National Library of Norway.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package no.nb.nna.broprox.contentwriter.text;
 
@@ -28,7 +38,7 @@ public class SkipSpaceContentHandler extends ContentHandlerDecorator {
 //    private static final LanguageDetect langDetector = new LanguageDetect();
     private final Metadata metadata;
 
-    private ExtractedText extractedText;
+    private ExtractedText.Builder extractedText = ExtractedText.newBuilder();
 
     private StringBuilder stringBuilder;
 
@@ -85,18 +95,18 @@ public class SkipSpaceContentHandler extends ContentHandlerDecorator {
                 });
             });
             extractedText = ExtractedText.newBuilder()
+                    .setWarcId(metadata.get("warc-id"))
                     .setText(text)
                     .setSentenceCount(sentenceCount)
                     .setWordCount(wordCount)
                     .setLongWordCount(longWordCount)
                     .setCharacterCount(characterCount)
-                    .setLix(calculateLix())
-                    .build();
+                    .setLix(calculateLix());
         }
     }
 
     public ExtractedText getExtractedText() {
-        return extractedText;
+        return extractedText.build();
     }
 
     public long calculateLix() {

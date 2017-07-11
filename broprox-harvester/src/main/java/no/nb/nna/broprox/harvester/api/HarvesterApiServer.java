@@ -22,7 +22,6 @@ import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.opentracing.contrib.ServerTracingInterceptor;
 import io.opentracing.util.GlobalTracer;
-import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.harvester.Harvester;
 import no.nb.nna.broprox.harvester.browsercontroller.BrowserController;
 import no.nb.nna.broprox.harvester.proxy.RecordingProxy;
@@ -41,7 +40,7 @@ public class HarvesterApiServer implements AutoCloseable {
     /**
      * Construct a new REST API server.
      */
-    public HarvesterApiServer(DbAdapter db, BrowserController controller, RecordingProxy proxy) {
+    public HarvesterApiServer(BrowserController controller, RecordingProxy proxy) {
         final int port = Harvester.getSettings().getApiPort();
         LOG.info("Starting API server listening on port {}.", port);
 
@@ -51,7 +50,7 @@ public class HarvesterApiServer implements AutoCloseable {
                 .build();
 
         server = ServerBuilder.forPort(port).addService(
-                tracingInterceptor.intercept(new HarvesterService(db, controller, proxy))).build();
+                tracingInterceptor.intercept(new HarvesterService(controller, proxy))).build();
     }
 
     @Override

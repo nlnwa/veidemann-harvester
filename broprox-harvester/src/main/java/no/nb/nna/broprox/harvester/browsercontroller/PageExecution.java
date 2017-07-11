@@ -40,18 +40,17 @@ import no.nb.nna.broprox.model.ConfigProto.Label;
 import no.nb.nna.broprox.model.MessagesProto;
 import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
 import no.nb.nna.broprox.model.MessagesProto.Screenshot;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
-import static no.nb.nna.broprox.commons.BroproxHeaderConstants.ALL_EXECUTION_IDS;
-import static no.nb.nna.broprox.commons.BroproxHeaderConstants.DISCOVERY_PATH;
-import static no.nb.nna.broprox.commons.BroproxHeaderConstants.EXECUTION_ID;
 
 /**
  *
  */
 public class PageExecution implements BroproxHeaderConstants {
 
-    private final String executionId;
+    private static final Logger LOG = LoggerFactory.getLogger(PageExecution.class);
 
     private final QueuedUri queuedUri;
 
@@ -67,8 +66,7 @@ public class PageExecution implements BroproxHeaderConstants {
 
     private final DbAdapter db;
 
-    public PageExecution(String executionId, QueuedUri queuedUri, Session session, long timeout, DbAdapter db, long sleep) {
-        this.executionId = executionId;
+    public PageExecution(QueuedUri queuedUri, Session session, long timeout, DbAdapter db, long sleep) {
         this.queuedUri = queuedUri;
         this.session = session;
         this.timeout = timeout;
@@ -77,8 +75,7 @@ public class PageExecution implements BroproxHeaderConstants {
 
         discoveryPath = queuedUri.getDiscoveryPath();
 
-        extraHeaders.put(EXECUTION_ID, executionId);
-        extraHeaders.put(ALL_EXECUTION_IDS, ProtoUtils.protoListToJson(queuedUri.getExecutionIdsList()));
+        extraHeaders.put(EXECUTION_ID, queuedUri.getExecutionId());
         extraHeaders.put(DISCOVERY_PATH, discoveryPath);
         extraHeaders.put(HttpHeaderNames.REFERER.toString(), queuedUri.getReferrer());
     }
@@ -88,6 +85,7 @@ public class PageExecution implements BroproxHeaderConstants {
             CompletableFuture<PageDomain.FrameStoppedLoading> loaded = session.page.onFrameStoppedLoading();
 
             session.page.onNavigationRequested(nr -> {
+                LOG.debug("Navigation requested {}", nr.url);
                 extraHeaders.put(DISCOVERY_PATH, discoveryPath + "E");
                 session.network.setExtraHTTPHeaders(extraHeaders);
                 session.page.processNavigation("Proceed", nr.navigationId);
@@ -132,7 +130,7 @@ public class PageExecution implements BroproxHeaderConstants {
                             .setHttpOnly(c.httpOnly)
                             .setSecure(c.secure)
                             .setSession(c.session)
-                            .setSameSite(c.sameSite)
+                            .setSameSite(c.sameSite == null ? "" : c.sameSite)
                             .build();
                 })
                 .collect(Collectors.toList());
@@ -148,11 +146,12 @@ public class PageExecution implements BroproxHeaderConstants {
             List<QueuedUri> outlinks = new ArrayList<>();
             for (BrowserScript script : scripts) {
                 if (ApiTools.hasLabel(script.getMeta(), outlinksLabel)) {
-
+                    LOG.debug("Executing link extractor script '{}'", script.getMeta().getName());
                     RuntimeDomain.Evaluate ev = session.runtime
                             .evaluate(script.getScript(), null, null, null, null, Boolean.TRUE, null, null, null)
                             .get(timeout, MILLISECONDS);
 
+                    LOG.trace("Outlinks: {}", ev.result.value);
                     if (ev.result.value != null) {
                         String resultString = ((String) ev.result.value).trim();
                         if (!resultString.isEmpty()) {
@@ -160,7 +159,7 @@ public class PageExecution implements BroproxHeaderConstants {
                             String path = discoveryPath + "L";
                             for (int i = 0; i < links.length; i++) {
                                 outlinks.add(QueuedUri.newBuilder()
-                                        .addAllExecutionIds(queuedUri.getExecutionIdsList())
+                                        .setExecutionId(queuedUri.getExecutionId())
                                         .setUri(links[i])
                                         .setReferrer(queuedUri.getUri())
                                         .setTimeStamp(ProtoUtils.odtToTs(OffsetDateTime.now()))
@@ -206,7 +205,7 @@ public class PageExecution implements BroproxHeaderConstants {
 
             db.addScreenshot(Screenshot.newBuilder()
                     .setImg(ByteString.copyFrom(img))
-                    .setExecutionId(executionId)
+                    .setExecutionId(queuedUri.getExecutionId())
                     .setUri(queuedUri.getUri())
                     .build());
         } catch (InterruptedException | ExecutionException | TimeoutException ex) {

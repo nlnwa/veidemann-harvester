@@ -23,12 +23,17 @@ import no.nb.nna.broprox.db.DbAdapter;
 import org.littleshoot.proxy.HttpFilters;
 import org.littleshoot.proxy.HttpFiltersAdapter;
 import org.littleshoot.proxy.HttpFiltersSourceAdapter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 /**
  * Filters source which extracts the uri from the request independently of http or https style before creating the
  * recorder filter.
  */
 public class RecorderFilterSourceAdapter extends HttpFiltersSourceAdapter {
+
+    private static final Logger LOG = LoggerFactory.getLogger(RecorderFilterSourceAdapter.class);
 
     private static final AttributeKey<String> CONNECTED_URL = AttributeKey.valueOf("connected_url");
 
@@ -48,6 +53,10 @@ public class RecorderFilterSourceAdapter extends HttpFiltersSourceAdapter {
     @Override
     public HttpFilters filterRequest(HttpRequest originalRequest, ChannelHandlerContext clientCtx) {
         String uri = originalRequest.uri();
+
+        MDC.put("uri", uri);
+        LOG.trace("Method: {}, Client Context: {}", originalRequest.method(), clientCtx);
+
         if (originalRequest.method() == HttpMethod.CONNECT) {
             if (clientCtx != null) {
                 String prefix = "https://" + uri.replaceFirst(":443$", "");
@@ -55,11 +64,11 @@ public class RecorderFilterSourceAdapter extends HttpFiltersSourceAdapter {
             }
             return HttpFiltersAdapter.NOOP_FILTER;
         }
+
         String connectedUrl = clientCtx.channel().attr(CONNECTED_URL).get();
         if (connectedUrl == null) {
             return new RecorderFilter(uri, originalRequest, clientCtx, db, contentWriterClient, cache);
         }
-        originalRequest.setUri(uri);
         return new RecorderFilter(connectedUrl + uri, originalRequest, clientCtx, db, contentWriterClient, cache);
     }
 

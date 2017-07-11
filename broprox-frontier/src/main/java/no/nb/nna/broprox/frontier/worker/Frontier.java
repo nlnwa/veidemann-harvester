@@ -111,8 +111,9 @@ public class Frontier implements AutoCloseable {
 
         String uri = seed.getMeta().getName();
         QueuedUri qUri = QueuedUri.newBuilder()
-                .addExecutionIds(QueuedUri.IdSeq.newBuilder().setId(status.getId()).setSeq(exe.getNextSequenceNum()))
                 .setUri(uri)
+                .setExecutionId(status.getId())
+                .setSequence(exe.getNextSequenceNum())
                 .setSurt(UriConfigs.SURT_KEY.buildUri(uri).toString())
                 .setScope(seed.getScope())
                 .build();

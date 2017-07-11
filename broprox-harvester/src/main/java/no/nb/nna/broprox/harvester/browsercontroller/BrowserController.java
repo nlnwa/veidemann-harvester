@@ -116,7 +116,12 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
                 });
 
                 session.network.onLoadingFailed(f -> {
-                    LOG.error("Failed fetching page {}", f.errorText);
+                    MDC.put("eid", queuedUri.getExecutionId());
+                    MDC.put("uri", queuedUri.getUri());
+                    LOG.error(
+                            "Failed fetching page: Error '{}', Blocked reason '{}', Resource type: '{}', Canceled: {}",
+                            f.errorText, f.blockedReason, f.type, f.canceled);
+                    MDC.clear();
                     throw new RuntimeException("Failed fetching page " + f.errorText);
                 });
 
@@ -135,7 +140,7 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
                 PageExecution pex = new PageExecution(queuedUri, session, config.getBrowserConfig()
                         .getPageLoadTimeoutMs(), db, config.getBrowserConfig().getSleepAfterPageloadMs());
 
-                LOG.debug("Navigate to page");
+                LOG.info("Navigate to page");
 
                 otw.run("navigatePage", pex::navigatePage);
                 if (config.getExtra().getCreateSnapshot()) {
@@ -160,7 +165,7 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
                 pex.scrollToTop();
             }
         } else {
-            LOG.debug("Precluded by robots.txt");
+            LOG.info("Precluded by robots.txt");
 
             // Precluded by robots.txt
             if (db != null) {

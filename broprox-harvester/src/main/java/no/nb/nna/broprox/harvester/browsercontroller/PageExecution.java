@@ -146,11 +146,12 @@ public class PageExecution implements BroproxHeaderConstants {
             List<QueuedUri> outlinks = new ArrayList<>();
             for (BrowserScript script : scripts) {
                 if (ApiTools.hasLabel(script.getMeta(), outlinksLabel)) {
-
+                    LOG.debug("Executing link extractor script '{}'", script.getMeta().getName());
                     RuntimeDomain.Evaluate ev = session.runtime
                             .evaluate(script.getScript(), null, null, null, null, Boolean.TRUE, null, null, null)
                             .get(timeout, MILLISECONDS);
 
+                    LOG.trace("Outlinks: {}", ev.result.value);
                     if (ev.result.value != null) {
                         String resultString = ((String) ev.result.value).trim();
                         if (!resultString.isEmpty()) {

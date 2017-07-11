@@ -30,6 +30,7 @@ import no.nb.nna.broprox.api.ControllerProto.CrawlJobListRequest;
 import no.nb.nna.broprox.api.ControllerProto.ListRequest;
 import no.nb.nna.broprox.api.ControllerProto.SeedListReply;
 import no.nb.nna.broprox.api.ControllerProto.SeedListRequest;
+import no.nb.nna.broprox.commons.util.ApiTools;
 import no.nb.nna.broprox.model.ConfigProto;
 import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
 import no.nb.nna.broprox.model.ConfigProto.CrawlEntity;
@@ -457,15 +458,14 @@ public class RethinkDbAdapterIT {
     @Test
     public void testSaveBrowserScript() {
         BrowserScript script = BrowserScript.newBuilder()
-                .setMeta(Meta.newBuilder().setName("test.js"))
+                .setMeta(ApiTools.buildMeta("test.js", "description", ApiTools.buildLabel("type", "login")))
                 .setScript("code")
-                .setType(BrowserScript.Type.LOGIN)
                 .build();
 
         BrowserScript result = db.saveBrowserScript(script);
         assertThat(result.getId()).isNotEmpty();
         assertThat(result.getScript()).isEqualTo("code");
-        assertThat(result.getType()).isSameAs(BrowserScript.Type.LOGIN);
+        assertThat(ApiTools.hasLabel(result.getMeta(), ApiTools.buildLabel("type", "login"))).isTrue();
     }
 
     /**
@@ -474,14 +474,13 @@ public class RethinkDbAdapterIT {
     @Test
     public void testListBrowserScripts() {
         BrowserScript script1 = BrowserScript.newBuilder()
-                .setMeta(Meta.newBuilder().setName("test.js"))
+                .setMeta(ApiTools.buildMeta("test.js", "description", ApiTools.buildLabel("type", "login")))
                 .setScript("code")
-                .setType(BrowserScript.Type.LOGIN)
                 .build();
         BrowserScript script2 = BrowserScript.newBuilder()
-                .setMeta(Meta.newBuilder().setName("extract-outlinks.js"))
+                .setMeta(ApiTools.buildMeta("extract-outlinks.js", "description",
+                        ApiTools.buildLabel("type", "extract_outlinks")))
                 .setScript("code")
-                .setType(BrowserScript.Type.EXTRACT_OUTLINKS)
                 .build();
         script1 = db.saveBrowserScript(script1);
         script2 = db.saveBrowserScript(script2);
@@ -492,13 +491,15 @@ public class RethinkDbAdapterIT {
         assertThat(result.getCount()).isEqualTo(2);
         assertThat(result.getValueList()).containsExactly(script2, script1);
 
-        request = BrowserScriptListRequest.newBuilder().setType(BrowserScript.Type.EXTRACT_OUTLINKS).build();
+        request = BrowserScriptListRequest.newBuilder()
+                .setSelector(ApiTools.buildSelector(ApiTools.buildLabel("type", "extract_outlinks"))).build();
         result = db.listBrowserScripts(request);
         assertThat(result.getValueCount()).isEqualTo(1);
         assertThat(result.getCount()).isEqualTo(1);
         assertThat(result.getValueList()).containsExactly(script2);
 
-        request = BrowserScriptListRequest.newBuilder().setType(BrowserScript.Type.BEHAVIOR).build();
+        request = BrowserScriptListRequest.newBuilder()
+                .setSelector(ApiTools.buildSelector(ApiTools.buildLabel("type", "behavior"))).build();
         result = db.listBrowserScripts(request);
         assertThat(result.getValueCount()).isEqualTo(0);
         assertThat(result.getCount()).isEqualTo(0);

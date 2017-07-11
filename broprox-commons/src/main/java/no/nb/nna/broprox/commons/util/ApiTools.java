@@ -17,8 +17,9 @@ package no.nb.nna.broprox.commons.util;
 
 import java.util.Arrays;
 
-import no.nb.nna.broprox.model.ConfigProto.Meta;
 import no.nb.nna.broprox.model.ConfigProto.Label;
+import no.nb.nna.broprox.model.ConfigProto.Meta;
+import no.nb.nna.broprox.model.ConfigProto.Selector;
 
 /**
  *
@@ -64,6 +65,12 @@ public class ApiTools {
         return Label.newBuilder()
                 .setKey(key)
                 .setValue(value)
+                .build();
+    }
+
+    public static Selector buildSelector(Label... label) {
+        return Selector.newBuilder()
+                .addAllLabel(Arrays.asList(label))
                 .build();
     }
 

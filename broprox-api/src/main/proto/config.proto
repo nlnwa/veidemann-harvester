@@ -36,8 +36,8 @@ message Seed {
     string id = 1;
     Meta meta = 2;
     string entity_id = 3;
-    CrawlScope scope = 5;
-    repeated string job_id = 6;
+    CrawlScope scope = 4;
+    repeated string job_id = 5;
     bool disabled = 18;
 }
 
@@ -105,7 +105,8 @@ message BrowserConfig {
     Selector script_selector = 7;
     repeated string script_id = 8;
     map<string, string> headers = 16;
-    int64 sleep_after_pageload_ms = 17;
+    map<string, string> script_parameters = 17; // Not implemented
+    int64 sleep_after_pageload_ms = 18;
 }
 
 message PolitenessConfig {
@@ -129,17 +130,8 @@ message ExtraConfig {
 
 // Message containing a javascript to be run in a browser
 message BrowserScript {
-    enum Type {
-        UNDEFINED = 0;
-        BEHAVIOR = 1;
-        EXTRACT_OUTLINKS = 2;
-        LOGIN = 3;
-    }
-
     string id = 1;
     Meta meta = 2;
-    Type type = 3;
-    string script = 4;
-    string url_regexp = 5;
-    map<string, string> parameters = 6;
+    string script = 3;
+    string url_regexp = 4; // Not implemented
 }

@@ -77,7 +77,7 @@ public class Harvester {
                         new File(SETTINGS.getWorkDir()),
                         SETTINGS.getProxyPort(), db, contentWriterClient, SETTINGS.getDnsServers());
 
-                HarvesterApiServer apiServer = new HarvesterApiServer(db, controller, proxy).start();) {
+                HarvesterApiServer apiServer = new HarvesterApiServer(controller, proxy).start();) {
 
             LOG.info("Broprox harvester (v. {}) started", Harvester.class.getPackage().getImplementationVersion());
 

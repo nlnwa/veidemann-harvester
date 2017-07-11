@@ -21,7 +21,6 @@ import com.google.protobuf.Empty;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import io.opentracing.contrib.OpenTracingContextKey;
-import no.nb.nna.broprox.db.DbAdapter;
 import no.nb.nna.broprox.api.HarvesterGrpc;
 import no.nb.nna.broprox.api.HarvesterProto.CleanupExecutionRequest;
 import no.nb.nna.broprox.api.HarvesterProto.HarvestPageReply;
@@ -39,14 +38,11 @@ import org.slf4j.LoggerFactory;
 public class HarvesterService extends HarvesterGrpc.HarvesterImplBase {
     private static final Logger LOG = LoggerFactory.getLogger(HarvesterService.class);
 
-    private final DbAdapter db;
-
     private final BrowserController controller;
 
     private final RecordingProxy proxy;
 
-    public HarvesterService(DbAdapter db, BrowserController controller, RecordingProxy proxy) {
-        this.db = db;
+    public HarvesterService(BrowserController controller, RecordingProxy proxy) {
         this.controller = controller;
         this.proxy = proxy;
     }

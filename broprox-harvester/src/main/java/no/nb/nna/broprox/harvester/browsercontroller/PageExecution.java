@@ -130,7 +130,7 @@ public class PageExecution implements BroproxHeaderConstants {
                             .setHttpOnly(c.httpOnly)
                             .setSecure(c.secure)
                             .setSession(c.session)
-                            .setSameSite(c.sameSite)
+                            .setSameSite(c.sameSite == null ? "" : c.sameSite)
                             .build();
                 })
                 .collect(Collectors.toList());

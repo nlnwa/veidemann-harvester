@@ -42,6 +42,7 @@ import no.nb.nna.broprox.harvester.proxy.RobotsServiceClient;
 import no.nb.nna.broprox.model.MessagesProto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
@@ -71,7 +72,10 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
     public List<QueuedUri> render(QueuedUri queuedUri, CrawlConfig config)
             throws ExecutionException, InterruptedException, IOException, TimeoutException {
         List<QueuedUri> outlinks;
-        System.out.println("RENDER " + queuedUri.getExecutionId() + " :: " + queuedUri.getUri());
+
+        MDC.put("eid", queuedUri.getExecutionId());
+        MDC.put("uri", queuedUri.getUri());
+
         OpenTracingWrapper otw = new OpenTracingWrapper("BrowserController", Tags.SPAN_KIND_CLIENT)
                 .setParentSpan(OpenTracingSpans.get(queuedUri.getExecutionId()));
 
@@ -81,6 +85,8 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
             try (Session session = chrome.newSession(
                     config.getBrowserConfig().getWindowWidth(),
                     config.getBrowserConfig().getWindowHeight())) {
+
+                LOG.debug("Browser session created");
 
                 CompletableFuture.allOf(
                         session.debugger.enable(),
@@ -101,14 +107,6 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
                         session.page.setControlNavigations(Boolean.TRUE)
                 ).get(config.getBrowserConfig().getPageLoadTimeoutMs(), MILLISECONDS);
 
-                // set cookies
-                CompletableFuture.allOf(queuedUri.getCookiesList().stream()
-                        .map(c -> session.network
-                        .setCookie(queuedUri.getUri(), c.getName(), c.getValue(), c.getDomain(),
-                                c.getPath(), c.getSecure(), c.getHttpOnly(), c.getSameSite(), c.getExpires()))
-                        .collect(Collectors.toList()).toArray(new CompletableFuture[]{}))
-                        .get(config.getBrowserConfig().getPageLoadTimeoutMs(), MILLISECONDS);
-
                 session.debugger.onPaused(p -> {
                     String scriptId = p.callFrames.get(0).location.scriptId;
                     System.out.println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>> SCRIPT BLE PAUSET: " + scriptId);
@@ -117,10 +115,31 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
                     System.out.println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>> SCRIPT RESUMED: " + scriptId);
                 });
 
+                session.network.onLoadingFailed(f -> {
+                    LOG.error("Failed fetching page {}", f.errorText);
+                    throw new RuntimeException("Failed fetching page " + f.errorText);
+                });
+
+                LOG.debug("Browser session configured");
+
+                // set cookies
+                CompletableFuture.allOf(queuedUri.getCookiesList().stream()
+                        .map(c -> session.network
+                        .setCookie(queuedUri.getUri(), c.getName(), c.getValue(), c.getDomain(),
+                                c.getPath(), c.getSecure(), c.getHttpOnly(), c.getSameSite(), c.getExpires()))
+                        .collect(Collectors.toList()).toArray(new CompletableFuture[]{}))
+                        .get(config.getBrowserConfig().getPageLoadTimeoutMs(), MILLISECONDS);
+
+                LOG.debug("Browser cookies initialized");
+
                 PageExecution pex = new PageExecution(queuedUri, session, config.getBrowserConfig()
                         .getPageLoadTimeoutMs(), db, config.getBrowserConfig().getSleepAfterPageloadMs());
+
+                LOG.debug("Navigate to page");
+
                 otw.run("navigatePage", pex::navigatePage);
                 if (config.getExtra().getCreateSnapshot()) {
+                    LOG.debug("Save screenshot");
                     otw.run("saveScreenshot", pex::saveScreenshot);
                 }
 
@@ -132,12 +151,17 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
 //                    }
 //                }
 //                System.out.println("<<<<<<");
+                LOG.debug("Extract outlinks");
+
                 List<BrowserScript> scripts = getScripts(config);
                 outlinks = otw.map("extractOutlinks", pex::extractOutlinks, scripts);
+
                 pex.getDocumentUrl();
                 pex.scrollToTop();
             }
         } else {
+            LOG.debug("Precluded by robots.txt");
+
             // Precluded by robots.txt
             if (db != null) {
                 MessagesProto.CrawlLog crawlLog = MessagesProto.CrawlLog.newBuilder()
@@ -150,12 +174,10 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
                 db.addCrawlLog(crawlLog);
             }
 
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Uri {} precluded by robots.txt", queuedUri.getUri());
-            }
-
             outlinks = Collections.EMPTY_LIST;
         }
+
+        MDC.clear();
         return outlinks;
 
     }

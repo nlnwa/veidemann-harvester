@@ -40,6 +40,8 @@ import no.nb.nna.broprox.model.ConfigProto.Label;
 import no.nb.nna.broprox.model.MessagesProto;
 import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
 import no.nb.nna.broprox.model.MessagesProto.Screenshot;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
@@ -47,6 +49,8 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
  *
  */
 public class PageExecution implements BroproxHeaderConstants {
+
+    private static final Logger LOG = LoggerFactory.getLogger(PageExecution.class);
 
     private final QueuedUri queuedUri;
 
@@ -81,6 +85,7 @@ public class PageExecution implements BroproxHeaderConstants {
             CompletableFuture<PageDomain.FrameStoppedLoading> loaded = session.page.onFrameStoppedLoading();
 
             session.page.onNavigationRequested(nr -> {
+                LOG.debug("Navigation requested {}", nr.url);
                 extraHeaders.put(DISCOVERY_PATH, discoveryPath + "E");
                 session.network.setExtraHTTPHeaders(extraHeaders);
                 session.page.processNavigation("Proceed", nr.navigationId);

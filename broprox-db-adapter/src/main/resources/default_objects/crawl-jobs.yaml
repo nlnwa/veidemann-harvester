@@ -64,6 +64,24 @@ crawlConfigSelector:
       value: "default"
 ---
 meta:
+    name: "Work hours"
+    description: "A job running every hour between 7 and 15 UTC, Monday through Friday"
+    label:
+        - key: "type"
+          value: "default"
+schedule:
+    meta:
+        name: "Work hours"
+        description: "A schedule which triggers every hour between 7 and 15 UTC, Monday through Friday"
+    cronExpression: "0 7-15 * * 1-5"
+limits:
+    maxDurationS: 86400
+crawlConfigSelector:
+    label:
+    - key: "type"
+      value: "default"
+---
+meta:
     name: "Unscheduled"
     description: "A job which will never trigger. Suitable for manual runs"
     label:

@@ -42,14 +42,8 @@
             <artifactId>littleproxy</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.github.ganskef</groupId>
-            <artifactId>littleproxy-mitm</artifactId>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.slf4j</groupId>
-                    <artifactId>slf4j-log4j12</artifactId>
-                </exclusion>
-            </exclusions>
+            <groupId>net.lightbody.bmp</groupId>
+            <artifactId>mitm</artifactId>
         </dependency>
         <dependency>
             <groupId>org.apache.commons</groupId>
@@ -58,6 +52,11 @@
         <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-all</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-tcnative-boringssl-static</artifactId>
+            <classifier>linux-x86_64</classifier>
         </dependency>
         <dependency>
             <groupId>org.glassfish.jersey.containers</groupId>
@@ -123,7 +122,6 @@
                     <plugin>
                         <groupId>org.codehaus.mojo</groupId>
                         <artifactId>appassembler-maven-plugin</artifactId>
-                        <version>2.0.0</version>
                         <configuration>
                             <licenseHeaderFile>${basedir}/../src/main/etc/license-header.txt</licenseHeaderFile>
                             <programs>

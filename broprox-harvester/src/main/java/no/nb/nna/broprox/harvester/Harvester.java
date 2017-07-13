@@ -22,7 +22,7 @@ import com.typesafe.config.ConfigBeanFactory;
 import com.typesafe.config.ConfigException;
 import com.typesafe.config.ConfigFactory;
 import no.nb.nna.broprox.commons.opentracing.TracerFactory;
-import no.nb.nna.broprox.db.DbAdapter;
+import no.nb.nna.broprox.commons.DbAdapter;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
 import no.nb.nna.broprox.harvester.api.HarvesterApiServer;
 import no.nb.nna.broprox.harvester.browsercontroller.BrowserController;

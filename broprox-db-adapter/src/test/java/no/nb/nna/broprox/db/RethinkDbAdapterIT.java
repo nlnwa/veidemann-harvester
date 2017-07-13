@@ -595,10 +595,18 @@ public class RethinkDbAdapterIT {
      * Test of listSeeds method, of class RethinkDbAdapter.
      */
     @Test
-    public void testListSeeds() {
+    public void testSaveAndListSeeds() {
+        CrawlEntity entity1 = CrawlEntity.newBuilder()
+                .setMeta(Meta.newBuilder()
+                        .setName("Nasjonalbiblioteket")
+                        .setCreated(ProtoUtils.odtToTs(OffsetDateTime.parse("2017-04-06T06:20:35.779Z"))))
+                .build();
+        entity1 = db.saveCrawlEntity(entity1);
+
         Seed seed1 = Seed.newBuilder()
                 .setMeta(Meta.newBuilder().setName("http://seed1.foo"))
                 .addJobId("job1")
+                .setEntityId(entity1.getId())
                 .build();
         Seed savedSeed1 = db.saveSeed(seed1);
 
@@ -612,28 +620,17 @@ public class RethinkDbAdapterIT {
         Seed seed3 = Seed.newBuilder()
                 .setMeta(Meta.newBuilder().setName("http://seed3.foo"))
                 .addJobId("job2")
+                .setEntityId(entity1.getId())
                 .build();
         Seed savedSeed3 = db.saveSeed(seed3);
 
         SeedListRequest request = SeedListRequest.newBuilder().setCrawlJobId("job1").build();
         SeedListReply result = db.listSeeds(request);
         assertThat(result.getValueList()).containsOnly(savedSeed1, savedSeed2);
-    }
 
-    /**
-     * Test of saveSeed method, of class RethinkDbAdapter.
-     */
-    @Test
-    @Ignore
-    public void testSaveSeed() {
-        System.out.println("saveSeed");
-        ConfigProto.Seed seed = null;
-        RethinkDbAdapter instance = null;
-        ConfigProto.Seed expResult = null;
-        ConfigProto.Seed result = instance.saveSeed(seed);
-//        assertEquals(expResult, result);
-        // TODO review the generated test code and remove the default call to fail.
-        fail("The test case is a prototype.");
+        request = SeedListRequest.newBuilder().setEntityId(entity1.getId()).build();
+        result = db.listSeeds(request);
+        assertThat(result.getValueList()).containsOnly(savedSeed1, savedSeed3);
     }
 
     /**

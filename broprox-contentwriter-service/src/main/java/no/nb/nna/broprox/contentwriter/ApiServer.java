@@ -22,7 +22,7 @@ import io.netty.channel.Channel;
 import javax.ws.rs.core.UriBuilder;
 import no.nb.nna.broprox.contentwriter.text.TextExtracter;
 import no.nb.nna.broprox.contentwriter.warc.WarcWriterPool;
-import no.nb.nna.broprox.db.DbAdapter;
+import no.nb.nna.broprox.commons.DbAdapter;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.media.multipart.MultiPartFeature;
 import org.glassfish.jersey.netty.httpserver.NettyHttpContainerProvider;

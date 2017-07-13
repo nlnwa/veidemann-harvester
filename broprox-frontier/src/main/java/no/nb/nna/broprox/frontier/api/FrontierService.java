@@ -21,7 +21,7 @@ import io.opentracing.tag.Tags;
 import no.nb.nna.broprox.api.FrontierGrpc;
 import no.nb.nna.broprox.api.FrontierProto.CrawlSeedRequest;
 import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
-import no.nb.nna.broprox.db.DbAdapter;
+import no.nb.nna.broprox.commons.DbAdapter;
 import no.nb.nna.broprox.frontier.worker.Frontier;
 import no.nb.nna.broprox.model.MessagesProto.CrawlExecutionStatus;
 import org.slf4j.Logger;

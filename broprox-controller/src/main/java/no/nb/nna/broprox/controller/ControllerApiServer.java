@@ -23,7 +23,7 @@ import io.grpc.ServerBuilder;
 import io.opentracing.contrib.ServerTracingInterceptor;
 import io.opentracing.util.GlobalTracer;
 import no.nb.nna.broprox.controller.scheduler.FrontierClient;
-import no.nb.nna.broprox.db.DbAdapter;
+import no.nb.nna.broprox.commons.DbAdapter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -15,6 +15,8 @@
  */
 package no.nb.nna.broprox.db;
 
+import no.nb.nna.broprox.commons.DbAdapter;
+
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;

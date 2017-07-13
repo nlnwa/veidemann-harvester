@@ -47,7 +47,7 @@ import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
 import no.nb.nna.broprox.contentwriter.text.TextExtracter;
 import no.nb.nna.broprox.contentwriter.warc.SingleWarcWriter;
 import no.nb.nna.broprox.contentwriter.warc.WarcWriterPool;
-import no.nb.nna.broprox.db.DbAdapter;
+import no.nb.nna.broprox.commons.DbAdapter;
 import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
 import org.glassfish.jersey.media.multipart.FormDataBodyPart;
 import org.glassfish.jersey.media.multipart.FormDataParam;

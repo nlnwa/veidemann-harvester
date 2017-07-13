@@ -35,7 +35,7 @@ import no.nb.nna.broprox.api.ControllerProto.SeedListReply;
 import no.nb.nna.broprox.api.ControllerProto.SeedListRequest;
 import no.nb.nna.broprox.commons.util.CrawlScopes;
 import no.nb.nna.broprox.controller.scheduler.FrontierClient;
-import no.nb.nna.broprox.db.DbAdapter;
+import no.nb.nna.broprox.commons.DbAdapter;
 import no.nb.nna.broprox.model.ConfigProto.BrowserConfig;
 import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
 import no.nb.nna.broprox.model.ConfigProto.CrawlConfig;

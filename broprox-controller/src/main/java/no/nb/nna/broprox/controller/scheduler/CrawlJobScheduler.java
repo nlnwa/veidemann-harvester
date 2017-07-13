@@ -16,7 +16,7 @@
 package no.nb.nna.broprox.controller.scheduler;
 
 import it.sauronsoftware.cron4j.Scheduler;
-import no.nb.nna.broprox.db.DbAdapter;
+import no.nb.nna.broprox.commons.DbAdapter;
 
 /**
  *

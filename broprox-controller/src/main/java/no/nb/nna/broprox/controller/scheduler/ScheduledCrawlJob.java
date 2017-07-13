@@ -17,7 +17,7 @@ package no.nb.nna.broprox.controller.scheduler;
 
 import it.sauronsoftware.cron4j.Task;
 import it.sauronsoftware.cron4j.TaskExecutionContext;
-import no.nb.nna.broprox.db.DbAdapter;
+import no.nb.nna.broprox.commons.DbAdapter;
 import no.nb.nna.broprox.api.ControllerProto.SeedListRequest;
 import no.nb.nna.broprox.model.ConfigProto.CrawlJob;
 import no.nb.nna.broprox.model.ConfigProto.Seed;

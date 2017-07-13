@@ -22,7 +22,7 @@ import it.sauronsoftware.cron4j.Task;
 import it.sauronsoftware.cron4j.TaskCollector;
 import it.sauronsoftware.cron4j.TaskTable;
 import no.nb.nna.broprox.api.ControllerProto.CrawlJobListRequest;
-import no.nb.nna.broprox.db.DbAdapter;
+import no.nb.nna.broprox.commons.DbAdapter;
 import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.model.ConfigProto.CrawlScheduleConfig;
 import no.nb.nna.broprox.model.ConfigProto.CrawlJob;

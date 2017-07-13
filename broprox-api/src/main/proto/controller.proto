@@ -50,6 +50,9 @@ service Controller {
     rpc SaveBrowserScript (BrowserScript) returns (BrowserScript) {}
     rpc DeleteBrowserScript (BrowserScript) returns (google.protobuf.Empty) {}
 
+    rpc GetLogConfig (google.protobuf.Empty) returns (LogLevels) {}
+    rpc SaveLogConfig (LogLevels) returns (LogLevels) {}
+
     rpc RunCrawl (RunCrawlRequest) returns (RunCrawlReply) {}
 }
 

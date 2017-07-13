@@ -37,6 +37,8 @@ import no.nb.nna.broprox.model.ConfigProto.CrawlEntity;
 import no.nb.nna.broprox.model.ConfigProto.CrawlJob;
 import no.nb.nna.broprox.model.ConfigProto.CrawlScheduleConfig;
 import no.nb.nna.broprox.model.ConfigProto.Label;
+import no.nb.nna.broprox.model.ConfigProto.LogLevels;
+import no.nb.nna.broprox.model.ConfigProto.LogLevels.LogLevel;
 import no.nb.nna.broprox.model.ConfigProto.Meta;
 import no.nb.nna.broprox.model.ConfigProto.Seed;
 import no.nb.nna.broprox.model.ConfigProto.Selector;
@@ -930,4 +932,17 @@ public class RethinkDbAdapterIT {
         db.deleteCrawlScheduleConfig(toBeDeleted);
     }
 
+    @Test
+    public void saveAndGetLogConfig() {
+        LogLevel l1 = LogLevel.newBuilder().setLogger("no.nb.nna").setLevel(LogLevels.Level.INFO).build();
+        LogLevel l2 = LogLevel.newBuilder().setLogger("org.apache").setLevel(LogLevels.Level.FATAL).build();
+        LogLevels logLevels = LogLevels.newBuilder().addLogLevel(l1).addLogLevel(l2).build();
+        LogLevels response;
+
+        response = db.saveLogConfig(logLevels);
+        assertThat(response).isEqualTo(logLevels);
+
+        response = db.getLogConfig();
+        assertThat(response).isEqualTo(logLevels);
+    }
 }

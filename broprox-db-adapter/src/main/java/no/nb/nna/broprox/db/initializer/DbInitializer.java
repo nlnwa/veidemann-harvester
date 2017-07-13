@@ -31,7 +31,7 @@ import com.typesafe.config.ConfigBeanFactory;
 import com.typesafe.config.ConfigFactory;
 import no.nb.nna.broprox.api.ControllerProto.CrawlJobListRequest;
 import no.nb.nna.broprox.commons.opentracing.TracerFactory;
-import no.nb.nna.broprox.db.DbAdapter;
+import no.nb.nna.broprox.commons.DbAdapter;
 import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
 import no.nb.nna.broprox.db.RethinkDbAdapter.TABLES;
@@ -119,6 +119,10 @@ public class DbInitializer {
 
         r.tableCreate(TABLES.SYSTEM.name).run(conn);
         r.table(TABLES.SYSTEM.name).insert(r.hashMap("id", "db_version").with("db_version", "0.1")).run(conn);
+        r.table(TABLES.SYSTEM.name).insert(r.hashMap("id", "log_levels")
+                .with("logLevel",
+                        r.array(r.hashMap("logger", "no.nb.nna.broprox").with("level", "INFO"))
+                )).run(conn);
 
         r.tableCreate(TABLES.CRAWL_LOG.name).optArg("primary_key", "warcId").run(conn);
         r.table(TABLES.CRAWL_LOG.name)
@@ -144,6 +148,7 @@ public class DbInitializer {
 
         r.tableCreate(TABLES.SEEDS.name).run(conn);
         r.table(TABLES.SEEDS.name).indexCreate("jobId").optArg("multi", true).run(conn);
+        r.table(TABLES.SEEDS.name).indexCreate("entityId").run(conn);
 
         r.tableCreate(TABLES.CRAWL_JOBS.name).run(conn);
 
@@ -167,7 +172,7 @@ public class DbInitializer {
 
         r.table(TABLES.URI_QUEUE.name).indexWait("surt", "executionId").run(conn);
         r.table(TABLES.CRAWL_LOG.name).indexWait("surt_time").run(conn);
-        r.table(TABLES.SEEDS.name).indexWait("jobId").run(conn);
+        r.table(TABLES.SEEDS.name).indexWait("jobId", "entityId").run(conn);
     }
 
     private final void createMetaIndexes(TABLES... tables) {

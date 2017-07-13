@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package no.nb.nna.broprox.db;
+package no.nb.nna.broprox.commons;
 
 import java.util.Optional;
 
@@ -36,6 +36,7 @@ import no.nb.nna.broprox.model.ConfigProto.CrawlConfig;
 import no.nb.nna.broprox.model.ConfigProto.CrawlEntity;
 import no.nb.nna.broprox.model.ConfigProto.CrawlJob;
 import no.nb.nna.broprox.model.ConfigProto.CrawlScheduleConfig;
+import no.nb.nna.broprox.model.ConfigProto.LogLevels;
 import no.nb.nna.broprox.model.ConfigProto.PolitenessConfig;
 import no.nb.nna.broprox.model.ConfigProto.Seed;
 import no.nb.nna.broprox.model.MessagesProto.CrawlExecutionStatus;
@@ -117,6 +118,10 @@ public interface DbAdapter extends AutoCloseable {
     Empty deleteBrowserScript(BrowserScript script);
 
     BrowserScriptListReply listBrowserScripts(BrowserScriptListRequest request);
+
+    LogLevels getLogConfig();
+
+    LogLevels saveLogConfig(LogLevels logLevels);
 
     @Override
     public void close();

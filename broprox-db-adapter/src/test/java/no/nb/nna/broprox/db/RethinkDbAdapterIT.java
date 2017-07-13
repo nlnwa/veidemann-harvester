@@ -30,12 +30,15 @@ import no.nb.nna.broprox.api.ControllerProto.CrawlJobListRequest;
 import no.nb.nna.broprox.api.ControllerProto.ListRequest;
 import no.nb.nna.broprox.api.ControllerProto.SeedListReply;
 import no.nb.nna.broprox.api.ControllerProto.SeedListRequest;
+import no.nb.nna.broprox.commons.util.ApiTools;
 import no.nb.nna.broprox.model.ConfigProto;
 import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
 import no.nb.nna.broprox.model.ConfigProto.CrawlEntity;
 import no.nb.nna.broprox.model.ConfigProto.CrawlJob;
 import no.nb.nna.broprox.model.ConfigProto.CrawlScheduleConfig;
 import no.nb.nna.broprox.model.ConfigProto.Label;
+import no.nb.nna.broprox.model.ConfigProto.LogLevels;
+import no.nb.nna.broprox.model.ConfigProto.LogLevels.LogLevel;
 import no.nb.nna.broprox.model.ConfigProto.Meta;
 import no.nb.nna.broprox.model.ConfigProto.Seed;
 import no.nb.nna.broprox.model.ConfigProto.Selector;
@@ -457,15 +460,14 @@ public class RethinkDbAdapterIT {
     @Test
     public void testSaveBrowserScript() {
         BrowserScript script = BrowserScript.newBuilder()
-                .setMeta(Meta.newBuilder().setName("test.js"))
+                .setMeta(ApiTools.buildMeta("test.js", "description", ApiTools.buildLabel("type", "login")))
                 .setScript("code")
-                .setType(BrowserScript.Type.LOGIN)
                 .build();
 
         BrowserScript result = db.saveBrowserScript(script);
         assertThat(result.getId()).isNotEmpty();
         assertThat(result.getScript()).isEqualTo("code");
-        assertThat(result.getType()).isSameAs(BrowserScript.Type.LOGIN);
+        assertThat(ApiTools.hasLabel(result.getMeta(), ApiTools.buildLabel("type", "login"))).isTrue();
     }
 
     /**
@@ -474,14 +476,13 @@ public class RethinkDbAdapterIT {
     @Test
     public void testListBrowserScripts() {
         BrowserScript script1 = BrowserScript.newBuilder()
-                .setMeta(Meta.newBuilder().setName("test.js"))
+                .setMeta(ApiTools.buildMeta("test.js", "description", ApiTools.buildLabel("type", "login")))
                 .setScript("code")
-                .setType(BrowserScript.Type.LOGIN)
                 .build();
         BrowserScript script2 = BrowserScript.newBuilder()
-                .setMeta(Meta.newBuilder().setName("extract-outlinks.js"))
+                .setMeta(ApiTools.buildMeta("extract-outlinks.js", "description",
+                        ApiTools.buildLabel("type", "extract_outlinks")))
                 .setScript("code")
-                .setType(BrowserScript.Type.EXTRACT_OUTLINKS)
                 .build();
         script1 = db.saveBrowserScript(script1);
         script2 = db.saveBrowserScript(script2);
@@ -492,13 +493,15 @@ public class RethinkDbAdapterIT {
         assertThat(result.getCount()).isEqualTo(2);
         assertThat(result.getValueList()).containsExactly(script2, script1);
 
-        request = BrowserScriptListRequest.newBuilder().setType(BrowserScript.Type.EXTRACT_OUTLINKS).build();
+        request = BrowserScriptListRequest.newBuilder()
+                .setSelector(ApiTools.buildSelector(ApiTools.buildLabel("type", "extract_outlinks"))).build();
         result = db.listBrowserScripts(request);
         assertThat(result.getValueCount()).isEqualTo(1);
         assertThat(result.getCount()).isEqualTo(1);
         assertThat(result.getValueList()).containsExactly(script2);
 
-        request = BrowserScriptListRequest.newBuilder().setType(BrowserScript.Type.BEHAVIOR).build();
+        request = BrowserScriptListRequest.newBuilder()
+                .setSelector(ApiTools.buildSelector(ApiTools.buildLabel("type", "behavior"))).build();
         result = db.listBrowserScripts(request);
         assertThat(result.getValueCount()).isEqualTo(0);
         assertThat(result.getCount()).isEqualTo(0);
@@ -594,10 +597,18 @@ public class RethinkDbAdapterIT {
      * Test of listSeeds method, of class RethinkDbAdapter.
      */
     @Test
-    public void testListSeeds() {
+    public void testSaveAndListSeeds() {
+        CrawlEntity entity1 = CrawlEntity.newBuilder()
+                .setMeta(Meta.newBuilder()
+                        .setName("Nasjonalbiblioteket")
+                        .setCreated(ProtoUtils.odtToTs(OffsetDateTime.parse("2017-04-06T06:20:35.779Z"))))
+                .build();
+        entity1 = db.saveCrawlEntity(entity1);
+
         Seed seed1 = Seed.newBuilder()
                 .setMeta(Meta.newBuilder().setName("http://seed1.foo"))
                 .addJobId("job1")
+                .setEntityId(entity1.getId())
                 .build();
         Seed savedSeed1 = db.saveSeed(seed1);
 
@@ -611,28 +622,17 @@ public class RethinkDbAdapterIT {
         Seed seed3 = Seed.newBuilder()
                 .setMeta(Meta.newBuilder().setName("http://seed3.foo"))
                 .addJobId("job2")
+                .setEntityId(entity1.getId())
                 .build();
         Seed savedSeed3 = db.saveSeed(seed3);
 
         SeedListRequest request = SeedListRequest.newBuilder().setCrawlJobId("job1").build();
         SeedListReply result = db.listSeeds(request);
         assertThat(result.getValueList()).containsOnly(savedSeed1, savedSeed2);
-    }
 
-    /**
-     * Test of saveSeed method, of class RethinkDbAdapter.
-     */
-    @Test
-    @Ignore
-    public void testSaveSeed() {
-        System.out.println("saveSeed");
-        ConfigProto.Seed seed = null;
-        RethinkDbAdapter instance = null;
-        ConfigProto.Seed expResult = null;
-        ConfigProto.Seed result = instance.saveSeed(seed);
-//        assertEquals(expResult, result);
-        // TODO review the generated test code and remove the default call to fail.
-        fail("The test case is a prototype.");
+        request = SeedListRequest.newBuilder().setEntityId(entity1.getId()).build();
+        result = db.listSeeds(request);
+        assertThat(result.getValueList()).containsOnly(savedSeed1, savedSeed3);
     }
 
     /**
@@ -932,4 +932,17 @@ public class RethinkDbAdapterIT {
         db.deleteCrawlScheduleConfig(toBeDeleted);
     }
 
+    @Test
+    public void saveAndGetLogConfig() {
+        LogLevel l1 = LogLevel.newBuilder().setLogger("no.nb.nna").setLevel(LogLevels.Level.INFO).build();
+        LogLevel l2 = LogLevel.newBuilder().setLogger("org.apache").setLevel(LogLevels.Level.FATAL).build();
+        LogLevels logLevels = LogLevels.newBuilder().addLogLevel(l1).addLogLevel(l2).build();
+        LogLevels response;
+
+        response = db.saveLogConfig(logLevels);
+        assertThat(response).isEqualTo(logLevels);
+
+        response = db.getLogConfig();
+        assertThat(response).isEqualTo(logLevels);
+    }
 }

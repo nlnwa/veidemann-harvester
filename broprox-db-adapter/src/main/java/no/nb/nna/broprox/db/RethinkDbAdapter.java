@@ -41,6 +41,7 @@ import no.nb.nna.broprox.api.ControllerProto.ListRequest;
 import no.nb.nna.broprox.api.ControllerProto.PolitenessConfigListReply;
 import no.nb.nna.broprox.api.ControllerProto.SeedListReply;
 import no.nb.nna.broprox.api.ControllerProto.SeedListRequest;
+import no.nb.nna.broprox.commons.DbAdapter;
 import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
 import no.nb.nna.broprox.model.ConfigProto.BrowserConfig;
 import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
@@ -48,6 +49,7 @@ import no.nb.nna.broprox.model.ConfigProto.CrawlConfig;
 import no.nb.nna.broprox.model.ConfigProto.CrawlEntity;
 import no.nb.nna.broprox.model.ConfigProto.CrawlJob;
 import no.nb.nna.broprox.model.ConfigProto.CrawlScheduleConfig;
+import no.nb.nna.broprox.model.ConfigProto.LogLevels;
 import no.nb.nna.broprox.model.ConfigProto.PolitenessConfig;
 import no.nb.nna.broprox.model.ConfigProto.Seed;
 import no.nb.nna.broprox.model.ConfigProto.Selector;
@@ -470,6 +472,31 @@ public class RethinkDbAdapter implements DbAdapter {
     public Empty deleteBrowserConfig(BrowserConfig browserConfig) {
         checkDependencies(browserConfig, TABLES.CRAWL_CONFIGS, CrawlConfig.getDefaultInstance(), "browser_config_id");
         return deleteConfigMessage(browserConfig, TABLES.BROWSER_CONFIGS);
+    }
+
+    @Override
+    public LogLevels getLogConfig() {
+        Map<String, Object> response = executeRequest(r.table(RethinkDbAdapter.TABLES.SYSTEM.name)
+                .get("log_levels")
+                .pluck("logLevel"));
+
+        return ProtoUtils.rethinkToProto(response, LogLevels.class);
+    }
+
+    @Override
+    public LogLevels saveLogConfig(LogLevels logLevels) {
+        Map<String, Object> doc = ProtoUtils.protoToRethink(logLevels);
+        doc.put("id", "log_levels");
+//        Map<String, Object> response = executeRequest(r.table(RethinkDbAdapter.TABLES.SYSTEM.name)
+        return executeInsert(r.table(RethinkDbAdapter.TABLES.SYSTEM.name)
+                .insert(doc)
+                .optArg("conflict", "replace"), LogLevels.class);
+//                .optArg("returnChanges", "always"));
+
+//        List<Map<String, Map>> changes = (List<Map<String, Map>>) response.get("changes");
+//
+//        Map newDoc = changes.get(0).get("new_val").;
+//        return ProtoUtils.rethinkToProto(newDoc, type);
     }
 
     public <T extends Message> T saveConfigMessage(T msg, TABLES table) {

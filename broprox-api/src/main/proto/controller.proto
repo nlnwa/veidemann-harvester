@@ -50,6 +50,9 @@ service Controller {
     rpc SaveBrowserScript (BrowserScript) returns (BrowserScript) {}
     rpc DeleteBrowserScript (BrowserScript) returns (google.protobuf.Empty) {}
 
+    rpc GetLogConfig (google.protobuf.Empty) returns (LogLevels) {}
+    rpc SaveLogConfig (LogLevels) returns (LogLevels) {}
+
     rpc RunCrawl (RunCrawlRequest) returns (RunCrawlReply) {}
 }
 
@@ -78,6 +81,7 @@ message SeedListRequest {
         string name_prefix = 2;
         string crawl_job_id = 3;
         Selector selector = 4;
+        string entity_id = 5;
     }
     int32 page_size = 14;
     int32 page = 15;
@@ -142,7 +146,6 @@ message BrowserScriptListRequest {
     oneof qry {
         string id = 1;
         string name_prefix = 2;
-        BrowserScript.Type type = 3;
         Selector selector = 4;
     }
     int32 page_size = 14;

@@ -24,7 +24,7 @@ import no.nb.nna.broprox.commons.opentracing.TracerFactory;
 import no.nb.nna.broprox.controller.scheduler.CrawlJobScheduler;
 import no.nb.nna.broprox.controller.scheduler.FrontierClient;
 import no.nb.nna.broprox.controller.settings.Settings;
-import no.nb.nna.broprox.db.DbAdapter;
+import no.nb.nna.broprox.commons.DbAdapter;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

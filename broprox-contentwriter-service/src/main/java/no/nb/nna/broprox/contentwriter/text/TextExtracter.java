@@ -18,7 +18,7 @@ package no.nb.nna.broprox.contentwriter.text;
 import java.io.IOException;
 import java.io.InputStream;
 
-import no.nb.nna.broprox.db.DbAdapter;
+import no.nb.nna.broprox.commons.DbAdapter;
 import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
 import org.apache.tika.exception.TikaException;
 import org.apache.tika.metadata.Metadata;

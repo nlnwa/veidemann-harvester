@@ -45,6 +45,10 @@ public class SeedListRequestQueryBuilder extends ConfigListQueryBuilder<SeedList
                 setCountQry(r.table(table.name).getAll(request.getCrawlJobId()).optArg("index", "jobId"));
                 setListQry(getCountQry());
                 break;
+            case ENTITY_ID:
+                setCountQry(r.table(table.name).getAll(request.getEntityId()).optArg("index", "entityId"));
+                setListQry(getCountQry());
+                break;
             default:
                 buildAllQuery();
                 break;

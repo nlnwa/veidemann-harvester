@@ -35,13 +35,14 @@ import no.nb.nna.broprox.api.ControllerProto.SeedListReply;
 import no.nb.nna.broprox.api.ControllerProto.SeedListRequest;
 import no.nb.nna.broprox.commons.util.CrawlScopes;
 import no.nb.nna.broprox.controller.scheduler.FrontierClient;
-import no.nb.nna.broprox.db.DbAdapter;
+import no.nb.nna.broprox.commons.DbAdapter;
 import no.nb.nna.broprox.model.ConfigProto.BrowserConfig;
 import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
 import no.nb.nna.broprox.model.ConfigProto.CrawlConfig;
 import no.nb.nna.broprox.model.ConfigProto.CrawlEntity;
 import no.nb.nna.broprox.model.ConfigProto.CrawlJob;
 import no.nb.nna.broprox.model.ConfigProto.CrawlScheduleConfig;
+import no.nb.nna.broprox.model.ConfigProto.LogLevels;
 import no.nb.nna.broprox.model.ConfigProto.PolitenessConfig;
 import no.nb.nna.broprox.model.ConfigProto.Seed;
 import org.slf4j.Logger;
@@ -354,6 +355,30 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     public void deleteBrowserScript(BrowserScript request, StreamObserver<Empty> respObserver) {
         try {
             respObserver.onNext(db.deleteBrowserScript(request));
+            respObserver.onCompleted();
+        } catch (Exception ex) {
+            LOG.error(ex.getMessage(), ex);
+            Status status = Status.UNKNOWN.withDescription(ex.toString());
+            respObserver.onError(status.asException());
+        }
+    }
+
+    @Override
+    public void saveLogConfig(LogLevels request, StreamObserver<LogLevels> respObserver) {
+        try {
+            respObserver.onNext(db.saveLogConfig(request));
+            respObserver.onCompleted();
+        } catch (Exception ex) {
+            LOG.error(ex.getMessage(), ex);
+            Status status = Status.UNKNOWN.withDescription(ex.toString());
+            respObserver.onError(status.asException());
+        }
+    }
+
+    @Override
+    public void getLogConfig(Empty request, StreamObserver<LogLevels> respObserver) {
+        try {
+            respObserver.onNext(db.getLogConfig());
             respObserver.onCompleted();
         } catch (Exception ex) {
             LOG.error(ex.getMessage(), ex);

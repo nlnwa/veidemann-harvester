@@ -39,10 +39,6 @@ public class BrowserScriptListRequestQueryBuilder extends ConfigListQueryBuilder
             case SELECTOR:
                 buildSelectorQuery(request.getSelector());
                 break;
-            case TYPE:
-                buildAllQuery();
-                addFilter((row -> row.g("type").eq(request.getType().name())));
-                break;
             default:
                 buildAllQuery();
                 break;

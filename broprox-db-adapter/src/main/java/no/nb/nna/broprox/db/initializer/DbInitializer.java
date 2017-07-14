@@ -212,29 +212,6 @@ public class DbInitializer {
         } catch (IOException ex) {
             throw new UncheckedIOException(ex);
         }
-
-        // Insert test seeds.
-        // TODO: Should be removed
-        String jobId = db.listCrawlJobs(CrawlJobListRequest.newBuilder().setNamePrefix("unscheduled").build())
-                .getValue(0).getId();
-
-        CrawlEntity entity = CrawlEntity.newBuilder().setMeta(Meta.newBuilder().setName("Entity1")).build();
-        entity = db.saveCrawlEntity(entity);
-        Seed seed = Seed.newBuilder()
-                .setMeta(Meta.newBuilder().setName("http://seed1.foo"))
-                .setEntityId(entity.getId())
-                .addJobId(jobId)
-                .build();
-        db.saveSeed(seed);
-
-        entity = CrawlEntity.newBuilder().setMeta(Meta.newBuilder().setName("Entity2")).build();
-        entity = db.saveCrawlEntity(entity);
-        seed = Seed.newBuilder()
-                .setMeta(Meta.newBuilder().setName("http://seed2.foo"))
-                .setEntityId(entity.getId())
-                .addJobId(jobId)
-                .build();
-        db.saveSeed(seed);
     }
 
     <T extends Message> Stream<T> readYamlFile(InputStream in, Class<T> type) {

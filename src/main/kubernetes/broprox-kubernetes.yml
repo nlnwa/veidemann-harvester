@@ -151,6 +151,7 @@ spec:
   - name: api
     port: 8080
     targetPort: 8080
+    nodePort: 31575
   selector:
     app: content-writer
     tier: backend

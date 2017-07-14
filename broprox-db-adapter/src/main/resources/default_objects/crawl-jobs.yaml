@@ -26,7 +26,7 @@ crawlConfig:
         userAgent: "broprox/1.0"
         windowWidth: 900
         windowHeight: 900
-        pageLoadTimeoutMs: 10000
+        pageLoadTimeoutMs: 180000
         sleepAfterPageLoadMs: 500
         scriptSelector:
             label:

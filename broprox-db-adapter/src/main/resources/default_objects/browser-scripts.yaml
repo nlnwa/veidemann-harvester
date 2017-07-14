@@ -6,7 +6,6 @@ meta:
       value: "default"
     - key: "type"
       value: "extract_outlinks"
-type: "EXTRACT_OUTLINKS"
 script: |
     var __brzl_framesDone = new Set();
     var __brzl_compileOutlinks = function(frame) {

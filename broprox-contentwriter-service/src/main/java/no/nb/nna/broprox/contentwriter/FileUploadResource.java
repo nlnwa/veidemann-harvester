@@ -15,17 +15,26 @@
  */
 package no.nb.nna.broprox.contentwriter;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
 import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Spliterators;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinTask;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
+import com.google.common.io.ByteStreams;
 import com.google.gson.Gson;
 import com.google.protobuf.util.JsonFormat;
 import io.opentracing.SpanContext;
@@ -36,6 +45,7 @@ import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
@@ -51,6 +61,9 @@ import no.nb.nna.broprox.commons.DbAdapter;
 import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
 import org.glassfish.jersey.media.multipart.FormDataBodyPart;
 import org.glassfish.jersey.media.multipart.FormDataParam;
+import org.jwat.warc.WarcReader;
+import org.jwat.warc.WarcReaderFactory;
+import org.jwat.warc.WarcRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -81,6 +94,19 @@ public class FileUploadResource {
 
     @Context
     UriInfo uriInfo;
+
+    private static final String htmlHeader = "<html><head>"
+            + "<title>WARC files</title>"
+            + "<style type=\"text/css\">"
+            + "p,td,th,a{font-size:11px; font-family:Helvetica,Arial,sans-serif; font-weight:lighter; text-align:left}"
+            + "th{font-weight:bold;}"
+            + "a{text-decoration: none;}"
+            + "a:hover {color: LimeGreen;text-decoration: none;}"
+            + "tr:hover {background-color: #e0e0e9;text-decoration: none;}"
+            + "</style>"
+            + "</head><body>";
+
+    private static final String htmlFooter = "</body></html>";
 
     public FileUploadResource() {
     }
@@ -133,6 +159,7 @@ public class FileUploadResource {
                         }
 
                     });
+
                     ForkJoinTask<Void> extractTextJob = ForkJoinPool.commonPool().submit(new Callable<Void>() {
                         @Override
                         public Void call() throws Exception {
@@ -142,7 +169,9 @@ public class FileUploadResource {
 
                     });
 
-                    size += writeWarcJob.get();
+                    long payloadSize = writeWarcJob.get();
+                    LOG.debug("Payload of size {}b written for {}", payloadSize, logEntry.getRequestedUri());
+                    size += payloadSize;
                     extractTextJob.get();
                 }
 
@@ -169,7 +198,8 @@ public class FileUploadResource {
 
     @GET
     @Path("warcs")
-    public String getFiles() {
+    @Produces(MediaType.APPLICATION_JSON)
+    public String getFilesJson() {
         List<WarcFileDescriptor> files = Arrays.stream(warcWriterPool.getTargetDir().listFiles())
                 .map(f -> new WarcFileDescriptor(f.getName(),
                 f.length(), uriInfo.getPath() + "/" + f.getName()))
@@ -179,9 +209,169 @@ public class FileUploadResource {
     }
 
     @GET
+    @Path("warcs")
+    @Produces(MediaType.TEXT_HTML)
+    public String getFilesHtml() {
+        StringBuilder html = new StringBuilder(htmlHeader)
+                .append("<h3>WARC files</h3>")
+                .append("<table><tr><th>Name</th><th>Size</th><th>Table of contents</th></tr>");
+
+        String path = "/" + (uriInfo.getPath().endsWith("/") ? uriInfo.getPath() : uriInfo.getPath() + "/");
+        Arrays.stream(warcWriterPool.getTargetDir().listFiles())
+                .forEach(f -> {
+                    String fileUrl = path + f.getName();
+                    html.append("<tr><th><a href='")
+                            .append(fileUrl)
+                            .append("'>")
+                            .append(f.getName())
+                            .append("</a></th><th>")
+                            .append(f.length())
+                            .append("</th><th><a href='")
+                            .append(fileUrl).append("/toc")
+                            .append("'>")
+                            .append("toc")
+                            .append("</a></th></tr>");
+                });
+        html.append("</table>");
+        return html.append(htmlFooter).toString();
+    }
+
+    @GET
     @Path("warcs/{fileName}")
     public File getFile(@PathParam("fileName") String fileName) {
         return new File(warcWriterPool.getTargetDir(), fileName);
+    }
+
+    @GET
+    @Path("warcs/{fileName}/toc")
+    @Produces(MediaType.TEXT_HTML)
+    public String getFileToc(@PathParam("fileName") String fileName) {
+        StringBuilder html = new StringBuilder(htmlHeader)
+                .append("<h3>Table of contents for ")
+                .append(fileName)
+                .append("</h3><table><tr><th>ID</th><th>URI</th><th>Type</th><th>WARC Headers</th><th>HTTP Headers</th></tr>");
+
+        String path = "/" + (uriInfo.getPath().replaceFirst("/toc/?", "/"));
+        try (Stream<WarcRecord> s = getContent(fileName);) {
+            s.forEach(r -> {
+                String recordUrl;
+                try {
+                    recordUrl = path + URLEncoder.encode(r.header.warcRecordIdStr, "UTF-8");
+                } catch (UnsupportedEncodingException ex) {
+                    throw new RuntimeException(ex);
+                }
+                html.append("<tr><td><a href='")
+                        .append(recordUrl)
+                        .append("'>")
+                        .append(r.header.warcRecordIdStr.replace("<", "&lt;"))
+                        .append("</a></td><td>")
+                        .append(r.header.warcTargetUriStr)
+                        .append("</td><td>")
+                        .append(r.header.warcTypeStr)
+                        .append("</td><td><a href='")
+                        .append(recordUrl).append("/warcheader")
+                        .append("'>")
+                        .append("warcheader</a></td>");
+                r.getPayload();
+                System.out
+                        .println("ID: " + r.header.warcRecordIdStr + ", Payload: " + r.hasPayload() + ", HTTP: " + (r
+                                .getHttpHeader() != null));
+                if (r.getHttpHeader() != null) {
+                    html.append("<td><a href='")
+                            .append(recordUrl).append("/httpheader")
+                            .append("'>")
+                            .append("http header")
+                            .append("</a></td>");
+                }
+                html.append("</tr>");
+            });
+        } catch (Exception ex) {
+            LOG.error(ex.toString(), ex);
+            throw new WebApplicationException(ex, 404);
+        }
+        html.append("</table>");
+        return html.append(htmlFooter).toString();
+    }
+
+    @GET
+    @Path("warcs/{fileName}/{id}/warcheader")
+    @Produces(MediaType.TEXT_HTML)
+    public String getWarcHeader(@PathParam("fileName") String fileName, @PathParam("id") String id) {
+        StringBuilder html = new StringBuilder(htmlHeader)
+                .append("<h3>WARC headers for for ")
+                .append(fileName).append(" :: ").append(id)
+                .append("</h3><pre>");
+
+        try (Stream<WarcRecord> s = getContent(fileName);) {
+            s.filter(r -> id.equals(r.header.warcRecordIdStr))
+                    .forEach(r -> {
+                        html.append(new String(r.header.headerBytes, StandardCharsets.UTF_8));
+                    });
+        } catch (Exception ex) {
+            LOG.error(ex.toString(), ex);
+            throw new WebApplicationException(ex, 404);
+        }
+        html.append("</pre>");
+        return html.append(htmlFooter).toString();
+    }
+
+    @GET
+    @Path("warcs/{fileName}/{id}/httpheader")
+    @Produces(MediaType.TEXT_HTML)
+    public String getHttpHeader(@PathParam("fileName") String fileName, @PathParam("id") String id) {
+        StringBuilder html = new StringBuilder(htmlHeader)
+                .append("<h3>HTTP headers for for ")
+                .append(fileName).append(" :: ").append(id)
+                .append("</h3><pre>");
+
+        try (Stream<WarcRecord> s = getContent(fileName);) {
+            s.filter(r -> id.equals(r.header.warcRecordIdStr))
+                    .forEach(r -> {
+                        html.append(r.getHttpHeader().toString());
+                    });
+        } catch (Exception ex) {
+            LOG.error(ex.toString(), ex);
+            throw new WebApplicationException(ex, 404);
+        }
+        html.append("</pre>");
+        return html.append(htmlFooter).toString();
+    }
+
+    @GET
+    @Path("warcs/{fileName}/{id}")
+//    @Produces(MediaType.TEXT_PLAIN)
+    public Response getContent(@PathParam("fileName") String fileName, @PathParam("id") String id) {
+        try (Stream<WarcRecord> s = getContent(fileName);) {
+            List<Response> resp = s.filter(r -> id.equals(r.header.warcRecordIdStr))
+                    .map(r -> {
+                        String type = MediaType.TEXT_PLAIN;
+                        if (r.getHttpHeader() != null) {
+                            type = r.getHttpHeader().getHeader("content-type").value;
+                        }
+                        System.out.println("ID: " + r.header.warcRecordIdStr);
+                        System.out.println("TYPE: " + type);
+                        System.out.println("HAS PAYLOAD: " + r.hasPayload());
+                        System.out.println("HAS HTTP: " + (r.getHttpHeader() != null));
+
+                        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                        try {
+                            ByteStreams.copy(r.getPayloadContent(), baos);
+                        } catch (IOException ex) {
+                            LOG.error(ex.toString(), ex);
+                            throw new RuntimeException(ex);
+                        }
+
+                        return Response.ok(baos.toByteArray(), type).build();
+//                        return Response.ok((StreamingOutput) (OutputStream output) -> {
+//                            ByteStreams.copy(r.getPayloadContent(), output);
+//                        }, type).build();
+                    })
+                    .collect(Collectors.toList());
+            return resp.get(0);
+        } catch (Exception ex) {
+            LOG.error(ex.toString(), ex);
+            throw new WebApplicationException(ex, 404);
+        }
     }
 
     @DELETE
@@ -198,6 +388,27 @@ public class FileUploadResource {
             LOG.error(ex.getMessage(), ex);
             throw new WebApplicationException(ex.getMessage(), ex);
         }
+    }
+
+    public Stream<WarcRecord> getContent(String fileName) {
+        File warcFile = new File(warcWriterPool.getTargetDir(), fileName);
+        try {
+            FileInputStream in = new FileInputStream(warcFile);
+            WarcReader warcReader = WarcReaderFactory.getReader(in);
+            return StreamSupport.stream(Spliterators.spliteratorUnknownSize(warcReader.iterator(), 0), false)
+                    .onClose(() -> {
+                        warcReader.close();
+                        try {
+                            in.close();
+                        } catch (IOException ex) {
+                            throw new RuntimeException(ex);
+                        }
+                    });
+        } catch (Exception e) {
+            System.out.println("---------------");
+            e.printStackTrace();
+        }
+        return null;
     }
 
 }

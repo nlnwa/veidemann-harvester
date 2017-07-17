@@ -21,15 +21,14 @@ import java.util.concurrent.TimeUnit;
 
 import no.nb.nna.broprox.model.ConfigProto.LogLevels;
 import no.nb.nna.broprox.model.ConfigProto.LogLevels.LogLevel;
-import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.core.config.ConfigurationSource;
 import org.apache.logging.log4j.core.config.xml.XmlConfiguration;
 import org.apache.logging.log4j.core.LoggerContext;
-import org.apache.logging.log4j.core.config.AppenderRef;
 import org.apache.logging.log4j.core.config.Configuration;
 import org.apache.logging.log4j.core.config.ConfigurationListener;
-import org.apache.logging.log4j.core.config.LoggerConfig;
+import org.apache.logging.log4j.core.config.Node;
 import org.apache.logging.log4j.core.config.Reconfigurable;
+import org.apache.logging.log4j.core.config.plugins.util.PluginType;
 
 /**
  * A log4j configuration implementation which reads an ordinary xml configuration and then adds loggers from a config
@@ -41,50 +40,62 @@ public class XmlPlusConfigServerOverridesConfiguration extends XmlConfiguration 
 
     int intervalSeconds;
 
+    private LogLevels logLevels;
+
     public XmlPlusConfigServerOverridesConfiguration(final LoggerContext loggerContext,
             final ConfigurationSource configSource) {
         super(loggerContext, configSource);
-    }
-
-    @Override
-    protected void doConfigure() {
-        super.doConfigure();
 
         try {
             ConfigServer configServer = ConfigServerFactory.getConfigServer();
             intervalSeconds = configServer.getConfigReloadInterval();
 
-            LogLevels logLevels = configServer.getLogLevels();
-            logLevels.getLogLevelList().forEach(l -> configureLogger(l));
+            logLevels = configServer.getLogLevels();
         } catch (Exception ex) {
             LOGGER.error("Could not read config overrides from config server", ex);
         }
-
-        if (intervalSeconds > 0) {
-            try {
-                future = getScheduler()
-                        .scheduleWithFixedDelay(new WatchRunnable(), intervalSeconds, intervalSeconds,
-                                TimeUnit.SECONDS);
-            } catch (Exception ex) {
-                LOGGER.error(ex.getMessage(), ex);
-            }
-        }
     }
 
-    void configureLogger(LogLevel logLevel) {
-        String loggerName = logLevel.getLogger();
-        Level level = Level.getLevel(logLevel.getLevel().name());
+    @Override
+    public void setup() {
+        super.setup();
+        Node loggers = getLoggersNode();
+        logLevels.getLogLevelList().stream().forEach(l -> processLogger(loggers, l));
+    }
 
-        LOGGER.debug("Setting {} to {}", loggerName, level);
-
-        LoggerConfig loggerConfig = getLogger(loggerName);
-        if (loggerConfig == null) {
-            AppenderRef[] refs = new AppenderRef[0];
-            loggerConfig = LoggerConfig.createLogger(false, level, loggerName, null, refs, null, this, null);
-            addLogger(loggerName, loggerConfig);
-        } else {
-            loggerConfig.setLevel(level);
+    Node getLoggersNode() {
+        PluginType loggersType = pluginManager.getPluginType("loggers");
+        for (Node n : getRootNode().getChildren()) {
+            if (n.getType().equals(loggersType)) {
+                return n;
+            }
         }
+        Node loggers = new Node(getRootNode(), "Loggers", loggersType);
+        getRootNode().getChildren().add(loggers);
+        return loggers;
+    }
+
+    void processLogger(Node loggers, LogLevel logger) {
+        for (Node n : loggers.getChildren()) {
+            if (n.getAttributes().containsKey("name") && logger.getLogger().equals(n.getAttributes().get("name"))) {
+                n.getAttributes().put("level", logger.getLevel().name());
+                return;
+            }
+        }
+
+        // No node found, creating new
+        PluginType loggerType = pluginManager.getPluginType("logger");
+        PluginType appenderRefType = pluginManager.getPluginType("appenderref");
+        Node l = new Node(loggers, "Logger", loggerType);
+        l.getAttributes().put("name", logger.getLogger());
+        l.getAttributes().put("level", logger.getLevel().name());
+        l.getAttributes().put("additivity", "false");
+
+        Node a = new Node(l, logger.getLogger(), appenderRefType);
+        a.getAttributes().put("ref", "Console");
+
+        l.getChildren().add(a);
+        loggers.getChildren().add(l);
     }
 
     @Override
@@ -115,7 +126,18 @@ public class XmlPlusConfigServerOverridesConfiguration extends XmlConfiguration 
     @Override
     public void start() {
         getScheduler().incrementScheduledItems();
+
         super.start();
+
+        if (intervalSeconds > 0) {
+            try {
+                future = getScheduler()
+                        .scheduleWithFixedDelay(new WatchRunnable(), intervalSeconds, intervalSeconds,
+                                TimeUnit.SECONDS);
+            } catch (Exception ex) {
+                LOGGER.error(ex.getMessage(), ex);
+            }
+        }
     }
 
     private class WatchRunnable implements Runnable {

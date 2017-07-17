@@ -32,6 +32,8 @@ import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.ParameterSpec;
 import com.squareup.javapoet.TypeSpec;
 import javax.lang.model.element.Modifier;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  *
@@ -44,6 +46,10 @@ public class Session {
 
     final FieldSpec sessionClient = FieldSpec
             .builder(Codegen.CLIENT_CLASS, "sessionClient", Modifier.PRIVATE, Modifier.FINAL).build();
+
+    final FieldSpec logger = FieldSpec
+            .builder(Logger.class, "LOG", Modifier.PRIVATE, Modifier.FINAL, Modifier.STATIC)
+            .initializer(CodeBlock.of("$T.getLogger($T.class)", LoggerFactory.class, type)).build();
 
     final FieldSpec timeout = FieldSpec
             .builder(long.class, "TIMEOUT", Modifier.PRIVATE, Modifier.FINAL, Modifier.STATIC)
@@ -67,6 +73,7 @@ public class Session {
 
         classBuilder = TypeSpec.classBuilder(type).addModifiers(Modifier.PUBLIC)
                 .addSuperinterface(Closeable.class)
+                .addField(logger)
                 .addField(timeout)
                 .addField(entryPoint)
                 .addField(sessionClient)
@@ -132,6 +139,8 @@ public class Session {
             constructor.addStatement("$N = new $T($N)", field, field.type, sessionClient);
         }
 
+        constructor.addCode("\n").addStatement("$N.info($S, $N)", logger, "Browser session created: {}", contextId);
+
         classBuilder.addMethod(constructor.build());
     }
 
@@ -139,6 +148,7 @@ public class Session {
         classBuilder.addMethod(MethodSpec.methodBuilder("close")
                 .addModifiers(Modifier.PUBLIC)
                 .addAnnotation(Override.class)
+                .addStatement("$N.info($S, $N)", logger, "Browser session closing: {}", contextId)
                 .beginControlFlow("try")
                 .addStatement("$N.close()", sessionClient)
                 .beginControlFlow("if ($N != null)", targetId)
@@ -150,6 +160,8 @@ public class Session {
                 .endControlFlow()
                 .beginControlFlow("catch ($T | $T | $T ex)",
                         InterruptedException.class, ExecutionException.class, TimeoutException.class)
+                .addStatement("$N.error($S, $N, ex.toString(), ex)",
+                        logger, "Failed closing browser session '{}': {}", contextId)
                 .endControlFlow()
                 .beginControlFlow("finally")
                 .addStatement("$N.onSessionClosed(this)", entryPoint)

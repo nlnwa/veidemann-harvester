@@ -30,7 +30,8 @@
         <module>broprox-api</module>
         <module>broprox-commons</module>
         <module>broprox-robotrules</module>
-    </modules>
+        <module>broproxctl</module>
+  </modules>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -48,6 +49,10 @@
         <io.zipkin.brave.version>4.3.4</io.zipkin.brave.version>
         <antlr.version>4.7</antlr.version>
         <antlr4test-maven-plugin.version>1.8</antlr4test-maven-plugin.version>
+
+        <!--Properties for golang-->
+        <go.sdk.version>1.8.3</go.sdk.version>
+        <go.wrapper.plugin.version>2.1.5</go.wrapper.plugin.version>
     </properties>
 
     <repositories>

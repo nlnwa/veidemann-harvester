@@ -22,3 +22,4 @@ buildNumber.properties
 /broproxctl/broproxctl.iml
 /broproxctl/src/broprox/
 /broproxctl/tmp/
+/broproxctl/pkg/

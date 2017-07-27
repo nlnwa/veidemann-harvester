@@ -21,9 +21,7 @@ import java.nio.file.Files;
 import java.util.Date;
 import java.util.List;
 
-import net.lightbody.bmp.mitm.CertificateAndKeySource;
 import net.lightbody.bmp.mitm.CertificateInfo;
-import net.lightbody.bmp.mitm.PemFileCertificateSource;
 import net.lightbody.bmp.mitm.RootCertificateGenerator;
 import net.lightbody.bmp.mitm.keys.ECKeyGenerator;
 import net.lightbody.bmp.mitm.manager.ImpersonatingMitmManager;
@@ -67,33 +65,21 @@ public class RecordingProxy implements AutoCloseable {
                 .notBefore(new Date(System.currentTimeMillis() - 365L * 24L * 60L * 60L * 1000L))
                 .notAfter(new Date(System.currentTimeMillis() + 365L * 24L * 60L * 60L * 1000L));
 
-        File caCertificateLocation = new File(certificateDir, "BroproxCA.pem");
-        File caPrivateKeyLocation = new File(certificateDir, "BroproxPrivateKey.pem");
-        String privateKeyPassword = "BroproxCApassword";
+        File certFile = new File(certificateDir, "BroproxCA.pem");
 
-        CertificateAndKeySource certificateSource;
-        if (caCertificateLocation.isFile() && caPrivateKeyLocation.isFile()) {
-            // Found existing certificate.
-            certificateSource = new PemFileCertificateSource(certificateDir, certificateDir, privateKeyPassword);
-        } else {
-            // create a dyamic CA root certificate generator using Elliptic Curve keys
-            RootCertificateGenerator ecRootCertificateGenerator = RootCertificateGenerator.builder()
-                    .certificateInfo(certInfo)
-                    .keyGenerator(new ECKeyGenerator()) // use EC keys, instead of the default RSA
-                    .build();
+        // create a dyamic CA root certificate generator using Elliptic Curve keys
+        RootCertificateGenerator ecRootCertGenerator = RootCertificateGenerator.builder()
+                .certificateInfo(certInfo)
+                .keyGenerator(new ECKeyGenerator()) // use EC keys, instead of the default RSA
+                .build();
 
-            // save the dynamically-generated CA root certificate for installation in a browser
-            ecRootCertificateGenerator.saveRootCertificateAsPemFile(caCertificateLocation);
-            ecRootCertificateGenerator
-                    .savePrivateKeyAsPemFile(caPrivateKeyLocation, privateKeyPassword);
-
-            certificateSource = ecRootCertificateGenerator;
-        }
+        // save the dynamically-generated CA root certificate for installation in a browser
+        ecRootCertGenerator.saveRootCertificateAsPemFile(certFile);
 
         // tell the MitmManager to use the root certificate we just generated, and to use EC keys when
         // creating impersonated server certs
         ImpersonatingMitmManager mitmManager = ImpersonatingMitmManager.builder()
-                .rootCertificateSource(certificateSource)
+                .rootCertificateSource(ecRootCertGenerator)
                 .serverKeyGenerator(new ECKeyGenerator())
                 .trustAllServers(true)
                 .build();

@@ -103,7 +103,6 @@ public class BrowserControllerIT {
                 .setUserAgent("broprox/1.0")
                 .setWindowHeight(900)
                 .setWindowWidth(900)
-                //                .setPageLoadTimeoutMs(180000)
                 .setPageLoadTimeoutMs(10000)
                 .setSleepAfterPageloadMs(500)
                 .setScriptSelector(ConfigProto.Selector.newBuilder().addLabel(ApiTools.buildLabel("scope", "default")))
@@ -128,9 +127,8 @@ public class BrowserControllerIT {
 
     private DbAdapter getDbMock() {
         DbAdapter db = mock(DbAdapter.class);
-        when(db.isDuplicateContent(any())).thenReturn(Optional.empty());
+        when(db.hasCrawledContent(any())).thenReturn(Optional.empty());
         when(db.addCrawlLog(any())).thenAnswer((InvocationOnMock i) -> {
-//            System.out.println("---\n" + i.getArgument(0).toString());
             return i.getArgument(0);
         });
         when(db.listBrowserScripts(any())).thenReturn(ControllerProto.BrowserScriptListReply.newBuilder()

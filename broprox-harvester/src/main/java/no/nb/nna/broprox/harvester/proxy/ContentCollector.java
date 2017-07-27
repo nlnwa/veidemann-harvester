@@ -207,7 +207,10 @@ public class ContentCollector {
             logEntryBuilder.setFetchTimeMillis(Duration.between(ProtoUtils.tsToOdt(
                     logEntryBuilder.getFetchTimeStamp()), OffsetDateTime.now(ZoneOffset.UTC)).toMillis());
 
-            Optional<CrawledContent> isDuplicate = db.isDuplicateContent(payloadDigestString);
+            Optional<CrawledContent> isDuplicate = db.hasCrawledContent(CrawledContent.newBuilder()
+                    .setDigest(payloadDigestString)
+                    .setWarcId(logEntry.getWarcId())
+                    .build());
 
             if (isDuplicate.isPresent()) {
                 logEntryBuilder.setRecordType("revisit")
@@ -232,13 +235,6 @@ public class ContentCollector {
                     LOG.debug("Writing {}", logEntryBuilder.getRequestedUri());
                 }
                 contentWriterClient.writeRecord(logEntry, headerBuf, payloadBuf);
-            }
-
-            if (!isDuplicate.isPresent()) {
-                db.addCrawledContent(CrawledContent.newBuilder()
-                        .setDigest(payloadDigestString)
-                        .setWarcId(logEntry.getWarcId())
-                        .build());
             }
         } finally {
             release();

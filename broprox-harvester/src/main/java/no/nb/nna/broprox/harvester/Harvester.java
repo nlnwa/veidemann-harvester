@@ -62,20 +62,22 @@ public class Harvester {
      * @return this instance
      */
     public Harvester start() {
+        BrowserSessionRegistry sessionRegistry = new BrowserSessionRegistry();
+
         try (DbAdapter db = new RethinkDbAdapter(SETTINGS.getDbHost(), SETTINGS.getDbPort(), SETTINGS.getDbName());
 
                 RobotsServiceClient robotsServiceClient = new RobotsServiceClient(
                         SETTINGS.getRobotsServiceHost(), SETTINGS.getRobotsServicePort());
 
                 BrowserController controller = new BrowserController(
-                        SETTINGS.getBrowserHost(), SETTINGS.getBrowserPort(), db, robotsServiceClient);
+                        SETTINGS.getBrowserHost(), SETTINGS.getBrowserPort(), db, robotsServiceClient, sessionRegistry);
 
                 ContentWriterClient contentWriterClient = new ContentWriterClient(
                         SETTINGS.getContentWriterHost(), SETTINGS.getContentWriterPort());
 
                 RecordingProxy proxy = new RecordingProxy(
                         new File(SETTINGS.getWorkDir()),
-                        SETTINGS.getProxyPort(), db, contentWriterClient, SETTINGS.getDnsServers());
+                        SETTINGS.getProxyPort(), db, contentWriterClient, SETTINGS.getDnsServers(), sessionRegistry);
 
                 HarvesterApiServer apiServer = new HarvesterApiServer(controller, proxy).start();) {
 

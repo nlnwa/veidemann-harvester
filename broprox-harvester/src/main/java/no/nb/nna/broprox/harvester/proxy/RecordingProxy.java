@@ -21,11 +21,14 @@ import java.nio.file.Files;
 import java.util.Date;
 import java.util.List;
 
+import net.lightbody.bmp.mitm.CertificateAndKeySource;
 import net.lightbody.bmp.mitm.CertificateInfo;
+import net.lightbody.bmp.mitm.PemFileCertificateSource;
 import net.lightbody.bmp.mitm.RootCertificateGenerator;
 import net.lightbody.bmp.mitm.keys.ECKeyGenerator;
 import net.lightbody.bmp.mitm.manager.ImpersonatingMitmManager;
 import no.nb.nna.broprox.commons.DbAdapter;
+import no.nb.nna.broprox.harvester.BrowserSessionRegistry;
 import org.littleshoot.proxy.HttpProxyServer;
 import org.littleshoot.proxy.impl.DefaultHttpProxyServer;
 import org.slf4j.Logger;
@@ -47,11 +50,10 @@ public class RecordingProxy implements AutoCloseable {
      * <p>
      * @param workDir a directory for storing temporary files
      * @param port the port to listen to
-     * @throws RootCertificateException is thrown if there where problems with the root certificate
      * @throws IOException is thrown if certificate directory could not be created
      */
     public RecordingProxy(File workDir, int port, DbAdapter db, final ContentWriterClient contentWriterClient,
-            final List<String> dnsServers) throws IOException {
+            final List<String> dnsServers, BrowserSessionRegistry sessionRegistry) throws IOException {
 
         LOG.info("Starting recording proxy listening on port {}.", port);
 
@@ -65,20 +67,35 @@ public class RecordingProxy implements AutoCloseable {
                 .notBefore(new Date(System.currentTimeMillis() - 365L * 24L * 60L * 60L * 1000L))
                 .notAfter(new Date(System.currentTimeMillis() + 365L * 24L * 60L * 60L * 1000L));
 
-        // create a dyamic CA root certificate generator using Elliptic Curve keys
-        RootCertificateGenerator ecRootCertificateGenerator = RootCertificateGenerator.builder()
-                .certificateInfo(certInfo)
-                .keyGenerator(new ECKeyGenerator())     // use EC keys, instead of the default RSA
-                .build();
+        File caCertificateLocation = new File(certificateDir, "BroproxCA.pem");
+        File caPrivateKeyLocation = new File(certificateDir, "BroproxPrivateKey.pem");
+        String privateKeyPassword = "BroproxCApassword";
 
-        // save the dynamically-generated CA root certificate for installation in a browser
-        ecRootCertificateGenerator.saveRootCertificateAsPemFile(new File(certificateDir, "BroproxCA.pem"));
+        CertificateAndKeySource certificateSource;
+        if (caCertificateLocation.isFile() && caPrivateKeyLocation.isFile()) {
+            // Found existing certificate.
+            certificateSource = new PemFileCertificateSource(certificateDir, certificateDir, privateKeyPassword);
+        } else {
+            // create a dyamic CA root certificate generator using Elliptic Curve keys
+            RootCertificateGenerator ecRootCertificateGenerator = RootCertificateGenerator.builder()
+                    .certificateInfo(certInfo)
+                    .keyGenerator(new ECKeyGenerator()) // use EC keys, instead of the default RSA
+                    .build();
+
+            // save the dynamically-generated CA root certificate for installation in a browser
+            ecRootCertificateGenerator.saveRootCertificateAsPemFile(caCertificateLocation);
+            ecRootCertificateGenerator
+                    .savePrivateKeyAsPemFile(caPrivateKeyLocation, privateKeyPassword);
+
+            certificateSource = ecRootCertificateGenerator;
+        }
 
         // tell the MitmManager to use the root certificate we just generated, and to use EC keys when
         // creating impersonated server certs
         ImpersonatingMitmManager mitmManager = ImpersonatingMitmManager.builder()
-                .rootCertificateSource(ecRootCertificateGenerator)
+                .rootCertificateSource(certificateSource)
                 .serverKeyGenerator(new ECKeyGenerator())
+                .trustAllServers(true)
                 .build();
 
         cache = new AlreadyCrawledCache();
@@ -89,7 +106,7 @@ public class RecordingProxy implements AutoCloseable {
                 .withTransparent(true)
                 .withServerResolver(new DnsLookup(db, contentWriterClient, dnsServers))
                 .withManInTheMiddle(mitmManager)
-                .withFiltersSource(new RecorderFilterSourceAdapter(db, contentWriterClient, cache))
+                .withFiltersSource(new RecorderFilterSourceAdapter(db, contentWriterClient, sessionRegistry, cache))
                 .start();
     }
 

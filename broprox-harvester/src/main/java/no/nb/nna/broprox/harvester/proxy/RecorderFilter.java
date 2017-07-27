@@ -16,6 +16,9 @@
 package no.nb.nna.broprox.harvester.proxy;
 
 import java.net.InetSocketAddress;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.FullHttpResponse;
@@ -29,7 +32,10 @@ import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
 import no.nb.nna.broprox.commons.DbAdapter;
 import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.commons.BroproxHeaderConstants;
+import no.nb.nna.broprox.harvester.BrowserSessionRegistry;
 import no.nb.nna.broprox.harvester.OpenTracingSpans;
+import no.nb.nna.broprox.harvester.browsercontroller.BrowserSession;
+import no.nb.nna.broprox.harvester.browsercontroller.PageRequest;
 import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
 import org.littleshoot.proxy.HttpFiltersAdapter;
 import org.littleshoot.proxy.impl.ProxyUtils;
@@ -47,6 +53,8 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
 
     private final String uri;
 
+    private final BrowserSessionRegistry sessionRegistry;
+
     private final AlreadyCrawledCache cache;
 
     private final CrawlLog.Builder crawlLog;
@@ -59,6 +67,10 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
 
     private String executionId;
 
+    private BrowserSession session;
+
+    private PageRequest pageRequest;
+
     private boolean toBeCached = false;
 
     private HttpResponseStatus responseStatus;
@@ -66,7 +78,8 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
     private HttpVersion httpVersion;
 
     public RecorderFilter(final String uri, final HttpRequest originalRequest, final ChannelHandlerContext ctx,
-            final DbAdapter db, final ContentWriterClient contentWriterClient, final AlreadyCrawledCache cache) {
+            final DbAdapter db, final ContentWriterClient contentWriterClient,
+            final BrowserSessionRegistry sessionRegistry, final AlreadyCrawledCache cache) {
 
         super(originalRequest, ctx);
         this.db = db;
@@ -77,6 +90,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
                 .setSurt(UriConfigs.SURT_KEY.buildUri(uri).toString());
         this.requestCollector = new ContentCollector(db, ctx, contentWriterClient);
         this.responseCollector = new ContentCollector(db, ctx, contentWriterClient);
+        this.sessionRegistry = sessionRegistry;
         this.cache = cache;
     }
 
@@ -86,6 +100,28 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
             HttpRequest request = (HttpRequest) httpObject;
 
             executionId = request.headers().get(EXECUTION_ID);
+            if (executionId == null) {
+                LOG.info("Manual download of {}", uri);
+                executionId = MANUAL_EXID;
+            }
+
+            session = sessionRegistry.get(executionId);
+            try {
+                pageRequest = session.getPageRequests().getByUrl(uri).get(session.getProtocolTimeout(), TimeUnit.MILLISECONDS);
+            } catch (InterruptedException ex) {
+                throw new RuntimeException(ex);
+            } catch (ExecutionException ex) {
+                throw new RuntimeException(ex);
+            } catch (TimeoutException ex) {
+                throw new RuntimeException(ex);
+            }
+            if (pageRequest != null) {
+//                System.out.println("DISCOVERY PATH: " + pageRequest.getDiscoveryPath());
+//                System.out.println("PAGE REQUEST " + request);
+            } else {
+                System.out.println("**************** NO PAGE REQUEST " + request);
+                return null;
+            }
 
             MDC.put("eid", executionId);
             MDC.put("uri", uri);
@@ -97,8 +133,8 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
 
             return otw.map("clientToProxyRequest", req -> {
 
-                if (req.headers().get(DISCOVERY_PATH).endsWith("E")) {
-                    FullHttpResponse cachedResponse = cache.get(uri, req.headers().get(EXECUTION_ID));
+                if (pageRequest.getDiscoveryPath().endsWith("E")) {
+                    FullHttpResponse cachedResponse = cache.get(uri, executionId);
                     if (cachedResponse != null) {
                         LOG.debug("Found in cache");
                         cachedResponse.headers().add("Connection", "close");
@@ -111,11 +147,11 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
                 // Fix headers before sending to final destination
                 req.headers().set("Accept-Encoding", "identity");
                 crawlLog.setFetchTimeStamp(ProtoUtils.getNowTs())
-                        .setReferrer(req.headers().get("referer", ""))
-                        .setDiscoveryPath(req.headers().get(DISCOVERY_PATH, ""));
+                        .setReferrer(req.headers().get("referer", session.getReferrer()))
+                        .setDiscoveryPath(pageRequest.getDiscoveryPath());
 
                 req.headers()
-                        .remove(DISCOVERY_PATH)
+//                        .remove(DISCOVERY_PATH)
                         .remove(EXECUTION_ID);
 
                 // Store request

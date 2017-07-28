@@ -15,7 +15,9 @@
  */
 package no.nb.nna.broprox.harvester.browsercontroller;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -31,6 +33,9 @@ import org.slf4j.MDC;
 public class PageRequestRegistry {
 
     private static final Logger LOG = LoggerFactory.getLogger(PageRequestRegistry.class);
+
+    // List of all requests since redirects reuses requestId
+    private final List<PageRequest> allRequests = new ArrayList<>();
 
     private final Map<String, PageRequest> pageRequestsById = new HashMap<>();
 
@@ -71,6 +76,14 @@ public class PageRequestRegistry {
         return rootRequest;
     }
 
+    public long getBytesDownloaded() {
+        return allRequests.stream().mapToLong(r -> r.getSize()).sum();
+    }
+
+    public int getUriDownloadedCount() {
+        return (int) allRequests.stream().filter(r -> !r.isFromCache()).count();
+    }
+
     void onRequestWillBeSent(NetworkDomain.RequestWillBeSent request, String rootDiscoveryPath) {
         PageRequest pageRequest = getById(request.requestId);
 
@@ -84,6 +97,7 @@ public class PageRequestRegistry {
                 //this.responseReceived(requestId, loaderId, time, Protocol.Page.ResourceType.Other, redirectResponse, frameId);
                 //networkRequest = this._appendRedirect(requestId, time, request.url);
                 pageRequest = new PageRequest(request, pageRequest);
+                allRequests.add(pageRequest);
             }
         } else {
             String referrer = (String) request.request.headers.get("Referer");
@@ -94,6 +108,7 @@ public class PageRequestRegistry {
                 // New request
                 pageRequest = new PageRequest(request, rootDiscoveryPath);
             }
+            allRequests.add(pageRequest);
         }
         add(pageRequest);
     }

@@ -60,7 +60,7 @@ public class HarvesterClient implements AutoCloseable {
         asyncStub = HarvesterGrpc.newStub(channel);
     }
 
-    public List<QueuedUri> fetchPage(QueuedUri qUri, CrawlConfig config) {
+    public HarvestPageReply fetchPage(QueuedUri qUri, CrawlConfig config) {
         if (qUri.getExecutionId().isEmpty()) {
             throw new IllegalArgumentException("A queued URI must have the execution ID set.");
         }
@@ -70,8 +70,7 @@ public class HarvesterClient implements AutoCloseable {
                     .setQueuedUri(qUri)
                     .setCrawlConfig(config)
                     .build();
-            HarvestPageReply reply = blockingStub.harvestPage(request);
-            return reply.getOutlinksList();
+            return blockingStub.harvestPage(request);
         } catch (StatusRuntimeException ex) {
             LOG.error("RPC failed: " + ex.getStatus(), ex);
             throw ex;

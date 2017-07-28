@@ -67,6 +67,8 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
 
     private String executionId;
 
+    private PageRequest pageRequest;
+
     private boolean toBeCached = false;
 
     private HttpResponseStatus responseStatus;
@@ -109,7 +111,6 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
             if (uri.endsWith("robots.txt")) {
                 discoveryPath = "P";
             } else {
-                PageRequest pageRequest;
                 try {
                     pageRequest = session.getPageRequests().getByUrl(uri)
                             .get(session.getProtocolTimeout(), TimeUnit.MILLISECONDS);
@@ -144,6 +145,9 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
                     if (cachedResponse != null) {
                         LOG.debug("Found in cache");
                         cachedResponse.headers().add("Connection", "close");
+                        if (pageRequest != null) {
+                            pageRequest.setFromCache(true);
+                        }
                         return cachedResponse;
                     } else {
                         toBeCached = true;
@@ -156,7 +160,8 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
 
                 crawlLog.setFetchTimeStamp(ProtoUtils.getNowTs())
                         .setReferrer(req.headers().get("referer", referrer))
-                        .setDiscoveryPath(discoveryPath);
+                        .setDiscoveryPath(discoveryPath)
+                        .setExecutionId(executionId);
 
                 // Store request
                 requestCollector.setRequestHeaders(req);
@@ -207,6 +212,9 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
                                 responseCollector.getPayloadBuf());
                     }
                     responseCollector.writeResponse(crawlLog.build());
+                    if (pageRequest != null) {
+                        pageRequest.setSize(responseCollector.getSize());
+                    }
                 }
             } else {
                 System.out.println(this.hashCode() + " :: RESP: " + response.getClass());

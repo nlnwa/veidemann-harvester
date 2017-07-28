@@ -17,7 +17,6 @@ package no.nb.nna.broprox.harvester.browsercontroller;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +25,7 @@ import java.util.concurrent.TimeoutException;
 
 import io.opentracing.tag.Tags;
 import no.nb.nna.broprox.api.ControllerProto;
+import no.nb.nna.broprox.api.HarvesterProto.HarvestPageReply;
 import no.nb.nna.broprox.chrome.client.ChromeDebugProtocol;
 import no.nb.nna.broprox.commons.BroproxHeaderConstants;
 import no.nb.nna.broprox.commons.DbAdapter;
@@ -69,9 +69,9 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
         this.sessionRegistry = sessionRegistry;
     }
 
-    public List<QueuedUri> render(QueuedUri queuedUri, CrawlConfig config)
+    public HarvestPageReply render(QueuedUri queuedUri, CrawlConfig config)
             throws ExecutionException, InterruptedException, IOException, TimeoutException {
-        List<QueuedUri> outlinks = Collections.EMPTY_LIST;
+        HarvestPageReply.Builder resultBuilder = HarvestPageReply.newBuilder();
 
         MDC.put("eid", queuedUri.getExecutionId());
         MDC.put("uri", queuedUri.getUri());
@@ -110,7 +110,9 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
                     LOG.debug("Extract outlinks");
 
                     List<BrowserScript> scripts = getScripts(config);
-                    outlinks = otw.map("extractOutlinks", session::extractOutlinks, scripts);
+                    resultBuilder.addAllOutlinks(otw.map("extractOutlinks", session::extractOutlinks, scripts));
+                    resultBuilder.setBytesDownloaded(session.getPageRequests().getBytesDownloaded());
+                    resultBuilder.setUriCount(session.getPageRequests().getUriDownloadedCount());
 
                     session.scrollToTop();
                 }
@@ -133,8 +135,7 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
         }
 
         MDC.clear();
-        return outlinks;
-
+        return resultBuilder.build();
     }
 
     private List<BrowserScript> getScripts(CrawlConfig config) {

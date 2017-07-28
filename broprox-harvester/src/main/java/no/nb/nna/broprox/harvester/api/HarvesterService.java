@@ -15,8 +15,6 @@
  */
 package no.nb.nna.broprox.harvester.api;
 
-import java.util.List;
-
 import com.google.protobuf.Empty;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
@@ -25,10 +23,10 @@ import no.nb.nna.broprox.api.HarvesterGrpc;
 import no.nb.nna.broprox.api.HarvesterProto.CleanupExecutionRequest;
 import no.nb.nna.broprox.api.HarvesterProto.HarvestPageReply;
 import no.nb.nna.broprox.api.HarvesterProto.HarvestPageRequest;
-import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
 import no.nb.nna.broprox.harvester.OpenTracingSpans;
 import no.nb.nna.broprox.harvester.browsercontroller.BrowserController;
 import no.nb.nna.broprox.harvester.proxy.RecordingProxy;
+import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,8 +51,7 @@ public class HarvesterService extends HarvesterGrpc.HarvesterImplBase {
         try {
             OpenTracingSpans.register(fetchUri.getExecutionId(), OpenTracingContextKey.activeSpan());
 
-            List<QueuedUri> outlinks = controller.render(fetchUri, request.getCrawlConfig());
-            HarvestPageReply reply = HarvestPageReply.newBuilder().addAllOutlinks(outlinks).build();
+            HarvestPageReply reply = controller.render(fetchUri, request.getCrawlConfig());
 
             respObserver.onNext(reply);
             respObserver.onCompleted();

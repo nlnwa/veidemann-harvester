@@ -42,6 +42,10 @@ public class PageRequest {
 
     private boolean renderable = false;
 
+    private long size = 0L;
+
+    private boolean fromCache = false;
+
     /**
      * True if this request is for the top level request.
      * <p>
@@ -73,7 +77,6 @@ public class PageRequest {
         } else {
             this.discoveryPath = parent.discoveryPath + "E";
         }
-//        System.out.println(" :: " + discoveryPath);
     }
 
     public String getRequestId() {
@@ -110,6 +113,22 @@ public class PageRequest {
 
     public boolean isRootResource() {
         return rootResource;
+    }
+
+    public long getSize() {
+        return size;
+    }
+
+    public void setSize(long size) {
+        this.size = size;
+    }
+
+    public boolean isFromCache() {
+        return fromCache;
+    }
+
+    public void setFromCache(boolean fromCache) {
+        this.fromCache = fromCache;
     }
 
     void addResponse(NetworkDomain.ResponseReceived response) {

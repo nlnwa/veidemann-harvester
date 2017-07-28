@@ -29,6 +29,8 @@ message CrawlExecutionStatus {
     google.protobuf.Timestamp end_time = 6;
     int64 documents_crawled = 7;
     int64 bytes_crawled = 8;
+    int64 uris_crawled = 9;
+    int64 documents_failed = 10;
 }
 
 message CrawlLog {
@@ -42,16 +44,11 @@ message CrawlLog {
 
     /**
      * Get the discoveryPath,
-     * <p>
-     * <table>
-     * <tr><td>R</td><td>Redirect</td></tr>
-     * <tr><td>E</td><td>Embed</td></tr>
-     * <tr><td>X</td><td>Speculative embed (aggressive/Javascript link extraction)</td></tr>
-     * <tr><td>L</td><td>Link</td></tr>
-     * <tr><td>P</td><td>Prerequisite (as for DNS or robots.txt before another URI)</td></tr>
-     * </table>
-     * <p>
-     * @return the discovery path
+     *  R - Redirect
+     *  E - Embed
+     *  X - Speculative embed (aggressive/Javascript link extraction)
+     *  L - Link
+     *  P - Prerequisite (as for DNS or robots.txt before another URI)
      */
     string discovery_path = 8;
     string referrer = 9;
@@ -64,6 +61,7 @@ message CrawlLog {
     string record_type = 16;
     string warc_refers_to = 17;
     string ip_address = 18;
+    string execution_id = 19;
 }
 
 message CrawledContent {

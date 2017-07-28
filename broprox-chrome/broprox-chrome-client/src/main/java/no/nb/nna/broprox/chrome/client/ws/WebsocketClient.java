@@ -16,7 +16,6 @@
 package no.nb.nna.broprox.chrome.client.ws;
 
 import java.net.URI;
-import java.net.URISyntaxException;
 
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.Unpooled;
@@ -69,19 +68,15 @@ public class WebsocketClient {
 
     private final WebSocketCallback callback;
 
-    public WebsocketClient(WebSocketCallback callback) {
+    private final URI uri;
+
+    public WebsocketClient(WebSocketCallback callback, URI uri) {
         this.callback = callback;
+        this.uri = uri;
+        connect();
     }
 
-    public void connect(String uri) {
-        try {
-            connect(new URI(uri));
-        } catch (URISyntaxException ex) {
-            throw new RuntimeException(ex);
-        }
-    }
-
-    public void connect(URI uri) {
+    private void connect() {
         String scheme = uri.getScheme() == null ? "ws" : uri.getScheme();
         final String host = uri.getHost() == null ? "127.0.0.1" : uri.getHost();
         final int port;
@@ -173,6 +168,15 @@ public class WebsocketClient {
     }
 
     public void sendMessage(String msg) {
+        int retryLimit = 5;
+        int retryAttempts = 0;
+        while (!channel.isActive() && retryAttempts < retryLimit) {
+            LOG.info("WS channel closed, try to reopen.");
+            close();
+            connect();
+            retryAttempts++;
+        }
+
         if (!channel.isActive()) {
             throw new IllegalStateException("closed", closeReason);
         }

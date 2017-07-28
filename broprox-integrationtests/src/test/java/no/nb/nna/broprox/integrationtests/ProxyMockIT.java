@@ -67,7 +67,7 @@ public class ProxyMockIT implements BroproxHeaderConstants {
         int dbPort = Integer.parseInt(System.getProperty("db.port"));
 
         channel = ManagedChannelBuilder.forAddress(controllerHost, controllerPort).usePlaintext(true).build();
-        controllerClient = ControllerGrpc.newBlockingStub(channel);
+        controllerClient = ControllerGrpc.newBlockingStub(channel).withWaitForReady();
 
         db = new RethinkDbAdapter(dbHost, dbPort, "broprox");
     }
@@ -122,6 +122,11 @@ public class ProxyMockIT implements BroproxHeaderConstants {
         Cursor c = db.executeRequest(r.table(RethinkDbAdapter.TABLES.CRAWL_LOG.name));
 //        c.toList().stream().forEach(r -> System.out.println("CC:: " + r));
         assertThat(c.toList().size()).isEqualTo(15);
+
+        executeJob(request).get();
+        c = db.executeRequest(r.table(RethinkDbAdapter.TABLES.CRAWL_LOG.name));
+//        c.toList().stream().forEach(r -> System.out.println("CC:: " + r));
+        assertThat(c.toList().size()).isEqualTo(27);
     }
 
     JobCompletion executeJob(ControllerProto.RunCrawlRequest crawlRequest) {

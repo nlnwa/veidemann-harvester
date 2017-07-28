@@ -76,17 +76,7 @@ public class QueueWorker extends RecursiveAction {
             QueuedUri qUri = getNextToFetch(exe.getId());
             if (qUri == null) {
                 // No more uris, we are done.
-                System.out.println("Reached end of crawl");
-                CrawlExecutionStatus.State state = exe.getStatus().getState();
-                if (state == CrawlExecutionStatus.State.RUNNING) {
-                    state = CrawlExecutionStatus.State.FINISHED;
-                }
-                exe.setStatus(exe.getStatus().toBuilder()
-                        .setState(state)
-                        .setEndTime(ProtoUtils.getNowTs())
-                        .build());
-                frontier.getDb().updateExecutionStatus(exe.getStatus());
-                frontier.getHarvesterClient().cleanupExecution(exe.getId());
+                exe.endCrawl(CrawlExecutionStatus.State.FINISHED);
                 frontier.runningExecutions.remove(exe.getId());
             } else {
                 frontier.getDb().executeRequest(r.table(TABLES.URI_QUEUE.name).get(qUri.getId()).delete());

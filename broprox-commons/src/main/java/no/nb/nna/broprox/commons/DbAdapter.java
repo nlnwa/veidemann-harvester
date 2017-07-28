@@ -51,9 +51,7 @@ import no.nb.nna.broprox.model.MessagesProto.Screenshot;
  */
 public interface DbAdapter extends AutoCloseable {
 
-    CrawledContent addCrawledContent(CrawledContent cc);
-
-    Optional<CrawledContent> isDuplicateContent(String digest);
+    Optional<CrawledContent> hasCrawledContent(CrawledContent cc);
 
     CrawlLog addCrawlLog(CrawlLog cl);
 

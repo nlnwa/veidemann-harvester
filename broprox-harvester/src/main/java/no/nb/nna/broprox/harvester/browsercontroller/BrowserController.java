@@ -21,30 +21,26 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
-import java.util.stream.Collectors;
 
 import io.opentracing.tag.Tags;
 import no.nb.nna.broprox.api.ControllerProto;
 import no.nb.nna.broprox.chrome.client.ChromeDebugProtocol;
-import no.nb.nna.broprox.chrome.client.Session;
-import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
-import no.nb.nna.broprox.commons.DbAdapter;
-import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
-import no.nb.nna.broprox.model.ConfigProto.CrawlConfig;
-import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
 import no.nb.nna.broprox.commons.BroproxHeaderConstants;
+import no.nb.nna.broprox.commons.DbAdapter;
+import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
 import no.nb.nna.broprox.db.ProtoUtils;
+import no.nb.nna.broprox.harvester.BrowserSessionRegistry;
 import no.nb.nna.broprox.harvester.OpenTracingSpans;
 import no.nb.nna.broprox.harvester.proxy.RobotsServiceClient;
+import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
+import no.nb.nna.broprox.model.ConfigProto.CrawlConfig;
 import no.nb.nna.broprox.model.MessagesProto;
+import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
-
-import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 /**
  *
@@ -57,21 +53,25 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
 
     private final DbAdapter db;
 
+    private final BrowserSessionRegistry sessionRegistry;
+
     private final Map<String, BrowserScript> scriptCache = new HashMap<>();
 
     private final RobotsServiceClient robotsServiceClient;
 
-    public BrowserController(String chromeHost, int chromePort, DbAdapter db,
-            final RobotsServiceClient robotsServiceClient) throws IOException {
+    public BrowserController(final String chromeHost, final int chromePort, final DbAdapter db,
+            final RobotsServiceClient robotsServiceClient, final BrowserSessionRegistry sessionRegistry)
+            throws IOException {
 
         this.chrome = new ChromeDebugProtocol(chromeHost, chromePort);
         this.db = db;
         this.robotsServiceClient = robotsServiceClient;
+        this.sessionRegistry = sessionRegistry;
     }
 
     public List<QueuedUri> render(QueuedUri queuedUri, CrawlConfig config)
             throws ExecutionException, InterruptedException, IOException, TimeoutException {
-        List<QueuedUri> outlinks;
+        List<QueuedUri> outlinks = Collections.EMPTY_LIST;
 
         MDC.put("eid", queuedUri.getExecutionId());
         MDC.put("uri", queuedUri.getUri());
@@ -82,71 +82,22 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
         // Check robots.txt
         if (robotsServiceClient.isAllowed(queuedUri, config)) {
 
-            try (Session session = chrome.newSession(
-                    config.getBrowserConfig().getWindowWidth(),
-                    config.getBrowserConfig().getWindowHeight())) {
+            try (BrowserSession session = new BrowserSession(chrome, config, queuedUri.getExecutionId())) {
+                sessionRegistry.put(session);
 
-                LOG.debug("Browser session created");
+                session.setBreakpoints();
+                session.setCookies(queuedUri);
+                session.loadPage(queuedUri);
+                if (session.isPageRenderable()) {
+//                // disable scrollbars
+//                session.runtime.evaluate("document.getElementsByTagName('body')[0].style.overflow='hidden'",
+//                        null, null, null, null, null, null, null, null)
+//                        .get(protocolTimeout, MILLISECONDS);
 
-                CompletableFuture.allOf(
-                        session.debugger.enable(),
-                        session.page.enable(),
-                        session.runtime.enable(),
-                        session.network.enable(null, null),
-                        session.network.setCacheDisabled(true),
-                        session.runtime
-                                .evaluate("navigator.userAgent;", null, false, false, null, false, false, false, false)
-                                .thenAccept(e -> {
-                                    session.network.setUserAgentOverride(((String) e.result.value)
-                                            .replace("HeadlessChrome", session.version()));
-                                }),
-                        session.debugger
-                                .setBreakpointByUrl(1, null, "https?://www.google-analytics.com/analytics.js", null, null),
-                        session.debugger
-                                .setBreakpointByUrl(1, null, "https?://www.google-analytics.com/ga.js", null, null),
-                        session.page.setControlNavigations(Boolean.TRUE)
-                ).get(config.getBrowserConfig().getPageLoadTimeoutMs(), MILLISECONDS);
-
-                session.debugger.onPaused(p -> {
-                    String scriptId = p.callFrames.get(0).location.scriptId;
-                    System.out.println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>> SCRIPT BLE PAUSET: " + scriptId);
-                    session.debugger.setScriptSource(scriptId, "console.log(\"google analytics is no more!\");", null);
-                    session.debugger.resume();
-                    System.out.println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>> SCRIPT RESUMED: " + scriptId);
-                });
-
-                session.network.onLoadingFailed(f -> {
-                    MDC.put("eid", queuedUri.getExecutionId());
-                    MDC.put("uri", queuedUri.getUri());
-                    LOG.error(
-                            "Failed fetching page: Error '{}', Blocked reason '{}', Resource type: '{}', Canceled: {}",
-                            f.errorText, f.blockedReason, f.type, f.canceled);
-                    MDC.clear();
-                    throw new RuntimeException("Failed fetching page " + f.errorText);
-                });
-
-                LOG.debug("Browser session configured");
-
-                // set cookies
-                CompletableFuture.allOf(queuedUri.getCookiesList().stream()
-                        .map(c -> session.network
-                        .setCookie(queuedUri.getUri(), c.getName(), c.getValue(), c.getDomain(),
-                                c.getPath(), c.getSecure(), c.getHttpOnly(), c.getSameSite(), c.getExpires()))
-                        .collect(Collectors.toList()).toArray(new CompletableFuture[]{}))
-                        .get(config.getBrowserConfig().getPageLoadTimeoutMs(), MILLISECONDS);
-
-                LOG.debug("Browser cookies initialized");
-
-                PageExecution pex = new PageExecution(queuedUri, session, config.getBrowserConfig()
-                        .getPageLoadTimeoutMs(), db, config.getBrowserConfig().getSleepAfterPageloadMs());
-
-                LOG.info("Navigate to page");
-
-                otw.run("navigatePage", pex::navigatePage);
-                if (config.getExtra().getCreateSnapshot()) {
-                    LOG.debug("Save screenshot");
-                    otw.run("saveScreenshot", pex::saveScreenshot);
-                }
+                    if (config.getExtra().getCreateSnapshot()) {
+                        LOG.debug("Save screenshot");
+                        otw.run("saveScreenshot", session::saveScreenshot, db);
+                    }
 
 //                System.out.println("LINKS >>>>>>");
 //                for (PageDomain.FrameResource fs : session.page.getResourceTree().get().frameTree.resources) {
@@ -156,13 +107,14 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
 //                    }
 //                }
 //                System.out.println("<<<<<<");
-                LOG.debug("Extract outlinks");
+                    LOG.debug("Extract outlinks");
 
-                List<BrowserScript> scripts = getScripts(config);
-                outlinks = otw.map("extractOutlinks", pex::extractOutlinks, scripts);
+                    List<BrowserScript> scripts = getScripts(config);
+                    outlinks = otw.map("extractOutlinks", session::extractOutlinks, scripts);
 
-                pex.getDocumentUrl();
-                pex.scrollToTop();
+                    session.scrollToTop();
+                }
+                sessionRegistry.remove(session);
             }
         } else {
             LOG.info("Precluded by robots.txt");
@@ -178,8 +130,6 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
                         .build();
                 db.addCrawlLog(crawlLog);
             }
-
-            outlinks = Collections.EMPTY_LIST;
         }
 
         MDC.clear();

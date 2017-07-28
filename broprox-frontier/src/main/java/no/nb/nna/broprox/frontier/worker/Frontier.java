@@ -93,26 +93,14 @@ public class Frontier implements AutoCloseable {
     }
 
     public CrawlExecutionStatus scheduleSeed(final CrawlJob job, final Seed seed) {
-        CrawlExecutionStatus status = CrawlExecutionStatus.newBuilder()
-                .setJobId(job.getId())
-                .setSeedId(seed.getId())
-                .setState(CrawlExecutionStatus.State.CREATED)
-                .build();
-
-        status = db.addExecutionStatus(status);
         CrawlExecution exe = new CrawlExecution(
-                OpenTracingParentContextKey.parentSpan(), this, status, job, seed.getScope());
-        runningExecutions.put(status.getId(), exe);
-
-        status = status.toBuilder().setState(CrawlExecutionStatus.State.RUNNING)
-                .setStartTime(ProtoUtils.getNowTs())
-                .build();
-        db.updateExecutionStatus(status);
+                OpenTracingParentContextKey.parentSpan(), this, seed, job, seed.getScope());
+        runningExecutions.put(exe.getId(), exe);
 
         String uri = seed.getMeta().getName();
         QueuedUri qUri = QueuedUri.newBuilder()
                 .setUri(uri)
-                .setExecutionId(status.getId())
+                .setExecutionId(exe.getId())
                 .setSequence(exe.getNextSequenceNum())
                 .setSurt(UriConfigs.SURT_KEY.buildUri(uri).toString())
                 .setScope(seed.getScope())
@@ -120,7 +108,7 @@ public class Frontier implements AutoCloseable {
         exe.setCurrentUri(qUri);
         executionsQueue.add(exe);
 
-        return status;
+        return exe.getStatus();
     }
 
     boolean alreadeyIncluded(QueuedUri qUri) {

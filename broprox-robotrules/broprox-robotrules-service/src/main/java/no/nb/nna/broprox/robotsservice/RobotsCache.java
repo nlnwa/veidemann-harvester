@@ -33,7 +33,6 @@ import org.netpreserve.commons.uri.Uri;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static no.nb.nna.broprox.commons.BroproxHeaderConstants.DISCOVERY_PATH;
 import static no.nb.nna.broprox.commons.BroproxHeaderConstants.EXECUTION_ID;
 import static org.cache2k.expiry.ExpiryTimeValues.NO_CACHE;
 
@@ -85,7 +84,6 @@ public class RobotsCache {
                         Request request = new Request.Builder()
                                 .url(url)
                                 .addHeader(EXECUTION_ID, key.executionId)
-                                .addHeader(DISCOVERY_PATH, "P")
                                 .build();
 
                         try (Response response = client.newCall(request).execute();) {

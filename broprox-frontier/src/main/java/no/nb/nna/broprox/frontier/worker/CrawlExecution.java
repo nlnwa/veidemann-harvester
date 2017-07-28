@@ -25,14 +25,16 @@ import java.util.concurrent.atomic.AtomicLong;
 import com.rethinkdb.RethinkDB;
 import io.opentracing.Span;
 import io.opentracing.tag.Tags;
+import no.nb.nna.broprox.commons.DbAdapter;
 import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
 import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
-import no.nb.nna.broprox.model.MessagesProto;
 import no.nb.nna.broprox.model.ConfigProto.CrawlConfig;
 import no.nb.nna.broprox.model.ConfigProto.CrawlJob;
 import no.nb.nna.broprox.model.ConfigProto.CrawlLimitsConfig;
 import no.nb.nna.broprox.model.ConfigProto.CrawlScope;
+import no.nb.nna.broprox.model.ConfigProto.Seed;
+import no.nb.nna.broprox.model.MessagesProto;
 import no.nb.nna.broprox.model.MessagesProto.CrawlExecutionStatus;
 import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
 import org.netpreserve.commons.uri.UriConfigs;
@@ -69,14 +71,21 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker, Delayed {
 
     private final Span parentSpan;
 
-    public CrawlExecution(Span span, Frontier frontier, CrawlExecutionStatus status, CrawlJob job, CrawlScope scope) {
-        System.out.println("NEW CRAWL EXECUTION: " + status.getId());
+    public CrawlExecution(Span span, Frontier frontier, Seed seed, CrawlJob job, CrawlScope scope) {
         this.frontier = frontier;
-        this.status = status;
         this.config = job.getCrawlConfig();
         this.parentSpan = span;
         this.scope = scope;
         this.limits = job.getLimits();
+
+        // Create execution
+        CrawlExecutionStatus s = CrawlExecutionStatus.newBuilder()
+                .setJobId(job.getId())
+                .setSeedId(seed.getId())
+                .setState(CrawlExecutionStatus.State.CREATED)
+                .build();
+        this.status = frontier.getDb().addExecutionStatus(s);
+        System.out.println("NEW CRAWL EXECUTION: " + status.getId());
     }
 
     public String getId() {
@@ -104,7 +113,29 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker, Delayed {
         this.outlinks = Collections.EMPTY_LIST;
     }
 
+    public void endCrawl(CrawlExecutionStatus.State state) {
+        System.out.println("Reached end of crawl");
+        CrawlExecutionStatus.State currentState = status.getState();
+        if (currentState != CrawlExecutionStatus.State.RUNNING) {
+            state = currentState;
+        }
+        status = status.toBuilder()
+                .setState(state)
+                .setEndTime(ProtoUtils.getNowTs())
+                .build();
+        status = frontier.getDb().updateExecutionStatus(status);
+        frontier.getHarvesterClient().cleanupExecution(getId());
+    }
+
     public void fetch() {
+        if (!status.hasStartTime()) {
+            // Start execution
+            status = status.toBuilder().setState(CrawlExecutionStatus.State.RUNNING)
+                    .setStartTime(ProtoUtils.getNowTs())
+                    .build();
+            status = frontier.getDb().updateExecutionStatus(status);
+        }
+
         System.out.println("Fetching " + currentUri.getUri());
         currentUri = currentUri.toBuilder()
                 .setSurt(UriConfigs.SURT_KEY.buildUri(currentUri.getUri()).toString())
@@ -117,7 +148,6 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker, Delayed {
                 seedResolved = true;
 
                 status = status.toBuilder()
-                        .setState(CrawlExecutionStatus.State.RUNNING)
                         .setDocumentsCrawled(status.getDocumentsCrawled() + 1)
                         .build();
                 frontier.getDb().updateExecutionStatus(status);

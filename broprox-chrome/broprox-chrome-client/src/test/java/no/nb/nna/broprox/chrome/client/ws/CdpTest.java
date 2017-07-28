@@ -17,6 +17,8 @@
 package no.nb.nna.broprox.chrome.client.ws;
 
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.concurrent.ExecutionException;
 
 import org.junit.Ignore;
@@ -34,10 +36,9 @@ public class CdpTest {
      */
     @Test
     @Ignore
-    public void testPing() throws InterruptedException {
+    public void testPing() throws InterruptedException, URISyntaxException {
         System.out.println("ping");
-        WebsocketClient instance = new WebsocketClient(null);
-        instance.connect("ws://echo.websocket.org");
+        WebsocketClient instance = new WebsocketClient(null, new URI("ws://echo.websocket.org"));
         instance.ping();
         instance.close();
         // TODO review the generated test code and remove the default call to fail.
@@ -49,7 +50,7 @@ public class CdpTest {
      */
     @Test
     @Ignore
-    public void testCall() throws InterruptedException, ExecutionException {
+    public void testCall() throws InterruptedException, ExecutionException, URISyntaxException {
         System.out.println("sendMessage");
         String msg = "Hello World";
         Cdp instance = new Cdp("ws://localhost:9222/devtools/page/cdb3c308-6abe-4159-b09e-4e464b499a92");

@@ -435,7 +435,7 @@
                                         </image>
 
                                         <image>
-                                            <name>testsites</name>
+                                            <name>norsknettarkiv/testsites</name>
                                             <alias>testsites</alias>
                                             <run>
                                                 <network>

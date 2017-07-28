@@ -16,6 +16,7 @@
 package no.nb.nna.broprox.chrome.client.ws;
 
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -50,13 +51,11 @@ public class Cdp implements WebSocketCallback {
     final WebsocketClient websocketClient;
 
     public Cdp(String uri) {
-        this.websocketClient = new WebsocketClient(this);
-        this.websocketClient.connect(uri);
+        this(URI.create(uri));
     }
 
     public Cdp(URI uri) {
-        this.websocketClient = new WebsocketClient(this);
-        this.websocketClient.connect(uri);
+        this.websocketClient = new WebsocketClient(this, uri);
     }
 
     public CompletableFuture<JsonElement> call(String method, Map<String, Object> params) {

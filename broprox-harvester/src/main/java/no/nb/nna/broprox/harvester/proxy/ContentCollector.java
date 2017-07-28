@@ -202,12 +202,18 @@ public class ContentCollector {
 
     public void writeResponse(CrawlLog logEntry) {
         try {
+            // Storing the logEntry fills in WARC-ID
+            logEntry = db.addCrawlLog(logEntry);
+
             CrawlLog.Builder logEntryBuilder = logEntry.toBuilder();
             String payloadDigestString = getPayloadDigest();
             logEntryBuilder.setFetchTimeMillis(Duration.between(ProtoUtils.tsToOdt(
                     logEntryBuilder.getFetchTimeStamp()), OffsetDateTime.now(ZoneOffset.UTC)).toMillis());
 
-            Optional<CrawledContent> isDuplicate = db.isDuplicateContent(payloadDigestString);
+            Optional<CrawledContent> isDuplicate = db.hasCrawledContent(CrawledContent.newBuilder()
+                    .setDigest(payloadDigestString)
+                    .setWarcId(logEntry.getWarcId())
+                    .build());
 
             if (isDuplicate.isPresent()) {
                 logEntryBuilder.setRecordType("revisit")
@@ -215,7 +221,7 @@ public class ContentCollector {
                         .setSize(headerSize)
                         .setWarcRefersTo(isDuplicate.get().getWarcId());
 
-                logEntry = db.addCrawlLog(logEntryBuilder.build());
+                logEntry = db.updateCrawlLog(logEntryBuilder.build());
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Writing {} as a revisit of {}",
                             logEntryBuilder.getRequestedUri(), logEntryBuilder.getWarcRefersTo());
@@ -227,18 +233,11 @@ public class ContentCollector {
                         .setPayloadDigest(payloadDigestString)
                         .setSize(headerSize + 2 + payloadSize);
 
-                logEntry = db.addCrawlLog(logEntryBuilder.build());
+                logEntry = db.updateCrawlLog(logEntryBuilder.build());
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Writing {}", logEntryBuilder.getRequestedUri());
                 }
                 contentWriterClient.writeRecord(logEntry, headerBuf, payloadBuf);
-            }
-
-            if (!isDuplicate.isPresent()) {
-                db.addCrawledContent(CrawledContent.newBuilder()
-                        .setDigest(payloadDigestString)
-                        .setWarcId(logEntry.getWarcId())
-                        .build());
             }
         } finally {
             release();

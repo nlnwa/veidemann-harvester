@@ -21,31 +21,26 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
-import java.util.stream.Collectors;
 
 import io.opentracing.tag.Tags;
 import no.nb.nna.broprox.api.ControllerProto;
 import no.nb.nna.broprox.chrome.client.ChromeDebugProtocol;
-import no.nb.nna.broprox.chrome.client.Session;
-import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
-import no.nb.nna.broprox.commons.DbAdapter;
-import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
-import no.nb.nna.broprox.model.ConfigProto.CrawlConfig;
-import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
 import no.nb.nna.broprox.commons.BroproxHeaderConstants;
+import no.nb.nna.broprox.commons.DbAdapter;
+import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
 import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.harvester.BrowserSessionRegistry;
 import no.nb.nna.broprox.harvester.OpenTracingSpans;
 import no.nb.nna.broprox.harvester.proxy.RobotsServiceClient;
+import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
+import no.nb.nna.broprox.model.ConfigProto.CrawlConfig;
 import no.nb.nna.broprox.model.MessagesProto;
+import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
-
-import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 /**
  *

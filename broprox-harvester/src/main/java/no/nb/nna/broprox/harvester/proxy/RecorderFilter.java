@@ -67,10 +67,6 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
 
     private String executionId;
 
-    private BrowserSession session;
-
-    private PageRequest pageRequest;
-
     private boolean toBeCached = false;
 
     private HttpResponseStatus responseStatus;
@@ -105,22 +101,32 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
                 executionId = MANUAL_EXID;
             }
 
-            session = sessionRegistry.get(executionId);
-            try {
-                pageRequest = session.getPageRequests().getByUrl(uri).get(session.getProtocolTimeout(), TimeUnit.MILLISECONDS);
-            } catch (InterruptedException ex) {
-                throw new RuntimeException(ex);
-            } catch (ExecutionException ex) {
-                throw new RuntimeException(ex);
-            } catch (TimeoutException ex) {
-                throw new RuntimeException(ex);
-            }
-            if (pageRequest != null) {
-//                System.out.println("DISCOVERY PATH: " + pageRequest.getDiscoveryPath());
-//                System.out.println("PAGE REQUEST " + request);
+            BrowserSession session = sessionRegistry.get(executionId);
+
+            String discoveryPath;
+            String referrer = session == null ? "" : session.getReferrer();
+
+            if (uri.endsWith("robots.txt")) {
+                discoveryPath = "P";
             } else {
-                System.out.println("**************** NO PAGE REQUEST " + request);
-                return null;
+                PageRequest pageRequest;
+                try {
+                    pageRequest = session.getPageRequests().getByUrl(uri)
+                            .get(session.getProtocolTimeout(), TimeUnit.MILLISECONDS);
+                } catch (InterruptedException ex) {
+                    throw new RuntimeException(ex);
+                } catch (ExecutionException ex) {
+                    throw new RuntimeException(ex);
+                } catch (TimeoutException ex) {
+                    throw new RuntimeException(ex);
+                }
+
+                if (pageRequest != null) {
+                    discoveryPath = pageRequest.getDiscoveryPath();
+                } else {
+                    System.out.println("**************** NO PAGE REQUEST " + request);
+                    return null;
+                }
             }
 
             MDC.put("eid", executionId);
@@ -133,7 +139,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
 
             return otw.map("clientToProxyRequest", req -> {
 
-                if (pageRequest.getDiscoveryPath().endsWith("E")) {
+                if (discoveryPath.endsWith("E")) {
                     FullHttpResponse cachedResponse = cache.get(uri, executionId);
                     if (cachedResponse != null) {
                         LOG.debug("Found in cache");
@@ -146,13 +152,11 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
 
                 // Fix headers before sending to final destination
                 req.headers().set("Accept-Encoding", "identity");
-                crawlLog.setFetchTimeStamp(ProtoUtils.getNowTs())
-                        .setReferrer(req.headers().get("referer", session.getReferrer()))
-                        .setDiscoveryPath(pageRequest.getDiscoveryPath());
+                req.headers().remove(EXECUTION_ID);
 
-                req.headers()
-//                        .remove(DISCOVERY_PATH)
-                        .remove(EXECUTION_ID);
+                crawlLog.setFetchTimeStamp(ProtoUtils.getNowTs())
+                        .setReferrer(req.headers().get("referer", referrer))
+                        .setDiscoveryPath(discoveryPath);
 
                 // Store request
                 requestCollector.setRequestHeaders(req);

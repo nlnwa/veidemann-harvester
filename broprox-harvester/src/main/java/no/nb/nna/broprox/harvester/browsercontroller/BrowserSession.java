@@ -32,7 +32,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.protobuf.ByteString;
 import no.nb.nna.broprox.chrome.client.ChromeDebugProtocol;
 import no.nb.nna.broprox.chrome.client.DebuggerDomain;
-import no.nb.nna.broprox.chrome.client.NetworkDomain;
 import no.nb.nna.broprox.chrome.client.PageDomain;
 import no.nb.nna.broprox.chrome.client.RuntimeDomain;
 import no.nb.nna.broprox.chrome.client.Session;

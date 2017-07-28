@@ -202,6 +202,9 @@ public class ContentCollector {
 
     public void writeResponse(CrawlLog logEntry) {
         try {
+            // Storing the logEntry fills in WARC-ID
+            logEntry = db.addCrawlLog(logEntry);
+
             CrawlLog.Builder logEntryBuilder = logEntry.toBuilder();
             String payloadDigestString = getPayloadDigest();
             logEntryBuilder.setFetchTimeMillis(Duration.between(ProtoUtils.tsToOdt(
@@ -218,7 +221,7 @@ public class ContentCollector {
                         .setSize(headerSize)
                         .setWarcRefersTo(isDuplicate.get().getWarcId());
 
-                logEntry = db.addCrawlLog(logEntryBuilder.build());
+                logEntry = db.updateCrawlLog(logEntryBuilder.build());
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Writing {} as a revisit of {}",
                             logEntryBuilder.getRequestedUri(), logEntryBuilder.getWarcRefersTo());
@@ -230,7 +233,7 @@ public class ContentCollector {
                         .setPayloadDigest(payloadDigestString)
                         .setSize(headerSize + 2 + payloadSize);
 
-                logEntry = db.addCrawlLog(logEntryBuilder.build());
+                logEntry = db.updateCrawlLog(logEntryBuilder.build());
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Writing {}", logEntryBuilder.getRequestedUri());
                 }

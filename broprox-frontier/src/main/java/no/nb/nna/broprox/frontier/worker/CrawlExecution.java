@@ -25,7 +25,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import com.rethinkdb.RethinkDB;
 import io.opentracing.Span;
 import io.opentracing.tag.Tags;
-import no.nb.nna.broprox.commons.DbAdapter;
+import no.nb.nna.broprox.api.HarvesterProto.HarvestPageReply;
 import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
 import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
@@ -144,13 +144,16 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker, Delayed {
 
         try {
             try {
-                outlinks = frontier.getHarvesterClient().fetchPage(currentUri, config);
+                HarvestPageReply harvestReply = frontier.getHarvesterClient().fetchPage(currentUri, config);
+                outlinks = harvestReply.getOutlinksList();
                 seedResolved = true;
 
                 status = status.toBuilder()
                         .setDocumentsCrawled(status.getDocumentsCrawled() + 1)
+                        .setBytesCrawled(status.getBytesCrawled() + harvestReply.getBytesDownloaded())
+                        .setUrisCrawled(status.getUrisCrawled() + harvestReply.getUriCount())
                         .build();
-                frontier.getDb().updateExecutionStatus(status);
+                status = frontier.getDb().updateExecutionStatus(status);
 
             } catch (Exception e) {
                 System.out.println("Error fetching page (" + currentUri + "): " + e);

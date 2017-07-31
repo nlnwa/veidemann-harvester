@@ -175,6 +175,10 @@ public class ContentCollector {
         return headerSize;
     }
 
+    public long getSize() {
+        return headerSize + (payloadSize == 0L ? 0L : 2L + payloadSize);
+    }
+
     public void writeRequest(CrawlLog logEntry) {
         try {
             CrawlLog.Builder logEntryBuilder = logEntry.toBuilder();
@@ -182,12 +186,12 @@ public class ContentCollector {
             if (payloadSize == 0L) {
                 logEntryBuilder.setRecordType("request")
                         .setBlockDigest(getHeaderDigest())
-                        .setSize(headerSize);
+                        .setSize(getSize());
             } else {
                 logEntryBuilder.setRecordType("request")
                         .setBlockDigest(getBlockDigest())
                         .setPayloadDigest(payloadDigestString)
-                        .setSize(headerSize + 2 + payloadSize);
+                        .setSize(getSize());
             }
             logEntry = db.addCrawlLog(logEntryBuilder.build());
             if (LOG.isDebugEnabled()) {
@@ -231,7 +235,7 @@ public class ContentCollector {
                 logEntryBuilder.setRecordType("response")
                         .setBlockDigest(getBlockDigest())
                         .setPayloadDigest(payloadDigestString)
-                        .setSize(headerSize + 2 + payloadSize);
+                        .setSize(getSize());
 
                 logEntry = db.updateCrawlLog(logEntryBuilder.build());
                 if (LOG.isDebugEnabled()) {

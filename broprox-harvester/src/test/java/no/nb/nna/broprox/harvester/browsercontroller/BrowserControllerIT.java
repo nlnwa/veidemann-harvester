@@ -18,11 +18,11 @@ package no.nb.nna.broprox.harvester.browsercontroller;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.List;
 import java.util.Optional;
 
 import com.google.common.collect.ImmutableList;
 import no.nb.nna.broprox.api.ControllerProto;
+import no.nb.nna.broprox.api.HarvesterProto;
 import no.nb.nna.broprox.commons.DbAdapter;
 import no.nb.nna.broprox.commons.util.ApiTools;
 import no.nb.nna.broprox.harvester.BrowserSessionRegistry;
@@ -88,8 +88,7 @@ public class BrowserControllerIT {
                 BrowserController controller = new BrowserController(browserHost, browserPort, db,
                         robotsServiceClient, sessionRegistry);) {
 
-            //List<MessagesProto.QueuedUri> expResult = null;
-            List<MessagesProto.QueuedUri> result = controller.render(queuedUri, config);
+            HarvesterProto.HarvestPageReply result = controller.render(queuedUri, config);
 
             System.out.println("=========\n" + result);
             // TODO review the generated test code and remove the default call to fail.

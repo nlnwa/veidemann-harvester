@@ -87,7 +87,7 @@ to quickly create a Cobra application.`,
 				}
 				r, err := client.ListCrawlJobs(context.Background(), &request)
 				if err != nil {
-					log.Fatalf("could not get seed: %v", err)
+					log.Fatalf("could not get job: %v", err)
 				}
 
 				if util.Marshal(file, format, r) != nil {

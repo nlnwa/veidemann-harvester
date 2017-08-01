@@ -21,6 +21,5 @@ package no.nb.nna.broprox.commons;
  */
 public interface BroproxHeaderConstants {
     static final String EXECUTION_ID = "broprox_eid";
-    static final String DISCOVERY_PATH = "broprox_discovery_path";
     static final String MANUAL_EXID = "manual";
 }

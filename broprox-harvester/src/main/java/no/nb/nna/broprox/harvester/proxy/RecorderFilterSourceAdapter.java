@@ -20,6 +20,7 @@ import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.util.AttributeKey;
 import no.nb.nna.broprox.commons.DbAdapter;
+import no.nb.nna.broprox.harvester.BrowserSessionRegistry;
 import org.littleshoot.proxy.HttpFilters;
 import org.littleshoot.proxy.HttpFiltersAdapter;
 import org.littleshoot.proxy.HttpFiltersSourceAdapter;
@@ -41,12 +42,15 @@ public class RecorderFilterSourceAdapter extends HttpFiltersSourceAdapter {
 
     private final ContentWriterClient contentWriterClient;
 
+    private final BrowserSessionRegistry sessionRegistry;
+
     private final AlreadyCrawledCache cache;
 
-    public RecorderFilterSourceAdapter(
-            final DbAdapter db, final ContentWriterClient contentWriterClient, final AlreadyCrawledCache cache) {
+    public RecorderFilterSourceAdapter(final DbAdapter db, final ContentWriterClient contentWriterClient,
+            final BrowserSessionRegistry sessionRegistry, final AlreadyCrawledCache cache) {
         this.db = db;
         this.contentWriterClient = contentWriterClient;
+        this.sessionRegistry = sessionRegistry;
         this.cache = cache;
     }
 
@@ -67,9 +71,10 @@ public class RecorderFilterSourceAdapter extends HttpFiltersSourceAdapter {
 
         String connectedUrl = clientCtx.channel().attr(CONNECTED_URL).get();
         if (connectedUrl == null) {
-            return new RecorderFilter(uri, originalRequest, clientCtx, db, contentWriterClient, cache);
+            return new RecorderFilter(uri, originalRequest, clientCtx, db, contentWriterClient, sessionRegistry, cache);
         }
-        return new RecorderFilter(connectedUrl + uri, originalRequest, clientCtx, db, contentWriterClient, cache);
+        return new RecorderFilter(
+                connectedUrl + uri, originalRequest, clientCtx, db, contentWriterClient, sessionRegistry, cache);
     }
 
 }

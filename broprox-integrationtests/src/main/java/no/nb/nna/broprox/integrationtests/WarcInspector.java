@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.List;
 
+import com.google.common.net.HttpHeaders;
 import com.google.gson.Gson;
 import okhttp3.HttpUrl;
 import okhttp3.OkHttpClient;
@@ -55,6 +56,7 @@ public class WarcInspector {
 
         Request request = new Request.Builder()
                 .url(url)
+                .header(HttpHeaders.ACCEPT, "application/json")
                 .build();
 
         try (Response response = CLIENT.newCall(request).execute();) {

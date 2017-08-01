@@ -18,6 +18,7 @@ package no.nb.nna.broprox.db;
 import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 import com.google.protobuf.Empty;
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -347,15 +348,37 @@ public class RethinkDbAdapterIT {
      * Test of isDuplicateContent method, of class RethinkDbAdapter.
      */
     @Test
-    public void testIsDuplicateContent() {
-        CrawledContent cc = CrawledContent.newBuilder()
+    public void testhasCrawledContent() {
+        CrawledContent cc1 = CrawledContent.newBuilder()
                 .setDigest("testIsDuplicateContent")
-                .setWarcId("warc-id")
+                .setWarcId("warc-id1")
+                .build();
+        CrawledContent cc2 = CrawledContent.newBuilder()
+                .setDigest("testIsDuplicateContent")
+                .setWarcId("warc-id2")
+                .build();
+        CrawledContent cc3 = CrawledContent.newBuilder()
+                .setDigest("testIsDuplicateContent")
+                .setWarcId("warc-id3")
                 .build();
 
-        assertThat(db.isDuplicateContent(cc.getDigest()).isPresent()).isFalse();
-        db.addCrawledContent(cc);
-        assertThat(db.isDuplicateContent(cc.getDigest()).isPresent()).isTrue();
+        assertThat(db.hasCrawledContent(cc1).isPresent()).isFalse();
+
+        Optional<CrawledContent> r2 = db.hasCrawledContent(cc2);
+        assertThat(r2.isPresent()).isTrue();
+        assertThat(r2.get()).isEqualTo(cc1);
+
+        Optional<CrawledContent> r3 = db.hasCrawledContent(cc3);
+        assertThat(r3.isPresent()).isTrue();
+        assertThat(r3.get()).isEqualTo(cc1);
+
+        CrawledContent cc4 = CrawledContent.newBuilder()
+                .setWarcId("warc-id4")
+                .build();
+
+        assertThatThrownBy(() -> db.hasCrawledContent(cc4))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("The required field 'digest' is missing from: 'CrawledContent");
     }
 
     /**
@@ -368,35 +391,9 @@ public class RethinkDbAdapterIT {
                 .setWarcId("warc-id")
                 .build();
 
-        db.addCrawledContent(cc);
+        db.hasCrawledContent(cc);
         db.deleteCrawledContent(cc.getDigest());
         db.deleteCrawledContent(cc.getDigest());
-    }
-
-    /**
-     * Test of addCrawledContent method, of class RethinkDbAdapter.
-     */
-    @Test
-    public void testAddCrawledContent() {
-        CrawledContent cc1 = CrawledContent.newBuilder()
-                .setDigest("testAddCrawledContent")
-                .setWarcId("warc-id")
-                .build();
-
-        CrawledContent result1 = db.addCrawledContent(cc1);
-        assertThat(result1).isEqualTo(cc1);
-
-        assertThatThrownBy(() -> db.addCrawledContent(cc1))
-                .isInstanceOf(DbException.class)
-                .hasMessageContaining("Duplicate primary key");
-
-        CrawledContent cc2 = CrawledContent.newBuilder()
-                .setWarcId("warc-id")
-                .build();
-
-        assertThatThrownBy(() -> db.addCrawledContent(cc2))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("The required field 'digest' is missing from: 'CrawledContent");
     }
 
     /**

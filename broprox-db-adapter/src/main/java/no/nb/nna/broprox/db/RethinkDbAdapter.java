@@ -112,9 +112,17 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
-    public Optional<CrawledContent> isDuplicateContent(String digest) {
-        Map<String, Object> response = otw.map("db-isDuplicateContent",
-                this::executeRequest, r.table(TABLES.CRAWLED_CONTENT.name).get(digest));
+    public Optional<CrawledContent> hasCrawledContent(CrawledContent cc) {
+        ensureContainsValue(cc, "digest");
+        ensureContainsValue(cc, "warc_id");
+
+        Map rMap = ProtoUtils.protoToRethink(cc);
+        Map<String, Object> response = otw.map("db-hasCrawledContent",
+                this::executeRequest, r.table(TABLES.CRAWLED_CONTENT.name)
+                        .insert(rMap)
+                        .optArg("conflict", (id, old_doc, new_doc) -> old_doc)
+                        .optArg("return_changes", "always")
+                        .g("changes").nth(0).g("old_val"));
 
         if (response == null) {
             return Optional.empty();
@@ -124,22 +132,8 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     public void deleteCrawledContent(String digest) {
-        otw.map("db-addExtractedText",
+        otw.map("db-deleteCrawledContent",
                 this::executeRequest, r.table(TABLES.CRAWLED_CONTENT.name).get(digest).delete());
-    }
-
-    @Override
-    public CrawledContent addCrawledContent(CrawledContent cc) {
-        ensureContainsValue(cc, "digest");
-        ensureContainsValue(cc, "warc_id");
-
-        Map rMap = ProtoUtils.protoToRethink(cc);
-        Map<String, Object> response = otw.map("db-addCrawledContent",
-                this::executeRequest, r.table(TABLES.CRAWLED_CONTENT.name)
-                        .insert(rMap)
-                        .optArg("conflict", "error"));
-
-        return cc;
     }
 
     @Override

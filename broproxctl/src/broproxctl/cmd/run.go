@@ -44,7 +44,7 @@ If seedId is not submitted then all the seeds wich are configured to use the sub
 					log.Fatalf("could not get entity: %v", err)
 				}
 
-				if util.MarshalJson(file, r) != nil {
+				if util.Marshal(file, "yaml", r) != nil {
 					os.Exit(1)
 				}
 			case 2:
@@ -55,7 +55,7 @@ If seedId is not submitted then all the seeds wich are configured to use the sub
 					log.Fatalf("could not get entity: %v", err)
 				}
 
-				if util.MarshalJson(file, r) != nil {
+				if util.Marshal(file, "yaml", r) != nil {
 					os.Exit(1)
 				}
 			}

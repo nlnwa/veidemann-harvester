@@ -16,8 +16,15 @@ package cmd
 import (
 	"fmt"
 
+	bp "broprox"
+	"broproxctl/util"
 	"github.com/spf13/cobra"
+	"golang.org/x/net/context"
+	"log"
+	"os"
 )
+
+var filename string
 
 // createCmd represents the create command
 var createCmd = &cobra.Command{
@@ -30,7 +37,36 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("create called")
+
+		if filename == "" {
+			cmd.Usage()
+			os.Exit(1)
+		} else if filename == "-" {
+			filename = ""
+		}
+		result, err := util.Unmarshal(filename)
+		if err != nil {
+			log.Fatalf("Parse error: %v", err)
+			os.Exit(1)
+		}
+
+		client := util.Connect()
+		for _, v := range result {
+			switch v.(type) {
+			case *bp.Seed:
+				r, err := client.SaveSeed(context.Background(), v.(*bp.Seed))
+				if err != nil {
+					log.Fatalf("Could not save %T: %v", v, err)
+				}
+				fmt.Printf("Saved %T: %v\n", r, r.Meta.Name)
+			case *bp.CrawlEntity:
+				r, err := client.SaveEntity(context.Background(), v.(*bp.CrawlEntity))
+				if err != nil {
+					log.Fatalf("Could not save %T: %v", v, err)
+				}
+				fmt.Printf("Saved %T: %v\n", r, r.Meta.Name)
+			}
+		}
 	},
 }
 
@@ -42,6 +78,8 @@ func init() {
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
 	// createCmd.PersistentFlags().String("foo", "", "A help for foo")
+	createCmd.PersistentFlags().StringVarP(&filename, "input", "i", "", "File name to read from. "+
+		"If input is a directory, all files ending in .yaml or .json will be tried. An input of '-' will read from stdin.")
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:

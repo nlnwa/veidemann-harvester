@@ -33,7 +33,7 @@ import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
 import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.harvester.BrowserSessionRegistry;
 import no.nb.nna.broprox.harvester.OpenTracingSpans;
-import no.nb.nna.broprox.harvester.proxy.RobotsServiceClient;
+import no.nb.nna.broprox.commons.client.RobotsServiceClient;
 import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
 import no.nb.nna.broprox.model.ConfigProto.CrawlConfig;
 import no.nb.nna.broprox.model.MessagesProto;

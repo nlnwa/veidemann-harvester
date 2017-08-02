@@ -19,14 +19,15 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.Date;
-import java.util.List;
 
 import net.lightbody.bmp.mitm.CertificateInfo;
 import net.lightbody.bmp.mitm.RootCertificateGenerator;
 import net.lightbody.bmp.mitm.keys.ECKeyGenerator;
 import net.lightbody.bmp.mitm.manager.ImpersonatingMitmManager;
 import no.nb.nna.broprox.commons.DbAdapter;
+import no.nb.nna.broprox.commons.client.ContentWriterClient;
 import no.nb.nna.broprox.harvester.BrowserSessionRegistry;
+import org.littleshoot.proxy.HostResolver;
 import org.littleshoot.proxy.HttpProxyServer;
 import org.littleshoot.proxy.impl.DefaultHttpProxyServer;
 import org.slf4j.Logger;
@@ -51,7 +52,7 @@ public class RecordingProxy implements AutoCloseable {
      * @throws IOException is thrown if certificate directory could not be created
      */
     public RecordingProxy(File workDir, int port, DbAdapter db, final ContentWriterClient contentWriterClient,
-            final List<String> dnsServers, BrowserSessionRegistry sessionRegistry) throws IOException {
+            final HostResolver hostResolver, BrowserSessionRegistry sessionRegistry) throws IOException {
 
         LOG.info("Starting recording proxy listening on port {}.", port);
 
@@ -90,7 +91,7 @@ public class RecordingProxy implements AutoCloseable {
                 .withAllowLocalOnly(false)
                 .withPort(port)
                 .withTransparent(true)
-                .withServerResolver(new DnsLookup(db, contentWriterClient, dnsServers))
+                .withServerResolver(hostResolver)
                 .withManInTheMiddle(mitmManager)
                 .withFiltersSource(new RecorderFilterSourceAdapter(db, contentWriterClient, sessionRegistry, cache))
                 .start();

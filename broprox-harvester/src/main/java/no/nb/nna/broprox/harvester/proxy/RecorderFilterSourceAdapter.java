@@ -20,6 +20,7 @@ import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.util.AttributeKey;
 import no.nb.nna.broprox.commons.DbAdapter;
+import no.nb.nna.broprox.commons.client.ContentWriterClient;
 import no.nb.nna.broprox.harvester.BrowserSessionRegistry;
 import org.littleshoot.proxy.HttpFilters;
 import org.littleshoot.proxy.HttpFiltersAdapter;

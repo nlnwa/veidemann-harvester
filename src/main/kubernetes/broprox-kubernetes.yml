@@ -123,8 +123,10 @@ spec:
           value: "robots"
         - name: ROBOTS_SERVICE_PORT
           value: "50052"
-        - name: DNS_SERVER
-          value: "testsites"
+        - name: DNS_SERVICE_HOST
+          value: "dnsservice"
+        - name: DNS_SERVICE_PORT
+          value: "50052"
         - name: TRACER_URI
           value: "http://tracer:9411/api/v1/spans"
         volumeMounts:
@@ -356,6 +358,61 @@ spec:
           value: "harvester"
         - name: PROXY_PORT
           value: "8080"
+        - name: TRACER_URI
+          value: "http://tracer:9411/api/v1/spans"
+      restartPolicy: Always
+      dnsPolicy: ClusterFirst
+
+---
+# Broprox DNS resolver service
+apiVersion: v1
+kind: Service
+metadata:
+  name: dnsservice
+  labels:
+    app: dnsservice
+    tier: backend
+    role: worker
+spec:
+  ports:
+  - name: api
+    port: 50052
+    targetPort: 50052
+  selector:
+    app: dnsservice
+    tier: backend
+    role: worker
+  type: NodePort
+---
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: dnsservice
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: dnsservice
+        tier: backend
+        role: worker
+    spec:
+      containers:
+      - name: robots
+        image: norsknettarkiv/broprox-dns-service
+        ports:
+        - containerPort: 50052
+        env:
+        - name: DB_HOST
+          value: "db"
+        - name: DB_PORT
+          value: "28015"
+        - name: CONTENT_WRITER_HOST
+          value: "content-writer"
+        - name: CONTENT_WRITER_PORT
+          value: "8080"
+        - name: DNS_SERVER
+          value: "8.8.8.8"
         - name: TRACER_URI
           value: "http://tracer:9411/api/v1/spans"
       restartPolicy: Always

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package no.nb.nna.broprox.harvester.proxy;
+package no.nb.nna.broprox.dnsservice;
 
 import java.io.IOException;
 import java.io.InterruptedIOException;
@@ -37,11 +37,11 @@ import com.google.common.net.InetAddresses;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.opentracing.tag.Tags;
-import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
 import no.nb.nna.broprox.commons.DbAdapter;
+import no.nb.nna.broprox.commons.client.ContentWriterClient;
+import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
 import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
-import org.littleshoot.proxy.HostResolver;
 import org.netpreserve.commons.util.datetime.DateFormat;
 import org.netpreserve.commons.util.datetime.Granularity;
 import org.netpreserve.commons.util.datetime.VariablePrecisionDateTime;
@@ -67,7 +67,7 @@ import org.xbill.DNS.Type;
 /**
  *
  */
-public class DnsLookup implements HostResolver {
+public class DnsLookup {
 
     private static final Logger LOG = LoggerFactory.getLogger(DnsLookup.class);
 
@@ -123,7 +123,6 @@ public class DnsLookup implements HostResolver {
         }
     }
 
-    @Override
     public InetSocketAddress resolve(String host, int port) throws UnknownHostException {
         OpenTracingWrapper otw = new OpenTracingWrapper("DnsLookup", Tags.SPAN_KIND_CLIENT)
                 .addTag("lookup", host + ':' + port)

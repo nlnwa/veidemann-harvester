@@ -16,23 +16,25 @@
 package no.nb.nna.broprox.harvester.browsercontroller;
 
 import java.io.File;
+import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Optional;
 
-import com.google.common.collect.ImmutableList;
 import no.nb.nna.broprox.api.ControllerProto;
 import no.nb.nna.broprox.api.HarvesterProto;
 import no.nb.nna.broprox.commons.DbAdapter;
+import no.nb.nna.broprox.commons.client.ContentWriterClient;
+import no.nb.nna.broprox.commons.client.RobotsServiceClient;
 import no.nb.nna.broprox.commons.util.ApiTools;
 import no.nb.nna.broprox.harvester.BrowserSessionRegistry;
-import no.nb.nna.broprox.harvester.proxy.ContentWriterClient;
 import no.nb.nna.broprox.harvester.proxy.RecordingProxy;
-import no.nb.nna.broprox.harvester.proxy.RobotsServiceClient;
 import no.nb.nna.broprox.model.ConfigProto;
 import no.nb.nna.broprox.model.MessagesProto;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.littleshoot.proxy.HostResolver;
 import org.mockito.invocation.InvocationOnMock;
 
 import static org.mockito.Mockito.*;
@@ -84,7 +86,7 @@ public class BrowserControllerIT {
         tmpDir.deleteOnExit();
 
         try (RecordingProxy proxy = new RecordingProxy(tmpDir, proxyPort, db, contentWriterClient,
-                ImmutableList.of("8.8.8.8"), sessionRegistry);
+                new TestHostResolver(), sessionRegistry);
                 BrowserController controller = new BrowserController(browserHost, browserPort, db,
                         robotsServiceClient, sessionRegistry);) {
 
@@ -152,4 +154,12 @@ public class BrowserControllerIT {
         return db;
     }
 
+    private class TestHostResolver implements HostResolver {
+
+        @Override
+        public InetSocketAddress resolve(String host, int port) throws UnknownHostException {
+            return new InetSocketAddress(host, port);
+        }
+
+    }
 }

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package no.nb.nna.broprox.harvester.proxy;
+package no.nb.nna.broprox.commons.client;
 
 import java.net.URI;
 import java.util.concurrent.Callable;

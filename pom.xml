@@ -29,9 +29,10 @@
         <module>broprox-controller</module>
         <module>broprox-api</module>
         <module>broprox-commons</module>
+        <module>broprox-dns-service</module>
         <module>broprox-robotrules</module>
         <module>broproxctl</module>
-  </modules>
+    </modules>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -257,6 +258,12 @@
                 <groupId>com.optimaize.languagedetector</groupId>
                 <artifactId>language-detector</artifactId>
                 <version>0.6</version>
+            </dependency>
+
+            <dependency>
+                <groupId>dnsjava</groupId>
+                <artifactId>dnsjava</artifactId>
+                <version>2.1.8</version>
             </dependency>
 
             <!-- ARC/WARC libraries -->

@@ -15,8 +15,6 @@
  */
 package no.nb.nna.broprox.harvester.settings;
 
-import java.util.List;
-
 import no.nb.nna.broprox.commons.settings.CommonSettings;
 
 /**
@@ -42,7 +40,9 @@ public class Settings extends CommonSettings {
 
     private int robotsServicePort;
 
-    private List<String> dnsServers;
+    private String dnsServiceHost;
+
+    private int dnsServicePort;
 
     public int getProxyPort() {
         return proxyPort;
@@ -116,12 +116,20 @@ public class Settings extends CommonSettings {
         this.robotsServicePort = robotsServicePort;
     }
 
-    public List<String> getDnsServers() {
-        return dnsServers;
+    public String getDnsServiceHost() {
+        return dnsServiceHost;
     }
 
-    public void setDnsServers(List<String> dnsServers) {
-        this.dnsServers = dnsServers;
+    public void setDnsServiceHost(String dnsServiceHost) {
+        this.dnsServiceHost = dnsServiceHost;
+    }
+
+    public int getDnsServicePort() {
+        return dnsServicePort;
+    }
+
+    public void setDnsServicePort(int dnsServicePort) {
+        this.dnsServicePort = dnsServicePort;
     }
 
 }

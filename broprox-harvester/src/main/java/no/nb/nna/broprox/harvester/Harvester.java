@@ -21,14 +21,16 @@ import com.typesafe.config.Config;
 import com.typesafe.config.ConfigBeanFactory;
 import com.typesafe.config.ConfigException;
 import com.typesafe.config.ConfigFactory;
-import no.nb.nna.broprox.commons.opentracing.TracerFactory;
 import no.nb.nna.broprox.commons.DbAdapter;
+import no.nb.nna.broprox.commons.client.ContentWriterClient;
+import no.nb.nna.broprox.commons.client.DnsServiceClient;
+import no.nb.nna.broprox.commons.client.RobotsServiceClient;
+import no.nb.nna.broprox.commons.opentracing.TracerFactory;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
 import no.nb.nna.broprox.harvester.api.HarvesterApiServer;
 import no.nb.nna.broprox.harvester.browsercontroller.BrowserController;
-import no.nb.nna.broprox.harvester.proxy.ContentWriterClient;
+import no.nb.nna.broprox.harvester.proxy.DnsServiceHostResolver;
 import no.nb.nna.broprox.harvester.proxy.RecordingProxy;
-import no.nb.nna.broprox.harvester.proxy.RobotsServiceClient;
 import no.nb.nna.broprox.harvester.settings.Settings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,6 +71,9 @@ public class Harvester {
                 RobotsServiceClient robotsServiceClient = new RobotsServiceClient(
                         SETTINGS.getRobotsServiceHost(), SETTINGS.getRobotsServicePort());
 
+                DnsServiceClient dnsServiceClient = new DnsServiceClient(
+                        SETTINGS.getDnsServiceHost(), SETTINGS.getDnsServicePort());
+
                 BrowserController controller = new BrowserController(
                         SETTINGS.getBrowserHost(), SETTINGS.getBrowserPort(), db, robotsServiceClient, sessionRegistry);
 
@@ -77,7 +82,8 @@ public class Harvester {
 
                 RecordingProxy proxy = new RecordingProxy(
                         new File(SETTINGS.getWorkDir()),
-                        SETTINGS.getProxyPort(), db, contentWriterClient, SETTINGS.getDnsServers(), sessionRegistry);
+                        SETTINGS.getProxyPort(), db, contentWriterClient,
+                        new DnsServiceHostResolver(dnsServiceClient), sessionRegistry);
 
                 HarvesterApiServer apiServer = new HarvesterApiServer(controller, proxy).start();) {
 

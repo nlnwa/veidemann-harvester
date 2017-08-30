@@ -14,8 +14,11 @@
  * limitations under the License.
  */
 
-package no.nb.nna.broprox.harvester.proxy;
+package no.nb.nna.broprox.commons.client;
 
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.util.concurrent.TimeUnit;
 
 import io.grpc.ManagedChannel;
@@ -23,52 +26,52 @@ import io.grpc.ManagedChannelBuilder;
 import io.grpc.StatusRuntimeException;
 import io.opentracing.contrib.ClientTracingInterceptor;
 import io.opentracing.util.GlobalTracer;
-import no.nb.nna.broprox.api.RobotsServiceGrpc;
-import no.nb.nna.broprox.api.RobotsServiceProto;
-import no.nb.nna.broprox.model.ConfigProto;
-import no.nb.nna.broprox.model.MessagesProto;
+import no.nb.nna.broprox.api.DnsServiceGrpc;
+import no.nb.nna.broprox.api.DnsServiceProto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  *
  */
-public class RobotsServiceClient implements AutoCloseable {
+public class DnsServiceClient implements AutoCloseable {
 
-    private static final Logger LOG = LoggerFactory.getLogger(RobotsServiceClient.class);
+    private static final Logger LOG = LoggerFactory.getLogger(DnsServiceClient.class);
 
     private final ManagedChannel channel;
 
-    private final RobotsServiceGrpc.RobotsServiceBlockingStub blockingStub;
+    private final DnsServiceGrpc.DnsServiceBlockingStub blockingStub;
 
-    private final RobotsServiceGrpc.RobotsServiceStub asyncStub;
+    private final DnsServiceGrpc.DnsServiceStub asyncStub;
 
-    public RobotsServiceClient(final String host, final int port) {
+    public DnsServiceClient(final String host, final int port) {
         this(ManagedChannelBuilder.forAddress(host, port).usePlaintext(true));
-        LOG.info("Robots service client pointing to " + host + ":" + port);
+        LOG.info("DNS service client pointing to " + host + ":" + port);
     }
 
-    public RobotsServiceClient(ManagedChannelBuilder<?> channelBuilder) {
-        LOG.info("Setting up Robots service client");
+    public DnsServiceClient(ManagedChannelBuilder<?> channelBuilder) {
+        LOG.info("Setting up DNS service client");
         ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor.Builder(GlobalTracer.get()).build();
         channel = channelBuilder.intercept(tracingInterceptor).build();
-        blockingStub = RobotsServiceGrpc.newBlockingStub(channel);
-        asyncStub = RobotsServiceGrpc.newStub(channel);
+        blockingStub = DnsServiceGrpc.newBlockingStub(channel);
+        asyncStub = DnsServiceGrpc.newStub(channel);
     }
 
-    public boolean isAllowed(MessagesProto.QueuedUri queuedUri, ConfigProto.CrawlConfig config) {
+    public InetSocketAddress resolve(String host, int port) {
         try {
-            RobotsServiceProto.IsAllowedRequest request = RobotsServiceProto.IsAllowedRequest.newBuilder()
-                    .setExecutionId(queuedUri.getExecutionId())
-                    .setUri(queuedUri.getUri())
-                    .setUserAgent(config.getBrowserConfig().getUserAgent())
-                    .setPoliteness(config.getPoliteness())
+            DnsServiceProto.ResolveRequest request = DnsServiceProto.ResolveRequest.newBuilder()
+                    .setHost(host)
+                    .setPort(port)
                     .build();
-            RobotsServiceProto.IsAllowedReply reply = blockingStub.isAllowed(request);
-            return reply.getIsAllowed();
+            DnsServiceProto.ResolveReply reply = blockingStub.resolve(request);
+            InetSocketAddress address = new InetSocketAddress(
+                    InetAddress.getByAddress(reply.getHost(), reply.getRawIp().toByteArray()), reply.getPort());
+            return address;
         } catch (StatusRuntimeException ex) {
             LOG.error("RPC failed: " + ex.getStatus(), ex);
             throw ex;
+        } catch (UnknownHostException ex) {
+            throw new RuntimeException(ex);
         }
     }
 

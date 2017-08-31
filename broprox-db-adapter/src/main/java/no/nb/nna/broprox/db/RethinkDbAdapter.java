@@ -34,6 +34,7 @@ import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListReply;
 import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListRequest;
 import no.nb.nna.broprox.api.ControllerProto.CrawlConfigListReply;
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;
+import no.nb.nna.broprox.api.ControllerProto.CrawlHostGroupConfigListReply;
 import no.nb.nna.broprox.api.ControllerProto.CrawlJobListReply;
 import no.nb.nna.broprox.api.ControllerProto.CrawlJobListRequest;
 import no.nb.nna.broprox.api.ControllerProto.CrawlScheduleConfigListReply;
@@ -47,6 +48,7 @@ import no.nb.nna.broprox.model.ConfigProto.BrowserConfig;
 import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
 import no.nb.nna.broprox.model.ConfigProto.CrawlConfig;
 import no.nb.nna.broprox.model.ConfigProto.CrawlEntity;
+import no.nb.nna.broprox.model.ConfigProto.CrawlHostGroupConfig;
 import no.nb.nna.broprox.model.ConfigProto.CrawlJob;
 import no.nb.nna.broprox.model.ConfigProto.CrawlScheduleConfig;
 import no.nb.nna.broprox.model.ConfigProto.LogLevels;
@@ -54,6 +56,7 @@ import no.nb.nna.broprox.model.ConfigProto.PolitenessConfig;
 import no.nb.nna.broprox.model.ConfigProto.Seed;
 import no.nb.nna.broprox.model.ConfigProto.Selector;
 import no.nb.nna.broprox.model.MessagesProto.CrawlExecutionStatus;
+import no.nb.nna.broprox.model.MessagesProto.CrawlHostGroup;
 import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
 import no.nb.nna.broprox.model.MessagesProto.CrawledContent;
 import no.nb.nna.broprox.model.MessagesProto.ExtractedText;
@@ -80,7 +83,9 @@ public class RethinkDbAdapter implements DbAdapter {
         CRAWL_CONFIGS("crawl_configs", CrawlConfig.getDefaultInstance()),
         CRAWL_SCHEDULE_CONFIGS("crawl_schedule_configs", CrawlScheduleConfig.getDefaultInstance()),
         BROWSER_CONFIGS("browser_configs", BrowserConfig.getDefaultInstance()),
-        POLITENESS_CONFIGS("politeness_configs", PolitenessConfig.getDefaultInstance());
+        POLITENESS_CONFIGS("politeness_configs", PolitenessConfig.getDefaultInstance()),
+        CRAWL_HOST_GROUP("crawl_host_group", CrawlHostGroup.getDefaultInstance()),
+        CRAWL_HOST_GROUP_CONFIGS("crawl_host_group_configs", CrawlHostGroupConfig.getDefaultInstance());
 
         public final String name;
 
@@ -202,6 +207,22 @@ public class RethinkDbAdapter implements DbAdapter {
     public BrowserScriptListReply listBrowserScripts(BrowserScriptListRequest request) {
         BrowserScriptListRequestQueryBuilder queryBuilder = new BrowserScriptListRequestQueryBuilder(request);
         return queryBuilder.executeList(otw, this).build();
+    }
+
+    @Override
+    public CrawlHostGroupConfig saveCrawlHostGroupConfig(CrawlHostGroupConfig crawlHostGroupConfig) {
+        return saveConfigMessage(crawlHostGroupConfig, TABLES.CRAWL_HOST_GROUP_CONFIGS);
+    }
+
+    @Override
+    public Empty deleteCrawlHostGroupConfig(CrawlHostGroupConfig crawlHostGroupConfig) {
+        return deleteConfigMessage(crawlHostGroupConfig, TABLES.CRAWL_HOST_GROUP_CONFIGS);
+    }
+
+    @Override
+    public CrawlHostGroupConfigListReply listCrawlHostGroupConfigs(ListRequest request) {
+        ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, TABLES.CRAWL_HOST_GROUP_CONFIGS);
+        return queryBuilder.executeList(otw, this, CrawlHostGroupConfigListReply.newBuilder()).build();
     }
 
     @Override

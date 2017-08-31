@@ -160,6 +160,13 @@ public class DbInitializer {
 
         r.tableCreate(TABLES.POLITENESS_CONFIGS.name).run(conn);
 
+        r.tableCreate(TABLES.CRAWL_HOST_GROUP_CONFIGS.name).run(conn);
+
+        r.tableCreate(TABLES.CRAWL_HOST_GROUP.name).run(conn);
+        r.table(TABLES.CRAWL_HOST_GROUP.name).indexCreate("id_politenessConfigId",
+                hGroup -> r.array(hGroup.g("id"), hGroup.g("politenessId"))).run(conn);
+        r.table(TABLES.CRAWL_HOST_GROUP.name).indexCreate("nextFetchTime").run(conn);
+
         createMetaIndexes(TABLES.BROWSER_SCRIPTS,
                 TABLES.CRAWL_ENTITIES,
                 TABLES.SEEDS,
@@ -173,6 +180,7 @@ public class DbInitializer {
         r.table(TABLES.URI_QUEUE.name).indexWait("surt", "executionId").run(conn);
         r.table(TABLES.CRAWL_LOG.name).indexWait("surt_time").run(conn);
         r.table(TABLES.SEEDS.name).indexWait("jobId", "entityId").run(conn);
+        r.table(TABLES.CRAWL_HOST_GROUP.name).indexWait("id_politenessConfigId", "nextFetchTime").run(conn);
     }
 
     private final void createMetaIndexes(TABLES... tables) {

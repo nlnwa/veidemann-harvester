@@ -121,6 +121,11 @@ message PolitenessConfig {
     int32 minimum_robots_validity_duration_s = 11;
     string custom_robots = 20;
     int64 min_time_between_page_load_ms = 4;
+    int64 max_time_between_page_load_ms = 5;
+    float delay_factor = 6;
+    int32 max_retries = 7; // The maximum number of retries before giving up fetching a uri
+    int32 retry_delay_seconds = 8;
+    Selector crawl_host_group_selector = 9;
 }
 
 message ExtraConfig {
@@ -134,6 +139,16 @@ message BrowserScript {
     Meta meta = 2;
     string script = 3;
     string url_regexp = 4; // Not implemented
+}
+
+message CrawlHostGroupConfig {
+    message IpRange {
+        string ip_from = 1;
+        string ip_to = 2;
+    }
+    string id = 1;
+    Meta meta = 2;
+    repeated IpRange ip_range = 3;
 }
 
 message LogLevels {

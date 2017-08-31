@@ -54,7 +54,7 @@ message CrawlLog {
     string referrer = 9;
     string content_type = 10;
     google.protobuf.Timestamp fetch_time_stamp = 11;
-    int64 fetch_time_millis = 12;
+    int64 fetch_time_ms = 12;
     string block_digest = 13;
     string payload_digest = 14;
     string storage_ref = 15;
@@ -62,6 +62,7 @@ message CrawlLog {
     string warc_refers_to = 17;
     string ip_address = 18;
     string execution_id = 19;
+    int32 retries = 20; // Number of times this uri has been retried. Zero means success on first attempt.
 }
 
 message CrawledContent {
@@ -79,6 +80,13 @@ message ExtractedText {
     int64 lix = 7;
 }
 
+message CrawlHostGroup {
+    string id = 1; // SHA-1 hash of uri or crawlgroup config id
+    string politeness_id = 2; // The politeness config this group is valid for
+    google.protobuf.Timestamp next_fetch_time = 3; // The earliest time a URI from this group might be fetched
+    bool busy = 4; // True if crawler is busy with fetching a URI from this group
+}
+
 message QueuedUri {
     string id = 1;
     string execution_id = 2;
@@ -87,24 +95,24 @@ message QueuedUri {
     int64 sequence = 4;
     string uri = 5;
     string surt = 6;
+    string ip = 7;
 
     /**
      * Get the discoveryPath,
-     * <p>
-     * <table>
-     * <tr><td>R</td><td>Redirect</td></tr>
-     * <tr><td>E</td><td>Embed</td></tr>
-     * <tr><td>X</td><td>Speculative embed (aggressive/Javascript link extraction)</td></tr>
-     * <tr><td>L</td><td>Link</td></tr>
-     * <tr><td>P</td><td>Prerequisite (as for DNS or robots.txt before another URI)</td></tr>
-     * </table>
-     * <p>
-     * @return the discovery path
+     *  R - Redirect
+     *  E - Embed
+     *  X - Speculative embed (aggressive/Javascript link extraction)
+     *  L - Link
+     *  P - Prerequisite (as for DNS or robots.txt before another URI)
      */
-    string discovery_path = 7;
-    string referrer = 8;
-    CrawlScope scope = 9;
-    repeated Cookie cookies = 10;
+    string discovery_path = 8;
+    string referrer = 9;
+    CrawlScope scope = 10;
+    repeated Cookie cookies = 11;
+    int64 page_fetch_time_ms = 12; // The time used to fetch and render the the uri including dependencies
+    int32 retries = 13; // Number of times this uri has been scheduled for retry.
+    google.protobuf.Timestamp earliest_fetch_time_stamp = 14; // Do not fetch this uri before this time
+    string crawl_host_group_id = 15; // The Crawl Host Group calculated for this uri
 }
 
 message Cookie {

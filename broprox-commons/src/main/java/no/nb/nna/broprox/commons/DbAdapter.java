@@ -42,6 +42,7 @@ import no.nb.nna.broprox.model.ConfigProto.LogLevels;
 import no.nb.nna.broprox.model.ConfigProto.PolitenessConfig;
 import no.nb.nna.broprox.model.ConfigProto.Seed;
 import no.nb.nna.broprox.model.MessagesProto.CrawlExecutionStatus;
+import no.nb.nna.broprox.model.MessagesProto.CrawlHostGroup;
 import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
 import no.nb.nna.broprox.model.MessagesProto.CrawledContent;
 import no.nb.nna.broprox.model.MessagesProto.ExtractedText;
@@ -68,6 +69,12 @@ public interface DbAdapter extends AutoCloseable {
     QueuedUri addQueuedUri(QueuedUri qu);
 
     QueuedUri updateQueuedUri(QueuedUri qu);
+
+    CrawlHostGroup getOrCreateCrawlHostGroup(String crawlHostGroupId, String politenessId);
+
+    Optional<CrawlHostGroup> borrowFirstReadyCrawlHostGroup();
+
+    CrawlHostGroup releaseCrawlHostGroup(CrawlHostGroup crawlHostGroup, long nextFetchDelayMs);
 
     Screenshot addScreenshot(Screenshot s);
 

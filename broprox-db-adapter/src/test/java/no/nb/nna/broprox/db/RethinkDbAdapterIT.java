@@ -44,6 +44,7 @@ import no.nb.nna.broprox.model.ConfigProto.Meta;
 import no.nb.nna.broprox.model.ConfigProto.Seed;
 import no.nb.nna.broprox.model.ConfigProto.Selector;
 import no.nb.nna.broprox.model.MessagesProto.CrawlExecutionStatus;
+import no.nb.nna.broprox.model.MessagesProto.CrawlHostGroup;
 import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
 import no.nb.nna.broprox.model.MessagesProto.CrawledContent;
 import no.nb.nna.broprox.model.MessagesProto.ExtractedText;
@@ -930,7 +931,7 @@ public class RethinkDbAdapterIT {
     }
 
     @Test
-    public void saveAndGetLogConfig() {
+    public void testSaveAndGetLogConfig() {
         LogLevel l1 = LogLevel.newBuilder().setLogger("no.nb.nna").setLevel(LogLevels.Level.INFO).build();
         LogLevel l2 = LogLevel.newBuilder().setLogger("org.apache").setLevel(LogLevels.Level.FATAL).build();
         LogLevels logLevels = LogLevels.newBuilder().addLogLevel(l1).addLogLevel(l2).build();
@@ -941,5 +942,71 @@ public class RethinkDbAdapterIT {
 
         response = db.getLogConfig();
         assertThat(response).isEqualTo(logLevels);
+    }
+
+    @Test
+    public void testGetOrCreateCrawlHostGroup() {
+        CrawlHostGroup chg1 = db.getOrCreateCrawlHostGroup("crawlHostGroupId", "politenessId");
+        CrawlHostGroup chg2 = db.getOrCreateCrawlHostGroup("crawlHostGroupId", "politenessId");
+        CrawlHostGroup chg3 = db.getOrCreateCrawlHostGroup("xxx", "politenessId");
+        assertThat(chg1).isEqualTo(chg2);
+        assertThat(chg1).isNotEqualTo(chg3);
+    }
+
+    @Test
+    public void testBorrowFirstReadyCrawlHostGroup() {
+        CrawlHostGroup chg1 = db.getOrCreateCrawlHostGroup("crawlHostGroupId", "politenessId");
+        CrawlHostGroup chg2 = db.getOrCreateCrawlHostGroup("xxx", "politenessId");
+
+        Optional<CrawlHostGroup> b1 = db.borrowFirstReadyCrawlHostGroup();
+        Optional<CrawlHostGroup> b2 = db.borrowFirstReadyCrawlHostGroup();
+        Optional<CrawlHostGroup> b3 = db.borrowFirstReadyCrawlHostGroup();
+
+        assertThat(b1.isPresent()).isTrue();
+        assertThat(b2.isPresent()).isTrue();
+        assertThat(b3.isPresent()).isFalse();
+
+        assertThat(b1.get().getId()).isEqualTo(chg1.getId());
+        assertThat(b1.get().getBusy()).isTrue();
+        assertThat(ProtoUtils.tsToOdt(b1.get().getNextFetchTime())).isBeforeOrEqualTo(OffsetDateTime.now());
+
+        assertThat(b2.get().getId()).isEqualTo(chg2.getId());
+        assertThat(b2.get().getBusy()).isTrue();
+        assertThat(ProtoUtils.tsToOdt(b2.get().getNextFetchTime())).isBeforeOrEqualTo(OffsetDateTime.now());
+    }
+
+    @Test
+    public void testReleaseCrawlHostGroup() throws InterruptedException {
+        CrawlHostGroup chg1 = db.getOrCreateCrawlHostGroup("crawlHostGroupId", "politenessId");
+        CrawlHostGroup chg2 = db.getOrCreateCrawlHostGroup("xxx", "politenessId");
+        Optional<CrawlHostGroup> b1 = db.borrowFirstReadyCrawlHostGroup();
+        Optional<CrawlHostGroup> b2 = db.borrowFirstReadyCrawlHostGroup();
+
+        CrawlHostGroup r1 = db.releaseCrawlHostGroup(b1.get(), 200);
+        CrawlHostGroup r2 = db.releaseCrawlHostGroup(b2.get(), 0);
+
+        Optional<CrawlHostGroup> b3 = db.borrowFirstReadyCrawlHostGroup();
+        Optional<CrawlHostGroup> b4 = db.borrowFirstReadyCrawlHostGroup();
+
+        assertThat(r1.getId()).isEqualTo(chg1.getId());
+        assertThat(r1.getBusy()).isFalse();
+        assertThat(ProtoUtils.tsToOdt(r1.getNextFetchTime())).isAfter(OffsetDateTime.now());
+
+        assertThat(r2.getId()).isEqualTo(chg2.getId());
+        assertThat(r2.getBusy()).isFalse();
+        assertThat(ProtoUtils.tsToOdt(r2.getNextFetchTime())).isBeforeOrEqualTo(OffsetDateTime.now());
+
+        assertThat(b3.isPresent()).isTrue();
+        assertThat(b3.get().getId()).isEqualTo(chg2.getId());
+        assertThat(b4.isPresent()).isFalse();
+
+        Thread.sleep(200);
+
+        Optional<CrawlHostGroup> b5 = db.borrowFirstReadyCrawlHostGroup();
+        Optional<CrawlHostGroup> b6 = db.borrowFirstReadyCrawlHostGroup();
+
+        assertThat(b5.isPresent()).isTrue();
+        assertThat(b5.get().getId()).isEqualTo(chg1.getId());
+        assertThat(b6.isPresent()).isFalse();
     }
 }

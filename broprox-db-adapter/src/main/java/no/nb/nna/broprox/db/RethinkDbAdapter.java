@@ -15,6 +15,7 @@
  */
 package no.nb.nna.broprox.db;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -223,6 +224,87 @@ public class RethinkDbAdapter implements DbAdapter {
     public CrawlHostGroupConfigListReply listCrawlHostGroupConfigs(ListRequest request) {
         ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, TABLES.CRAWL_HOST_GROUP_CONFIGS);
         return queryBuilder.executeList(otw, this, CrawlHostGroupConfigListReply.newBuilder()).build();
+    }
+
+    @Override
+    public CrawlHostGroup getOrCreateCrawlHostGroup(String crawlHostGroupId, String politenessId) {
+        List key = r.array(crawlHostGroupId, politenessId);
+        Map<String, Object> response = otw.map("db-getOrCreateCrawlHostGroup",
+                this::executeRequest, r.table(TABLES.CRAWL_HOST_GROUP.name)
+                        .insert(r.hashMap("id", key).with("nextFetchTime", r.now()).with("busy", false))
+                        .optArg("conflict", (id, oldDoc, newDoc) -> oldDoc)
+                        .optArg("return_changes", "always"));
+
+        Map resultDoc = ((List<Map<String, Map>>) response.get("changes")).get(0).get("new_val");
+
+        CrawlHostGroup chg = CrawlHostGroup.newBuilder()
+                .setId(((List<String>) resultDoc.get("id")).get(0))
+                .setPolitenessId(((List<String>) resultDoc.get("id")).get(1))
+                .setNextFetchTime(ProtoUtils.odtToTs((OffsetDateTime) resultDoc.get("nextFetchTime")))
+                .setBusy((boolean) resultDoc.get("busy"))
+                .build();
+
+        return chg;
+    }
+
+    @Override
+    public Optional<CrawlHostGroup> borrowFirstReadyCrawlHostGroup() {
+        Map<String, Object> response = otw.map("db-borrowFirstReadyCrawlHostGroup",
+                this::executeRequest, r.table(TABLES.CRAWL_HOST_GROUP.name)
+                        .orderBy().optArg("index", "nextFetchTime")
+                        .between(r.minval(), r.now()).optArg("right_bound", "closed")
+                        .filter(r.hashMap("busy", false))
+                        .limit(1)
+                        .update(r.hashMap("busy", true))
+                        .optArg("return_changes", "always"));
+
+        long replaced = (long) response.get("replaced");
+        long unchanged = (long) response.get("unchanged");
+
+        if (unchanged == 1L) {
+            // Another thread picked the same CrawlHostGroup during the query (the query is not atomic)
+            // Retry the request.
+            return borrowFirstReadyCrawlHostGroup();
+        }
+
+        if (replaced == 0L) {
+            // No CrawlHostGroup was ready
+            return Optional.empty();
+        }
+
+        Map resultDoc = ((List<Map<String, Map>>) response.get("changes")).get(0).get("new_val");
+
+        CrawlHostGroup chg = CrawlHostGroup.newBuilder()
+                .setId(((List<String>) resultDoc.get("id")).get(0))
+                .setPolitenessId(((List<String>) resultDoc.get("id")).get(1))
+                .setNextFetchTime(ProtoUtils.odtToTs((OffsetDateTime) resultDoc.get("nextFetchTime")))
+                .setBusy((boolean) resultDoc.get("busy"))
+                .build();
+
+        return Optional.of(chg);
+    }
+
+    @Override
+    public CrawlHostGroup releaseCrawlHostGroup(CrawlHostGroup crawlHostGroup, long nextFetchDelayMs) {
+        List key = r.array(crawlHostGroup.getId(), crawlHostGroup.getPolitenessId());
+        double nextFetchDelayS = nextFetchDelayMs / 1000.0;
+
+        Map<String, Object> response = otw.map("db-releaseCrawlHostGroup",
+                this::executeRequest, r.table(TABLES.CRAWL_HOST_GROUP.name)
+                        .get(key)
+                        .update(r.hashMap("busy", false).with("nextFetchTime", r.now().add(nextFetchDelayS)))
+                        .optArg("return_changes", "always"));
+
+        Map resultDoc = ((List<Map<String, Map>>) response.get("changes")).get(0).get("new_val");
+
+        CrawlHostGroup chg = CrawlHostGroup.newBuilder()
+                .setId(((List<String>) resultDoc.get("id")).get(0))
+                .setPolitenessId(((List<String>) resultDoc.get("id")).get(1))
+                .setNextFetchTime(ProtoUtils.odtToTs((OffsetDateTime) resultDoc.get("nextFetchTime")))
+                .setBusy((boolean) resultDoc.get("busy"))
+                .build();
+
+        return chg;
     }
 
     @Override

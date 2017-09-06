@@ -31,6 +31,7 @@ import no.nb.nna.broprox.api.ControllerProto.CrawlJobListRequest;
 import no.nb.nna.broprox.api.ControllerProto.ListRequest;
 import no.nb.nna.broprox.api.ControllerProto.SeedListReply;
 import no.nb.nna.broprox.api.ControllerProto.SeedListRequest;
+import no.nb.nna.broprox.commons.FutureOptional;
 import no.nb.nna.broprox.commons.util.ApiTools;
 import no.nb.nna.broprox.model.ConfigProto;
 import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
@@ -958,9 +959,9 @@ public class RethinkDbAdapterIT {
         CrawlHostGroup chg1 = db.getOrCreateCrawlHostGroup("crawlHostGroupId", "politenessId");
         CrawlHostGroup chg2 = db.getOrCreateCrawlHostGroup("xxx", "politenessId");
 
-        Optional<CrawlHostGroup> b1 = db.borrowFirstReadyCrawlHostGroup();
-        Optional<CrawlHostGroup> b2 = db.borrowFirstReadyCrawlHostGroup();
-        Optional<CrawlHostGroup> b3 = db.borrowFirstReadyCrawlHostGroup();
+        FutureOptional<CrawlHostGroup> b1 = db.borrowFirstReadyCrawlHostGroup();
+        FutureOptional<CrawlHostGroup> b2 = db.borrowFirstReadyCrawlHostGroup();
+        FutureOptional<CrawlHostGroup> b3 = db.borrowFirstReadyCrawlHostGroup();
 
         assertThat(b1.isPresent()).isTrue();
         assertThat(b2.isPresent()).isTrue();
@@ -979,18 +980,19 @@ public class RethinkDbAdapterIT {
     public void testReleaseCrawlHostGroup() throws InterruptedException {
         CrawlHostGroup chg1 = db.getOrCreateCrawlHostGroup("crawlHostGroupId", "politenessId");
         CrawlHostGroup chg2 = db.getOrCreateCrawlHostGroup("xxx", "politenessId");
-        Optional<CrawlHostGroup> b1 = db.borrowFirstReadyCrawlHostGroup();
-        Optional<CrawlHostGroup> b2 = db.borrowFirstReadyCrawlHostGroup();
+        FutureOptional<CrawlHostGroup> b1 = db.borrowFirstReadyCrawlHostGroup();
+        FutureOptional<CrawlHostGroup> b2 = db.borrowFirstReadyCrawlHostGroup();
 
-        CrawlHostGroup r1 = db.releaseCrawlHostGroup(b1.get(), 200);
+        CrawlHostGroup r1 = db.releaseCrawlHostGroup(b1.get(), 1000);
+        OffsetDateTime now = OffsetDateTime.now();
         CrawlHostGroup r2 = db.releaseCrawlHostGroup(b2.get(), 0);
 
-        Optional<CrawlHostGroup> b3 = db.borrowFirstReadyCrawlHostGroup();
-        Optional<CrawlHostGroup> b4 = db.borrowFirstReadyCrawlHostGroup();
+        FutureOptional<CrawlHostGroup> b3 = db.borrowFirstReadyCrawlHostGroup();
+        FutureOptional<CrawlHostGroup> b4 = db.borrowFirstReadyCrawlHostGroup();
 
         assertThat(r1.getId()).isEqualTo(chg1.getId());
         assertThat(r1.getBusy()).isFalse();
-        assertThat(ProtoUtils.tsToOdt(r1.getNextFetchTime())).isAfter(OffsetDateTime.now());
+        assertThat(ProtoUtils.tsToOdt(r1.getNextFetchTime())).isAfter(now);
 
         assertThat(r2.getId()).isEqualTo(chg2.getId());
         assertThat(r2.getBusy()).isFalse();
@@ -999,14 +1001,36 @@ public class RethinkDbAdapterIT {
         assertThat(b3.isPresent()).isTrue();
         assertThat(b3.get().getId()).isEqualTo(chg2.getId());
         assertThat(b4.isPresent()).isFalse();
+        assertThat(b4.isMaybeInFuture()).isTrue();
+        assertThat(b4.getWhen()).isBetween(now, now.plusSeconds(2));
 
-        Thread.sleep(200);
+        Thread.sleep(b4.getDelayMs());
 
-        Optional<CrawlHostGroup> b5 = db.borrowFirstReadyCrawlHostGroup();
-        Optional<CrawlHostGroup> b6 = db.borrowFirstReadyCrawlHostGroup();
+        FutureOptional<CrawlHostGroup> b5 = db.borrowFirstReadyCrawlHostGroup();
+        FutureOptional<CrawlHostGroup> b6 = db.borrowFirstReadyCrawlHostGroup();
 
         assertThat(b5.isPresent()).isTrue();
         assertThat(b5.get().getId()).isEqualTo(chg1.getId());
         assertThat(b6.isPresent()).isFalse();
+        assertThat(b6.isMaybeInFuture()).isFalse();
+        assertThat(b6.isEmpty()).isTrue();
+    }
+
+    @Test
+    public void testGetNextQueuedUriToFetch() {
+        QueuedUri qUri = QueuedUri.newBuilder()
+                .setUri("http://www.foo.bar")
+                .setIp("127.0.0.1")
+                .setSequence(1L)
+                .setCrawlHostGroupId("CHGID")
+                .setPolitenessId("PID")
+                .setExecutionId("EID")
+                .build();
+        db.addQueuedUri(qUri);
+
+        CrawlHostGroup chg1 = db.getOrCreateCrawlHostGroup("CHGID", "PID");
+
+        FutureOptional<QueuedUri> foqu = db.getNextQueuedUriToFetch(chg1);
+        assertThat(foqu.isPresent()).isTrue();
     }
 }

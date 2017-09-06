@@ -66,13 +66,27 @@ public interface DbAdapter extends AutoCloseable {
 
     CrawlExecutionStatus updateExecutionStatus(CrawlExecutionStatus status);
 
+    CrawlExecutionStatus getExecutionStatus(String executionId);
+
     QueuedUri addQueuedUri(QueuedUri qu);
 
     QueuedUri updateQueuedUri(QueuedUri qu);
 
+    void deleteQueuedUri(QueuedUri qu);
+
+    long queuedUriCount(String executionId);
+
+    /**
+     * Get the first URI wich is ready to be fetched for a CrawlHostGroup.
+     *
+     * @param crawlHostGroup the CrawlHostGroup for which a URI is requested
+     * @return an Optional containing the next URI to be fetched or empty if none are ready yet.
+     */
+    FutureOptional<QueuedUri> getNextQueuedUriToFetch(CrawlHostGroup crawlHostGroup);
+
     CrawlHostGroup getOrCreateCrawlHostGroup(String crawlHostGroupId, String politenessId);
 
-    Optional<CrawlHostGroup> borrowFirstReadyCrawlHostGroup();
+    FutureOptional<CrawlHostGroup> borrowFirstReadyCrawlHostGroup();
 
     CrawlHostGroup releaseCrawlHostGroup(CrawlHostGroup crawlHostGroup, long nextFetchDelayMs);
 

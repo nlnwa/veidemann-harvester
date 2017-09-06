@@ -31,6 +31,7 @@ message CrawlExecutionStatus {
     int64 bytes_crawled = 8;
     int64 uris_crawled = 9;
     int64 documents_failed = 10;
+    CrawlScope scope = 11;
 }
 
 message CrawlLog {
@@ -107,12 +108,12 @@ message QueuedUri {
      */
     string discovery_path = 8;
     string referrer = 9;
-    CrawlScope scope = 10;
-    repeated Cookie cookies = 11;
-    int64 page_fetch_time_ms = 12; // The time used to fetch and render the the uri including dependencies
-    int32 retries = 13; // Number of times this uri has been scheduled for retry.
-    google.protobuf.Timestamp earliest_fetch_time_stamp = 14; // Do not fetch this uri before this time
-    string crawl_host_group_id = 15; // The Crawl Host Group calculated for this uri
+    repeated Cookie cookies = 10;
+    int64 page_fetch_time_ms = 11; // The time used to fetch and render the the uri including dependencies
+    int32 retries = 12; // Number of times this uri has been scheduled for retry.
+    google.protobuf.Timestamp earliest_fetch_time_stamp = 13; // Do not fetch this uri before this time
+    string crawl_host_group_id = 14; // The Crawl Host Group calculated for this uri
+    string politeness_id = 15; // Id of the politeness config used when discovering this uri
 }
 
 message Cookie {

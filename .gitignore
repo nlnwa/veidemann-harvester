@@ -17,10 +17,12 @@ buildNumber.properties
 /broprox-robotrules/broprox-robotrules-service/nbproject/
 /broprox-harvester/nbproject/
 /broproxctl/bin/
-/broproxctl/.idea/
 /broproxctl/nbactions.xml
-/broproxctl/broproxctl.iml
 /broproxctl/src/broprox/
 /broproxctl/tmp/
 /broproxctl/pkg/
 /broprox-dns-service/nbproject/
+
+# IDEA
+*.iml
+.idea

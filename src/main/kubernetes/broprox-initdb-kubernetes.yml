@@ -1,7 +1,9 @@
+---
 apiVersion: batch/v1
 kind: Job
 metadata:
   name: initdb
+  namespace: db
 spec:
   template:
     metadata:
@@ -12,7 +14,7 @@ spec:
         image: norsknettarkiv/broprox-db-initializer
         env:
         - name: DB_HOST
-          value: "db"
+          value: "rethink"
         - name: DB_PORT
           value: "28015"
       restartPolicy: Never

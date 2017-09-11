@@ -1,53 +1,4 @@
 # Broprox app for Kubernetes
-
-# Rethink DB
-apiVersion: v1
-kind: Service
-metadata:
-  name: db
-  labels:
-    app: rethinkdb
-    tier: backend
-    role: master
-spec:
-  ports:
-  - name: api
-    port: 28015
-    targetPort: 28015
-  - name: intracluster
-    port: 29015
-    targetPort: 29015
-  - name: webconsole
-    port: 8888
-    targetPort: 8080
-    nodePort: 30888
-  selector:
-    app: rethinkdb
-    tier: backend
-    role: master
-  type: NodePort
----
-apiVersion: apps/v1beta1
-kind: Deployment
-metadata:
-  name: db
-spec:
-  replicas: 1
-  template:
-    metadata:
-      labels:
-        app: rethinkdb
-        tier: backend
-        role: master
-    spec:
-      containers:
-      - name: rethinkdb
-        image: rethinkdb:2.3
-        ports:
-        - containerPort: 28015
-        - containerPort: 29015
-        - containerPort: 8080
-
 ---
 # Harvester (proxy and browser)
 apiVersion: v1
@@ -112,7 +63,7 @@ spec:
         - name: BROWSER_PORT
           value: "9222"
         - name: DB_HOST
-          value: "db"
+          value: "rethink.db"
         - name: DB_PORT
           value: "28015"
         - name: CONTENT_WRITER_HOST
@@ -180,7 +131,7 @@ spec:
         - containerPort: 8080
         env:
         - name: DB_HOST
-          value: "db"
+          value: "rethink.db"
         - name: DB_PORT
           value: "28015"
         - name: TRACER_URI
@@ -239,7 +190,7 @@ spec:
         - containerPort: 7700
         env:
         - name: DB_HOST
-          value: "db"
+          value: "rethink.db"
         - name: DB_PORT
           value: "28015"
         - name: HARVESTER_HOST
@@ -298,7 +249,7 @@ spec:
         - containerPort: 50051
         env:
         - name: DB_HOST
-          value: "db"
+          value: "rethink.db"
         - name: DB_PORT
           value: "28015"
         - name: FRONTIER_HOST
@@ -351,7 +302,7 @@ spec:
         - containerPort: 50052
         env:
         - name: DB_HOST
-          value: "db"
+          value: "rethink.db"
         - name: DB_PORT
           value: "28015"
         - name: PROXY_HOST
@@ -404,7 +355,7 @@ spec:
         - containerPort: 50052
         env:
         - name: DB_HOST
-          value: "db"
+          value: "rethink.db"
         - name: DB_PORT
           value: "28015"
         - name: CONTENT_WRITER_HOST

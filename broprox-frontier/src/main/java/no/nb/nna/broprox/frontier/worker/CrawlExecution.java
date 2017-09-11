@@ -20,6 +20,9 @@ import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.google.protobuf.Timestamp;
+import com.google.protobuf.util.Durations;
+import com.google.protobuf.util.Timestamps;
 import com.rethinkdb.RethinkDB;
 import io.opentracing.Span;
 import io.opentracing.tag.Tags;
@@ -60,7 +63,9 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker {
 
     private volatile List<QueuedUri> outlinks;
 
-    private long nextExecTimestamp = 0L;
+    private long delayMs = 0L;
+
+    private long fetchTimeMs = 0L;
 
     private final AtomicLong nextSeqNum = new AtomicLong(1L);
 
@@ -100,7 +105,7 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker {
     }
 
     public void endCrawl(CrawlExecutionStatus.State state) {
-        System.out.println("Reached end of crawl");
+        System.out.println("Reached end of crawl: " + state);
         CrawlExecutionStatus.State currentState = status.getState();
         if (currentState != CrawlExecutionStatus.State.RUNNING) {
             state = currentState;
@@ -114,14 +119,6 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker {
     }
 
     public void fetch() {
-        if (!status.hasStartTime()) {
-            // Start execution
-            status = status.toBuilder().setState(CrawlExecutionStatus.State.RUNNING)
-                    .setStartTime(ProtoUtils.getNowTs())
-                    .build();
-            status = frontier.getDb().updateExecutionStatus(status);
-        }
-
         System.out.println("Fetching " + qUri.getUri());
         frontier.getDb().deleteQueuedUri(qUri);
 
@@ -146,7 +143,7 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker {
                 long fetchStart = System.currentTimeMillis();
                 HarvestPageReply harvestReply = frontier.getHarvesterClient().fetchPage(qUri, config);
                 long fetchEnd = System.currentTimeMillis();
-                long fetchTimeMs = fetchEnd - fetchStart;
+                fetchTimeMs = fetchEnd - fetchStart;
 
                 outlinks = harvestReply.getOutlinksList();
 
@@ -166,14 +163,11 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker {
                     queueOutlinks();
                 }
             } catch (Exception e) {
-                System.out.println("Error fetching page (" + qUri + "): " + e);
-                // should do some logging and updating here
-                status = frontier.getDb().updateExecutionStatus(status.toBuilder()
-                        .setState(CrawlExecutionStatus.State.FAILED)
-                        .build());
-                System.out.println("Nothing more to do since Harvester is dead.");
+                e.printStackTrace();
+                retryUri(qUri, e);
             }
         }
+
         calculateDelay();
 
         System.out.println("DELAY: " + getDelay(TimeUnit.MILLISECONDS));
@@ -236,15 +230,107 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker {
         return false;
     }
 
-    public int calculateDepth(QueuedUri uri) {
+    private int calculateDepth(QueuedUri uri) {
         return uri.getDiscoveryPath().length();
+    }
+
+    private void calculateDelay() {
+        float delayFactor = getConfig().getPoliteness().getDelayFactor();
+        long minTimeBetweenPageLoadMs = getConfig().getPoliteness().getMinTimeBetweenPageLoadMs();
+        long maxTimeBetweenPageLoadMs = getConfig().getPoliteness().getMaxTimeBetweenPageLoadMs();
+        if (delayFactor == 0f) {
+            delayFactor = 1f;
+        } else if (delayFactor < 0f) {
+            delayFactor = 0f;
+        }
+        delayMs = (long) (fetchTimeMs * delayFactor);
+        if (minTimeBetweenPageLoadMs > 0) {
+            delayMs = Math.max(delayMs, minTimeBetweenPageLoadMs);
+        }
+        if (maxTimeBetweenPageLoadMs > 0) {
+            delayMs = Math.min(delayMs, maxTimeBetweenPageLoadMs);
+        }
+    }
+
+    public long getDelay(TimeUnit unit) {
+        return unit.convert(delayMs, TimeUnit.MILLISECONDS);
+    }
+
+    public long getNextSequenceNum() {
+        return nextSeqNum.getAndIncrement();
+    }
+
+    private void retryUri(QueuedUri qUri, Exception e) {
+        if (qUri.getRetries() < config.getPoliteness().getMaxRetries()) {
+            long retryDelaySeconds = getConfig().getPoliteness().getRetryDelaySeconds();
+            Timestamp earliestFetch = Timestamps.add(ProtoUtils.getNowTs(), Durations.fromSeconds(retryDelaySeconds));
+            QueuedUri retryUri = qUri.toBuilder()
+                    .setRetries(qUri.getRetries() + 1)
+                    .setEarliestFetchTimeStamp(earliestFetch)
+                    .setError(e.toString())
+                    .build();
+            frontier.getDb().addQueuedUri(retryUri);
+            LOG.info("Failed fetching ({}) at attempt #{}", qUri, qUri.getRetries());
+        }
+        LOG.warn("Failed fetching page ({}), reason: e", qUri, e);
+        CrawlExecutionStatus.State s = status.getState();
+        if (qUri.getDiscoveryPath().isEmpty()) {
+            // Seed failed; mark crawl as failed
+            s = CrawlExecutionStatus.State.FAILED;
+        }
+        status = frontier.getDb().updateExecutionStatus(status.toBuilder()
+                .setDocumentsFailed(status.getDocumentsFailed() + 1)
+                .setState(s)
+                .build());
+    }
+
+    private boolean shouldFetch() {
+        if (limits.getMaxBytes() > 0 && status.getBytesCrawled() > limits.getMaxBytes()) {
+            delayMs = 0L;
+            frontier.getDb().deleteQueuedUri(qUri);
+            switch (status.getState()) {
+                case CREATED:
+                case RUNNING:
+                case UNDEFINED:
+                case UNRECOGNIZED:
+                    endCrawl(CrawlExecutionStatus.State.ABORTED_SIZE);
+            }
+            return false;
+        }
+
+        if (limits.getMaxDurationS() > 0
+                && Timestamps.between(status.getStartTime(), ProtoUtils.getNowTs()).getSeconds()
+                > limits.getMaxDurationS()) {
+            delayMs = 0L;
+            frontier.getDb().deleteQueuedUri(qUri);
+            switch (status.getState()) {
+                case CREATED:
+                case RUNNING:
+                case UNDEFINED:
+                case UNRECOGNIZED:
+                    endCrawl(CrawlExecutionStatus.State.ABORTED_TIMEOUT);
+            }
+            return false;
+        }
+
+        return true;
     }
 
     @Override
     public boolean block() throws InterruptedException {
-        new OpenTracingWrapper("CrawlExecution")
-                .addTag(Tags.HTTP_URL.getKey(), qUri.getUri())
-                .run("Fetch", this::fetch);
+        if (!status.hasStartTime()) {
+            // Start execution
+            status = status.toBuilder().setState(CrawlExecutionStatus.State.RUNNING)
+                    .setStartTime(ProtoUtils.getNowTs())
+                    .build();
+            status = frontier.getDb().updateExecutionStatus(status);
+        }
+
+        if (shouldFetch()) {
+            new OpenTracingWrapper("CrawlExecution")
+                    .addTag(Tags.HTTP_URL.getKey(), qUri.getUri())
+                    .run("Fetch", this::fetch);
+        }
         done = true;
         return done;
     }
@@ -252,24 +338,6 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker {
     @Override
     public boolean isReleasable() {
         return done;
-    }
-
-    public long getNextSequenceNum() {
-        return nextSeqNum.getAndIncrement();
-    }
-
-    public void calculateDelay() {
-        float delayFactor = getConfig().getPoliteness().getDelayFactor();
-        long minTimeBetweenPageLoadMs = getConfig().getPoliteness().getMinTimeBetweenPageLoadMs();
-        long maxTimeBetweenPageLoadMs = getConfig().getPoliteness().getMaxTimeBetweenPageLoadMs();
-        long pageFetchTimeMs = qUri.getPageFetchTimeMs();
-
-        nextExecTimestamp = System.currentTimeMillis() + getConfig().getPoliteness().getMinTimeBetweenPageLoadMs();
-    }
-
-    public long getDelay(TimeUnit unit) {
-        long remainingDelayMillis = nextExecTimestamp - System.currentTimeMillis();
-        return unit.convert(remainingDelayMillis, TimeUnit.MILLISECONDS);
     }
 
     public Span getParentSpan() {

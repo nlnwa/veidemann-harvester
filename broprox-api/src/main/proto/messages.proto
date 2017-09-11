@@ -92,7 +92,7 @@ message CrawlHostGroup {
 message QueuedUri {
     string id = 1;
     string execution_id = 2;
-    google.protobuf.Timestamp time_stamp = 3;
+    google.protobuf.Timestamp discovered_time_stamp = 3;
     // Sequence number to order the fetch of uris from a seed
     int64 sequence = 4;
     string uri = 5;
@@ -115,6 +115,7 @@ message QueuedUri {
     google.protobuf.Timestamp earliest_fetch_time_stamp = 13; // Do not fetch this uri before this time
     string crawl_host_group_id = 14; // The Crawl Host Group calculated for this uri
     string politeness_id = 15; // Id of the politeness config used when discovering this uri
+    string error = 16; // Contains the error reason if fetch failed
 }
 
 message Cookie {

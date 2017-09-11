@@ -302,7 +302,7 @@ public class BrowserSession implements AutoCloseable, BroproxHeaderConstants {
                                         .setExecutionId(executionId)
                                         .setUri(links[i])
                                         .setReferrer(pageRequests.getRootRequest().getUrl())
-                                        .setTimeStamp(ProtoUtils.odtToTs(OffsetDateTime.now()))
+                                        .setDiscoveredTimeStamp(ProtoUtils.odtToTs(OffsetDateTime.now()))
                                         .setDiscoveryPath(path)
                                         .addAllCookies(cookies)
                                         .build());

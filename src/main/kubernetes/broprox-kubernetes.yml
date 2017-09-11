@@ -467,6 +467,50 @@ spec:
       dnsPolicy: ClusterFirst
 
 ---
+# API Gateway
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway
+  labels:
+    app: api-gateway
+    tier: frontend
+    role: api-gateway
+spec:
+  ports:
+  - port: 3010
+    targetPort: 3010
+  selector:
+    app: api-gateway
+    tier: frontend
+    role: api-gateway
+  type: NodePort
+---
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: api-gateway
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+        tier: frontend
+        role: api-gateway
+    spec:
+      containers:
+      - name: api-gateway
+        image: norsknettarkiv/broprox-api-gateway
+        ports:
+        - containerPort: 3010
+        env:
+        - name: GRPC_CONTROLLER
+          value: "controller:50051"
+      restartPolicy: Always
+      dnsPolicy: ClusterFirst
+
+---
 # Admin GUI
 apiVersion: v1
 kind: Service
@@ -480,7 +524,7 @@ spec:
   ports:
   - name: gui
     port: 80
-    targetPort: 3010
+    targetPort: 80
     nodePort: 30890
   selector:
     app: admin
@@ -505,10 +549,10 @@ spec:
       - name: admin
         image: norsknettarkiv/broprox-gui
         ports:
-        - containerPort: 3010
+        - containerPort: 80
         env:
-        - name: grpc_controller
-          value: "controller:50051"
+        - name: PROXY_ADDR
+          value: "api-gateway:3010"
       restartPolicy: Always
       dnsPolicy: ClusterFirst
 

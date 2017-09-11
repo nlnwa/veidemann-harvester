@@ -77,6 +77,7 @@ message ExtractedText {
     int64 long_word_count = 5;
     int64 character_count = 6;
     int64 lix = 7;
+    string language = 8;
 }
 
 message QueuedUri {

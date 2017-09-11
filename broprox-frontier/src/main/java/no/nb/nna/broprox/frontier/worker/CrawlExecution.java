@@ -15,9 +15,7 @@
  */
 package no.nb.nna.broprox.frontier.worker;
 
-import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.Delayed;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -25,27 +23,26 @@ import java.util.concurrent.atomic.AtomicLong;
 import com.rethinkdb.RethinkDB;
 import io.opentracing.Span;
 import io.opentracing.tag.Tags;
+import no.nb.nna.broprox.api.ControllerProto;
 import no.nb.nna.broprox.api.HarvesterProto.HarvestPageReply;
+import no.nb.nna.broprox.commons.opentracing.OpenTracingParentContextKey;
 import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
 import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
 import no.nb.nna.broprox.model.ConfigProto.CrawlConfig;
 import no.nb.nna.broprox.model.ConfigProto.CrawlJob;
 import no.nb.nna.broprox.model.ConfigProto.CrawlLimitsConfig;
-import no.nb.nna.broprox.model.ConfigProto.CrawlScope;
-import no.nb.nna.broprox.model.ConfigProto.Seed;
-import no.nb.nna.broprox.model.MessagesProto;
 import no.nb.nna.broprox.model.MessagesProto.CrawlExecutionStatus;
+import no.nb.nna.broprox.model.MessagesProto.CrawlHostGroup;
+import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
 import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
-import org.netpreserve.commons.uri.UriConfigs;
-import org.openjdk.jol.info.GraphLayout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  *
  */
-public class CrawlExecution implements ForkJoinPool.ManagedBlocker, Delayed {
+public class CrawlExecution implements ForkJoinPool.ManagedBlocker {
 
     private static final Logger LOG = LoggerFactory.getLogger(CrawlExecution.class);
 
@@ -55,11 +52,11 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker, Delayed {
 
     private final CrawlConfig config;
 
-    private final CrawlScope scope;
-
     private final CrawlLimitsConfig limits;
 
-    private QueuedUri currentUri;
+    private final QueuedUri qUri;
+
+    private final CrawlHostGroup crawlHostGroup;
 
     private volatile List<QueuedUri> outlinks;
 
@@ -67,25 +64,23 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker, Delayed {
 
     private final AtomicLong nextSeqNum = new AtomicLong(1L);
 
-    private boolean seedResolved = false;
-
     private final Span parentSpan;
 
-    public CrawlExecution(Span span, Frontier frontier, Seed seed, CrawlJob job, CrawlScope scope) {
+    private boolean done = false;
+
+    public CrawlExecution(QueuedUri qUri, CrawlHostGroup crawlHostGroup, Frontier frontier) {
+        this.status = frontier.getDb().getExecutionStatus(qUri.getExecutionId());
+        ControllerProto.CrawlJobListRequest jobRequest = ControllerProto.CrawlJobListRequest.newBuilder()
+                .setId(status.getJobId())
+                .setExpand(true)
+                .build();
+        CrawlJob job = frontier.getDb().listCrawlJobs(jobRequest).getValueList().get(0);
+        this.qUri = qUri;
+        this.crawlHostGroup = crawlHostGroup;
         this.frontier = frontier;
         this.config = job.getCrawlConfig();
-        this.parentSpan = span;
-        this.scope = scope;
+        this.parentSpan = OpenTracingParentContextKey.parentSpan();
         this.limits = job.getLimits();
-
-        // Create execution
-        CrawlExecutionStatus s = CrawlExecutionStatus.newBuilder()
-                .setJobId(job.getId())
-                .setSeedId(seed.getId())
-                .setState(CrawlExecutionStatus.State.CREATED)
-                .build();
-        this.status = frontier.getDb().addExecutionStatus(s);
-        System.out.println("NEW CRAWL EXECUTION: " + status.getId());
     }
 
     public String getId() {
@@ -96,21 +91,12 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker, Delayed {
         return config;
     }
 
-    public CrawlExecutionStatus getStatus() {
-        return status;
+    public QueuedUri getUri() {
+        return qUri;
     }
 
-    public void setStatus(CrawlExecutionStatus status) {
-        this.status = status;
-    }
-
-    public QueuedUri getCurrentUri() {
-        return currentUri;
-    }
-
-    public void setCurrentUri(QueuedUri currentUri) {
-        this.currentUri = currentUri;
-        this.outlinks = Collections.EMPTY_LIST;
+    public CrawlHostGroup getCrawlHostGroup() {
+        return crawlHostGroup;
     }
 
     public void endCrawl(CrawlExecutionStatus.State state) {
@@ -136,17 +122,33 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker, Delayed {
             status = frontier.getDb().updateExecutionStatus(status);
         }
 
-        System.out.println("Fetching " + currentUri.getUri());
-        currentUri = currentUri.toBuilder()
-                .setSurt(UriConfigs.SURT_KEY.buildUri(currentUri.getUri()).toString())
-                .setScope(scope)
-                .build();
+        System.out.println("Fetching " + qUri.getUri());
+        frontier.getDb().deleteQueuedUri(qUri);
 
-        try {
+        // Check robots.txt
+        if (!frontier.getRobotsServiceClient().isAllowed(qUri, config)) {
+            LOG.info("Precluded by robots.txt");
+
+            // Precluded by robots.txt
+            CrawlLog crawlLog = CrawlLog.newBuilder()
+                    .setRequestedUri(qUri.getUri())
+                    .setSurt(qUri.getSurt())
+                    .setRecordType("response")
+                    .setStatusCode(-9998)
+                    .setFetchTimeStamp(ProtoUtils.getNowTs())
+                    .build();
+            frontier.getDb().addCrawlLog(crawlLog);
+            if (frontier.getDb().queuedUriCount(getId()) == 0) {
+                endCrawl(CrawlExecutionStatus.State.FINISHED);
+            }
+        } else {
             try {
-                HarvestPageReply harvestReply = frontier.getHarvesterClient().fetchPage(currentUri, config);
+                long fetchStart = System.currentTimeMillis();
+                HarvestPageReply harvestReply = frontier.getHarvesterClient().fetchPage(qUri, config);
+                long fetchEnd = System.currentTimeMillis();
+                long fetchTimeMs = fetchEnd - fetchStart;
+
                 outlinks = harvestReply.getOutlinksList();
-                seedResolved = true;
 
                 status = status.toBuilder()
                         .setDocumentsCrawled(status.getDocumentsCrawled() + 1)
@@ -155,29 +157,27 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker, Delayed {
                         .build();
                 status = frontier.getDb().updateExecutionStatus(status);
 
+                if (outlinks.isEmpty()) {
+                    LOG.debug("No outlinks from {}", qUri.getSurt());
+                    if (frontier.getDb().queuedUriCount(getId()) == 0) {
+                        endCrawl(CrawlExecutionStatus.State.FINISHED);
+                    }
+                } else {
+                    queueOutlinks();
+                }
             } catch (Exception e) {
-                System.out.println("Error fetching page (" + currentUri + "): " + e);
+                System.out.println("Error fetching page (" + qUri + "): " + e);
                 // should do some logging and updating here
                 status = frontier.getDb().updateExecutionStatus(status.toBuilder()
                         .setState(CrawlExecutionStatus.State.FAILED)
                         .build());
-                seedResolved = true;
                 System.out.println("Nothing more to do since Harvester is dead.");
-                return;
             }
-
-            if (outlinks.isEmpty()) {
-                LOG.debug("No outlinks from {}", currentUri.getSurt());
-                return;
-            }
-
-            queueOutlinks();
-        } catch (Exception e) {
-            System.out.println("Strange error fetching page (" + currentUri + "): " + e);
-            e.printStackTrace();
-            // TODO: should do some logging and updating here
         }
-        return;
+        calculateDelay();
+
+        System.out.println("DELAY: " + getDelay(TimeUnit.MILLISECONDS));
+        frontier.getDb().releaseCrawlHostGroup(getCrawlHostGroup(), getDelay(TimeUnit.MILLISECONDS));
     }
 
     void queueOutlinks() {
@@ -187,41 +187,31 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker, Delayed {
         }
 
         for (QueuedUri outUri : outlinks) {
+            outUri = frontier.enrichUri(outUri, getId(), nextSequenceNum, config);
             QueuedUri.Builder outUriBuilder = outUri.toBuilder();
-            try {
-                outUriBuilder.setSurt(UriConfigs.SURT_KEY.buildUri(outUriBuilder.getUri()).toString());
-            } catch (Exception e) {
-                System.out.println("Strange error with outlink (" + outUriBuilder + "): " + e);
-                e.printStackTrace();
-                return;
-            }
 
-            if (shouldInclude(outUriBuilder)) {
-                LOG.debug("Found new URI: {}, queueing.", outUriBuilder.getSurt());
+            if (shouldInclude(outUri)) {
+                LOG.debug("Found new URI: {}, queueing.", outUri.getSurt());
 
-                if (outUriBuilder.getSequence() != 1L) {
+                if (outUri.getSequence() != 1L) {
                     if (config.getDepthFirst()) {
                         nextSequenceNum = getNextSequenceNum();
                     }
 
                     outUriBuilder.setSequence(nextSequenceNum);
                 }
-                try {
-                    frontier.getDb().addQueuedUri(outUriBuilder.build());
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
+                frontier.addUriToQueue(outUriBuilder);
             }
         }
     }
 
-    boolean shouldInclude(MessagesProto.QueuedUriOrBuilder outlink) {
+    boolean shouldInclude(QueuedUri outlink) {
         if (limits.getDepth() > 0 && limits.getDepth() <= calculateDepth(outlink)) {
             LOG.debug("Maximum configured depth reached for: {}, skipping.", outlink.getSurt());
             return false;
         }
 
-        if (!outlink.getSurt().startsWith(scope.getSurtPrefix())) {
+        if (!outlink.getSurt().startsWith(status.getScope().getSurtPrefix())) {
             LOG.debug("URI '{}' is out of scope, skipping.", outlink.getSurt());
             return false;
         }
@@ -246,39 +236,22 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker, Delayed {
         return false;
     }
 
-    public int calculateDepth(MessagesProto.QueuedUriOrBuilder uri) {
+    public int calculateDepth(QueuedUri uri) {
         return uri.getDiscoveryPath().length();
-    }
-
-    public long objectSize() {
-        long size = 0L;
-        size += GraphLayout.parseInstance(getId()).totalSize();
-        size += GraphLayout.parseInstance(config).totalSize();
-        size += GraphLayout.parseInstance(currentUri).totalSize();
-        return size;
     }
 
     @Override
     public boolean block() throws InterruptedException {
-        if (outlinks.isEmpty()) {
-            new OpenTracingWrapper("CrawlExecution")
-                    .addTag(Tags.HTTP_URL.getKey(), currentUri.getUri())
-                    .run("Fetch", this::fetch);
-        }
-        return true;
+        new OpenTracingWrapper("CrawlExecution")
+                .addTag(Tags.HTTP_URL.getKey(), qUri.getUri())
+                .run("Fetch", this::fetch);
+        done = true;
+        return done;
     }
 
     @Override
     public boolean isReleasable() {
-        return !outlinks.isEmpty();
-    }
-
-    public boolean isDone() {
-        return outlinks.isEmpty();
-    }
-
-    public boolean isSeedResolved() {
-        return seedResolved;
+        return done;
     }
 
     public long getNextSequenceNum() {
@@ -286,21 +259,17 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker, Delayed {
     }
 
     public void calculateDelay() {
+        float delayFactor = getConfig().getPoliteness().getDelayFactor();
+        long minTimeBetweenPageLoadMs = getConfig().getPoliteness().getMinTimeBetweenPageLoadMs();
+        long maxTimeBetweenPageLoadMs = getConfig().getPoliteness().getMaxTimeBetweenPageLoadMs();
+        long pageFetchTimeMs = qUri.getPageFetchTimeMs();
+
         nextExecTimestamp = System.currentTimeMillis() + getConfig().getPoliteness().getMinTimeBetweenPageLoadMs();
     }
 
-    @Override
     public long getDelay(TimeUnit unit) {
         long remainingDelayMillis = nextExecTimestamp - System.currentTimeMillis();
-        return unit.convert(remainingDelayMillis, TimeUnit.NANOSECONDS);
-    }
-
-    @Override
-    public int compareTo(Delayed o) {
-        if (o instanceof CrawlExecution) {
-            return (int) (((CrawlExecution) o).nextExecTimestamp - nextExecTimestamp);
-        }
-        throw new IllegalArgumentException("Can only compare CrawlExecution");
+        return unit.convert(remainingDelayMillis, TimeUnit.MILLISECONDS);
     }
 
     public Span getParentSpan() {

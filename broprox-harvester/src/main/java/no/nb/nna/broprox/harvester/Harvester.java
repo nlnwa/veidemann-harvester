@@ -24,7 +24,6 @@ import com.typesafe.config.ConfigFactory;
 import no.nb.nna.broprox.commons.DbAdapter;
 import no.nb.nna.broprox.commons.client.ContentWriterClient;
 import no.nb.nna.broprox.commons.client.DnsServiceClient;
-import no.nb.nna.broprox.commons.client.RobotsServiceClient;
 import no.nb.nna.broprox.commons.opentracing.TracerFactory;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
 import no.nb.nna.broprox.harvester.api.HarvesterApiServer;
@@ -68,14 +67,11 @@ public class Harvester {
 
         try (DbAdapter db = new RethinkDbAdapter(SETTINGS.getDbHost(), SETTINGS.getDbPort(), SETTINGS.getDbName());
 
-                RobotsServiceClient robotsServiceClient = new RobotsServiceClient(
-                        SETTINGS.getRobotsServiceHost(), SETTINGS.getRobotsServicePort());
-
                 DnsServiceClient dnsServiceClient = new DnsServiceClient(
-                        SETTINGS.getDnsServiceHost(), SETTINGS.getDnsServicePort());
+                        SETTINGS.getDnsResolverHost(), SETTINGS.getDnsResolverPort());
 
                 BrowserController controller = new BrowserController(
-                        SETTINGS.getBrowserHost(), SETTINGS.getBrowserPort(), db, robotsServiceClient, sessionRegistry);
+                        SETTINGS.getBrowserHost(), SETTINGS.getBrowserPort(), db, sessionRegistry);
 
                 ContentWriterClient contentWriterClient = new ContentWriterClient(
                         SETTINGS.getContentWriterHost(), SETTINGS.getContentWriterPort());

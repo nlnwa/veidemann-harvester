@@ -36,13 +36,9 @@ public class Settings extends CommonSettings {
 
     private int contentWriterPort;
 
-    private String robotsServiceHost;
+    private String dnsResolverHost;
 
-    private int robotsServicePort;
-
-    private String dnsServiceHost;
-
-    private int dnsServicePort;
+    private int dnsResolverPort;
 
     public int getProxyPort() {
         return proxyPort;
@@ -100,36 +96,20 @@ public class Settings extends CommonSettings {
         this.contentWriterPort = contentWriterPort;
     }
 
-    public String getRobotsServiceHost() {
-        return robotsServiceHost;
+    public String getDnsResolverHost() {
+        return dnsResolverHost;
     }
 
-    public void setRobotsServiceHost(String robotsServiceHost) {
-        this.robotsServiceHost = robotsServiceHost;
+    public void setDnsResolverHost(String dnsResolverHost) {
+        this.dnsResolverHost = dnsResolverHost;
     }
 
-    public int getRobotsServicePort() {
-        return robotsServicePort;
+    public int getDnsResolverPort() {
+        return dnsResolverPort;
     }
 
-    public void setRobotsServicePort(int robotsServicePort) {
-        this.robotsServicePort = robotsServicePort;
-    }
-
-    public String getDnsServiceHost() {
-        return dnsServiceHost;
-    }
-
-    public void setDnsServiceHost(String dnsServiceHost) {
-        this.dnsServiceHost = dnsServiceHost;
-    }
-
-    public int getDnsServicePort() {
-        return dnsServicePort;
-    }
-
-    public void setDnsServicePort(int dnsServicePort) {
-        this.dnsServicePort = dnsServicePort;
+    public void setDnsResolverPort(int dnsResolverPort) {
+        this.dnsResolverPort = dnsResolverPort;
     }
 
 }

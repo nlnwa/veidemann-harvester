@@ -119,13 +119,9 @@ spec:
           value: "content-writer"
         - name: CONTENT_WRITER_PORT
           value: "8080"
-        - name: ROBOTS_SERVICE_HOST
-          value: "robots"
-        - name: ROBOTS_SERVICE_PORT
-          value: "50052"
-        - name: DNS_SERVICE_HOST
+        - name: DNS_RESOLVER_HOST
           value: "dnsservice"
-        - name: DNS_SERVICE_PORT
+        - name: DNS_RESOLVER_PORT
           value: "50052"
         - name: TRACER_URI
           value: "http://tracer:9411/api/v1/spans"
@@ -246,6 +242,14 @@ spec:
           value: "harvester"
         - name: HARVESTER_PORT
           value: "9090"
+        - name: ROBOTS_EVALUATOR_HOST
+          value: "robots"
+        - name: ROBOTS_EVALUATOR_PORT
+          value: "50052"
+        - name: DNS_RESOLVER_HOST
+          value: "dnsservice"
+        - name: DNS_RESOLVER_PORT
+          value: "50052"
         - name: TRACER_URI
           value: "http://tracer:9411/api/v1/spans"
         volumeMounts:
@@ -272,6 +276,7 @@ spec:
   - name: api
     port: 50051
     targetPort: 50051
+    nodePort: 30891
   selector:
     app: controller
     tier: backend

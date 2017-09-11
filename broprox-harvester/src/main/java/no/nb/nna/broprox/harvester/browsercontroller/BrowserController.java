@@ -30,13 +30,10 @@ import no.nb.nna.broprox.chrome.client.ChromeDebugProtocol;
 import no.nb.nna.broprox.commons.BroproxHeaderConstants;
 import no.nb.nna.broprox.commons.DbAdapter;
 import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
-import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.harvester.BrowserSessionRegistry;
 import no.nb.nna.broprox.harvester.OpenTracingSpans;
-import no.nb.nna.broprox.commons.client.RobotsServiceClient;
 import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
 import no.nb.nna.broprox.model.ConfigProto.CrawlConfig;
-import no.nb.nna.broprox.model.MessagesProto;
 import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,15 +54,12 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
 
     private final Map<String, BrowserScript> scriptCache = new HashMap<>();
 
-    private final RobotsServiceClient robotsServiceClient;
-
     public BrowserController(final String chromeHost, final int chromePort, final DbAdapter db,
-            final RobotsServiceClient robotsServiceClient, final BrowserSessionRegistry sessionRegistry)
+            final BrowserSessionRegistry sessionRegistry)
             throws IOException {
 
         this.chrome = new ChromeDebugProtocol(chromeHost, chromePort);
         this.db = db;
-        this.robotsServiceClient = robotsServiceClient;
         this.sessionRegistry = sessionRegistry;
     }
 
@@ -79,25 +73,22 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
         OpenTracingWrapper otw = new OpenTracingWrapper("BrowserController", Tags.SPAN_KIND_CLIENT)
                 .setParentSpan(OpenTracingSpans.get(queuedUri.getExecutionId()));
 
-        // Check robots.txt
-        if (robotsServiceClient.isAllowed(queuedUri, config)) {
+        try (BrowserSession session = new BrowserSession(chrome, config, queuedUri.getExecutionId())) {
+            sessionRegistry.put(session);
 
-            try (BrowserSession session = new BrowserSession(chrome, config, queuedUri.getExecutionId())) {
-                sessionRegistry.put(session);
-
-                session.setBreakpoints();
-                session.setCookies(queuedUri);
-                session.loadPage(queuedUri);
-                if (session.isPageRenderable()) {
+            session.setBreakpoints();
+            session.setCookies(queuedUri);
+            session.loadPage(queuedUri);
+            if (session.isPageRenderable()) {
 //                // disable scrollbars
 //                session.runtime.evaluate("document.getElementsByTagName('body')[0].style.overflow='hidden'",
 //                        null, null, null, null, null, null, null, null)
 //                        .get(protocolTimeout, MILLISECONDS);
 
-                    if (config.getExtra().getCreateSnapshot()) {
-                        LOG.debug("Save screenshot");
-                        otw.run("saveScreenshot", session::saveScreenshot, db);
-                    }
+                if (config.getExtra().getCreateSnapshot()) {
+                    LOG.debug("Save screenshot");
+                    otw.run("saveScreenshot", session::saveScreenshot, db);
+                }
 
 //                System.out.println("LINKS >>>>>>");
 //                for (PageDomain.FrameResource fs : session.page.getResourceTree().get().frameTree.resources) {
@@ -107,31 +98,16 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
 //                    }
 //                }
 //                System.out.println("<<<<<<");
-                    LOG.debug("Extract outlinks");
+                LOG.debug("Extract outlinks");
 
-                    List<BrowserScript> scripts = getScripts(config);
-                    resultBuilder.addAllOutlinks(otw.map("extractOutlinks", session::extractOutlinks, scripts));
-                    resultBuilder.setBytesDownloaded(session.getPageRequests().getBytesDownloaded());
-                    resultBuilder.setUriCount(session.getPageRequests().getUriDownloadedCount());
+                List<BrowserScript> scripts = getScripts(config);
+                resultBuilder.addAllOutlinks(otw.map("extractOutlinks", session::extractOutlinks, scripts));
+                resultBuilder.setBytesDownloaded(session.getPageRequests().getBytesDownloaded());
+                resultBuilder.setUriCount(session.getPageRequests().getUriDownloadedCount());
 
-                    session.scrollToTop();
-                }
-                sessionRegistry.remove(session);
+                session.scrollToTop();
             }
-        } else {
-            LOG.info("Precluded by robots.txt");
-
-            // Precluded by robots.txt
-            if (db != null) {
-                MessagesProto.CrawlLog crawlLog = MessagesProto.CrawlLog.newBuilder()
-                        .setRequestedUri(queuedUri.getUri())
-                        .setSurt(queuedUri.getSurt())
-                        .setRecordType("response")
-                        .setStatusCode(-9998)
-                        .setFetchTimeStamp(ProtoUtils.getNowTs())
-                        .build();
-                db.addCrawlLog(crawlLog);
-            }
+            sessionRegistry.remove(session);
         }
 
         MDC.clear();

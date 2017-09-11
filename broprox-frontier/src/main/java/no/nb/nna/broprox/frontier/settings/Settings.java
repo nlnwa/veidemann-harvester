@@ -30,6 +30,14 @@ public class Settings extends CommonSettings {
 
     private int harvesterPort;
 
+    private String robotsEvaluatorHost;
+
+    private int robotsEvaluatorPort;
+
+    private String dnsResolverHost;
+
+    private int dnsResolverPort;
+
     public int getApiPort() {
         return apiPort;
     }
@@ -60,6 +68,38 @@ public class Settings extends CommonSettings {
 
     public void setHarvesterPort(int harvesterPort) {
         this.harvesterPort = harvesterPort;
+    }
+
+    public String getRobotsEvaluatorHost() {
+        return robotsEvaluatorHost;
+    }
+
+    public void setRobotsEvaluatorHost(String robotsEvaluatorHost) {
+        this.robotsEvaluatorHost = robotsEvaluatorHost;
+    }
+
+    public int getRobotsEvaluatorPort() {
+        return robotsEvaluatorPort;
+    }
+
+    public void setRobotsEvaluatorPort(int robotsEvaluatorPort) {
+        this.robotsEvaluatorPort = robotsEvaluatorPort;
+    }
+
+    public String getDnsResolverHost() {
+        return dnsResolverHost;
+    }
+
+    public void setDnsResolverHost(String dnsResolverHost) {
+        this.dnsResolverHost = dnsResolverHost;
+    }
+
+    public int getDnsResolverPort() {
+        return dnsResolverPort;
+    }
+
+    public void setDnsResolverPort(int dnsResolverPort) {
+        this.dnsResolverPort = dnsResolverPort;
     }
 
 }

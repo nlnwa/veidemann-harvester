@@ -9,11 +9,10 @@ spec:
     spec:
       containers:
       - name: initdb
-        image: norsknettarkiv/broprox-db-initializer
+        image: norsknettarkiv/broprox-db-initializer:1.0.0-SNAPSHOT
         env:
         - name: DB_HOST
           value: "db"
         - name: DB_PORT
           value: "28015"
       restartPolicy: Never
-      

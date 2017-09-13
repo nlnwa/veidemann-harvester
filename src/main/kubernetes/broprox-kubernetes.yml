@@ -100,7 +100,7 @@ spec:
         - mountPath: /data
           name: workdir
       - name: proxy
-        image: norsknettarkiv/broprox-harvester
+        image: norsknettarkiv/broprox-harvester:1.0.0-SNAPSHOT
         ports:
         - name: proxy
           containerPort: 8080
@@ -171,7 +171,7 @@ spec:
     spec:
       containers:
       - name: content-writer
-        image: norsknettarkiv/broprox-contentwriter-service
+        image: norsknettarkiv/broprox-contentwriter-service:1.0.0-SNAPSHOT
         ports:
         - containerPort: 8080
         env:
@@ -230,7 +230,7 @@ spec:
     spec:
       containers:
       - name: frontier
-        image: norsknettarkiv/broprox-frontier
+        image: norsknettarkiv/broprox-frontier:1.0.0-SNAPSHOT
         ports:
         - containerPort: 7700
         env:
@@ -298,7 +298,7 @@ spec:
     spec:
       containers:
       - name: controller
-        image: norsknettarkiv/broprox-controller
+        image: norsknettarkiv/broprox-controller:1.0.0-SNAPSHOT
         ports:
         - containerPort: 50051
         env:
@@ -351,7 +351,7 @@ spec:
     spec:
       containers:
       - name: robots
-        image: norsknettarkiv/broprox-robotrules-service
+        image: norsknettarkiv/broprox-robotrules-service:1.0.0-SNAPSHOT
         ports:
         - containerPort: 50052
         env:
@@ -404,7 +404,7 @@ spec:
     spec:
       containers:
       - name: robots
-        image: norsknettarkiv/broprox-dns-service
+        image: norsknettarkiv/broprox-dns-service:1.0.0-SNAPSHOT
         ports:
         - containerPort: 50052
         env:

@@ -15,7 +15,6 @@
  */
 package no.nb.nna.broprox.frontier.worker;
 
-import java.time.OffsetDateTime;
 import java.util.concurrent.RecursiveAction;
 
 import io.opentracing.References;
@@ -23,11 +22,15 @@ import no.nb.nna.broprox.commons.FutureOptional;
 import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
 import no.nb.nna.broprox.model.MessagesProto;
 import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  *
  */
 public class QueueWorker extends RecursiveAction {
+
+    private static final Logger LOG = LoggerFactory.getLogger(QueueWorker.class);
 
     private static final long RESCHEDULE_DELAY = 2000;
 
@@ -41,7 +44,7 @@ public class QueueWorker extends RecursiveAction {
     protected void compute() {
         while (true) {
             try {
-                System.out.println("Waiting for next execution to be ready");
+                LOG.trace("Waiting for next execution to be ready");
                 CrawlExecution exe = getNextToFetch();
 
                 new OpenTracingWrapper("QueueWorker")
@@ -55,11 +58,11 @@ public class QueueWorker extends RecursiveAction {
     }
 
     private void processExecution(CrawlExecution exe) {
-        System.out.println("Running next fetch of exexcution: " + exe.getId());
         try {
             // Execute fetch
+            LOG.debug("Running next fetch of exexcution: {}", exe.getId());
             getPool().managedBlock(exe);
-            System.out.println("End of Link crawl");
+            LOG.debug("End of Link crawl");
         } catch (InterruptedException ex) {
             throw new RuntimeException(ex);
         }
@@ -86,21 +89,26 @@ public class QueueWorker extends RecursiveAction {
         while (true) {
             FutureOptional<MessagesProto.CrawlHostGroup> crawlHostGroup = frontier.getDb()
                     .borrowFirstReadyCrawlHostGroup();
+            LOG.trace("Borrow Crawl Host Group: {}", crawlHostGroup);
 
             if (crawlHostGroup.isMaybeInFuture()) {
                 // A CrawlHostGroup suitable for execution in the future was found, wait until it is ready.
+                LOG.trace("Crawl Host Group not ready yet, delaying: {}", crawlHostGroup.getDelayMs());
                 sleep = crawlHostGroup.getDelayMs();
             } else if (crawlHostGroup.isPresent()) {
                 FutureOptional<QueuedUri> foqu = frontier.getDb().getNextQueuedUriToFetch(crawlHostGroup.get());
 
                 if (foqu.isPresent()) {
                     // A fetchabel URI was found, return it
+                    LOG.debug("Found Queued URI: {}", foqu.get());
                     return new CrawlExecution(foqu.get(), crawlHostGroup.get(), frontier);
                 } else if (foqu.isMaybeInFuture()) {
                     // A URI was found, but isn't fetchable yet. Wait for it
-                    sleep = (foqu.getWhen().toEpochSecond() - OffsetDateTime.now().toEpochSecond()) * 1000;
+                    LOG.debug("Queued URI might be available at: {}", foqu.getWhen());
+                    sleep = (foqu.getDelayMs());
                 } else {
                     // No URI found for this CrawlHostGroup. Wait for RESCHEDULE_DELAY and try again.
+                    LOG.trace("No Queued URI found waiting {}ms before retry", RESCHEDULE_DELAY);
                     sleep = RESCHEDULE_DELAY;
                 }
                 frontier.getDb().releaseCrawlHostGroup(crawlHostGroup.get(), sleep);

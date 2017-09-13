@@ -105,7 +105,7 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker {
     }
 
     public void endCrawl(CrawlExecutionStatus.State state) {
-        System.out.println("Reached end of crawl: " + state);
+        LOG.info("Reached end of crawl '{}' with state: {}", getId(), state);
         CrawlExecutionStatus.State currentState = status.getState();
         if (currentState != CrawlExecutionStatus.State.RUNNING) {
             state = currentState;
@@ -119,7 +119,7 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker {
     }
 
     public void fetch() {
-        System.out.println("Fetching " + qUri.getUri());
+        LOG.info("Fetching " + qUri.getUri());
         frontier.getDb().deleteQueuedUri(qUri);
 
         // Check robots.txt
@@ -169,9 +169,6 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker {
         }
 
         calculateDelay();
-
-        System.out.println("DELAY: " + getDelay(TimeUnit.MILLISECONDS));
-        frontier.getDb().releaseCrawlHostGroup(getCrawlHostGroup(), getDelay(TimeUnit.MILLISECONDS));
     }
 
     void queueOutlinks() {
@@ -318,20 +315,25 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker {
 
     @Override
     public boolean block() throws InterruptedException {
-        if (!status.hasStartTime()) {
-            // Start execution
-            status = status.toBuilder().setState(CrawlExecutionStatus.State.RUNNING)
-                    .setStartTime(ProtoUtils.getNowTs())
-                    .build();
-            status = frontier.getDb().updateExecutionStatus(status);
+        try {
+            if (!status.hasStartTime()) {
+                // Start execution
+                status = status.toBuilder().setState(CrawlExecutionStatus.State.RUNNING)
+                        .setStartTime(ProtoUtils.getNowTs())
+                        .build();
+                status = frontier.getDb().updateExecutionStatus(status);
+            }
+
+            if (shouldFetch()) {
+                new OpenTracingWrapper("CrawlExecution")
+                        .addTag(Tags.HTTP_URL.getKey(), qUri.getUri())
+                        .run("Fetch", this::fetch);
+            }
+            done = true;
+        } finally {
+            frontier.getDb().releaseCrawlHostGroup(getCrawlHostGroup(), getDelay(TimeUnit.MILLISECONDS));
         }
 
-        if (shouldFetch()) {
-            new OpenTracingWrapper("CrawlExecution")
-                    .addTag(Tags.HTTP_URL.getKey(), qUri.getUri())
-                    .run("Fetch", this::fetch);
-        }
-        done = true;
         return done;
     }
 

@@ -139,7 +139,6 @@ public class RethinkDbAdapterIT {
                 .setId(result.getId())
                 .build();
 
-        start = OffsetDateTime.now();
         CrawlEntity overrideResult = db.saveCrawlEntity(override);
 
         assertThat(overrideResult.getId()).isEqualTo(result.getId());
@@ -150,7 +149,7 @@ public class RethinkDbAdapterIT {
         assertThat(overrideResult.getMeta().getLastModified()).isNotNull();
         assertThat(overrideResult.getMeta().getLastModified()).isNotEqualTo(result.getMeta().getLastModified());
         assertThat(ProtoUtils.tsToOdt(overrideResult.getMeta().getLastModified()))
-                .isAfterOrEqualTo(start)
+                .isAfterOrEqualTo(ProtoUtils.tsToOdt(result.getMeta().getLastModified()))
                 .isBeforeOrEqualTo(OffsetDateTime.now());
         assertThat(overrideResult.getMeta().getLastModifiedBy()).isEqualTo("anonymous");
         assertThat(overrideResult.getMeta().getLabelList()).isEmpty();

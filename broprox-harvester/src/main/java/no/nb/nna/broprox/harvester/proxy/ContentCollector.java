@@ -212,7 +212,7 @@ public class ContentCollector {
 
             CrawlLog.Builder logEntryBuilder = logEntry.toBuilder();
             String payloadDigestString = getPayloadDigest();
-            logEntryBuilder.setFetchTimeMillis(Duration.between(ProtoUtils.tsToOdt(
+            logEntryBuilder.setFetchTimeMs(Duration.between(ProtoUtils.tsToOdt(
                     logEntryBuilder.getFetchTimeStamp()), OffsetDateTime.now(ZoneOffset.UTC)).toMillis());
 
             Optional<CrawledContent> isDuplicate = db.hasCrawledContent(CrawledContent.newBuilder()

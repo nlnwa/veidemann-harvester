@@ -63,8 +63,6 @@ public class BrowserControllerIT {
     @Test
     public void testRender() throws Exception {
         BrowserSessionRegistry sessionRegistry = new BrowserSessionRegistry();
-        RobotsServiceClient robotsServiceClient = mock(RobotsServiceClient.class);
-        when(robotsServiceClient.isAllowed(any(), any())).thenReturn(Boolean.TRUE);
 
         ContentWriterClient contentWriterClient = mock(ContentWriterClient.class);
         DbAdapter db = getDbMock();
@@ -88,7 +86,7 @@ public class BrowserControllerIT {
         try (RecordingProxy proxy = new RecordingProxy(tmpDir, proxyPort, db, contentWriterClient,
                 new TestHostResolver(), sessionRegistry);
                 BrowserController controller = new BrowserController(browserHost, browserPort, db,
-                        robotsServiceClient, sessionRegistry);) {
+                        sessionRegistry);) {
 
             HarvesterProto.HarvestPageReply result = controller.render(queuedUri, config);
 

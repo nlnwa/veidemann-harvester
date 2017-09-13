@@ -29,17 +29,13 @@ import com.rethinkdb.net.Connection;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigBeanFactory;
 import com.typesafe.config.ConfigFactory;
-import no.nb.nna.broprox.api.ControllerProto.CrawlJobListRequest;
-import no.nb.nna.broprox.commons.opentracing.TracerFactory;
 import no.nb.nna.broprox.commons.DbAdapter;
+import no.nb.nna.broprox.commons.opentracing.TracerFactory;
 import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
 import no.nb.nna.broprox.db.RethinkDbAdapter.TABLES;
 import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
-import no.nb.nna.broprox.model.ConfigProto.CrawlEntity;
 import no.nb.nna.broprox.model.ConfigProto.CrawlJob;
-import no.nb.nna.broprox.model.ConfigProto.Meta;
-import no.nb.nna.broprox.model.ConfigProto.Seed;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
@@ -137,8 +133,12 @@ public class DbInitializer {
 
         r.tableCreate(TABLES.URI_QUEUE.name).run(conn);
         r.table(TABLES.URI_QUEUE.name).indexCreate("surt").run(conn);
-        r.table(TABLES.URI_QUEUE.name).indexCreate("executionId",
-                uri -> r.array(uri.g("executionId"), uri.g("sequence"))).run(conn);
+        r.table(TABLES.URI_QUEUE.name).indexCreate("executionId").run(conn);
+        r.table(TABLES.URI_QUEUE.name).indexCreate("crawlHostGroupKey_sequence_earliestFetch",
+                uri -> r.array(uri.g("crawlHostGroupId"),
+                        uri.g("politenessId"),
+                        uri.g("sequence"),
+                        uri.g("earliestFetchTimeStamp"))).run(conn);
 
         r.tableCreate(TABLES.EXECUTIONS.name).run(conn);
 
@@ -160,6 +160,11 @@ public class DbInitializer {
 
         r.tableCreate(TABLES.POLITENESS_CONFIGS.name).run(conn);
 
+        r.tableCreate(TABLES.CRAWL_HOST_GROUP_CONFIGS.name).run(conn);
+
+        r.tableCreate(TABLES.CRAWL_HOST_GROUP.name).run(conn);
+        r.table(TABLES.CRAWL_HOST_GROUP.name).indexCreate("nextFetchTime").run(conn);
+
         createMetaIndexes(TABLES.BROWSER_SCRIPTS,
                 TABLES.CRAWL_ENTITIES,
                 TABLES.SEEDS,
@@ -170,9 +175,12 @@ public class DbInitializer {
                 TABLES.POLITENESS_CONFIGS
         );
 
-        r.table(TABLES.URI_QUEUE.name).indexWait("surt", "executionId").run(conn);
+        r.table(TABLES.URI_QUEUE.name)
+                .indexWait("surt", "executionId", "crawlHostGroupKey_sequence_earliestFetch")
+                .run(conn);
         r.table(TABLES.CRAWL_LOG.name).indexWait("surt_time").run(conn);
         r.table(TABLES.SEEDS.name).indexWait("jobId", "entityId").run(conn);
+        r.table(TABLES.CRAWL_HOST_GROUP.name).indexWait("nextFetchTime").run(conn);
     }
 
     private final void createMetaIndexes(TABLES... tables) {

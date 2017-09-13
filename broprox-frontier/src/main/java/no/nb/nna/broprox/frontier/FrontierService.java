@@ -21,6 +21,8 @@ import com.typesafe.config.ConfigException;
 import com.typesafe.config.ConfigFactory;
 import no.nb.nna.broprox.commons.opentracing.TracerFactory;
 import no.nb.nna.broprox.commons.DbAdapter;
+import no.nb.nna.broprox.commons.client.DnsServiceClient;
+import no.nb.nna.broprox.commons.client.RobotsServiceClient;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
 import no.nb.nna.broprox.frontier.api.FrontierApiServer;
 import no.nb.nna.broprox.frontier.worker.HarvesterClient;
@@ -61,7 +63,14 @@ public class FrontierService {
         try (DbAdapter db = new RethinkDbAdapter(SETTINGS.getDbHost(), SETTINGS.getDbPort(), SETTINGS.getDbName());
                 HarvesterClient harvesterClient = new HarvesterClient(SETTINGS.getHarvesterHost(), SETTINGS
                         .getHarvesterPort());
-                Frontier frontier = new Frontier((RethinkDbAdapter) db, harvesterClient);
+
+                RobotsServiceClient robotsServiceClient = new RobotsServiceClient(
+                        SETTINGS.getRobotsEvaluatorHost(), SETTINGS.getRobotsEvaluatorPort());
+
+                DnsServiceClient dnsServiceClient = new DnsServiceClient(
+                        SETTINGS.getDnsResolverHost(), SETTINGS.getDnsResolverPort());
+
+                Frontier frontier = new Frontier((RethinkDbAdapter) db, harvesterClient, robotsServiceClient, dnsServiceClient);
                 FrontierApiServer apiServer = new FrontierApiServer(SETTINGS.getApiPort(), db, frontier).start();) {
 
             LOG.info("Broprox Frontier (v. {}) started",

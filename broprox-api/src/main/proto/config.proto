@@ -91,8 +91,10 @@ message CrawlScope {
 message CrawlLimitsConfig {
     // How deep from a seed to crawl
     int32 depth = 1;
-    int64 max_duration_s = 2; // Not implemented
-    int64 max_bytes = 3; // Not implemented
+    // Maximum time in seconds allowed for crawl to finish
+    int64 max_duration_s = 2;
+    // Maximum number of bytes to fetch before ending crawl
+    int64 max_bytes = 3;
 }
 
 message BrowserConfig {
@@ -121,6 +123,18 @@ message PolitenessConfig {
     int32 minimum_robots_validity_duration_s = 11;
     string custom_robots = 20;
     int64 min_time_between_page_load_ms = 4;
+    int64 max_time_between_page_load_ms = 5;
+    /**
+     * The fetch time of the URI is multiplied with this value to get the delay time before fetching the next URI.
+     * If min_time_between_page_load_ms and/or max_time_between_page_load_ms are set, then those values are used as
+     * the upper/lower limits for delay.
+     * If delay_factor is unset or zero, then a delay_facor of one is assumed. If delay_factor is negative,
+     * a delay_factor of zero is assumed.
+     */
+    float delay_factor = 6;
+    int32 max_retries = 7; // The maximum number of retries before giving up fetching a uri
+    int32 retry_delay_seconds = 8;
+    Selector crawl_host_group_selector = 9;
 }
 
 message ExtraConfig {
@@ -134,6 +148,16 @@ message BrowserScript {
     Meta meta = 2;
     string script = 3;
     string url_regexp = 4; // Not implemented
+}
+
+message CrawlHostGroupConfig {
+    message IpRange {
+        string ip_from = 1;
+        string ip_to = 2;
+    }
+    string id = 1;
+    Meta meta = 2;
+    repeated IpRange ip_range = 3;
 }
 
 message LogLevels {

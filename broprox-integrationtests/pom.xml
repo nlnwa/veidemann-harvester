@@ -237,10 +237,8 @@
                                                     <DB_HOST>db</DB_HOST>
                                                     <CONTENT_WRITER_HOST>content-writer</CONTENT_WRITER_HOST>
                                                     <CONTENT_WRITER_PORT>8080</CONTENT_WRITER_PORT>
-                                                    <ROBOTS_SERVICE_PORT>50052</ROBOTS_SERVICE_PORT>
-                                                    <ROBOTS_SERVICE_HOST>robots</ROBOTS_SERVICE_HOST>
-                                                    <DNS_SERVICE_HOST>dnsservice</DNS_SERVICE_HOST>
-                                                    <DNS_SERVICE_PORT>50052</DNS_SERVICE_PORT>
+                                                    <DNS_RESOLVER_HOST>dnsservice</DNS_RESOLVER_HOST>
+                                                    <DNS_RESOLVER_PORT>50052</DNS_RESOLVER_PORT>
                                                     <TRACER_URI>http://tracer:9411/api/v1/spans</TRACER_URI>
                                                 </env>
                                                 <log>
@@ -319,6 +317,10 @@
                                                 <env>
                                                     <DB_HOST>db</DB_HOST>
                                                     <HARVESTER_HOST>harvester</HARVESTER_HOST>
+                                                    <ROBOTS_EVALUATOR_PORT>50052</ROBOTS_EVALUATOR_PORT>
+                                                    <ROBOTS_EVALUATOR_HOST>robots</ROBOTS_EVALUATOR_HOST>
+                                                    <DNS_RESOLVER_HOST>dnsservice</DNS_RESOLVER_HOST>
+                                                    <DNS_RESOLVER_PORT>50052</DNS_RESOLVER_PORT>
                                                     <TRACER_URI>http://tracer:9411/api/v1/spans</TRACER_URI>
                                                 </env>
                                                 <log>

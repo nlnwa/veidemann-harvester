@@ -15,6 +15,7 @@
  */
 package no.nb.nna.broprox.db;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -23,17 +24,20 @@ import java.util.concurrent.TimeoutException;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Empty;
 import com.google.protobuf.Message;
+import com.google.protobuf.util.Timestamps;
 import com.rethinkdb.RethinkDB;
 import com.rethinkdb.gen.ast.Insert;
 import com.rethinkdb.gen.ast.ReqlExpr;
 import com.rethinkdb.gen.exc.ReqlError;
 import com.rethinkdb.net.Connection;
+import com.rethinkdb.net.Cursor;
 import io.opentracing.tag.Tags;
 import no.nb.nna.broprox.api.ControllerProto.BrowserConfigListReply;
 import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListReply;
 import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListRequest;
 import no.nb.nna.broprox.api.ControllerProto.CrawlConfigListReply;
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;
+import no.nb.nna.broprox.api.ControllerProto.CrawlHostGroupConfigListReply;
 import no.nb.nna.broprox.api.ControllerProto.CrawlJobListReply;
 import no.nb.nna.broprox.api.ControllerProto.CrawlJobListRequest;
 import no.nb.nna.broprox.api.ControllerProto.CrawlScheduleConfigListReply;
@@ -42,11 +46,13 @@ import no.nb.nna.broprox.api.ControllerProto.PolitenessConfigListReply;
 import no.nb.nna.broprox.api.ControllerProto.SeedListReply;
 import no.nb.nna.broprox.api.ControllerProto.SeedListRequest;
 import no.nb.nna.broprox.commons.DbAdapter;
+import no.nb.nna.broprox.commons.FutureOptional;
 import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
 import no.nb.nna.broprox.model.ConfigProto.BrowserConfig;
 import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
 import no.nb.nna.broprox.model.ConfigProto.CrawlConfig;
 import no.nb.nna.broprox.model.ConfigProto.CrawlEntity;
+import no.nb.nna.broprox.model.ConfigProto.CrawlHostGroupConfig;
 import no.nb.nna.broprox.model.ConfigProto.CrawlJob;
 import no.nb.nna.broprox.model.ConfigProto.CrawlScheduleConfig;
 import no.nb.nna.broprox.model.ConfigProto.LogLevels;
@@ -54,6 +60,7 @@ import no.nb.nna.broprox.model.ConfigProto.PolitenessConfig;
 import no.nb.nna.broprox.model.ConfigProto.Seed;
 import no.nb.nna.broprox.model.ConfigProto.Selector;
 import no.nb.nna.broprox.model.MessagesProto.CrawlExecutionStatus;
+import no.nb.nna.broprox.model.MessagesProto.CrawlHostGroup;
 import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
 import no.nb.nna.broprox.model.MessagesProto.CrawledContent;
 import no.nb.nna.broprox.model.MessagesProto.ExtractedText;
@@ -80,7 +87,9 @@ public class RethinkDbAdapter implements DbAdapter {
         CRAWL_CONFIGS("crawl_configs", CrawlConfig.getDefaultInstance()),
         CRAWL_SCHEDULE_CONFIGS("crawl_schedule_configs", CrawlScheduleConfig.getDefaultInstance()),
         BROWSER_CONFIGS("browser_configs", BrowserConfig.getDefaultInstance()),
-        POLITENESS_CONFIGS("politeness_configs", PolitenessConfig.getDefaultInstance());
+        POLITENESS_CONFIGS("politeness_configs", PolitenessConfig.getDefaultInstance()),
+        CRAWL_HOST_GROUP("crawl_host_group", CrawlHostGroup.getDefaultInstance()),
+        CRAWL_HOST_GROUP_CONFIGS("crawl_host_group_configs", CrawlHostGroupConfig.getDefaultInstance());
 
         public final String name;
 
@@ -205,6 +214,114 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
+    public CrawlHostGroupConfig saveCrawlHostGroupConfig(CrawlHostGroupConfig crawlHostGroupConfig) {
+        return saveConfigMessage(crawlHostGroupConfig, TABLES.CRAWL_HOST_GROUP_CONFIGS);
+    }
+
+    @Override
+    public Empty deleteCrawlHostGroupConfig(CrawlHostGroupConfig crawlHostGroupConfig) {
+        return deleteConfigMessage(crawlHostGroupConfig, TABLES.CRAWL_HOST_GROUP_CONFIGS);
+    }
+
+    @Override
+    public CrawlHostGroupConfigListReply listCrawlHostGroupConfigs(ListRequest request) {
+        ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, TABLES.CRAWL_HOST_GROUP_CONFIGS);
+        return queryBuilder.executeList(otw, this, CrawlHostGroupConfigListReply.newBuilder()).build();
+    }
+
+    @Override
+    public CrawlHostGroup getOrCreateCrawlHostGroup(String crawlHostGroupId, String politenessId) {
+        List key = r.array(crawlHostGroupId, politenessId);
+        Map<String, Object> response = otw.map("db-getOrCreateCrawlHostGroup",
+                this::executeRequest, r.table(TABLES.CRAWL_HOST_GROUP.name)
+                        .insert(r.hashMap("id", key).with("nextFetchTime", r.now()).with("busy", false))
+                        .optArg("conflict", (id, oldDoc, newDoc) -> oldDoc)
+                        .optArg("return_changes", "always"));
+
+        Map resultDoc = ((List<Map<String, Map>>) response.get("changes")).get(0).get("new_val");
+
+        CrawlHostGroup chg = CrawlHostGroup.newBuilder()
+                .setId(((List<String>) resultDoc.get("id")).get(0))
+                .setPolitenessId(((List<String>) resultDoc.get("id")).get(1))
+                .setNextFetchTime(ProtoUtils.odtToTs((OffsetDateTime) resultDoc.get("nextFetchTime")))
+                .setBusy((boolean) resultDoc.get("busy"))
+                .build();
+
+        return chg;
+    }
+
+    @Override
+    public FutureOptional<CrawlHostGroup> borrowFirstReadyCrawlHostGroup() {
+        Map<String, Object> response = otw.map("db-borrowFirstReadyCrawlHostGroup",
+                this::executeRequest, r.table(TABLES.CRAWL_HOST_GROUP.name)
+                        .orderBy().optArg("index", "nextFetchTime")
+                        .between(r.minval(), r.now()).optArg("right_bound", "closed")
+                        .filter(r.hashMap("busy", false))
+                        .limit(1)
+                        .update(r.hashMap("busy", true))
+                        .optArg("return_changes", "always"));
+
+        long replaced = (long) response.get("replaced");
+        long unchanged = (long) response.get("unchanged");
+
+        if (unchanged == 1L) {
+            // Another thread picked the same CrawlHostGroup during the query (the query is not atomic)
+            // Retry the request.
+            return borrowFirstReadyCrawlHostGroup();
+        }
+
+        if (replaced == 0L) {
+            // No CrawlHostGroup was ready, find time when next will be ready
+            Cursor<Map<String, Object>> cursor = otw.map("db-borrowFirstReadyCrawlHostGroup",
+                    this::executeRequest, r.table(TABLES.CRAWL_HOST_GROUP.name)
+                            .orderBy().optArg("index", "nextFetchTime")
+                            .filter(r.hashMap("busy", false))
+                            .limit(1)
+                            .pluck("nextFetchTime"));
+
+            if (cursor.hasNext()) {
+                return FutureOptional.emptyUntil((OffsetDateTime) cursor.next().get("nextFetchTime"));
+            } else {
+                return FutureOptional.empty();
+            }
+        }
+
+        Map resultDoc = ((List<Map<String, Map>>) response.get("changes")).get(0).get("new_val");
+
+        CrawlHostGroup chg = CrawlHostGroup.newBuilder()
+                .setId(((List<String>) resultDoc.get("id")).get(0))
+                .setPolitenessId(((List<String>) resultDoc.get("id")).get(1))
+                .setNextFetchTime(ProtoUtils.odtToTs((OffsetDateTime) resultDoc.get("nextFetchTime")))
+                .setBusy((boolean) resultDoc.get("busy"))
+                .build();
+
+        return FutureOptional.of(chg);
+    }
+
+    @Override
+    public CrawlHostGroup releaseCrawlHostGroup(CrawlHostGroup crawlHostGroup, long nextFetchDelayMs) {
+        List key = r.array(crawlHostGroup.getId(), crawlHostGroup.getPolitenessId());
+        double nextFetchDelayS = nextFetchDelayMs / 1000.0;
+
+        Map<String, Object> response = otw.map("db-releaseCrawlHostGroup",
+                this::executeRequest, r.table(TABLES.CRAWL_HOST_GROUP.name)
+                        .get(key)
+                        .update(r.hashMap("busy", false).with("nextFetchTime", r.now().add(nextFetchDelayS)))
+                        .optArg("return_changes", "always"));
+
+        Map resultDoc = ((List<Map<String, Map>>) response.get("changes")).get(0).get("new_val");
+
+        CrawlHostGroup chg = CrawlHostGroup.newBuilder()
+                .setId(((List<String>) resultDoc.get("id")).get(0))
+                .setPolitenessId(((List<String>) resultDoc.get("id")).get(1))
+                .setNextFetchTime(ProtoUtils.odtToTs((OffsetDateTime) resultDoc.get("nextFetchTime")))
+                .setBusy((boolean) resultDoc.get("busy"))
+                .build();
+
+        return chg;
+    }
+
+    @Override
     public CrawlExecutionStatus addExecutionStatus(CrawlExecutionStatus status) {
         Map rMap = ProtoUtils.protoToRethink(status);
 
@@ -231,7 +348,20 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
+    public CrawlExecutionStatus getExecutionStatus(String executionId) {
+        Map<String, Object> response = otw.map("db-updateExecutionStatus",
+                this::executeRequest, r.table(TABLES.EXECUTIONS.name)
+                        .get(executionId));
+
+        return ProtoUtils.rethinkToProto(response, CrawlExecutionStatus.class);
+    }
+
+    @Override
     public QueuedUri addQueuedUri(QueuedUri qu) {
+        if (!qu.hasEarliestFetchTimeStamp()) {
+            qu = qu.toBuilder().setEarliestFetchTimeStamp(ProtoUtils.getNowTs()).build();
+        }
+
         Map rMap = ProtoUtils.protoToRethink(qu);
 
         Map<String, Object> response = otw.map("db-addQueudUri",
@@ -254,6 +384,53 @@ public class RethinkDbAdapter implements DbAdapter {
                         .update(rMap));
 
         return qu;
+    }
+
+    @Override
+    public void deleteQueuedUri(QueuedUri qu) {
+        deleteConfigMessage(qu, TABLES.URI_QUEUE);
+    }
+
+    @Override
+    public long queuedUriCount(String executionId) {
+        return otw.map("db-queuedUriCount",
+                this::executeRequest, r.table(TABLES.URI_QUEUE.name)
+                        .getAll(executionId).optArg("index", "executionId")
+                        .count());
+    }
+
+    @Override
+    public FutureOptional<QueuedUri> getNextQueuedUriToFetch(CrawlHostGroup crawlHostGroup) {
+        List fromKey = r.array(
+                crawlHostGroup.getId(),
+                crawlHostGroup.getPolitenessId(),
+                r.minval(),
+                r.minval()
+        );
+
+        List toKey = r.array(
+                crawlHostGroup.getId(),
+                crawlHostGroup.getPolitenessId(),
+                r.maxval(),
+                r.maxval()
+        );
+
+        try (Cursor<Map<String, Object>> cursor = otw.map("db-getNextQueuedUriToFetch",
+                this::executeRequest, r.table(TABLES.URI_QUEUE.name)
+                        .orderBy().optArg("index", "crawlHostGroupKey_sequence_earliestFetch")
+                        .between(fromKey, toKey)
+                        .limit(1));) {
+
+            if (cursor.hasNext()) {
+                QueuedUri qUri = ProtoUtils.rethinkToProto(cursor.next(), QueuedUri.class);
+                if (Timestamps.comparator().compare(qUri.getEarliestFetchTimeStamp(), ProtoUtils.getNowTs()) <= 0) {
+                    return FutureOptional.of(qUri);
+                } else {
+                    return FutureOptional.emptyUntil(ProtoUtils.tsToOdt(qUri.getEarliestFetchTimeStamp()));
+                }
+            }
+        }
+        return FutureOptional.empty();
     }
 
     @Override

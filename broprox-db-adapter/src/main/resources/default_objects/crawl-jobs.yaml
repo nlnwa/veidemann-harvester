@@ -40,6 +40,10 @@ crawlConfig:
         robotsPolicy: OBEY_ROBOTS
         minimumRobotsValidityDurationS: 86400
         minTimeBetweenPageLoadMs: 1000
+        maxTimeBetweenPageLoadMs: 30000
+        delayFactor: 1
+        maxRetries: 3
+        retryDelaySeconds: 60
     extra:
         extractText: true
         createSnapshot: true
@@ -88,7 +92,9 @@ meta:
         - key: "type"
           value: "default"
 limits:
+    depth: 10
     maxDurationS: 86400
+    maxBytes: 1073741824
 crawlConfigSelector:
     label:
     - key: "type"

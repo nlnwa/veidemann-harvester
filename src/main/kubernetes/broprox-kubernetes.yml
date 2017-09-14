@@ -1,10 +1,17 @@
 # Broprox app for Kubernetes
+# Namespace
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: broprox
 ---
 # Harvester (proxy and browser)
 apiVersion: v1
 kind: Service
 metadata:
   name: harvester
+  namespace: broprox
   labels:
     app: harvester
     tier: backend
@@ -30,6 +37,7 @@ apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
   name: harvester
+  namespace: broprox
 spec:
   template:
     metadata:
@@ -95,6 +103,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: content-writer
+  namespace: broprox
   labels:
     app: content-writer
     tier: backend
@@ -115,6 +124,7 @@ apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
   name: content-writer
+  namespace: broprox
 spec:
   replicas: 1
   template:
@@ -155,6 +165,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: frontier
+  namespace: broprox
   labels:
     app: frontier
     tier: backend
@@ -174,6 +185,7 @@ apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
   name: frontier
+  namespace: broprox
 spec:
   replicas: 1
   template:
@@ -214,6 +226,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: controller
+  namespace: broprox
   labels:
     app: controller
     tier: backend
@@ -233,6 +246,7 @@ apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
   name: controller
+  namespace: broprox
 spec:
   replicas: 1
   template:
@@ -267,6 +281,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: robots
+  namespace: broprox
   labels:
     app: robots
     tier: backend
@@ -286,6 +301,7 @@ apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
   name: robots
+  namespace: broprox
 spec:
   replicas: 1
   template:
@@ -320,6 +336,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: dnsservice
+  namespace: broprox
   labels:
     app: dnsservice
     tier: backend
@@ -339,6 +356,7 @@ apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
   name: dnsservice
+  namespace: broprox
 spec:
   replicas: 1
   template:
@@ -375,6 +393,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: tracer
+  namespace: broprox
   labels:
     app: tracer
     tier: backend
@@ -395,6 +414,7 @@ apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
   name: tracer
+  namespace: broprox
 spec:
   replicas: 1
   template:
@@ -418,6 +438,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: api-gateway
+  namespace: broprox
   labels:
     app: api-gateway
     tier: frontend
@@ -436,6 +457,7 @@ apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
   name: api-gateway
+  namespace: broprox
 spec:
   replicas: 1
   template:
@@ -462,6 +484,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: admin
+  namespace: broprox
   labels:
     app: admin
     tier: frontend
@@ -482,6 +505,7 @@ apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
   name: admin
+  namespace: broprox
 spec:
   replicas: 1
   template:
@@ -508,6 +532,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: testsites
+  namespace: broprox
   labels:
     app: testsites
     tier: backend
@@ -533,6 +558,7 @@ apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
   name: testsites
+  namespace: broprox
 spec:
   replicas: 1
   template:

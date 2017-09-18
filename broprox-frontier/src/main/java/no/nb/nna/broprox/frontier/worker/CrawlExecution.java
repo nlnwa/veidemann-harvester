@@ -28,6 +28,7 @@ import io.opentracing.Span;
 import io.opentracing.tag.Tags;
 import no.nb.nna.broprox.api.ControllerProto;
 import no.nb.nna.broprox.api.HarvesterProto.HarvestPageReply;
+import no.nb.nna.broprox.commons.FailedFetchCodes;
 import no.nb.nna.broprox.commons.opentracing.OpenTracingParentContextKey;
 import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
 import no.nb.nna.broprox.db.ProtoUtils;
@@ -57,7 +58,7 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker {
 
     private final CrawlLimitsConfig limits;
 
-    private final QueuedUri qUri;
+    private QueuedUri qUri;
 
     private final CrawlHostGroup crawlHostGroup;
 
@@ -124,18 +125,25 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker {
 
         // Check robots.txt
         if (!frontier.getRobotsServiceClient().isAllowed(qUri, config)) {
-            LOG.info("Precluded by robots.txt");
+            LOG.info("URI '{}' precluded by robots.txt", qUri.getUri());
+            qUri = qUri.toBuilder().setError(FailedFetchCodes.PRECLUDED_BY_ROBOTS.toFetchError()).build();
+        }
 
-            // Precluded by robots.txt
+        // Check preclusion or errors
+        if (qUri.hasError()) {
             CrawlLog crawlLog = CrawlLog.newBuilder()
                     .setRequestedUri(qUri.getUri())
                     .setSurt(qUri.getSurt())
                     .setRecordType("response")
-                    .setStatusCode(-9998)
+                    .setStatusCode(qUri.getError().getCode())
                     .setFetchTimeStamp(ProtoUtils.getNowTs())
                     .build();
             frontier.getDb().addCrawlLog(crawlLog);
-            if (frontier.getDb().queuedUriCount(getId()) == 0) {
+
+            if (qUri.getDiscoveryPath().isEmpty()) {
+                // Seed failed; mark crawl as failed
+                endCrawl(CrawlExecutionStatus.State.FAILED);
+            } else if (frontier.getDb().queuedUriCount(getId()) == 0) {
                 endCrawl(CrawlExecutionStatus.State.FINISHED);
             }
         } else {
@@ -163,7 +171,7 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker {
                     queueOutlinks();
                 }
             } catch (Exception e) {
-                e.printStackTrace();
+                LOG.info("Failed fetch of {}",qUri.getUri(), e);
                 retryUri(qUri, e);
             }
         }
@@ -264,21 +272,30 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker {
             QueuedUri retryUri = qUri.toBuilder()
                     .setRetries(qUri.getRetries() + 1)
                     .setEarliestFetchTimeStamp(earliestFetch)
-                    .setError(e.toString())
+                    .setError(FailedFetchCodes.RUNTIME_EXCEPTION.toFetchError(e.toString()))
                     .build();
             frontier.getDb().addQueuedUri(retryUri);
             LOG.info("Failed fetching ({}) at attempt #{}", qUri, qUri.getRetries());
+        } else {
+            LOG.warn("Failed fetching page ({}), reason: e", qUri, e);
+            status = frontier.getDb().updateExecutionStatus(status.toBuilder()
+                    .setDocumentsFailed(status.getDocumentsFailed() + 1)
+                    .build());
+
+            CrawlLog crawlLog = CrawlLog.newBuilder()
+                    .setRequestedUri(qUri.getUri())
+                    .setSurt(qUri.getSurt())
+                    .setRecordType("response")
+                    .setStatusCode(FailedFetchCodes.RETRY_LIMIT_REACHED.getCode())
+                    .setFetchTimeStamp(ProtoUtils.getNowTs())
+                    .build();
+            frontier.getDb().addCrawlLog(crawlLog);
+
+            if (qUri.getDiscoveryPath().isEmpty()) {
+                // Seed failed; mark crawl as failed
+                endCrawl(CrawlExecutionStatus.State.FAILED);
+            }
         }
-        LOG.warn("Failed fetching page ({}), reason: e", qUri, e);
-        CrawlExecutionStatus.State s = status.getState();
-        if (qUri.getDiscoveryPath().isEmpty()) {
-            // Seed failed; mark crawl as failed
-            s = CrawlExecutionStatus.State.FAILED;
-        }
-        status = frontier.getDb().updateExecutionStatus(status.toBuilder()
-                .setDocumentsFailed(status.getDocumentsFailed() + 1)
-                .setState(s)
-                .build());
     }
 
     private boolean shouldFetch() {

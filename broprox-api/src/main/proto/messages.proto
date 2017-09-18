@@ -89,6 +89,11 @@ message CrawlHostGroup {
     bool busy = 4; // True if crawler is busy with fetching a URI from this group
 }
 
+message FetchError {
+    int32 code = 1;
+    string msg = 2;
+}
+
 message QueuedUri {
     string id = 1;
     string execution_id = 2;
@@ -115,7 +120,7 @@ message QueuedUri {
     google.protobuf.Timestamp earliest_fetch_time_stamp = 13; // Do not fetch this uri before this time
     string crawl_host_group_id = 14; // The Crawl Host Group calculated for this uri
     string politeness_id = 15; // Id of the politeness config used when discovering this uri
-    string error = 16; // Contains the error reason if fetch failed
+    FetchError error = 16; // Contains the error reason if fetch failed
 }
 
 message Cookie {

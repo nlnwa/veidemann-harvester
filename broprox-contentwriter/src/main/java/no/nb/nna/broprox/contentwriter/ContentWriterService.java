@@ -22,6 +22,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinTask;
 
+import com.google.protobuf.Empty;
 import io.grpc.Status;
 import io.grpc.StatusException;
 import io.grpc.stub.StreamObserver;
@@ -119,6 +120,34 @@ public class ContentWriterService extends ContentWriterGrpc.ContentWriterImplBas
             }
 
         };
+    }
+
+    @Override
+    public void flush(Empty request, StreamObserver<Empty> responseObserver) {
+        try {
+            warcWriterPool.restart(false);
+            responseObserver.onNext(Empty.getDefaultInstance());
+            responseObserver.onCompleted();
+        } catch (Exception ex) {
+            responseObserver.onError(Status.UNKNOWN.withDescription(ex.toString()).asException());
+            LOG.error(ex.getMessage(), ex);
+        }
+    }
+
+    @Override
+    public void delete(Empty request, StreamObserver<Empty> responseObserver) {
+        try {
+            if (ContentWriter.getSettings().isUnsafe()) {
+                warcWriterPool.restart(true);
+                responseObserver.onNext(Empty.getDefaultInstance());
+                responseObserver.onCompleted();
+            } else {
+                responseObserver.onError(Status.PERMISSION_DENIED.withDescription("Deletion not allowed").asException());
+            }
+        } catch (Exception ex) {
+            responseObserver.onError(Status.UNKNOWN.withDescription(ex.toString()).asException());
+            LOG.error(ex.getMessage(), ex);
+        }
     }
 
     private void detectRevisit(final ContentBuffer contentBuffer, final MessagesProto.CrawlLog.Builder crawlLog) {

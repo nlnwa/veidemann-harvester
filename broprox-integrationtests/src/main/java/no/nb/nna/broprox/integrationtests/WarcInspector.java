@@ -38,8 +38,8 @@ public class WarcInspector {
     final static HttpUrl WARC_SERVER_URL;
 
     static {
-        String warcServerHost = System.getProperty("contentwriter.host");
-        int warcServerPort = Integer.parseInt(System.getProperty("contentwriter.port"));
+        String warcServerHost = System.getProperty("contentexplorer.host");
+        int warcServerPort = Integer.parseInt(System.getProperty("contentexplorer.port"));
 
         WARC_SERVER_URL = new HttpUrl.Builder()
                 .scheme("http")

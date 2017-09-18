@@ -33,19 +33,6 @@
             <groupId>io.netty</groupId>
             <artifactId>netty-all</artifactId>
         </dependency>
-        <dependency>
-            <groupId>org.glassfish.jersey.containers</groupId>
-            <artifactId>jersey-container-netty-http</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.glassfish.jersey.media</groupId>
-            <artifactId>jersey-media-multipart</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.glassfish.jersey.test-framework.providers</groupId>
-            <artifactId>jersey-test-framework-provider-inmemory</artifactId>
-            <scope>test</scope>
-        </dependency>
 
         <!-- ARC/WARC libraries -->
         <dependency>
@@ -112,7 +99,6 @@
                     <plugin>
                         <groupId>org.codehaus.mojo</groupId>
                         <artifactId>appassembler-maven-plugin</artifactId>
-                        <version>2.0.0</version>
                         <configuration>
                             <licenseHeaderFile>${basedir}/../src/main/etc/license-header.txt</licenseHeaderFile>
                             <programs>

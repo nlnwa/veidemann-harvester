@@ -20,7 +20,6 @@ import java.io.InterruptedIOException;
 import java.math.BigInteger;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.URI;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -34,6 +33,8 @@ import java.util.List;
 import java.util.concurrent.Callable;
 
 import com.google.common.net.InetAddresses;
+import com.google.protobuf.ByteString;
+import io.grpc.StatusException;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.opentracing.tag.Tags;
@@ -171,7 +172,9 @@ public class DnsLookup {
         this.digestAlgorithm = digestAlgorithm;
     }
 
-    protected void storeDnsRecord(final String host, final State state) throws IOException, NoSuchAlgorithmException {
+    protected void storeDnsRecord(final String host, final State state) throws IOException, NoSuchAlgorithmException,
+            InterruptedException, StatusException {
+
         ByteBuf payload = Unpooled.buffer();
 
         // Start the record with a 14-digit date per RFC 2540
@@ -209,8 +212,12 @@ public class DnsLookup {
         if (db != null) {
             crawlLog = db.addCrawlLog(crawlLog);
         }
+
         if (contentWriterClient != null) {
-            URI uri = contentWriterClient.writeRecord(crawlLog, payload, null);
+            String uri = contentWriterClient.createSession()
+                    .sendCrawlLog(crawlLog)
+                    .sendPayload(ByteString.copyFrom(buf))
+                    .finish();
         }
 
         LOG.debug("DNS record for {} written", host);
@@ -436,7 +443,7 @@ public class DnsLookup {
                     if (!state.fromCache) {
                         try {
                             storeDnsRecord(host, state);
-                        } catch (IOException | NoSuchAlgorithmException ex) {
+                        } catch (IOException | NoSuchAlgorithmException | InterruptedException | StatusException ex) {
                             LOG.error("Could not store DNS lookup", ex);
                             throw new RuntimeException(ex);
                         }

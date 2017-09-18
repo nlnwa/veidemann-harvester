@@ -70,8 +70,6 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
 
     private PageRequest pageRequest;
 
-    private boolean toBeCached = false;
-
     private HttpResponseStatus responseStatus;
 
     private HttpVersion httpVersion;
@@ -87,8 +85,8 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
         this.crawlLog = CrawlLog.newBuilder()
                 .setRequestedUri(uri)
                 .setSurt(UriConfigs.SURT_KEY.buildUri(uri).toString());
-        this.requestCollector = new ContentCollector(db, ctx, contentWriterClient);
-        this.responseCollector = new ContentCollector(db, ctx, contentWriterClient);
+        this.requestCollector = new ContentCollector(db, contentWriterClient);
+        this.responseCollector = new ContentCollector(db, contentWriterClient);
         this.sessionRegistry = sessionRegistry;
         this.cache = cache;
     }
@@ -151,7 +149,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
                         }
                         return cachedResponse;
                     } else {
-                        toBeCached = true;
+                        responseCollector.setShouldCache(true);
                     }
                 }
 
@@ -197,20 +195,21 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
                         .setContentType(res.headers().get("Content-Type"));
                 responseCollector.setResponseHeaders(res);
 
-            } else if (response instanceof HttpContent) {
+            }
+
+            if (response instanceof HttpContent) {
                 LOG.debug("Got http content");
 
                 HttpContent res = (HttpContent) response;
                 responseCollector.addPayload(res.content());
 
                 if (ProxyUtils.isLastChunk(response)) {
-                    if (toBeCached) {
+                    if (responseCollector.isShouldCache()) {
                         cache.put(httpVersion,
                                 responseStatus,
                                 uri,
                                 executionId,
-                                responseCollector.getHeaderBuf(),
-                                responseCollector.getPayloadBuf());
+                                responseCollector.getCacheValue());
                     }
                     responseCollector.writeResponse(crawlLog.build());
                     if (pageRequest != null) {

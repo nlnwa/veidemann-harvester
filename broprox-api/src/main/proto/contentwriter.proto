@@ -6,10 +6,13 @@ option java_package = "no.nb.nna.broprox.api";
 option java_outer_classname = "ContentWriterProto";
 
 import "messages.proto";
+import "google/protobuf/empty.proto";
 
 // Service for writing archival data to persisten storage.
 service ContentWriter {
     rpc write (stream WriteRequest) returns (WriteReply) {}
+    rpc flush (google.protobuf.Empty) returns (google.protobuf.Empty) {}
+    rpc delete (google.protobuf.Empty) returns (google.protobuf.Empty) {}
 }
 
 message WriteRequest {

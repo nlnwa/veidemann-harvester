@@ -21,12 +21,12 @@ import com.typesafe.config.Config;
 import com.typesafe.config.ConfigBeanFactory;
 import com.typesafe.config.ConfigException;
 import com.typesafe.config.ConfigFactory;
-import no.nb.nna.broprox.commons.opentracing.TracerFactory;
 import no.nb.nna.broprox.commons.DbAdapter;
-import no.nb.nna.broprox.db.RethinkDbAdapter;
+import no.nb.nna.broprox.commons.opentracing.TracerFactory;
 import no.nb.nna.broprox.contentwriter.settings.Settings;
 import no.nb.nna.broprox.contentwriter.text.TextExtracter;
 import no.nb.nna.broprox.contentwriter.warc.WarcWriterPool;
+import no.nb.nna.broprox.db.RethinkDbAdapter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,7 +63,7 @@ public class ContentWriter {
                 WarcWriterPool warcWriterPool = new WarcWriterPool(new File(SETTINGS.getWarcDir()),
                         SETTINGS.getWarcFileSize(), SETTINGS.isCompressWarc(), SETTINGS.getWarcWriterPoolSize());
                 TextExtracter textExtracter = new TextExtracter();
-                ApiServer apiServer = new ApiServer(SETTINGS.getApiPort(), db, warcWriterPool, textExtracter);) {
+                ApiServer apiServer = new ApiServer(SETTINGS.getApiPort(), db, warcWriterPool, textExtracter).start();) {
             LOG.info("Broprox content writer (v. {}) started",
                     ContentWriter.class.getPackage().getImplementationVersion());
 

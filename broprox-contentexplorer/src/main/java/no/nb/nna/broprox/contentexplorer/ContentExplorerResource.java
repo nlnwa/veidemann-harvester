@@ -258,22 +258,6 @@ public class ContentExplorerResource {
         }
     }
 
-//    @DELETE
-//    @Path("warcs")
-//    public Response deleteWarcs() {
-//        try {
-//            if (ContentWriter.getSettings().isUnsafe()) {
-//                warcWriterPool.restart(true);
-//                return Response.ok().build();
-//            } else {
-//                return Response.status(Response.Status.METHOD_NOT_ALLOWED).build();
-//            }
-//        } catch (Exception ex) {
-//            LOG.error(ex.getMessage(), ex);
-//            throw new WebApplicationException(ex.getMessage(), ex);
-//        }
-//    }
-
     public Stream<WarcRecord> getContent(String fileName) {
         File warcFile = new File(warcDir, fileName);
         try {

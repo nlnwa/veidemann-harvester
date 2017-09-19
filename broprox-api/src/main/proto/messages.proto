@@ -64,6 +64,7 @@ message CrawlLog {
     string ip_address = 18;
     string execution_id = 19;
     int32 retries = 20; // Number of times this uri has been retried. Zero means success on first attempt.
+    FetchError error = 21; // Contains the error reason if fetch failed
 }
 
 message CrawledContent {

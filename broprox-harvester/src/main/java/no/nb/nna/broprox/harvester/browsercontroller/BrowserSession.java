@@ -156,7 +156,6 @@ public class BrowserSession implements AutoCloseable, BroproxHeaderConstants {
         ).get(protocolTimeout, MILLISECONDS);
 
         //session.debugger.onBreakpointResolved(b -> breakpoints.put(b.breakpointId, b.location));
-
         session.debugger.onPaused(p -> {
             String scriptId = p.callFrames.get(0).location.scriptId;
             System.out.println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>> SCRIPT BLE PAUSET: " + scriptId);
@@ -260,18 +259,38 @@ public class BrowserSession implements AutoCloseable, BroproxHeaderConstants {
         try {
             return session.network.getCookies().get(protocolTimeout, MILLISECONDS).cookies.stream()
                     .map(c -> {
-                        return MessagesProto.Cookie.newBuilder()
-                                .setName(c.name)
-                                .setValue(c.value)
-                                .setDomain(c.domain)
-                                .setPath(c.path)
-                                .setExpires(c.expires)
-                                .setSize(c.size)
-                                .setHttpOnly(c.httpOnly)
-                                .setSecure(c.secure)
-                                .setSession(c.session)
-                                .setSameSite(c.sameSite == null ? "" : c.sameSite)
-                                .build();
+                        MessagesProto.Cookie.Builder cb = MessagesProto.Cookie.newBuilder();
+                        if (c.name != null) {
+                            cb.setName(c.name);
+                        }
+                        if (c.value != null) {
+                            cb.setValue(c.value);
+                        }
+                        if (c.domain != null) {
+                            cb.setDomain(c.domain);
+                        }
+                        if (c.path != null) {
+                            cb.setPath(c.path);
+                        }
+                        if (c.expires != null) {
+                            cb.setExpires(c.expires);
+                        }
+                        if (c.size != null) {
+                            cb.setSize(c.size);
+                        }
+                        if (c.httpOnly != null) {
+                            cb.setHttpOnly(c.httpOnly);
+                        }
+                        if (c.secure != null) {
+                            cb.setSecure(c.secure);
+                        }
+                        if (c.session != null) {
+                            cb.setSession(c.session);
+                        }
+                        if (c.sameSite != null) {
+                            cb.setSameSite(c.sameSite);
+                        }
+                        return cb.build();
                     })
                     .collect(Collectors.toList());
         } catch (InterruptedException | ExecutionException | TimeoutException ex) {
@@ -418,7 +437,6 @@ public class BrowserSession implements AutoCloseable, BroproxHeaderConstants {
 //        self._wait_for(
 //                lambda: self.websock_thread.got_page_load_event,
 //                timeout=timeout)
-
     @Override
     public void close() {
         if (session != null) {

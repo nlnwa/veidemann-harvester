@@ -272,7 +272,6 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker {
             QueuedUri retryUri = qUri.toBuilder()
                     .setRetries(qUri.getRetries() + 1)
                     .setEarliestFetchTimeStamp(earliestFetch)
-                    .setError(FailedFetchCodes.RUNTIME_EXCEPTION.toFetchError(e.toString()))
                     .build();
             frontier.getDb().addQueuedUri(retryUri);
             LOG.info("Failed fetching ({}) at attempt #{}", qUri, qUri.getRetries());
@@ -287,6 +286,7 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker {
                     .setSurt(qUri.getSurt())
                     .setRecordType("response")
                     .setStatusCode(FailedFetchCodes.RETRY_LIMIT_REACHED.getCode())
+                    .setError(FailedFetchCodes.RUNTIME_EXCEPTION.toFetchError(e.toString()))
                     .setFetchTimeStamp(ProtoUtils.getNowTs())
                     .build();
             frontier.getDb().addCrawlLog(crawlLog);

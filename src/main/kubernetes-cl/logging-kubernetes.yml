@@ -11,35 +11,30 @@ data:
   td-agent.conf: |-
     # Example:
     # {"log":"[info:2016-02-16T16:04:05.930-08:00] Some log text here\n","stream":"stdout","time":"2016-02-17T00:04:05.931087621Z"}
-
+    # 
     <source>
       type tail
-      #      format json
       format multiline
       multiline_flush_interval 5s
-      #      format_firstline /.*\d{2}:\d{2}:\d{2}.\d{3}/
-      format_firstline /^.*(\d{2}:\d{2}:\d{2}.\d{3}) \[(.*)\] ([^\s]+).*/
-      # format1 /^.*(?<tidspunkt>\d{2}:\d{2}:\d{2}.\d{3}) \[(?<thread>.*)\] (?<level>[^\s]+)(?<message>(.|\s)*)/
-      format1 /(\w{2}\.)(?<thread>.+\:) (?<status>\w+)(?<message>.*)/
-      #format1 /^(?<message>.*)/
-      #      format2 /^(?<message>.*)/
-      path /var/log/containers/front*.log
-      pos_file /var/log/es-frontcontainer.log.pos
+      format_firstline /^(([{"log:]*))(?<tidspunkt>\d{2}:\d{2}:\d{2}.\d{3})/
+      format1 /^(([{"log:]*))(?<tidspunkt>\d{2}:\d{2}:\d{2}.\d{3}) (?<thread>\[(.*)\]) (?<level>\w+) (?<logger>[^\s]+) - (?<message>.*)/
+      path /var/log/containers/veidemann*.log
+      pos_file /var/log/es-containers.log.pos
       time_format %Y-%m-%dT%H:%M:%S.%NZ
-      tag tomat.*
+      tag kubernetes.*
       read_from_head true
     </source>
-      
-    #    <source>
-    #      type tail
-    #      path /var/log/containers/*.log
-    #      pos_file /var/log/es-containers.log.pos
-    #      time_format %Y-%m-%dT%H:%M:%S.%NZ
-    #      format json
-    #      tag kubernetes.*
-    #      read_from_head true
-    #    </source>
-   
+    #catch rest
+    <source>
+      type tail
+      path /var/log/containers/*.log
+      pos_file /var/log/es-containers.log.pos
+      time_format %Y-%m-%dT%H:%M:%S.%NZ
+      format json
+      tag kubernetes.*
+      read_from_head true
+    </source>
+  
     # Example:
     # 2015-12-21 23:17:22,066 [salt.state       ][INFO    ] Completed state [net.ipv4.ip_forward] at time 23:17:22.066081
     <source>
@@ -223,7 +218,7 @@ data:
        num_threads 2
     </match>
 metadata:
-  name: fluentd-es-config-v0.1.0
+  name: fluentd.v1conf
   namespace: logging
   labels:
     addonmanager.kubernetes.io/mode: Reconcile
@@ -265,7 +260,7 @@ spec:
           name: varlog
         - name: config-volume
           configMap:
-            name: fluentd-es-config-v0.1.0
+            name: fluentd.v1conf
 ---
 kind: Service
 apiVersion: v1

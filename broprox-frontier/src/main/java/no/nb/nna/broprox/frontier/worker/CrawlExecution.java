@@ -294,6 +294,9 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker {
             if (qUri.getDiscoveryPath().isEmpty()) {
                 // Seed failed; mark crawl as failed
                 endCrawl(CrawlExecutionStatus.State.FAILED);
+            } else if (frontier.getDb().queuedUriCount(getId()) == 0) {
+                // No more queued URIs finish execution
+                endCrawl(CrawlExecutionStatus.State.FINISHED);
             }
         }
     }

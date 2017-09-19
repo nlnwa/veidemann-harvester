@@ -15,6 +15,7 @@
  */
 package no.nb.nna.broprox.frontier.worker;
 
+import java.net.UnknownHostException;
 import java.util.List;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
@@ -23,6 +24,7 @@ import com.github.mgunlogson.cuckoofilter4j.CuckooFilter;
 import com.google.common.hash.Funnels;
 import com.rethinkdb.RethinkDB;
 import no.nb.nna.broprox.api.ControllerProto;
+import no.nb.nna.broprox.commons.FailedFetchCodes;
 import no.nb.nna.broprox.commons.client.DnsServiceClient;
 import no.nb.nna.broprox.commons.client.RobotsServiceClient;
 import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
@@ -35,11 +37,15 @@ import no.nb.nna.broprox.model.MessagesProto.CrawlExecutionStatus;
 import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
 import org.netpreserve.commons.uri.Uri;
 import org.netpreserve.commons.uri.UriConfigs;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  *
  */
 public class Frontier implements AutoCloseable {
+
+    private static final Logger LOG = LoggerFactory.getLogger(Frontier.class);
 
     private static final int EXPECTED_MAX_URIS = 1000000;
 
@@ -64,7 +70,6 @@ public class Frontier implements AutoCloseable {
         this.dnsServiceClient = dnsServiceClient;
         this.alreadyIncluded = new CuckooFilter.Builder<>(Funnels.unencodedCharsFunnel(), EXPECTED_MAX_URIS).build();
 
-        System.out.println("Starting Queue Processor");
 //        ForkJoinTask proc = EXECUTOR_SERVICE.submit(new Runnable() {
 //            @Override
 //            public void map() {
@@ -105,7 +110,7 @@ public class Frontier implements AutoCloseable {
                 .setScope(seed.getScope())
                 .build();
         status = getDb().addExecutionStatus(status);
-        System.out.println("NEW CRAWL EXECUTION: " + status.getId());
+        LOG.debug("New crawl execution: " + status.getId());
 
         String uri = seed.getMeta().getName();
         MessagesProto.QueuedUriOrBuilder qUri = QueuedUri.newBuilder()
@@ -117,18 +122,8 @@ public class Frontier implements AutoCloseable {
         return status;
     }
 
-    public QueuedUri enrichUri(MessagesProto.QueuedUriOrBuilder qUri, String executionId, long sequence, ConfigProto.CrawlConfig config) {
-        Uri surt = UriConfigs.SURT_KEY.buildUri(qUri.getUri());
-        String ip = getDnsServiceClient()
-                .resolve(surt.getHost(), surt.getDecodedPort())
-                .getAddress()
-                .getHostAddress();
-
-        List<ConfigProto.CrawlHostGroupConfig> groupConfigs = getDb()
-                .listCrawlHostGroupConfigs(ControllerProto.ListRequest.newBuilder()
-                        .setSelector(config.getPoliteness().getCrawlHostGroupSelector()).build()).getValueList();
-        String crawlHostGroupId = CrawlHostGroupCalculator.calculateCrawlHostGroup(ip, groupConfigs);
-        getDb().getOrCreateCrawlHostGroup(crawlHostGroupId, config.getPoliteness().getId());
+    public QueuedUri enrichUri(MessagesProto.QueuedUriOrBuilder qUri, String executionId, long sequence,
+            ConfigProto.CrawlConfig config) {
 
         QueuedUri.Builder qUriBuilder;
         if (qUri instanceof QueuedUri.Builder) {
@@ -136,13 +131,39 @@ public class Frontier implements AutoCloseable {
         } else {
             qUriBuilder = ((QueuedUri) qUri).toBuilder();
         }
-        qUriBuilder.setIp(ip)
-                .setSurt(surt.toString())
-                .setCrawlHostGroupId(crawlHostGroupId)
-                .setPolitenessId(config.getPoliteness().getId())
-                .setExecutionId(executionId)
-                .setSequence(sequence);
 
+        Uri surt = null;
+        try {
+            surt = UriConfigs.SURT_KEY.buildUri(qUri.getUri());
+            LOG.debug("Resolve ip for URI '{}'", qUri.getUri());
+
+            String ip = getDnsServiceClient()
+                    .resolve(surt.getHost(), surt.getDecodedPort())
+                    .getAddress()
+                    .getHostAddress();
+
+            List<ConfigProto.CrawlHostGroupConfig> groupConfigs = getDb()
+                    .listCrawlHostGroupConfigs(ControllerProto.ListRequest.newBuilder()
+                            .setSelector(config.getPoliteness().getCrawlHostGroupSelector()).build()).getValueList();
+            String crawlHostGroupId = CrawlHostGroupCalculator.calculateCrawlHostGroup(ip, groupConfigs);
+            getDb().getOrCreateCrawlHostGroup(crawlHostGroupId, config.getPoliteness().getId());
+
+            qUriBuilder.setIp(ip)
+                    .setSurt(surt.toString())
+                    .setCrawlHostGroupId(crawlHostGroupId)
+                    .setPolitenessId(config.getPoliteness().getId())
+                    .setExecutionId(executionId)
+                    .setSequence(sequence);
+
+
+        } catch (UnknownHostException ex) {
+            LOG.error("Failed ip resolution for URI '{}' by extracting host '{}' and port '{}'",
+                    qUri.getUri(),
+                    surt.getHost(),
+                    surt.getDecodedPort());
+
+            qUriBuilder.setError(FailedFetchCodes.FAILED_DNS.toFetchError(ex.toString()));
+        }
         return qUriBuilder.build();
     }
 

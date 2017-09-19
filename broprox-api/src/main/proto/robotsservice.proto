@@ -6,7 +6,6 @@ option java_package = "no.nb.nna.broprox.api";
 option java_outer_classname = "RobotsServiceProto";
 
 import "config.proto";
-import "messages.proto";
 
 // Service for controlling frontier.
 service RobotsService {

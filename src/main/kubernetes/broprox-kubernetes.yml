@@ -116,11 +116,11 @@ spec:
         - name: DB_PORT
           value: "28015"
         - name: CONTENT_WRITER_HOST
-          value: "content-writer"
+          value: "contentwriter"
         - name: CONTENT_WRITER_PORT
           value: "8080"
         - name: DNS_RESOLVER_HOST
-          value: "dnsservice"
+          value: "dnsresolver"
         - name: DNS_RESOLVER_PORT
           value: "50052"
         - name: TRACER_URI
@@ -139,9 +139,9 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: content-writer
+  name: contentwriter
   labels:
-    app: content-writer
+    app: contentwriter
     tier: backend
     role: worker
 spec:
@@ -150,8 +150,12 @@ spec:
     port: 8080
     targetPort: 8080
     nodePort: 31575
+  - name: explorer
+    port: 8081
+    targetPort: 8081
+    nodePort: 31576
   selector:
-    app: content-writer
+    app: contentwriter
     tier: backend
     role: worker
   type: NodePort
@@ -159,21 +163,37 @@ spec:
 apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
-  name: content-writer
+  name: contentwriter
 spec:
   replicas: 1
   template:
     metadata:
       labels:
-        app: content-writer
+        app: contentwriter
         tier: backend
         role: worker
     spec:
       containers:
-      - name: content-writer
-        image: norsknettarkiv/broprox-contentwriter-service:1.0.0-SNAPSHOT
+      - name: contentwriter
+        image: norsknettarkiv/broprox-contentwriter:1.0.0-SNAPSHOT
         ports:
         - containerPort: 8080
+        env:
+        - name: DB_HOST
+          value: "db"
+        - name: DB_PORT
+          value: "28015"
+        - name: TRACER_URI
+          value: "http://tracer:9411/api/v1/spans"
+        volumeMounts:
+        - mountPath: /workdir
+          name: workdir
+        - mountPath: /warcs
+          name: warcs
+      - name: contentexplorer
+        image: norsknettarkiv/broprox-contentexplorer:1.0.0-SNAPSHOT
+        ports:
+        - containerPort: 8081
         env:
         - name: DB_HOST
           value: "db"
@@ -247,7 +267,7 @@ spec:
         - name: ROBOTS_EVALUATOR_PORT
           value: "50052"
         - name: DNS_RESOLVER_HOST
-          value: "dnsservice"
+          value: "dnsresolver"
         - name: DNS_RESOLVER_PORT
           value: "50052"
         - name: TRACER_URI
@@ -373,9 +393,9 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: dnsservice
+  name: dnsresolver
   labels:
-    app: dnsservice
+    app: dnsresolver
     tier: backend
     role: worker
 spec:
@@ -384,7 +404,7 @@ spec:
     port: 50052
     targetPort: 50052
   selector:
-    app: dnsservice
+    app: dnsresolver
     tier: backend
     role: worker
   type: NodePort
@@ -392,13 +412,13 @@ spec:
 apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
-  name: dnsservice
+  name: dnsresover
 spec:
   replicas: 1
   template:
     metadata:
       labels:
-        app: dnsservice
+        app: dnsresolver
         tier: backend
         role: worker
     spec:
@@ -413,7 +433,7 @@ spec:
         - name: DB_PORT
           value: "28015"
         - name: CONTENT_WRITER_HOST
-          value: "content-writer"
+          value: "contentwriter"
         - name: CONTENT_WRITER_PORT
           value: "8080"
         - name: DNS_SERVER

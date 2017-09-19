@@ -23,7 +23,8 @@
         <module>broprox-harvester</module>
         <module>broprox-db-adapter</module>
         <module>broprox-chrome</module>
-        <module>broprox-contentwriter-service</module>
+        <module>broprox-contentwriter</module>
+        <module>broprox-contentexplorer</module>
         <module>broprox-frontier</module>
         <module>broprox-integrationtests</module>
         <module>broprox-controller</module>

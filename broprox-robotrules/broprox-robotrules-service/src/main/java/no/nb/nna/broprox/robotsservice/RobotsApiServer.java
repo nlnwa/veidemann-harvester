@@ -52,7 +52,7 @@ public class RobotsApiServer implements AutoCloseable {
         try {
             server.start();
 
-            LOG.info("Controller api listening on {}", server.getPort());
+            LOG.info("Robots Evaluator api listening on {}", server.getPort());
 
             Runtime.getRuntime().addShutdownHook(new Thread() {
                 @Override

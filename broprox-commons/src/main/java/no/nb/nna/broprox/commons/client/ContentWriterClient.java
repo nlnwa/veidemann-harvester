@@ -15,106 +15,140 @@
  */
 package no.nb.nna.broprox.commons.client;
 
-import java.net.URI;
-import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 
-import com.google.protobuf.InvalidProtocolBufferException;
-import com.google.protobuf.util.JsonFormat;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufInputStream;
-import io.opentracing.tag.Tags;
-import javax.ws.rs.WebApplicationException;
-import javax.ws.rs.client.Client;
-import javax.ws.rs.client.ClientBuilder;
-import javax.ws.rs.client.Entity;
-import javax.ws.rs.client.WebTarget;
-import javax.ws.rs.core.MultivaluedHashMap;
-import javax.ws.rs.core.MultivaluedMap;
-import javax.ws.rs.core.Response;
-import javax.ws.rs.core.UriBuilder;
-import no.nb.nna.broprox.commons.opentracing.OpenTracingJersey;
-import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
+import com.google.protobuf.ByteString;
+import io.grpc.ManagedChannel;
+import io.grpc.ManagedChannelBuilder;
+import io.grpc.Status;
+import io.grpc.StatusException;
+import io.grpc.stub.StreamObserver;
+import io.opentracing.contrib.ClientTracingInterceptor;
+import io.opentracing.util.GlobalTracer;
+import no.nb.nna.broprox.api.ContentWriterGrpc;
+import no.nb.nna.broprox.api.ContentWriterProto.WriteReply;
+import no.nb.nna.broprox.api.ContentWriterProto.WriteRequest;
 import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
-import org.glassfish.jersey.media.multipart.FormDataMultiPart;
-import org.glassfish.jersey.media.multipart.MultiPart;
-import org.glassfish.jersey.media.multipart.MultiPartFeature;
-import org.glassfish.jersey.media.multipart.file.StreamDataBodyPart;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  *
  */
 public class ContentWriterClient implements AutoCloseable {
 
-    final static Client CLIENT = ClientBuilder.newClient()
-            .register(MultiPartFeature.class);
+    private static final Logger LOG = LoggerFactory.getLogger(ContentWriterClient.class);
 
-    final WebTarget contentWriterTarget;
+    private final ManagedChannel channel;
+
+    private final ContentWriterGrpc.ContentWriterBlockingStub blockingStub;
+
+    private final ContentWriterGrpc.ContentWriterStub asyncStub;
 
     public ContentWriterClient(final String host, final int port) {
-        contentWriterTarget = CLIENT.target(UriBuilder.fromPath("/").host(host).port(port).scheme("http").build());
+        this(ManagedChannelBuilder.forAddress(host, port).usePlaintext(true));
+        LOG.info("ContentWriter client pointing to " + host + ":" + port);
     }
 
-    public URI writeRecord(CrawlLog logEntry, ByteBuf headers, ByteBuf payload) {
-        OpenTracingWrapper otw = new OpenTracingWrapper("ContentWriterClient", Tags.SPAN_KIND_CLIENT);
-        try {
-            return otw.call("writeWarcRecord", new WriteRecordTask(logEntry, headers, payload));
-        } catch (Exception ex) {
-            throw new RuntimeException(ex);
-        }
+    public ContentWriterClient(ManagedChannelBuilder<?> channelBuilder) {
+        LOG.info("Setting up ContentWriter client");
+        ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor.Builder(GlobalTracer.get()).build();
+        channel = channelBuilder.intercept(tracingInterceptor).build();
+        blockingStub = ContentWriterGrpc.newBlockingStub(channel);
+        asyncStub = ContentWriterGrpc.newStub(channel);
+    }
+
+    public ContentWriterSession createSession() {
+        return new ContentWriterSession();
     }
 
     @Override
     public void close() {
-        CLIENT.close();
+        try {
+            channel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
+        } catch (InterruptedException ex) {
+            throw new RuntimeException(ex);
+        }
     }
 
-    private class WriteRecordTask implements Callable<URI> {
+    public class ContentWriterSession {
 
-        final CrawlLog logEntry;
+        private final StreamObserver<WriteRequest> requestObserver;
 
-        final ByteBuf headers;
+        private final CountDownLatch finishLatch = new CountDownLatch(1);
 
-        final ByteBuf payload;
+        private String storageRef;
 
-        public WriteRecordTask(CrawlLog logEntry, ByteBuf headers, ByteBuf payload) {
-            this.logEntry = logEntry;
-            this.headers = headers;
-            this.payload = payload;
+        private StatusException error;
+
+        private ContentWriterSession() {
+
+            StreamObserver<WriteReply> responseObserver = new StreamObserver<WriteReply>() {
+                @Override
+                public void onNext(WriteReply reply) {
+                    storageRef = reply.getStorageRef();
+                }
+
+                @Override
+                public void onError(Throwable t) {
+                    Status status = Status.fromThrowable(t);
+                    LOG.warn("ContentWriter Failed: {}", status);
+                    error = status.asException();
+                    finishLatch.countDown();
+                }
+
+                @Override
+                public void onCompleted() {
+                    finishLatch.countDown();
+                }
+
+            };
+
+            this.requestObserver = asyncStub.write(responseObserver);
         }
 
-        @Override
-        public URI call() throws Exception {
-            final MultiPart multipart;
+        public ContentWriterSession sendCrawlLog(CrawlLog crawlLog) {
+            sendRequest(() -> WriteRequest.newBuilder().setCrawlLog(crawlLog).build());
+            return this;
+        }
+
+        public ContentWriterSession sendHeader(ByteString header) {
+            sendRequest(() -> WriteRequest.newBuilder().setHeader(header).build());
+            return this;
+        }
+
+        public ContentWriterSession sendPayload(ByteString payload) {
+            sendRequest(() -> WriteRequest.newBuilder().setPayload(payload).build());
+            return this;
+        }
+
+        public String finish() throws InterruptedException, StatusException {
+            requestObserver.onCompleted();
+            // Receiving happens asynchronously
+            finishLatch.await(1, TimeUnit.MINUTES);
+            if (error != null) {
+                throw error;
+            }
+            return storageRef;
+        }
+
+        private void sendRequest(Supplier<WriteRequest> request) {
+            if (finishLatch.getCount() == 0) {
+                // RPC completed or errored before we finished sending.
+                // Sending further requests won't error, but they will just be thrown away.
+                return;
+            }
+
             try {
-                multipart = new FormDataMultiPart()
-                        .field("logEntry", JsonFormat.printer().print(logEntry));
-            } catch (InvalidProtocolBufferException ex) {
-                throw new RuntimeException(ex);
+                requestObserver.onNext(request.get());
+            } catch (RuntimeException e) {
+                // Cancel RPC
+                requestObserver.onError(e);
+                throw e;
             }
-
-            if (headers != null) {
-                final StreamDataBodyPart headersPart = new StreamDataBodyPart("headers", new ByteBufInputStream(headers));
-                multipart.bodyPart(headersPart);
-            }
-
-            if (payload != null) {
-                final StreamDataBodyPart payloadPart = new StreamDataBodyPart("payload", new ByteBufInputStream(payload));
-                multipart.bodyPart(payloadPart);
-            }
-
-            MultivaluedMap<String, Object> httpHeaders = new MultivaluedHashMap<>();
-            OpenTracingJersey.injectSpanHeaders(httpHeaders);
-
-            Response storageRef = contentWriterTarget.path("warcrecord")
-                    .request()
-                    .headers(httpHeaders)
-                    .post(Entity.entity(multipart, multipart.getMediaType()), Response.class);
-
-            if (storageRef.getStatusInfo().getFamily() != Response.Status.Family.SUCCESSFUL) {
-                throw new WebApplicationException(storageRef);
-            }
-
-            return storageRef.getLocation();
         }
+
     }
 }

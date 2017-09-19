@@ -17,6 +17,7 @@ package no.nb.nna.broprox.harvester.proxy;
 
 import java.util.Objects;
 
+import com.google.protobuf.ByteString;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
@@ -86,14 +87,13 @@ public class AlreadyCrawledCache {
             HttpResponseStatus status,
             String uri,
             String exIdHeader,
-            ByteBuf headers,
-            ByteBuf payload) {
+            ByteString cacheValue) {
 
         if (exIdHeader == null) {
             return;
         }
 
-        ByteBuf data = Unpooled.copiedBuffer(headers, headerPayloadSep, payload).asReadOnly();
+        ByteBuf data = Unpooled.wrappedBuffer(cacheValue.toByteArray());
         FullHttpResponse httpResponse = new DefaultFullHttpResponse(httpVersion, status, data);
 
         CacheKey key = new CacheKey(uri, exIdHeader);

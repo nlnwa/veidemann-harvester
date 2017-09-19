@@ -64,6 +64,7 @@ message CrawlLog {
     string ip_address = 18;
     string execution_id = 19;
     int32 retries = 20; // Number of times this uri has been retried. Zero means success on first attempt.
+    FetchError error = 21; // Contains the error reason if fetch failed
 }
 
 message CrawledContent {
@@ -87,6 +88,11 @@ message CrawlHostGroup {
     string politeness_id = 2; // The politeness config this group is valid for
     google.protobuf.Timestamp next_fetch_time = 3; // The earliest time a URI from this group might be fetched
     bool busy = 4; // True if crawler is busy with fetching a URI from this group
+}
+
+message FetchError {
+    int32 code = 1;
+    string msg = 2;
 }
 
 message QueuedUri {
@@ -115,7 +121,7 @@ message QueuedUri {
     google.protobuf.Timestamp earliest_fetch_time_stamp = 13; // Do not fetch this uri before this time
     string crawl_host_group_id = 14; // The Crawl Host Group calculated for this uri
     string politeness_id = 15; // Id of the politeness config used when discovering this uri
-    string error = 16; // Contains the error reason if fetch failed
+    FetchError error = 16; // Contains the error reason if fetch failed
 }
 
 message Cookie {

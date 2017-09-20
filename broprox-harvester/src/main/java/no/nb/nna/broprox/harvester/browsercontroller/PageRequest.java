@@ -56,7 +56,9 @@ public class PageRequest {
     private PageRequest(NetworkDomain.RequestWillBeSent request) {
         this.request = request;
         this.resourceType = ResourceType.forName(request.type);
-//        System.out.println("***** 1PR: " + request.requestId + "\n d: " + request.documentURL + "\n u: " + request.request.url + "\n i: " + request.initiator + "\n :: " + request.redirectResponse + "\n r: " + request.request.headers.get("Referer"));
+        LOG.debug("RequestId: {}, documentUrl: {}, URL: {}, initiator: {}, redirectResponse: {}, referer: {}",
+                request.requestId, request.documentURL, request.request.url, request.initiator,
+                request.redirectResponse, request.request.headers.get("Referer"));
     }
 
     public PageRequest(NetworkDomain.RequestWillBeSent request, String initialDiscoveryPath) {

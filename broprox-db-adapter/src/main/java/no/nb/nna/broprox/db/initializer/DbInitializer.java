@@ -165,14 +165,16 @@ public class DbInitializer {
         r.tableCreate(TABLES.CRAWL_HOST_GROUP.name).run(conn);
         r.table(TABLES.CRAWL_HOST_GROUP.name).indexCreate("nextFetchTime").run(conn);
 
-        createMetaIndexes(TABLES.BROWSER_SCRIPTS,
+        createMetaIndexes(
+                TABLES.BROWSER_SCRIPTS,
                 TABLES.CRAWL_ENTITIES,
                 TABLES.SEEDS,
                 TABLES.CRAWL_JOBS,
                 TABLES.CRAWL_CONFIGS,
                 TABLES.CRAWL_SCHEDULE_CONFIGS,
                 TABLES.BROWSER_CONFIGS,
-                TABLES.POLITENESS_CONFIGS
+                TABLES.POLITENESS_CONFIGS,
+                TABLES.CRAWL_HOST_GROUP_CONFIGS
         );
 
         r.table(TABLES.URI_QUEUE.name)

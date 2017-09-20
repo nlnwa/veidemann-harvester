@@ -70,6 +70,12 @@ func Marshal(filename string, format string, msg proto.Message) error {
 			}
 		}
 		return nil
+	case "table":
+		err := MarshalTable(w, msg)
+		if err != nil {
+			return err
+		}
+		return nil
 	default:
 		log.Fatalf("Illegal format %s", format)
 	}
@@ -118,7 +124,7 @@ func EncodeJson(msg proto.Message) ([]byte, error) {
 	values := make(map[string]interface{})
 	json.Unmarshal(buf.Bytes(), &values)
 
-	kind := GetObjectName(reflect.TypeOf(msg))
+	kind := GetObjectName(msg)
 
 	values["kind"] = kind
 	b, _ := json.Marshal(values)

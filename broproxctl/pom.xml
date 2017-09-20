@@ -65,6 +65,7 @@
                                 <package>github.com/spf13/viper</package>
                                 <package>github.com/mitchellh/go-homedir</package>
                                 <package>github.com/ghodss/yaml</package>
+                                <package>github.com/buger/goterm</package>
                             </packages>
                         </configuration>
                     </execution>

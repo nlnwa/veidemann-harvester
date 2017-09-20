@@ -1,59 +1,18 @@
-# Broprox app for Kubernetes
-
-# Rethink DB
-apiVersion: v1
-kind: Service
-metadata:
-  name: db
-  labels:
-    app: rethinkdb
-    tier: backend
-    role: master
-spec:
-  ports:
-  - name: api
-    port: 28015
-    targetPort: 28015
-  - name: intracluster
-    port: 29015
-    targetPort: 29015
-  - name: webconsole
-    port: 8888
-    targetPort: 8080
-    nodePort: 30888
-  selector:
-    app: rethinkdb
-    tier: backend
-    role: master
-  type: NodePort
+# Veidemann app for Kubernetes
 ---
-apiVersion: apps/v1beta1
-kind: Deployment
+# Namespace
+apiVersion: v1
+kind: Namespace
 metadata:
-  name: db
-spec:
-  replicas: 1
-  template:
-    metadata:
-      labels:
-        app: rethinkdb
-        tier: backend
-        role: master
-    spec:
-      containers:
-      - name: rethinkdb
-        image: rethinkdb:2.3
-        ports:
-        - containerPort: 28015
-        - containerPort: 29015
-        - containerPort: 8080
+  name: veidemann
 
 ---
 # Harvester (proxy and browser)
 apiVersion: v1
 kind: Service
 metadata:
-  name: harvester
+  name: veidemann-harvester
+  namespace: veidemann
   labels:
     app: harvester
     tier: backend
@@ -78,7 +37,8 @@ spec:
 apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
-  name: harvester
+  name: veidemann-harvester
+  namespace: veidemann
 spec:
   template:
     metadata:
@@ -112,19 +72,19 @@ spec:
         - name: BROWSER_PORT
           value: "9222"
         - name: DB_HOST
-          value: "db"
+          value: "rethink.db"
         - name: DB_PORT
           value: "28015"
         - name: CONTENT_WRITER_HOST
-          value: "contentwriter"
+          value: "veidemann-contentwriter"
         - name: CONTENT_WRITER_PORT
           value: "8080"
         - name: DNS_RESOLVER_HOST
-          value: "dnsresolver"
+          value: "veidemann-dnsresolver"
         - name: DNS_RESOLVER_PORT
           value: "50052"
         - name: TRACER_URI
-          value: "http://tracer:9411/api/v1/spans"
+          value: "http://zipkin.zipkin:9411/api/v1/spans"
         volumeMounts:
         - mountPath: /workdir
           name: workdir
@@ -139,7 +99,8 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: contentwriter
+  name: veidemann-contentwriter
+  namespace: veidemann
   labels:
     app: contentwriter
     tier: backend
@@ -163,7 +124,8 @@ spec:
 apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
-  name: contentwriter
+  name: veidemann-contentwriter
+  namespace: veidemann
 spec:
   replicas: 1
   template:
@@ -180,11 +142,11 @@ spec:
         - containerPort: 8080
         env:
         - name: DB_HOST
-          value: "db"
+          value: "rethink.db"
         - name: DB_PORT
           value: "28015"
         - name: TRACER_URI
-          value: "http://tracer:9411/api/v1/spans"
+          value: "http://zipkin.zipkin:9411/api/v1/spans"
         volumeMounts:
         - mountPath: /workdir
           name: workdir
@@ -196,11 +158,11 @@ spec:
         - containerPort: 8081
         env:
         - name: DB_HOST
-          value: "db"
+          value: "rethink.db"
         - name: DB_PORT
           value: "28015"
         - name: TRACER_URI
-          value: "http://tracer:9411/api/v1/spans"
+          value: "http://zipkin.zipkin:9411/api/v1/spans"
         volumeMounts:
         - mountPath: /workdir
           name: workdir
@@ -219,7 +181,8 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: frontier
+  name: veidemann-frontier
+  namespace: veidemann
   labels:
     app: frontier
     tier: backend
@@ -238,7 +201,8 @@ spec:
 apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
-  name: frontier
+  name: veidemann-frontier
+  namespace: veidemann
 spec:
   replicas: 1
   template:
@@ -255,23 +219,23 @@ spec:
         - containerPort: 7700
         env:
         - name: DB_HOST
-          value: "db"
+          value: "rethink.db"
         - name: DB_PORT
           value: "28015"
         - name: HARVESTER_HOST
-          value: "harvester"
+          value: "veidemann-harvester"
         - name: HARVESTER_PORT
           value: "9090"
         - name: ROBOTS_EVALUATOR_HOST
-          value: "robots"
+          value: "veidemann-robots"
         - name: ROBOTS_EVALUATOR_PORT
           value: "50052"
         - name: DNS_RESOLVER_HOST
-          value: "dnsresolver"
+          value: "veidemann-dnsresolver"
         - name: DNS_RESOLVER_PORT
           value: "50052"
         - name: TRACER_URI
-          value: "http://tracer:9411/api/v1/spans"
+          value: "http://zipkin.zipkin:9411/api/v1/spans"
         volumeMounts:
         - mountPath: /workdir
           name: workdir
@@ -286,7 +250,8 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: controller
+  name: veidemann-controller
+  namespace: veidemann
   labels:
     app: controller
     tier: backend
@@ -306,7 +271,8 @@ spec:
 apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
-  name: controller
+  name: veidemann-controller
+  namespace: veidemann
 spec:
   replicas: 1
   template:
@@ -323,24 +289,25 @@ spec:
         - containerPort: 50051
         env:
         - name: DB_HOST
-          value: "db"
+          value: "rethink.db"
         - name: DB_PORT
           value: "28015"
         - name: FRONTIER_HOST
-          value: "frontier"
+          value: "veidemann-frontier"
         - name: FRONTIER_PORT
           value: "7700"
         - name: TRACER_URI
-          value: "http://tracer:9411/api/v1/spans"
+          value: "http://zipkin.zipkin:9411/api/v1/spans"
       restartPolicy: Always
       dnsPolicy: ClusterFirst
 
 ---
-# Broprox Robots honoring service
+# Veidemann Robots honoring service
 apiVersion: v1
 kind: Service
 metadata:
-  name: robots
+  name: veidemann-robots
+  namespace: veidemann
   labels:
     app: robots
     tier: backend
@@ -359,7 +326,8 @@ spec:
 apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
-  name: robots
+  name: veidemann-robots
+  namespace: veidemann
 spec:
   replicas: 1
   template:
@@ -376,24 +344,25 @@ spec:
         - containerPort: 50052
         env:
         - name: DB_HOST
-          value: "db"
+          value: "rethink.db"
         - name: DB_PORT
           value: "28015"
         - name: PROXY_HOST
-          value: "harvester"
+          value: "veidemann-harvester"
         - name: PROXY_PORT
           value: "8080"
         - name: TRACER_URI
-          value: "http://tracer:9411/api/v1/spans"
+          value: "http://zipkin.zipkin:9411/api/v1/spans"
       restartPolicy: Always
       dnsPolicy: ClusterFirst
 
 ---
-# Broprox DNS resolver service
+# Veidemann DNS resolver service
 apiVersion: v1
 kind: Service
 metadata:
-  name: dnsresolver
+  name: veidemann-dnsresolver
+  namespace: veidemann
   labels:
     app: dnsresolver
     tier: backend
@@ -412,7 +381,8 @@ spec:
 apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
-  name: dnsresover
+  name: veidemann-dnsresolver
+  namespace: veidemann
 spec:
   replicas: 1
   template:
@@ -429,60 +399,17 @@ spec:
         - containerPort: 50052
         env:
         - name: DB_HOST
-          value: "db"
+          value: "rethink.db"
         - name: DB_PORT
           value: "28015"
         - name: CONTENT_WRITER_HOST
-          value: "contentwriter"
+          value: "veidemann-contentwriter"
         - name: CONTENT_WRITER_PORT
           value: "8080"
         - name: DNS_SERVER
           value: "8.8.8.8"
         - name: TRACER_URI
-          value: "http://tracer:9411/api/v1/spans"
-      restartPolicy: Always
-      dnsPolicy: ClusterFirst
-
----
-# Zipkin log trace server
-apiVersion: v1
-kind: Service
-metadata:
-  name: tracer
-  labels:
-    app: tracer
-    tier: backend
-    role: log
-spec:
-  ports:
-  - name: api
-    port: 9411
-    targetPort: 9411
-    nodePort: 30889
-  selector:
-    app: tracer
-    tier: backend
-    role: log
-  type: NodePort
----
-apiVersion: apps/v1beta1
-kind: Deployment
-metadata:
-  name: tracer
-spec:
-  replicas: 1
-  template:
-    metadata:
-      labels:
-        app: tracer
-        tier: backend
-        role: log
-    spec:
-      containers:
-      - name: tracer
-        image: openzipkin/zipkin
-        ports:
-        - containerPort: 9411
+          value: "http://zipkin.zipkin:9411/api/v1/spans"
       restartPolicy: Always
       dnsPolicy: ClusterFirst
 
@@ -491,7 +418,8 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: api-gateway
+  name: veidemann-api-gateway
+  namespace: veidemann
   labels:
     app: api-gateway
     tier: frontend
@@ -509,7 +437,8 @@ spec:
 apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
-  name: api-gateway
+  name: veidemann-api-gateway
+  namespace: veidemann
 spec:
   replicas: 1
   template:
@@ -526,7 +455,7 @@ spec:
         - containerPort: 3010
         env:
         - name: GRPC_CONTROLLER
-          value: "controller:50051"
+          value: "veidemann-controller:50051"
       restartPolicy: Always
       dnsPolicy: ClusterFirst
 
@@ -535,7 +464,8 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: admin
+  name: veidemann-admin
+  namespace: veidemann
   labels:
     app: admin
     tier: frontend
@@ -555,7 +485,8 @@ spec:
 apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
-  name: admin
+  name: veidemann-admin
+  namespace: veidemann
 spec:
   replicas: 1
   template:
@@ -572,7 +503,7 @@ spec:
         - containerPort: 80
         env:
         - name: PROXY_ADDR
-          value: "api-gateway:3010"
+          value: "veidemann-api-gateway:3010"
       restartPolicy: Always
       dnsPolicy: ClusterFirst
 
@@ -581,7 +512,8 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: testsites
+  name: veidemann-testsites
+  namespace: veidemann
   labels:
     app: testsites
     tier: backend
@@ -606,7 +538,8 @@ spec:
 apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
-  name: testsites
+  name: veidemann-testsites
+  namespace: veidemann
 spec:
   replicas: 1
   template:
@@ -627,6 +560,6 @@ spec:
           protocol: UDP
         env:
         - name: HOST
-          value: "testsites"
+          value: "veidemann-testsites"
       restartPolicy: Always
       dnsPolicy: ClusterFirst

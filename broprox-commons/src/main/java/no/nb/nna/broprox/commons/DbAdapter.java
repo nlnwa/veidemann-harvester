@@ -23,6 +23,7 @@ import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListReply;
 import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListRequest;
 import no.nb.nna.broprox.api.ControllerProto.CrawlConfigListReply;
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;
+import no.nb.nna.broprox.api.ControllerProto.CrawlHostGroupConfigListReply;
 import no.nb.nna.broprox.api.ControllerProto.CrawlJobListReply;
 import no.nb.nna.broprox.api.ControllerProto.CrawlJobListRequest;
 import no.nb.nna.broprox.api.ControllerProto.CrawlScheduleConfigListReply;
@@ -34,12 +35,14 @@ import no.nb.nna.broprox.model.ConfigProto.BrowserConfig;
 import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
 import no.nb.nna.broprox.model.ConfigProto.CrawlConfig;
 import no.nb.nna.broprox.model.ConfigProto.CrawlEntity;
+import no.nb.nna.broprox.model.ConfigProto.CrawlHostGroupConfig;
 import no.nb.nna.broprox.model.ConfigProto.CrawlJob;
 import no.nb.nna.broprox.model.ConfigProto.CrawlScheduleConfig;
 import no.nb.nna.broprox.model.ConfigProto.LogLevels;
 import no.nb.nna.broprox.model.ConfigProto.PolitenessConfig;
 import no.nb.nna.broprox.model.ConfigProto.Seed;
 import no.nb.nna.broprox.model.MessagesProto.CrawlExecutionStatus;
+import no.nb.nna.broprox.model.MessagesProto.CrawlHostGroup;
 import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
 import no.nb.nna.broprox.model.MessagesProto.CrawledContent;
 import no.nb.nna.broprox.model.MessagesProto.ExtractedText;
@@ -63,9 +66,29 @@ public interface DbAdapter extends AutoCloseable {
 
     CrawlExecutionStatus updateExecutionStatus(CrawlExecutionStatus status);
 
+    CrawlExecutionStatus getExecutionStatus(String executionId);
+
     QueuedUri addQueuedUri(QueuedUri qu);
 
     QueuedUri updateQueuedUri(QueuedUri qu);
+
+    void deleteQueuedUri(QueuedUri qu);
+
+    long queuedUriCount(String executionId);
+
+    /**
+     * Get the first URI wich is ready to be fetched for a CrawlHostGroup.
+     *
+     * @param crawlHostGroup the CrawlHostGroup for which a URI is requested
+     * @return an Optional containing the next URI to be fetched or empty if none are ready yet.
+     */
+    FutureOptional<QueuedUri> getNextQueuedUriToFetch(CrawlHostGroup crawlHostGroup);
+
+    CrawlHostGroup getOrCreateCrawlHostGroup(String crawlHostGroupId, String politenessId);
+
+    FutureOptional<CrawlHostGroup> borrowFirstReadyCrawlHostGroup();
+
+    CrawlHostGroup releaseCrawlHostGroup(CrawlHostGroup crawlHostGroup, long nextFetchDelayMs);
 
     Screenshot addScreenshot(Screenshot s);
 
@@ -116,6 +139,12 @@ public interface DbAdapter extends AutoCloseable {
     Empty deleteBrowserScript(BrowserScript script);
 
     BrowserScriptListReply listBrowserScripts(BrowserScriptListRequest request);
+
+    CrawlHostGroupConfig saveCrawlHostGroupConfig(CrawlHostGroupConfig crawlHostGroupConfig);
+
+    Empty deleteCrawlHostGroupConfig(CrawlHostGroupConfig crawlHostGroupConfig);
+
+    CrawlHostGroupConfigListReply listCrawlHostGroupConfigs(ListRequest request);
 
     LogLevels getLogConfig();
 

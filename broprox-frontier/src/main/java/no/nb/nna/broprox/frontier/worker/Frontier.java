@@ -15,29 +15,37 @@
  */
 package no.nb.nna.broprox.frontier.worker;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.DelayQueue;
+import java.net.UnknownHostException;
+import java.util.List;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 
 import com.github.mgunlogson.cuckoofilter4j.CuckooFilter;
 import com.google.common.hash.Funnels;
 import com.rethinkdb.RethinkDB;
-import no.nb.nna.broprox.commons.opentracing.OpenTracingParentContextKey;
+import no.nb.nna.broprox.api.ControllerProto;
+import no.nb.nna.broprox.commons.FailedFetchCodes;
+import no.nb.nna.broprox.commons.client.DnsServiceClient;
+import no.nb.nna.broprox.commons.client.RobotsServiceClient;
 import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
-import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
+import no.nb.nna.broprox.model.ConfigProto;
 import no.nb.nna.broprox.model.ConfigProto.CrawlJob;
 import no.nb.nna.broprox.model.ConfigProto.Seed;
+import no.nb.nna.broprox.model.MessagesProto;
 import no.nb.nna.broprox.model.MessagesProto.CrawlExecutionStatus;
 import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
+import org.netpreserve.commons.uri.Uri;
 import org.netpreserve.commons.uri.UriConfigs;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  *
  */
 public class Frontier implements AutoCloseable {
+
+    private static final Logger LOG = LoggerFactory.getLogger(Frontier.class);
 
     private static final int EXPECTED_MAX_URIS = 1000000;
 
@@ -45,22 +53,23 @@ public class Frontier implements AutoCloseable {
 
     private final HarvesterClient harvesterClient;
 
+    private final RobotsServiceClient robotsServiceClient;
+
+    private final DnsServiceClient dnsServiceClient;
+
     static final RethinkDB r = RethinkDB.r;
-
-    final Map<String, CrawlExecution> runningExecutions = new ConcurrentHashMap<>();
-
-    final DelayQueue<CrawlExecution> executionsQueue = new DelayQueue<>();
 
     static final ForkJoinPool EXECUTOR_SERVICE = new ForkJoinPool(32);
 
     CuckooFilter<CharSequence> alreadyIncluded;
 
-    public Frontier(RethinkDbAdapter db, HarvesterClient harvesterClient) {
+    public Frontier(RethinkDbAdapter db, HarvesterClient harvesterClient, RobotsServiceClient robotsServiceClient, DnsServiceClient dnsServiceClient) {
         this.db = db;
         this.harvesterClient = harvesterClient;
+        this.robotsServiceClient = robotsServiceClient;
+        this.dnsServiceClient = dnsServiceClient;
         this.alreadyIncluded = new CuckooFilter.Builder<>(Funnels.unencodedCharsFunnel(), EXPECTED_MAX_URIS).build();
 
-        System.out.println("Starting Queue Processor");
 //        ForkJoinTask proc = EXECUTOR_SERVICE.submit(new Runnable() {
 //            @Override
 //            public void map() {
@@ -93,22 +102,77 @@ public class Frontier implements AutoCloseable {
     }
 
     public CrawlExecutionStatus scheduleSeed(final CrawlJob job, final Seed seed) {
-        CrawlExecution exe = new CrawlExecution(
-                OpenTracingParentContextKey.parentSpan(), this, seed, job, seed.getScope());
-        runningExecutions.put(exe.getId(), exe);
-
-        String uri = seed.getMeta().getName();
-        QueuedUri qUri = QueuedUri.newBuilder()
-                .setUri(uri)
-                .setExecutionId(exe.getId())
-                .setSequence(exe.getNextSequenceNum())
-                .setSurt(UriConfigs.SURT_KEY.buildUri(uri).toString())
+        // Create execution
+        CrawlExecutionStatus status = CrawlExecutionStatus.newBuilder()
+                .setJobId(job.getId())
+                .setSeedId(seed.getId())
+                .setState(CrawlExecutionStatus.State.CREATED)
                 .setScope(seed.getScope())
                 .build();
-        exe.setCurrentUri(qUri);
-        executionsQueue.add(exe);
+        status = getDb().addExecutionStatus(status);
+        LOG.debug("New crawl execution: " + status.getId());
 
-        return exe.getStatus();
+        String uri = seed.getMeta().getName();
+        MessagesProto.QueuedUriOrBuilder qUri = QueuedUri.newBuilder()
+                .setUri(uri);
+
+        qUri = enrichUri(qUri, status.getId(), 1L, job.getCrawlConfig());
+        qUri = addUriToQueue(qUri);
+
+        return status;
+    }
+
+    public QueuedUri enrichUri(MessagesProto.QueuedUriOrBuilder qUri, String executionId, long sequence,
+            ConfigProto.CrawlConfig config) {
+
+        QueuedUri.Builder qUriBuilder;
+        if (qUri instanceof QueuedUri.Builder) {
+            qUriBuilder = (QueuedUri.Builder) qUri;
+        } else {
+            qUriBuilder = ((QueuedUri) qUri).toBuilder();
+        }
+
+        Uri surt = null;
+        try {
+            surt = UriConfigs.SURT_KEY.buildUri(qUri.getUri());
+            LOG.debug("Resolve ip for URI '{}'", qUri.getUri());
+
+            String ip = getDnsServiceClient()
+                    .resolve(surt.getHost(), surt.getDecodedPort())
+                    .getAddress()
+                    .getHostAddress();
+
+            List<ConfigProto.CrawlHostGroupConfig> groupConfigs = getDb()
+                    .listCrawlHostGroupConfigs(ControllerProto.ListRequest.newBuilder()
+                            .setSelector(config.getPoliteness().getCrawlHostGroupSelector()).build()).getValueList();
+            String crawlHostGroupId = CrawlHostGroupCalculator.calculateCrawlHostGroup(ip, groupConfigs);
+            getDb().getOrCreateCrawlHostGroup(crawlHostGroupId, config.getPoliteness().getId());
+
+            qUriBuilder.setIp(ip)
+                    .setSurt(surt.toString())
+                    .setCrawlHostGroupId(crawlHostGroupId)
+                    .setPolitenessId(config.getPoliteness().getId())
+                    .setExecutionId(executionId)
+                    .setSequence(sequence);
+
+
+        } catch (UnknownHostException ex) {
+            LOG.error("Failed ip resolution for URI '{}' by extracting host '{}' and port '{}'",
+                    qUri.getUri(),
+                    surt.getHost(),
+                    surt.getDecodedPort());
+
+            qUriBuilder.setError(FailedFetchCodes.FAILED_DNS.toFetchError(ex.toString()));
+        }
+        return qUriBuilder.build();
+    }
+
+    public QueuedUri addUriToQueue(MessagesProto.QueuedUriOrBuilder qUri) {
+        if (qUri instanceof QueuedUri.Builder) {
+            return getDb().addQueuedUri(((QueuedUri.Builder) qUri).build());
+        } else {
+            return getDb().addQueuedUri((QueuedUri) qUri);
+        }
     }
 
     boolean alreadeyIncluded(QueuedUri qUri) {
@@ -125,6 +189,14 @@ public class Frontier implements AutoCloseable {
 
     public HarvesterClient getHarvesterClient() {
         return harvesterClient;
+    }
+
+    public RobotsServiceClient getRobotsServiceClient() {
+        return robotsServiceClient;
+    }
+
+    public DnsServiceClient getDnsServiceClient() {
+        return dnsServiceClient;
     }
 
     @Override

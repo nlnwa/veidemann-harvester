@@ -24,6 +24,7 @@ import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListReply;
 import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListRequest;
 import no.nb.nna.broprox.api.ControllerProto.CrawlConfigListReply;
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;
+import no.nb.nna.broprox.api.ControllerProto.CrawlHostGroupConfigListReply;
 import no.nb.nna.broprox.api.ControllerProto.CrawlJobListReply;
 import no.nb.nna.broprox.api.ControllerProto.CrawlJobListRequest;
 import no.nb.nna.broprox.api.ControllerProto.CrawlScheduleConfigListReply;
@@ -40,6 +41,7 @@ import no.nb.nna.broprox.model.ConfigProto.BrowserConfig;
 import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
 import no.nb.nna.broprox.model.ConfigProto.CrawlConfig;
 import no.nb.nna.broprox.model.ConfigProto.CrawlEntity;
+import no.nb.nna.broprox.model.ConfigProto.CrawlHostGroupConfig;
 import no.nb.nna.broprox.model.ConfigProto.CrawlJob;
 import no.nb.nna.broprox.model.ConfigProto.CrawlScheduleConfig;
 import no.nb.nna.broprox.model.ConfigProto.LogLevels;
@@ -355,6 +357,43 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     public void deleteBrowserScript(BrowserScript request, StreamObserver<Empty> respObserver) {
         try {
             respObserver.onNext(db.deleteBrowserScript(request));
+            respObserver.onCompleted();
+        } catch (Exception ex) {
+            LOG.error(ex.getMessage(), ex);
+            Status status = Status.UNKNOWN.withDescription(ex.toString());
+            respObserver.onError(status.asException());
+        }
+    }
+
+    @Override
+    public void saveCrawlHostGroupConfig(CrawlHostGroupConfig request, StreamObserver<CrawlHostGroupConfig> respObserver) {
+        try {
+            respObserver.onNext(db.saveCrawlHostGroupConfig(request));
+            respObserver.onCompleted();
+        } catch (Exception ex) {
+            LOG.error(ex.getMessage(), ex);
+            Status status = Status.UNKNOWN.withDescription(ex.toString());
+            respObserver.onError(status.asException());
+        }
+    }
+
+    @Override
+    public void listCrawlHostGroupConfigs(ListRequest request,
+            StreamObserver<CrawlHostGroupConfigListReply> respObserver) {
+        try {
+            respObserver.onNext(db.listCrawlHostGroupConfigs(request));
+            respObserver.onCompleted();
+        } catch (Exception ex) {
+            LOG.error(ex.getMessage(), ex);
+            Status status = Status.UNKNOWN.withDescription(ex.toString());
+            respObserver.onError(status.asException());
+        }
+    }
+
+    @Override
+    public void deleteCrawlHostGroupConfig(CrawlHostGroupConfig request, StreamObserver<Empty> respObserver) {
+        try {
+            respObserver.onNext(db.deleteCrawlHostGroupConfig(request));
             respObserver.onCompleted();
         } catch (Exception ex) {
             LOG.error(ex.getMessage(), ex);

@@ -7,7 +7,6 @@ option java_outer_classname = "FrontierProto";
 
 import "config.proto";
 import "messages.proto";
-import "google/protobuf/empty.proto";
 
 // Service for controlling frontier.
 service Frontier {

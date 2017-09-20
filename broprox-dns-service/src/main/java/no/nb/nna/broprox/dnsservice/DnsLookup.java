@@ -20,7 +20,6 @@ import java.io.InterruptedIOException;
 import java.math.BigInteger;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.URI;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -34,6 +33,8 @@ import java.util.List;
 import java.util.concurrent.Callable;
 
 import com.google.common.net.InetAddresses;
+import com.google.protobuf.ByteString;
+import io.grpc.StatusException;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.opentracing.tag.Tags;
@@ -130,9 +131,11 @@ public class DnsLookup {
         try {
             return otw.call("resolve", new Resolver(host, port));
         } catch (UnknownHostException ex) {
+            LOG.info("Failed DNS lookup of host '{}' and port '{}'", host, port, ex);
             throw ex;
         } catch (Exception ex) {
-            throw new RuntimeException(ex);
+            LOG.info("Failed DNS lookup of host '{}' and port '{}'", host, port, ex);
+            throw (UnknownHostException) new UnknownHostException(host).initCause(ex);
         }
     }
 
@@ -171,7 +174,9 @@ public class DnsLookup {
         this.digestAlgorithm = digestAlgorithm;
     }
 
-    protected void storeDnsRecord(final String host, final State state) throws IOException, NoSuchAlgorithmException {
+    protected void storeDnsRecord(final String host, final State state) throws IOException, NoSuchAlgorithmException,
+            InterruptedException, StatusException {
+
         ByteBuf payload = Unpooled.buffer();
 
         // Start the record with a 14-digit date per RFC 2540
@@ -209,8 +214,12 @@ public class DnsLookup {
         if (db != null) {
             crawlLog = db.addCrawlLog(crawlLog);
         }
+
         if (contentWriterClient != null) {
-            URI uri = contentWriterClient.writeRecord(crawlLog, payload, null);
+            String uri = contentWriterClient.createSession()
+                    .sendCrawlLog(crawlLog)
+                    .sendPayload(ByteString.copyFrom(buf))
+                    .finish();
         }
 
         LOG.debug("DNS record for {} written", host);
@@ -281,7 +290,7 @@ public class DnsLookup {
     State lookup(Name name, State state) {
         SetResponse sr = cache.lookupRecords(name, TYPE, Credibility.NORMAL);
 
-        LOG.debug("Cache lookup {}, Response {}", name, sr);
+        LOG.debug("Cache lookup '{}', Response '{}'", name, sr);
 
         if (sr.isUnknown() || sr.isDelegation()) {
             // Cache miss
@@ -303,7 +312,7 @@ public class DnsLookup {
             if (sr == null) {
                 sr = cache.lookupRecords(name, TYPE, Credibility.NORMAL);
             }
-            LOG.debug("Queried {}, Response {}", name, sr);
+            LOG.debug("Queried '{}', Response '{}'", name, sr);
             processResponse(name, sr, state);
         }
         return state;
@@ -421,7 +430,7 @@ public class DnsLookup {
         public InetSocketAddress call() throws UnknownHostException {
             // Check if host is already an ip address
             if (InetAddresses.isInetAddress(host)) {
-                LOG.debug("Host {} is IP address, return as is");
+                LOG.debug("Host '{}' is IP address, return as is");
                 return new InetSocketAddress(InetAddresses.forString(host), port);
             }
 
@@ -436,12 +445,12 @@ public class DnsLookup {
                     if (!state.fromCache) {
                         try {
                             storeDnsRecord(host, state);
-                        } catch (IOException | NoSuchAlgorithmException ex) {
+                        } catch (IOException | NoSuchAlgorithmException | InterruptedException | StatusException ex) {
                             LOG.error("Could not store DNS lookup", ex);
                             throw new RuntimeException(ex);
                         }
                     }
-                    LOG.debug("Resolved {} to {}", host, address);
+                    LOG.debug("Resolved '{}' to '{}'", host, address);
                     return address;
                 }
             }
@@ -449,11 +458,11 @@ public class DnsLookup {
             if (getAcceptNonDnsResolves() || "localhost".equals(host)) {
                 // Do lookup that bypasses javadns.
                 address = new InetSocketAddress(InetAddress.getByName(host), port);
-                LOG.debug("Found address {} for {} using native dns.", address, host);
+                LOG.debug("Found address '{}' for '{}' using native dns.", address, host);
                 return address;
             }
 
-            LOG.error("Could not lookup host {}", host);
+            LOG.error("Could not lookup host '{}'", host);
             throw new UnknownHostException(host);
         }
 

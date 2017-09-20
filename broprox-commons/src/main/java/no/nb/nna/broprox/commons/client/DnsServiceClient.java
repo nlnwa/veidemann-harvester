@@ -57,8 +57,10 @@ public class DnsServiceClient implements AutoCloseable {
         asyncStub = DnsServiceGrpc.newStub(channel);
     }
 
-    public InetSocketAddress resolve(String host, int port) {
+    public InetSocketAddress resolve(String host, int port) throws UnknownHostException {
         try {
+            // Ensure host is never null
+            host = host == null ? "" : host;
             DnsServiceProto.ResolveRequest request = DnsServiceProto.ResolveRequest.newBuilder()
                     .setHost(host)
                     .setPort(port)
@@ -69,9 +71,7 @@ public class DnsServiceClient implements AutoCloseable {
             return address;
         } catch (StatusRuntimeException ex) {
             LOG.error("RPC failed: " + ex.getStatus(), ex);
-            throw ex;
-        } catch (UnknownHostException ex) {
-            throw new RuntimeException(ex);
+            throw new UnknownHostException(host);
         }
     }
 

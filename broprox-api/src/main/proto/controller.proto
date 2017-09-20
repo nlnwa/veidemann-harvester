@@ -50,6 +50,10 @@ service Controller {
     rpc SaveBrowserScript (BrowserScript) returns (BrowserScript) {}
     rpc DeleteBrowserScript (BrowserScript) returns (google.protobuf.Empty) {}
 
+    rpc ListCrawlHostGroupConfigs (ListRequest) returns (CrawlHostGroupConfigListReply) {}
+    rpc SaveCrawlHostGroupConfig (CrawlHostGroupConfig) returns (CrawlHostGroupConfig) {}
+    rpc DeleteCrawlHostGroupConfig (CrawlHostGroupConfig) returns (google.protobuf.Empty) {}
+
     rpc GetLogConfig (google.protobuf.Empty) returns (LogLevels) {}
     rpc SaveLogConfig (LogLevels) returns (LogLevels) {}
 
@@ -155,6 +159,14 @@ message BrowserScriptListRequest {
 // A list of browserscripts
 message BrowserScriptListReply {
     repeated BrowserScript value = 1;
+    int64 count = 2;
+    int32 page_size = 14;
+    int32 page = 15;
+}
+
+// A list of CrawlHostGroupConfigs
+message CrawlHostGroupConfigListReply {
+    repeated CrawlHostGroupConfig value = 1;
     int64 count = 2;
     int32 page_size = 14;
     int32 page = 15;

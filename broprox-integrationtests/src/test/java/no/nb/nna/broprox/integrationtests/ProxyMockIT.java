@@ -25,10 +25,12 @@ import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.RunnableFuture;
 import java.util.stream.StreamSupport;
 
+import com.google.protobuf.Empty;
 import com.rethinkdb.RethinkDB;
 import com.rethinkdb.net.Cursor;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import no.nb.nna.broprox.api.ContentWriterGrpc;
 import no.nb.nna.broprox.api.ControllerGrpc;
 import no.nb.nna.broprox.api.ControllerProto;
 import no.nb.nna.broprox.commons.BroproxHeaderConstants;
@@ -48,9 +50,13 @@ import static org.assertj.core.api.Assertions.*;
  */
 public class ProxyMockIT implements BroproxHeaderConstants {
 
-    static ManagedChannel channel;
+    static ManagedChannel contentWriterChannel;
+
+    static ManagedChannel controllerChannel;
 
     static ControllerGrpc.ControllerBlockingStub controllerClient;
+
+    static ContentWriterGrpc.ContentWriterBlockingStub contentWriterClient;
 
     static RethinkDbAdapter db;
 
@@ -58,24 +64,30 @@ public class ProxyMockIT implements BroproxHeaderConstants {
 
     @BeforeClass
     public static void init() throws InterruptedException {
-        // Sleep a little to let docker routing complete
-//        Thread.sleep(2000);
-
         String controllerHost = System.getProperty("controller.host");
         int controllerPort = Integer.parseInt(System.getProperty("controller.port"));
+        String contentWriterHost = System.getProperty("contentwriter.host");
+        int contentWriterPort = Integer.parseInt(System.getProperty("contentwriter.port"));
         String dbHost = System.getProperty("db.host");
         int dbPort = Integer.parseInt(System.getProperty("db.port"));
 
-        channel = ManagedChannelBuilder.forAddress(controllerHost, controllerPort).usePlaintext(true).build();
-        controllerClient = ControllerGrpc.newBlockingStub(channel).withWaitForReady();
+        controllerChannel = ManagedChannelBuilder.forAddress(controllerHost, controllerPort).usePlaintext(true).build();
+        controllerClient = ControllerGrpc.newBlockingStub(controllerChannel).withWaitForReady();
+
+        contentWriterChannel = ManagedChannelBuilder.forAddress(contentWriterHost, contentWriterPort).usePlaintext(true)
+                .build();
+        contentWriterClient = ContentWriterGrpc.newBlockingStub(contentWriterChannel).withWaitForReady();
 
         db = new RethinkDbAdapter(dbHost, dbPort, "broprox");
     }
 
     @AfterClass
     public static void shutdown() {
-        if (channel != null) {
-            channel.shutdown();
+        if (contentWriterChannel != null) {
+            contentWriterChannel.shutdown();
+        }
+        if (controllerChannel != null) {
+            controllerChannel.shutdown();
         }
         if (db != null) {
             db.close();
@@ -84,7 +96,7 @@ public class ProxyMockIT implements BroproxHeaderConstants {
 
     @After
     public void cleanup() {
-        WarcInspector.deleteWarcFiles();
+        contentWriterClient.delete(Empty.getDefaultInstance());
         db.executeRequest(r.table(RethinkDbAdapter.TABLES.CRAWLED_CONTENT.name).delete());
         db.executeRequest(r.table(RethinkDbAdapter.TABLES.CRAWL_LOG.name).delete());
         db.executeRequest(r.table(RethinkDbAdapter.TABLES.EXECUTIONS.name).delete());

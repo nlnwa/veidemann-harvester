@@ -5,9 +5,6 @@ option java_package = "no.nb.nna.broprox.api";
 //option java_multiple_files = true;
 option java_outer_classname = "DnsServiceProto";
 
-import "config.proto";
-import "messages.proto";
-
 // Service for resolving, caching and logging dns requests.
 service DnsService {
     rpc resolve (ResolveRequest) returns (ResolveReply) {}

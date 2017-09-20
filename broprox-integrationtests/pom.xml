@@ -221,11 +221,11 @@
                                                 <dependsOn>
                                                     <container>db-initializer</container>
                                                     <container>browser</container>
-                                                    <container>content-writer</container>
+                                                    <container>contentwriter</container>
                                                     <container>testsites</container>
                                                     <container>tracer</container>
                                                     <container>robots</container>
-                                                    <container>dnsservice</container>
+                                                    <container>dnsresolver</container>
                                                 </dependsOn>
                                                 <volumes>
                                                     <bind>
@@ -235,12 +235,10 @@
                                                 <env>
                                                     <BROWSER_HOST>browser</BROWSER_HOST>
                                                     <DB_HOST>db</DB_HOST>
-                                                    <CONTENT_WRITER_HOST>content-writer</CONTENT_WRITER_HOST>
+                                                    <CONTENT_WRITER_HOST>contentwriter</CONTENT_WRITER_HOST>
                                                     <CONTENT_WRITER_PORT>8080</CONTENT_WRITER_PORT>
-                                                    <ROBOTS_SERVICE_PORT>50052</ROBOTS_SERVICE_PORT>
-                                                    <ROBOTS_SERVICE_HOST>robots</ROBOTS_SERVICE_HOST>
-                                                    <DNS_SERVICE_HOST>dnsservice</DNS_SERVICE_HOST>
-                                                    <DNS_SERVICE_PORT>50052</DNS_SERVICE_PORT>
+                                                    <DNS_RESOLVER_HOST>dnsresolver</DNS_RESOLVER_HOST>
+                                                    <DNS_RESOLVER_PORT>50052</DNS_RESOLVER_PORT>
                                                     <TRACER_URI>http://tracer:9411/api/v1/spans</TRACER_URI>
                                                 </env>
                                                 <log>
@@ -259,16 +257,57 @@
                                             </run>
                                         </image>
                                         <image>
-                                            <name>norsknettarkiv/broprox-contentwriter-service</name>
-                                            <alias>content-writer</alias>
+                                            <name>norsknettarkiv/broprox-contentwriter</name>
+                                            <alias>contentwriter</alias>
                                             <run>
                                                 <network>
                                                     <mode>custom</mode>
                                                     <name>integration-test-net</name>
-                                                    <alias>content-writer</alias>
+                                                    <alias>contentwriter</alias>
                                                 </network>
                                                 <ports>
                                                     <port>+contentwriter.host:contentwriter.port:8080</port>
+                                                </ports>
+                                                <dependsOn>
+                                                    <container>db-initializer</container>
+                                                    <container>tracer</container>
+                                                </dependsOn>
+                                                <volumes>
+                                                    <bind>
+                                                        <volume>contentwriter-warcs:/warcs</volume>
+                                                        <volume>contentwriter-workdir:/workdir</volume>
+                                                    </bind>
+                                                </volumes>
+                                                <env>
+                                                    <DB_HOST>db</DB_HOST>
+                                                    <TRACER_URI>http://tracer:9411/api/v1/spans</TRACER_URI>
+                                                    <UNSAFE>true</UNSAFE>
+                                                </env>
+                                                <log>
+                                                    <enabled>true</enabled>
+                                                </log>
+                                                <wait>
+                                                    <tcp>
+                                                        <mode>mapped</mode>
+                                                        <ports>
+                                                            <port>8080</port>
+                                                        </ports>
+                                                    </tcp>
+                                                    <time>20000</time>
+                                                </wait>
+                                            </run>
+                                        </image>
+                                        <image>
+                                            <name>norsknettarkiv/broprox-contentexplorer</name>
+                                            <alias>contentexplorer</alias>
+                                            <run>
+                                                <network>
+                                                    <mode>custom</mode>
+                                                    <name>integration-test-net</name>
+                                                    <alias>contentexplorer</alias>
+                                                </network>
+                                                <ports>
+                                                    <port>+contentexplorer.host:contentexplorer.port:8080</port>
                                                 </ports>
                                                 <dependsOn>
                                                     <container>db-initializer</container>
@@ -319,6 +358,10 @@
                                                 <env>
                                                     <DB_HOST>db</DB_HOST>
                                                     <HARVESTER_HOST>harvester</HARVESTER_HOST>
+                                                    <ROBOTS_EVALUATOR_PORT>50052</ROBOTS_EVALUATOR_PORT>
+                                                    <ROBOTS_EVALUATOR_HOST>robots</ROBOTS_EVALUATOR_HOST>
+                                                    <DNS_RESOLVER_HOST>dnsresolver</DNS_RESOLVER_HOST>
+                                                    <DNS_RESOLVER_PORT>50052</DNS_RESOLVER_PORT>
                                                     <TRACER_URI>http://tracer:9411/api/v1/spans</TRACER_URI>
                                                 </env>
                                                 <log>
@@ -351,11 +394,11 @@
                                                 <dependsOn>
                                                     <container>db-initializer</container>
                                                     <container>robots</container>
-                                                    <container>dnsservice</container>
+                                                    <container>dnsresolver</container>
                                                     <container>frontier</container>
                                                     <container>tracer</container>
                                                     <container>browser</container>
-                                                    <container>content-writer</container>
+                                                    <container>contentwriter</container>
                                                     <container>harvester</container>
                                                     <container>testsites</container>
                                                 </dependsOn>
@@ -381,24 +424,24 @@
                                         </image>
                                         <image>
                                             <name>norsknettarkiv/broprox-dns-service</name>
-                                            <alias>dnsservice</alias>
+                                            <alias>dnsresolver</alias>
                                             <run>
                                                 <network>
                                                     <mode>custom</mode>
                                                     <name>integration-test-net</name>
-                                                    <alias>dnsservice</alias>
+                                                    <alias>dnsresolver</alias>
                                                 </network>
                                                 <ports>
                                                     <port>+dns.host:dns.port:50052</port>
                                                 </ports>
                                                 <dependsOn>
                                                     <container>db-initializer</container>
-                                                    <container>content-writer</container>
+                                                    <container>contentwriter</container>
                                                     <container>tracer</container>
                                                 </dependsOn>
                                                 <env>
                                                     <DB_HOST>db</DB_HOST>
-                                                    <CONTENT_WRITER_HOST>content-writer</CONTENT_WRITER_HOST>
+                                                    <CONTENT_WRITER_HOST>contentwriter</CONTENT_WRITER_HOST>
                                                     <CONTENT_WRITER_PORT>8080</CONTENT_WRITER_PORT>
                                                     <DNS_SERVER>testsites</DNS_SERVER>
                                                     <TRACER_URI>http://tracer:9411/api/v1/spans</TRACER_URI>
@@ -551,6 +594,8 @@
                                 <frontier.port>${frontier.port}</frontier.port>
                                 <contentwriter.host>${contentwriter.host}</contentwriter.host>
                                 <contentwriter.port>${contentwriter.port}</contentwriter.port>
+                                <contentexplorer.host>${contentexplorer.host}</contentexplorer.host>
+                                <contentexplorer.port>${contentexplorer.port}</contentexplorer.port>
                             </systemPropertyVariables>
                         </configuration>
                     </plugin>

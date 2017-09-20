@@ -9,7 +9,7 @@ metadata:
 apiVersion: v1
 kind: Service
 metadata:
-  name: db
+  name: rethink
   namespace: db
   labels:
     app: rethinkdb
@@ -36,7 +36,7 @@ spec:
 apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
-  name: db
+  name: rethink
   namespace: db
 spec:
   replicas: 1

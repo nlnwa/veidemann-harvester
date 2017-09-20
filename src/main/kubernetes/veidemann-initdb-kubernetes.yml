@@ -1,4 +1,9 @@
 ---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: db
+---
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -11,11 +16,11 @@ spec:
     spec:
       containers:
       - name: initdb
-        image: norsknettarkiv/broprox-db-initializer
+        imagePullPolicy: Always
+        image: norsknettarkiv/broprox-db-initializer:1.0.0-SNAPSHOT
         env:
         - name: DB_HOST
-          value: "rethink"
+          value: "rethink.db"
         - name: DB_PORT
           value: "28015"
       restartPolicy: Never
-      

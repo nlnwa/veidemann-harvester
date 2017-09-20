@@ -93,6 +93,84 @@ to quickly create a Cobra application.`,
 				if util.Marshal(file, format, r) != nil {
 					os.Exit(1)
 				}
+			case "crawlconfig":
+				request := bp.ListRequest{}
+				if selector != nil {
+					request.Qry = &bp.ListRequest_Selector{selector}
+				}
+				r, err := client.ListCrawlConfigs(context.Background(), &request)
+				if err != nil {
+					log.Fatalf("could not get crawl config: %v", err)
+				}
+
+				if util.Marshal(file, format, r) != nil {
+					os.Exit(1)
+				}
+			case "schedule":
+				request := bp.ListRequest{}
+				if selector != nil {
+					request.Qry = &bp.ListRequest_Selector{selector}
+				}
+				r, err := client.ListCrawlScheduleConfigs(context.Background(), &request)
+				if err != nil {
+					log.Fatalf("could not get schedule config: %v", err)
+				}
+
+				if util.Marshal(file, format, r) != nil {
+					os.Exit(1)
+				}
+			case "browser":
+				request := bp.ListRequest{}
+				if selector != nil {
+					request.Qry = &bp.ListRequest_Selector{selector}
+				}
+				r, err := client.ListBrowserConfigs(context.Background(), &request)
+				if err != nil {
+					log.Fatalf("could not get browser config: %v", err)
+				}
+
+				if util.Marshal(file, format, r) != nil {
+					os.Exit(1)
+				}
+			case "politeness":
+				request := bp.ListRequest{}
+				if selector != nil {
+					request.Qry = &bp.ListRequest_Selector{selector}
+				}
+				r, err := client.ListPolitenessConfigs(context.Background(), &request)
+				if err != nil {
+					log.Fatalf("could not get politeness config: %v", err)
+				}
+
+				if util.Marshal(file, format, r) != nil {
+					os.Exit(1)
+				}
+			case "script":
+				request := bp.BrowserScriptListRequest{}
+				if selector != nil {
+					request.Qry = &bp.BrowserScriptListRequest_Selector{selector}
+				}
+				r, err := client.ListBrowserScripts(context.Background(), &request)
+				if err != nil {
+					log.Fatalf("could not get browser script: %v", err)
+				}
+
+				if util.Marshal(file, format, r) != nil {
+					os.Exit(1)
+				}
+			case "group":
+				request := bp.ListRequest{}
+				if selector != nil {
+					request.Qry = &bp.ListRequest_Selector{selector}
+				}
+				r, err := client.ListCrawlHostGroupConfigs(context.Background(), &request)
+				if err != nil {
+					log.Fatalf("could not get crawl host group config: %v", err)
+				}
+
+				if util.Marshal(file, format, r) != nil {
+					os.Exit(1)
+				}
 			case "loglevel":
 				r, err := client.GetLogConfig(context.Background(), &empty.Empty{})
 				if err != nil {

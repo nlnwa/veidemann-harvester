@@ -15,7 +15,6 @@ package cmd
 
 import (
 	"log"
-	"os"
 
 	bp "broprox"
 	"broproxctl/util"
@@ -44,9 +43,7 @@ If seedId is not submitted then all the seeds wich are configured to use the sub
 					log.Fatalf("could not get entity: %v", err)
 				}
 
-				if util.Marshal(file, "yaml", r) != nil {
-					os.Exit(1)
-				}
+				println(r)
 			case 2:
 				// Two arguments (jobId and seedId)
 				request := bp.RunCrawlRequest{JobId: args[0], SeedId: args[1]}
@@ -55,9 +52,7 @@ If seedId is not submitted then all the seeds wich are configured to use the sub
 					log.Fatalf("could not get entity: %v", err)
 				}
 
-				if util.Marshal(file, "yaml", r) != nil {
-					os.Exit(1)
-				}
+				println(r)
 			}
 		} else {
 			cmd.Usage()

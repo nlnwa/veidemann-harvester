@@ -35,6 +35,8 @@ import com.google.protobuf.MessageOrBuilder;
 import com.google.protobuf.Timestamp;
 import com.google.protobuf.util.JsonFormat;
 import com.google.protobuf.util.Timestamps;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static no.nb.nna.broprox.db.RethinkDbAdapter.r;
 
@@ -42,6 +44,8 @@ import static no.nb.nna.broprox.db.RethinkDbAdapter.r;
  * Static methods for converting between Protobuf messages and RethinkDB objects.
  */
 public class ProtoUtils {
+
+    private static final Logger LOG = LoggerFactory.getLogger(ProtoUtils.class);
 
     private static final JsonFormat.Parser JSON_PARSER = JsonFormat.parser();
 
@@ -181,6 +185,13 @@ public class ProtoUtils {
                                 protoBuilder.setField(fd, ((Long) value).intValue());
                             } else {
                                 protoBuilder.setField(fd, (int) value);
+                            }
+                            break;
+                        case FLOAT:
+                            if (value instanceof Double) {
+                                protoBuilder.setField(fd, ((Double) value).floatValue());
+                            } else {
+                                protoBuilder.setField(fd, (float) value);
                             }
                             break;
                         case BYTES:

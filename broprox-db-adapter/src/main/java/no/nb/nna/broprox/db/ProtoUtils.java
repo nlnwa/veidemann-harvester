@@ -190,6 +190,10 @@ public class ProtoUtils {
                         case FLOAT:
                             if (value instanceof Double) {
                                 protoBuilder.setField(fd, ((Double) value).floatValue());
+                            } else if (value instanceof Long) {
+                                protoBuilder.setField(fd, ((Long) value).floatValue());
+                            } else if (value instanceof Integer) {
+                                protoBuilder.setField(fd, ((Integer) value).floatValue());
                             } else {
                                 protoBuilder.setField(fd, (float) value);
                             }

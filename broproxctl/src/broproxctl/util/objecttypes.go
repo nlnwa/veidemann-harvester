@@ -69,3 +69,11 @@ func GetTableDef(msg proto.Message) []string {
 	}
 	return nil
 }
+
+func GetObjectNames() []string {
+	result := make([]string, len(objectTypes))
+	for idx, ot := range objectTypes {
+		result[idx] = ot.vName
+	}
+	return result
+}

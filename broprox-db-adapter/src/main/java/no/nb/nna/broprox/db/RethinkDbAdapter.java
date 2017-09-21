@@ -490,7 +490,7 @@ public class RethinkDbAdapter implements DbAdapter {
     public CrawlJob saveCrawlJob(CrawlJob crawlJob) {
         CrawlJob.Builder builder = crawlJob.toBuilder();
 
-        switch (crawlJob.getSceduleConfigOrIdCase()) {
+        switch (crawlJob.getScheduleConfigOrIdCase()) {
             case SCHEDULE:
                 CrawlScheduleConfig schedule = crawlJob.getSchedule();
                 schedule = saveCrawlScheduleConfig(schedule);

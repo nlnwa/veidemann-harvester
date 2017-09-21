@@ -676,8 +676,8 @@ public class RethinkDbAdapterIT {
                 .satisfies(r -> {
                     assertThat(r.getCount()).isEqualTo(1);
                     assertThat(r.getValue(0).getMeta().getName()).isEqualTo("Test job");
-                    assertThat(r.getValue(0).getSceduleConfigOrIdCase())
-                            .isSameAs(CrawlJob.SceduleConfigOrIdCase.SCHEDULE_ID);
+                    assertThat(r.getValue(0).getScheduleConfigOrIdCase())
+                            .isSameAs(CrawlJob.ScheduleConfigOrIdCase.SCHEDULE_ID);
                 });
 
         assertThat(db.listCrawlScheduleConfigs(ListRequest.getDefaultInstance()))
@@ -719,8 +719,8 @@ public class RethinkDbAdapterIT {
                 .satisfies(r -> {
                     assertThat(r.getCount()).isEqualTo(1);
                     assertThat(r.getValue(0).getMeta().getName()).isEqualTo("Test job");
-                    assertThat(r.getValue(0).getSceduleConfigOrIdCase())
-                            .isSameAs(CrawlJob.SceduleConfigOrIdCase.SCHEDULE);
+                    assertThat(r.getValue(0).getScheduleConfigOrIdCase())
+                            .isSameAs(CrawlJob.ScheduleConfigOrIdCase.SCHEDULE);
                 });
 
         Label label = Label.newBuilder().setKey("type").setValue("default").build();
@@ -739,8 +739,8 @@ public class RethinkDbAdapterIT {
                 .satisfies(r -> {
                     assertThat(r.getCount()).isEqualTo(1);
                     assertThat(r.getValue(0).getMeta().getName()).isEqualTo("Test job");
-                    assertThat(r.getValue(0).getSceduleConfigOrIdCase())
-                            .isSameAs(CrawlJob.SceduleConfigOrIdCase.SCEDULECONFIGORID_NOT_SET);
+                    assertThat(r.getValue(0).getScheduleConfigOrIdCase())
+                            .isSameAs(CrawlJob.ScheduleConfigOrIdCase.SCHEDULECONFIGORID_NOT_SET);
                     assertThat(r.getValue(0).getCrawlConfigOrIdCase())
                             .isSameAs(CrawlJob.CrawlConfigOrIdCase.CRAWL_CONFIG);
                 });
@@ -767,8 +767,8 @@ public class RethinkDbAdapterIT {
                 .satisfies(r -> {
                     assertThat(r.getCount()).isEqualTo(1);
                     assertThat(r.getValue(0).getMeta().getName()).isEqualTo("Test job");
-                    assertThat(r.getValue(0).getSceduleConfigOrIdCase())
-                            .isSameAs(CrawlJob.SceduleConfigOrIdCase.SCEDULECONFIGORID_NOT_SET);
+                    assertThat(r.getValue(0).getScheduleConfigOrIdCase())
+                            .isSameAs(CrawlJob.ScheduleConfigOrIdCase.SCHEDULECONFIGORID_NOT_SET);
                     assertThat(r.getValue(0).getCrawlConfigOrIdCase())
                             .isSameAs(CrawlJob.CrawlConfigOrIdCase.CRAWL_CONFIG);
                     assertThat(r.getValue(0).getCrawlConfig().getId())

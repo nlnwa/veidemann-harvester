@@ -37,12 +37,16 @@ var (
 var getCmd = &cobra.Command{
 	Use:   "get [object_type]",
 	Short: "Get the value(s) for an object type",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
+	Long: `Display one or many objects.
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+` +
+		printValidObejctTypes() +
+		`Examples:
+  #List all seeds.
+  broproxctl get seed
+
+  #List all seeds in yaml output format.
+  broproxctl get seed -f yaml`,
 
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) == 1 {
@@ -185,9 +189,19 @@ to quickly create a Cobra application.`,
 				cmd.Usage()
 			}
 		} else {
-			cmd.Usage()
+			fmt.Print("You must specify the object type to get. ")
+			fmt.Println(printValidObejctTypes())
+			fmt.Println("See 'broproxctl get -h' for help")
 		}
 	},
+}
+
+func printValidObejctTypes() string {
+	var names string
+	for _, v := range util.GetObjectNames() {
+		names += fmt.Sprintf("  * %s\n", v)
+	}
+	return fmt.Sprintf("Valid object types include:\n%s\n", names)
 }
 
 func init() {
@@ -198,7 +212,7 @@ func init() {
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
 	getCmd.PersistentFlags().StringVarP(&label, "label", "l", "", "List objects by label")
-	getCmd.PersistentFlags().StringVarP(&format, "format", "f", "yaml", "Output format (json|yaml)")
+	getCmd.PersistentFlags().StringVarP(&format, "format", "f", "table", "Output format (table|json|yaml)")
 	getCmd.PersistentFlags().StringVarP(&file, "output", "o", "", "File name to write to")
 
 	// Cobra supports local flags which will only run when this command

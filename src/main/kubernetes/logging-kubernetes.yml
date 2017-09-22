@@ -202,6 +202,7 @@ data:
       @type concat
       key log
       multiline_start_regexp /(\d{2}:\d{2}:\d{2}.\d{3})/
+      flush_interval 10
     </filter>
 
 
@@ -253,14 +254,14 @@ spec:
             - name: varlibdockercontainers
               mountPath: /mnt/sda1/var/lib/docker/containers
             - name: varlibboot2docker
-              mountPath: /mnt/sda1/var/lib/boot2docker
+              mountPath: /var/lib/boot2docker
             - name: varlog
               mountPath: /var/log
             - name: config-volume
               mountPath: /etc/fluent
       volumes:
         - hostPath:
-            path: /var/lib/boot2docker
+            path: /mnt/sda1/var/lib/boot2docker
           name: varlibboot2docker
         - hostPath:
             path: /mnt/sda1/var/lib/docker/containers

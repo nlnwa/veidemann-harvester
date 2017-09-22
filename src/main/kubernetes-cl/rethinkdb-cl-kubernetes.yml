@@ -81,7 +81,6 @@ spec:
         args:
           - "--cache-size"
           - "256"
-        imagePullPolicy: Always
         name: rethinkdb
         env:
         - name: POD_NAMESPACE
@@ -155,7 +154,6 @@ spec:
     spec:
       containers:
       - image: rosskukulinski/rethinkdb-kubernetes:2.3.5
-        imagePullPolicy: Always
         name: rethinkdb
         env:
         - name: PROXY
@@ -224,7 +222,6 @@ spec:
     spec:
       containers:
       - image: rosskukulinski/rethinkdb-kubernetes:2.3.5
-        imagePullPolicy: Always
         name: rethinkdb
         env:
         - name: PROXY

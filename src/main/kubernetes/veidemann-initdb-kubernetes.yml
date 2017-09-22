@@ -16,7 +16,6 @@ spec:
     spec:
       containers:
       - name: initdb
-        imagePullPolicy: Always
         image: norsknettarkiv/broprox-db-initializer:1.0.0-SNAPSHOT
         env:
         - name: DB_HOST

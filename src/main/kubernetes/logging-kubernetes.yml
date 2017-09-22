@@ -8,48 +8,34 @@ metadata:
 kind: ConfigMap
 apiVersion: v1
 data:
-  td-agent.conf: |-
+  fluent.conf: |-
     # Example:
     # {"log":"[info:2016-02-16T16:04:05.930-08:00] Some log text here\n","stream":"stdout","time":"2016-02-17T00:04:05.931087621Z"}
     # 
-    <source>
-      type tail
-      format multiline
-      multiline_flush_interval 5s
-      format_firstline /^(([{"log:]*))(?<tidspunkt>\d{2}:\d{2}:\d{2}.\d{3})/
-      format1 /^(([{"log:]*))(?<tidspunkt>\d{2}:\d{2}:\d{2}.\d{3}) (?<thread>\[(.*)\]) (?<level>\w+) (?<logger>[^\s]+) - (?<message>.*)/
-      path /var/log/containers/veidemann*.log
-      pos_file /var/log/es-containers.log.pos
-      time_format %Y-%m-%dT%H:%M:%S.%NZ
-      tag kubernetes.*
-      read_from_head true
-    </source>
-
     #    <source>
     #      type tail
-    #      format multiline
-    #      multiline_flush_interval 5s
+    #      #      format multiline
+    #      #multiline_flush_interval 5s
+    #      #format_firstline /^(([{"log:]*))(?<tidspunkt>\d{2}:\d{2}:\d{2}.\d{3})/
+    #      #format1 /^(([{"log:]*))(?<tidspunkt>\d{2}:\d{2}:\d{2}.\d{3}) (?<thread>\[(.*)\]) (?<level>\w+) (?<logger>[^\s]+) - (?<message>.*)/
     #      format json
-    #      format_firstline /^(?<tidspunkt>\d{2}:\d{2}:\d{2}.\d{3})/
-    #      format1 /^(?<message>[^\d].*)/
-    #      path /var/log/containers/*.log
+    #      path /var/log/containers/veidemann*.log
     #      pos_file /var/log/es-containers.log.pos
     #      time_format %Y-%m-%dT%H:%M:%S.%NZ
-    #      tag kubernetes.*
+    #      tag kubernetes.veidemann*
     #      read_from_head true
     #    </source>
 
-
      #catch rest
-     <source>
-       type tail
-       path /var/log/containers/*.log
-       pos_file /var/log/es-containers.log.pos
-       time_format %Y-%m-%dT%H:%M:%S.%NZ
-       format json
-       tag kubernetes.*
-       read_from_head true
-     </source>
+    <source>
+      type tail
+      path /var/log/containers/*.log
+      pos_file /var/log/es-containers.log.pos
+      time_format %Y-%m-%dT%H:%M:%S.%NZ
+      format json
+      tag kubernetes.*
+      read_from_head true
+    </source>
   
     # Example:
     # 2015-12-21 23:17:22,066 [salt.state       ][INFO    ] Completed state [net.ipv4.ip_forward] at time 23:17:22.066081
@@ -212,9 +198,17 @@ data:
     </source>
     #  output.conf: |-
     # Enriches records with Kubernetes metadata
+    <filter kubernetes.var.log.containers.veidemann**>
+      @type concat
+      key log
+      multiline_start_regexp /(\d{2}:\d{2}:\d{2}.\d{3})/
+    </filter>
+
+
     <filter kubernetes.**>
       type kubernetes_metadata
     </filter>
+
     <match **>
        type elasticsearch
        log_level info
@@ -254,19 +248,19 @@ spec:
     spec:
       containers:
         - name: fluentd-es
-          image: gcr.io/google_containers/fluentd-elasticsearch:1.22
+          image: norsknettarkiv/fluentd-nna
           volumeMounts:
             - name: varlibdockercontainers
               mountPath: /mnt/sda1/var/lib/docker/containers
             - name: varlibboot2docker
-              mountPath: /var/lib/boot2docker
+              mountPath: /mnt/sda1/var/lib/boot2docker
             - name: varlog
               mountPath: /var/log
             - name: config-volume
-              mountPath: /etc/td-agent
+              mountPath: /etc/fluent
       volumes:
         - hostPath:
-            path: /mnt/sda1/var/lib/boot2docker
+            path: /var/lib/boot2docker
           name: varlibboot2docker
         - hostPath:
             path: /mnt/sda1/var/lib/docker/containers
@@ -309,7 +303,6 @@ spec:
       containers:
         - name: elasticsearch-logging
           image: elasticsearch
-          imagePullPolicy: Always 
           ports:
             - containerPort: 9200
 ---

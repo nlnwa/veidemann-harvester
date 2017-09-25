@@ -5,7 +5,33 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: veidemann
-
+---
+kind: ConfigMap
+apiVersion: v1
+data:
+  log4j2.xml: |-
+    <?xml version="1.0" encoding="UTF-8"?>
+    <Configuration status="WARN" monitorInterval="0">
+        <Appenders>
+            <Console name="Console" target="SYSTEM_OUT">
+                <PatternLayout pattern="%d{yyyy-MM-dd'T'HH:mm:ss.SSSZ} [%thread] %-5level %logger{36} - %msg%n"/>
+            </Console>
+        </Appenders>
+        <Loggers>
+            <Logger name="no.nb.nna.broprox" level="info" additivity="false">
+                <AppenderRef ref="Console"/>
+            </Logger>
+            <Root level="error">
+                <AppenderRef ref="Console"/>
+            </Root>
+        </Loggers>
+    </Configuration>
+metadata:
+  name: log4j.conf
+  namespace: veidemann
+  labels:
+    tier: backend
+    role: config
 ---
 # Harvester (proxy and browser)
 apiVersion: v1
@@ -88,12 +114,17 @@ spec:
         volumeMounts:
         - mountPath: /workdir
           name: workdir
+        - name: log4j-config
+          mountPath: /broprox-harvester/config/log4j2.xml
+          subPath: log4j2.xml
       restartPolicy: Always
       dnsPolicy: ClusterFirst
       volumes:
       - emptyDir: {}
         name: workdir
-
+      - name: log4j-config
+        configMap:
+          name: log4j.conf
 ---
 # Content writer
 apiVersion: v1
@@ -152,6 +183,9 @@ spec:
           name: workdir
         - mountPath: /warcs
           name: warcs
+        - name: log4j-config
+          mountPath: /broprox-contentwriter/config/log4j2.xml
+          subPath: log4j2.xml
       - name: contentexplorer
         image: norsknettarkiv/broprox-contentexplorer:1.0.0-SNAPSHOT
         ports:
@@ -168,6 +202,9 @@ spec:
           name: workdir
         - mountPath: /warcs
           name: warcs
+        - name: log4j-config
+          mountPath: /broprox-contentwriter/config/log4j2.xml
+          subPath: log4j2.xml
       restartPolicy: Always
       dnsPolicy: ClusterFirst
       volumes:
@@ -175,6 +212,9 @@ spec:
         name: workdir
       - emptyDir: {}
         name: warcs
+      - name: log4j-config
+        configMap:
+          name: log4j.conf
 
 ---
 # Frontier
@@ -239,11 +279,17 @@ spec:
         volumeMounts:
         - mountPath: /workdir
           name: workdir
+        - name: log4j-config
+          mountPath: /broprox-frontier/config/log4j2.xml
+          subPath: log4j2.xml
       restartPolicy: Always
       dnsPolicy: ClusterFirst
       volumes:
       - emptyDir: {}
         name: workdir
+      - name: log4j-config
+        configMap:
+          name: log4j.conf
 
 ---
 # Controller
@@ -298,8 +344,16 @@ spec:
           value: "7700"
         - name: TRACER_URI
           value: "http://zipkin.zipkin:9411/api/v1/spans"
+        volumeMounts:
+        - name: log4j-config
+          mountPath: /broprox-controller/config/log4j2.xml
+          subPath: log4j2.xml
       restartPolicy: Always
       dnsPolicy: ClusterFirst
+      volumes:
+      - name: log4j-config
+        configMap:
+          name: log4j.conf
 
 ---
 # Veidemann Robots honoring service
@@ -353,8 +407,16 @@ spec:
           value: "8080"
         - name: TRACER_URI
           value: "http://zipkin.zipkin:9411/api/v1/spans"
+        volumeMounts:
+        - name: log4j-config
+          mountPath: /broprox-robotrules-service/config/log4j2.xml
+          subPath: log4j2.xml
       restartPolicy: Always
       dnsPolicy: ClusterFirst
+      volumes:
+      - name: log4j-config
+        configMap:
+          name: log4j.conf
 
 ---
 # Veidemann DNS resolver service
@@ -410,8 +472,16 @@ spec:
           value: "8.8.8.8"
         - name: TRACER_URI
           value: "http://zipkin.zipkin:9411/api/v1/spans"
+        volumeMounts:
+        - name: log4j-config
+          mountPath: /broprox-dns-service/config/log4j2.xml
+          subPath: log4j2.xml
       restartPolicy: Always
       dnsPolicy: ClusterFirst
+      volumes:
+      - name: log4j-config
+        configMap:
+          name: log4j.conf
 
 ---
 # API Gateway

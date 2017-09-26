@@ -35,8 +35,8 @@ public class SeedListRequestQueryBuilder extends ConfigListQueryBuilder<SeedList
             case ID:
                 buildIdQuery(request.getId());
                 break;
-            case NAME_PREFIX:
-                buildNamePrefixQuery(request.getNamePrefix());
+            case NAME:
+                buildNameQuery(request.getName());
                 break;
             case SELECTOR:
                 buildSelectorQuery(request.getSelector());

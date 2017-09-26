@@ -54,3 +54,6 @@ spec:
         - containerPort: 28015
         - containerPort: 29015
         - containerPort: 8080
+        resources:
+            requests:
+                memory: "500Mi"

@@ -63,7 +63,7 @@ service Controller {
 message ListRequest {
     oneof qry {
         string id = 1;
-        string name_prefix = 2;
+        string name = 2;
         Selector selector = 3;
     }
     int32 page_size = 14;
@@ -81,7 +81,7 @@ message CrawlEntityListReply {
 message SeedListRequest {
     oneof qry {
         string id = 1;
-        string name_prefix = 2;
+        string name = 2;
         string crawl_job_id = 3;
         Selector selector = 4;
         string entity_id = 5;
@@ -100,7 +100,7 @@ message SeedListReply {
 message CrawlJobListRequest {
     oneof qry {
         string id = 1;
-        string name_prefix = 2;
+        string name = 2;
         Selector selector = 3;
     }
     // Expand dependencies (i.e. include the complete object graph)
@@ -148,7 +148,7 @@ message BrowserConfigListReply {
 message BrowserScriptListRequest {
     oneof qry {
         string id = 1;
-        string name_prefix = 2;
+        string name = 2;
         Selector selector = 4;
     }
     int32 page_size = 14;

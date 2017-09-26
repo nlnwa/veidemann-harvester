@@ -250,11 +250,23 @@ public class RethinkDbAdapterIT {
         assertThat(result.getCount()).isEqualTo(1);
         assertThat(result.getValueList()).contains(entity1);
 
-        request = ListRequest.newBuilder().setNamePrefix("nasj").build();
+        request = ListRequest.newBuilder().setName("^nasj.*").build();
         result = db.listCrawlEntities(request);
         assertThat(result.getValueCount()).isEqualTo(2);
         assertThat(result.getCount()).isEqualTo(2);
         assertThat(result.getValueList()).contains(entity1, entity3);
+
+        request = ListRequest.newBuilder().setName(".*biblioteket$").build();
+        result = db.listCrawlEntities(request);
+        assertThat(result.getValueCount()).isEqualTo(1);
+        assertThat(result.getCount()).isEqualTo(1);
+        assertThat(result.getValueList()).contains(entity1);
+
+        request = ListRequest.newBuilder().setName(".*ball.*").build();
+        result = db.listCrawlEntities(request);
+        assertThat(result.getValueCount()).isEqualTo(1);
+        assertThat(result.getCount()).isEqualTo(1);
+        assertThat(result.getValueList()).contains(entity3);
 
         request = ListRequest.newBuilder().setPageSize(2).build();
         result = db.listCrawlEntities(request);
@@ -504,7 +516,7 @@ public class RethinkDbAdapterIT {
         assertThat(result.getValueCount()).isEqualTo(0);
         assertThat(result.getCount()).isEqualTo(0);
 
-        request = BrowserScriptListRequest.newBuilder().setNamePrefix("extr").build();
+        request = BrowserScriptListRequest.newBuilder().setName("extr.*").build();
         result = db.listBrowserScripts(request);
         assertThat(result.getValueCount()).isEqualTo(1);
         assertThat(result.getCount()).isEqualTo(1);

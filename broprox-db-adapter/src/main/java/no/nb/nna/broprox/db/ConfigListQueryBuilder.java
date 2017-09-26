@@ -69,19 +69,21 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
     }
 
     /**
-     * Build a query for a name prefix request.
+     * Build a query for a name request.
+     * <p>
+     * The name parameter accepts regular expressions.
      * <p>
      * When this method returns, both {@link #getListQry()} and {@link #getCountQry()} will return the generated
      * queries.
      *
-     * @param prefix the name prefix
+     * @param name the name regex
      */
-    void buildNamePrefixQuery(String prefix) {
-        prefix = prefix.toLowerCase();
+    void buildNameQuery(String name) {
+        final String qry = "(?i)" + name;
         countQry = r.table(table.name)
-                .between(prefix, prefix + Character.toString(Character.MAX_VALUE))
-                .optArg("index", "name");
-        listQry = countQry.orderBy().optArg("index", "name");
+                .orderBy().optArg("index", "name")
+                .filter(doc -> doc.g("meta").g("name").match(qry));
+        listQry = countQry;
     }
 
     /**
@@ -129,12 +131,8 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
                     endSpan = prefix + Character.toString(Character.MAX_VALUE);
                     spanQry.add(r.table(table.name).between(startSpan, endSpan).optArg("index", "label_value").g("id"));
                 } else if (label.getValue().isEmpty()) {
-                    startSpan = r.minval();
-                    endSpan = r.maxval();
                     spanQry.add(r.table(table.name).getAll().optArg("index", "label_value").g("id"));
                 } else {
-                    startSpan = label.getValue().toLowerCase();
-                    endSpan = startSpan;
                     spanQry.add(r.table(table.name).getAll(label.getValue().toLowerCase())
                             .optArg("index", "label_value").g("id"));
                 }
@@ -181,7 +179,7 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
     }
 
     void setPaging(int pageSize, int page) {
-        this.pageSize = pageSize;
+        this.pageSize = pageSize == 0 ? 30 : pageSize;
         this.page = page;
     }
 
@@ -210,7 +208,7 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
     }
 
     public <R extends Message.Builder> R executeList(OpenTracingWrapper otw, RethinkDbAdapter db, R resultBuilder) {
-        if (pageSize > 0) {
+        if (id == null) {
             listQry = listQry.skip(page * pageSize).limit(pageSize);
         }
 

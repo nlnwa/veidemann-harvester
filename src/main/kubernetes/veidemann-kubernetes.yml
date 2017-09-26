@@ -450,7 +450,7 @@ spec:
     spec:
       containers:
       - name: api-gateway
-        image: norsknettarkiv/broprox-api-gateway
+        image: norsknettarkiv/veidemann-api-gateway
         ports:
         - containerPort: 3010
         env:
@@ -498,7 +498,7 @@ spec:
     spec:
       containers:
       - name: admin
-        image: norsknettarkiv/broprox-gui
+        image: norsknettarkiv/veidemann-gui
         ports:
         - containerPort: 80
         env:

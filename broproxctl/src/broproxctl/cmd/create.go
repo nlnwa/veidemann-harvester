@@ -31,7 +31,7 @@ var filename string
 var createCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create or update a config object",
-	Long: ``,
+	Long:  ``,
 	Run: func(cmd *cobra.Command, args []string) {
 
 		if filename == "" {
@@ -46,7 +46,7 @@ var createCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		client := util.Connect()
+		client := util.NewControllerClient()
 		for _, v := range result {
 			switch v.(type) {
 			case *bp.CrawlEntity:

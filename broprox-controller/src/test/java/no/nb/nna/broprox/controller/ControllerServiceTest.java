@@ -41,7 +41,7 @@ import static org.mockito.Mockito.*;
 /**
  *
  */
-public class ControllerApiServerTest {
+public class ControllerServiceTest {
 
     private final String uniqueServerName = "in-process server for " + getClass();
 

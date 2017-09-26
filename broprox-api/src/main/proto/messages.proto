@@ -12,13 +12,14 @@ message CrawlExecutionStatus {
     enum State {
         UNDEFINED = 0;
         CREATED = 1;
-        RUNNING = 2;
-        FINISHED = 3;
-        ABORTED_TIMEOUT = 4;
-        ABORTED_SIZE = 5;
-        ABORTED_MANUAL = 6;
-        FAILED = 7;
-        DIED = 8;
+        FETCHING = 2;
+        SLEEPING = 3;
+        FINISHED = 4;
+        ABORTED_TIMEOUT = 5;
+        ABORTED_SIZE = 6;
+        ABORTED_MANUAL = 7;
+        FAILED = 8;
+        DIED = 9;
     }
 
     string id = 1;

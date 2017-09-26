@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
 
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Empty;
@@ -45,6 +46,8 @@ import no.nb.nna.broprox.api.ControllerProto.ListRequest;
 import no.nb.nna.broprox.api.ControllerProto.PolitenessConfigListReply;
 import no.nb.nna.broprox.api.ControllerProto.SeedListReply;
 import no.nb.nna.broprox.api.ControllerProto.SeedListRequest;
+import no.nb.nna.broprox.api.StatusProto;
+import no.nb.nna.broprox.commons.ChangeFeed;
 import no.nb.nna.broprox.commons.DbAdapter;
 import no.nb.nna.broprox.commons.FutureOptional;
 import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
@@ -445,6 +448,56 @@ public class RethinkDbAdapter implements DbAdapter {
         String key = ((List<String>) response.get("generated_keys")).get(0);
 
         return s.toBuilder().setId(key).build();
+    }
+
+    @Override
+    public ChangeFeed<StatusProto.ExecutionsListReply> getExecutionStatusStream(StatusProto.ExecutionsRequest request) {
+        int limit = request.getPageSize();
+        if (limit == 0) {
+            limit = 100;
+        }
+        Cursor<Map> res = executeRequest(
+                r.table(RethinkDbAdapter.TABLES.EXECUTIONS.name)
+                        .orderBy().optArg("index", "startTime")
+                        .limit(limit)
+                        .changes().optArg("include_initial", true).optArg("include_offsets", true)
+                        .map(v -> v.g("new_val").merge(r.hashMap("newOffset", v.g("new_offset").default_((String) null))
+                        .with("oldOffset", v.g("old_offset").default_((String) null))))
+                        .eqJoin("seedId", r.table("seeds"))
+                        .map(v -> {
+                            return v.g("left").merge(r.hashMap("seed", v.g("right").g("meta").g("name"))
+                                    .with("queueSize",
+                                            r.table("uri_queue")
+                                                    .getAll(v.g("left").g("id")).optArg("index", "executionId")
+                                                    .count()));
+                        })
+                        .without("seedId")
+        );
+
+        return new ChangeFeedBase<StatusProto.ExecutionsListReply>(res) {
+            StatusProto.ExecutionsListReply.Builder reply = StatusProto.ExecutionsListReply.newBuilder();
+
+            @Override
+            protected Function<Map<String, Object>, StatusProto.ExecutionsListReply> mapper() {
+                return new Function<Map<String, Object>, StatusProto.ExecutionsListReply>() {
+                    @Override
+                    public StatusProto.ExecutionsListReply apply(Map<String, Object> t) {
+                        Long newOffset = (Long) t.remove("newOffset");
+                        Long oldOffset = (Long) t.remove("oldOffset");
+                        StatusProto.StatusDetail resp = ProtoUtils.rethinkToProto(t, StatusProto.StatusDetail.class);
+                        if (oldOffset != null) {
+                            reply.removeValue(oldOffset.intValue());
+                        }
+                        if (newOffset != null) {
+                            reply.addValue(newOffset.intValue(), resp);
+                        }
+                        return reply.build();
+                    }
+
+                };
+            }
+
+        };
     }
 
     @Override

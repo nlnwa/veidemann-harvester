@@ -30,11 +30,17 @@ func MarshalTable(w io.Writer, msg proto.Message) error {
 	var values reflect.Value
 	values = reflect.ValueOf(msg).Elem().FieldByName("Value")
 	if values.IsValid() {
+		if values.Len() == 0 {
+			fmt.Println("Empty result")
+			return nil
+		}
+
 		m := values.Index(0).Interface().(proto.Message)
 		tableDef := GetTableDef(m)
 		formatHeader(table, tableDef, m)
 
 		for i := 0; i < values.Len(); i++ {
+			m := values.Index(i).Interface().(proto.Message)
 			err := formatData(table, tableDef, m)
 			if err != nil {
 				return err
@@ -108,6 +114,9 @@ func getField(msg proto.Message, fieldName string) reflect.Value {
 			v = reflect.Indirect(reflect.ValueOf(v.Interface()))
 		}
 		v = v.FieldByName(tok)
+		if v.Kind() == reflect.Interface && v.IsNil() {
+			return v
+		}
 	}
 	return v
 }

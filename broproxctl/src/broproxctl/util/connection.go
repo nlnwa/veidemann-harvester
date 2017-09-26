@@ -21,7 +21,7 @@ import (
 	"log"
 )
 
-func Connect() broprox.ControllerClient {
+func NewControllerClient() broprox.ControllerClient {
 	address := viper.GetString("controllerAddress")
 	fmt.Printf("Connecting to %s\n", address)
 	// Set up a connection to the server.
@@ -31,5 +31,18 @@ func Connect() broprox.ControllerClient {
 	}
 	//defer conn.Close()
 	c := broprox.NewControllerClient(conn)
+	return c
+}
+
+func NewStatusClient() broprox.StatusClient {
+	address := viper.GetString("controllerAddress")
+	fmt.Printf("Connecting to %s\n", address)
+	// Set up a connection to the server.
+	conn, err := grpc.Dial(address, grpc.WithInsecure())
+	if err != nil {
+		log.Fatalf("did not connect: %v", err)
+	}
+	//defer conn.Close()
+	c := broprox.NewStatusClient(conn)
 	return c
 }

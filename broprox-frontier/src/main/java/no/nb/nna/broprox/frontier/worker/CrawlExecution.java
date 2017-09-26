@@ -107,10 +107,10 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker {
 
     public void endCrawl(CrawlExecutionStatus.State state) {
         LOG.info("Reached end of crawl '{}' with state: {}", getId(), state);
-        CrawlExecutionStatus.State currentState = status.getState();
-        if (currentState != CrawlExecutionStatus.State.RUNNING) {
-            state = currentState;
-        }
+//        CrawlExecutionStatus.State currentState = status.getState();
+//        if (currentState != CrawlExecutionStatus.State.RUNNING) {
+//            state = currentState;
+//        }
         status = status.toBuilder()
                 .setState(state)
                 .setEndTime(ProtoUtils.getNowTs())
@@ -169,9 +169,12 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker {
                     }
                 } else {
                     queueOutlinks();
+                    if (frontier.getDb().queuedUriCount(getId()) == 0) {
+                        endCrawl(CrawlExecutionStatus.State.FINISHED);
+                    }
                 }
             } catch (Exception e) {
-                LOG.info("Failed fetch of {}",qUri.getUri(), e);
+                LOG.info("Failed fetch of {}", qUri.getUri(), e);
                 retryUri(qUri, e);
             }
         }
@@ -307,7 +310,8 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker {
             frontier.getDb().deleteQueuedUri(qUri);
             switch (status.getState()) {
                 case CREATED:
-                case RUNNING:
+                case FETCHING:
+                case SLEEPING:
                 case UNDEFINED:
                 case UNRECOGNIZED:
                     endCrawl(CrawlExecutionStatus.State.ABORTED_SIZE);
@@ -322,7 +326,8 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker {
             frontier.getDb().deleteQueuedUri(qUri);
             switch (status.getState()) {
                 case CREATED:
-                case RUNNING:
+                case FETCHING:
+                case SLEEPING:
                 case UNDEFINED:
                 case UNRECOGNIZED:
                     endCrawl(CrawlExecutionStatus.State.ABORTED_TIMEOUT);
@@ -336,13 +341,12 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker {
     @Override
     public boolean block() throws InterruptedException {
         try {
+            CrawlExecutionStatus.Builder statusB = status.toBuilder().setState(CrawlExecutionStatus.State.FETCHING);
             if (!status.hasStartTime()) {
                 // Start execution
-                status = status.toBuilder().setState(CrawlExecutionStatus.State.RUNNING)
-                        .setStartTime(ProtoUtils.getNowTs())
-                        .build();
-                status = frontier.getDb().updateExecutionStatus(status);
+                statusB.setStartTime(ProtoUtils.getNowTs());
             }
+            status = frontier.getDb().updateExecutionStatus(statusB.build());
 
             if (shouldFetch()) {
                 new OpenTracingWrapper("CrawlExecution")
@@ -351,6 +355,11 @@ public class CrawlExecution implements ForkJoinPool.ManagedBlocker {
             }
             done = true;
         } finally {
+            if (status.getState() == CrawlExecutionStatus.State.FETCHING) {
+                status = status.toBuilder().setState(CrawlExecutionStatus.State.SLEEPING)
+                        .build();
+                status = frontier.getDb().updateExecutionStatus(status);
+            }
             frontier.getDb().releaseCrawlHostGroup(getCrawlHostGroup(), getDelay(TimeUnit.MILLISECONDS));
         }
 

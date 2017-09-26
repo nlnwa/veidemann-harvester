@@ -23,9 +23,9 @@ import java.util.Map;
 import com.google.protobuf.Message;
 import com.google.protobuf.Timestamp;
 import com.google.protobuf.util.Timestamps;
-import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;
+import no.nb.nna.broprox.api.ControllerProto.PolitenessConfigListReply;
 import no.nb.nna.broprox.model.ConfigProto;
-import no.nb.nna.broprox.model.ConfigProto.CrawlEntity;
+import no.nb.nna.broprox.model.ConfigProto.PolitenessConfig;
 import org.junit.Test;
 
 import static no.nb.nna.broprox.db.RethinkDbAdapter.r;
@@ -41,8 +41,8 @@ public class ProtoUtilsTest {
      */
     @Test
     public void testProtoToRethink() {
-        CrawlEntityListReply msg = CrawlEntityListReply.newBuilder()
-                .addValue(CrawlEntity.newBuilder()
+        PolitenessConfigListReply msg = PolitenessConfigListReply.newBuilder()
+                .addValue(PolitenessConfig.newBuilder()
                         .setId("UUID")
                         .setMeta(ConfigProto.Meta.newBuilder()
                                 .setName("Nasjonalbiblioteket")
@@ -53,21 +53,23 @@ public class ProtoUtilsTest {
                                         .setKey("orgType")
                                         .setValue("Government"))
                                 .setCreated(ProtoUtils.odtToTs(OffsetDateTime.parse("2017-04-06T06:20:35.779Z"))))
+                        .setDelayFactor(.1f)
                 ).build();
 
-        Map crawlEntity = r.hashMap("id", "UUID")
+        Map politenessConfig = r.hashMap("id", "UUID")
                 .with("meta", r.hashMap()
                         .with("name", "Nasjonalbiblioteket")
                         .with("created", OffsetDateTime.parse("2017-04-06T06:20:35.779Z"))
                         .with("label", r.array(
                                 r.hashMap("key", "frequency").with("value", "Daily"),
                                 r.hashMap("key", "orgType").with("value", "Government")))
-                );
-        Map crawlEntityList = r.hashMap("value", r.array(crawlEntity));
+                )
+                .with("delayFactor", .1f);
+        Map politenessConfigList = r.hashMap("value", r.array(politenessConfig));
 
         Map<String, Object> result = ProtoUtils.protoToRethink(msg);
 
-        assertThat(result).isEqualTo(crawlEntityList);
+        assertThat(result).isEqualTo(politenessConfigList);
     }
 
     /**
@@ -75,8 +77,8 @@ public class ProtoUtilsTest {
      */
     @Test
     public void testRethinkToProto_Map_Class() {
-        CrawlEntityListReply expResult = CrawlEntityListReply.newBuilder()
-                .addValue(CrawlEntity.newBuilder()
+        PolitenessConfigListReply expResult = PolitenessConfigListReply.newBuilder()
+                .addValue(PolitenessConfig.newBuilder()
                         .setId("UUID")
                         .setMeta(ConfigProto.Meta.newBuilder()
                                 .setName("Nasjonalbiblioteket")
@@ -87,19 +89,22 @@ public class ProtoUtilsTest {
                                         .setKey("orgType")
                                         .setValue("Government"))
                                 .setCreated(ProtoUtils.odtToTs(OffsetDateTime.parse("2017-04-06T06:20:35.779Z"))))
+                        .setDelayFactor(.1f)
                 ).build();
 
-        Map crawlEntity = r.hashMap("id", "UUID")
+        Map politenessConfig = r.hashMap("id", "UUID")
                 .with("meta", r.hashMap()
                         .with("name", "Nasjonalbiblioteket")
                         .with("created", OffsetDateTime.parse("2017-04-06T06:20:35.779Z"))
                         .with("label", r.array(
                                 r.hashMap("key", "frequency").with("value", "Daily"),
                                 r.hashMap("key", "orgType").with("value", "Government")))
-                );
-        Map crawlEntityList = r.hashMap("value", r.array(crawlEntity));
+                )
+                .with("delayFactor", .1f);
+        Map politenessConfigList = r.hashMap("value", r.array(politenessConfig));
 
-        CrawlEntityListReply result = ProtoUtils.rethinkToProto(crawlEntityList, CrawlEntityListReply.class);
+        PolitenessConfigListReply result = ProtoUtils
+                .rethinkToProto(politenessConfigList, PolitenessConfigListReply.class);
 
         assertThat(result).isEqualTo(expResult);
     }
@@ -109,8 +114,8 @@ public class ProtoUtilsTest {
      */
     @Test
     public void testRethinkToProto_Map_MessageBuilder() {
-        CrawlEntityListReply expResult = CrawlEntityListReply.newBuilder()
-                .addValue(CrawlEntity.newBuilder()
+        PolitenessConfigListReply expResult = PolitenessConfigListReply.newBuilder()
+                .addValue(PolitenessConfig.newBuilder()
                         .setId("UUID")
                         .setMeta(ConfigProto.Meta.newBuilder()
                                 .setName("Nasjonalbiblioteket")
@@ -121,19 +126,21 @@ public class ProtoUtilsTest {
                                         .setKey("orgType")
                                         .setValue("Government"))
                                 .setCreated(ProtoUtils.odtToTs(OffsetDateTime.parse("2017-04-06T06:20:35.779Z"))))
+                        .setDelayFactor(.1f)
                 ).build();
 
-        Map crawlEntity = r.hashMap("id", "UUID")
+        Map politenessConfig = r.hashMap("id", "UUID")
                 .with("meta", r.hashMap()
                         .with("name", "Nasjonalbiblioteket")
                         .with("created", OffsetDateTime.parse("2017-04-06T06:20:35.779Z"))
                         .with("label", r.array(
                                 r.hashMap("key", "frequency").with("value", "Daily"),
                                 r.hashMap("key", "orgType").with("value", "Government")))
-                );
-        Map crawlEntityList = r.hashMap("value", r.array(crawlEntity));
+                )
+                .with("delayFactor", .1f);
+        Map politenessConfigList = r.hashMap("value", r.array(politenessConfig));
 
-        Message result = ProtoUtils.rethinkToProto(crawlEntityList, CrawlEntityListReply.newBuilder());
+        Message result = ProtoUtils.rethinkToProto(politenessConfigList, PolitenessConfigListReply.newBuilder());
 
         assertThat(result).isEqualTo(expResult);
     }

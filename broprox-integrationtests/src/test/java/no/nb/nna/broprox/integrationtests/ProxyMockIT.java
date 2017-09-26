@@ -211,7 +211,8 @@ public class ProxyMockIT implements BroproxHeaderConstants {
         private boolean isEnded(CrawlExecutionStatus execution) {
             switch (execution.getState()) {
                 case CREATED:
-                case RUNNING:
+                case FETCHING:
+                case SLEEPING:
                     return false;
                 default:
                     return true;

@@ -6,13 +6,13 @@
 #
 # Usage:
 #   mvn package
-#   source ./set_go_env.sh
+#   eval $(./set_go_env.sh)
 #   go install broproxctl
 
 ENV=$(mvn mvn-golang-wrapper:custom | grep -e GOBIN -e GOPATH -e GOROOT | cut -d' ' -f2 | tr -d '"')
 
 for e in ${ENV}; do
-  export ${e}
+  echo export ${e}
 done
 
-export PATH=${PATH}:${GOROOT}/bin:${GOBIN}
+echo export PATH=${PATH}:${GOROOT}/bin:${GOBIN}

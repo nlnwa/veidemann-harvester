@@ -37,16 +37,20 @@ var (
 var getCmd = &cobra.Command{
 	Use:   "get [object_type]",
 	Short: "Get the value(s) for an object type",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
+	Long: `Display one or many objects.
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+` +
+		printValidObejctTypes() +
+		`Examples:
+  #List all seeds.
+  broproxctl get seed
+
+  #List all seeds in yaml output format.
+  broproxctl get seed -f yaml`,
 
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) == 1 {
-			client := util.Connect()
+			client := util.NewControllerClient()
 			var selector *bp.Selector
 
 			if label != "" {
@@ -93,6 +97,84 @@ to quickly create a Cobra application.`,
 				if util.Marshal(file, format, r) != nil {
 					os.Exit(1)
 				}
+			case "crawlconfig":
+				request := bp.ListRequest{}
+				if selector != nil {
+					request.Qry = &bp.ListRequest_Selector{selector}
+				}
+				r, err := client.ListCrawlConfigs(context.Background(), &request)
+				if err != nil {
+					log.Fatalf("could not get crawl config: %v", err)
+				}
+
+				if util.Marshal(file, format, r) != nil {
+					os.Exit(1)
+				}
+			case "schedule":
+				request := bp.ListRequest{}
+				if selector != nil {
+					request.Qry = &bp.ListRequest_Selector{selector}
+				}
+				r, err := client.ListCrawlScheduleConfigs(context.Background(), &request)
+				if err != nil {
+					log.Fatalf("could not get schedule config: %v", err)
+				}
+
+				if util.Marshal(file, format, r) != nil {
+					os.Exit(1)
+				}
+			case "browser":
+				request := bp.ListRequest{}
+				if selector != nil {
+					request.Qry = &bp.ListRequest_Selector{selector}
+				}
+				r, err := client.ListBrowserConfigs(context.Background(), &request)
+				if err != nil {
+					log.Fatalf("could not get browser config: %v", err)
+				}
+
+				if util.Marshal(file, format, r) != nil {
+					os.Exit(1)
+				}
+			case "politeness":
+				request := bp.ListRequest{}
+				if selector != nil {
+					request.Qry = &bp.ListRequest_Selector{selector}
+				}
+				r, err := client.ListPolitenessConfigs(context.Background(), &request)
+				if err != nil {
+					log.Fatalf("could not get politeness config: %v", err)
+				}
+
+				if util.Marshal(file, format, r) != nil {
+					os.Exit(1)
+				}
+			case "script":
+				request := bp.BrowserScriptListRequest{}
+				if selector != nil {
+					request.Qry = &bp.BrowserScriptListRequest_Selector{selector}
+				}
+				r, err := client.ListBrowserScripts(context.Background(), &request)
+				if err != nil {
+					log.Fatalf("could not get browser script: %v", err)
+				}
+
+				if util.Marshal(file, format, r) != nil {
+					os.Exit(1)
+				}
+			case "group":
+				request := bp.ListRequest{}
+				if selector != nil {
+					request.Qry = &bp.ListRequest_Selector{selector}
+				}
+				r, err := client.ListCrawlHostGroupConfigs(context.Background(), &request)
+				if err != nil {
+					log.Fatalf("could not get crawl host group config: %v", err)
+				}
+
+				if util.Marshal(file, format, r) != nil {
+					os.Exit(1)
+				}
 			case "loglevel":
 				r, err := client.GetLogConfig(context.Background(), &empty.Empty{})
 				if err != nil {
@@ -107,9 +189,19 @@ to quickly create a Cobra application.`,
 				cmd.Usage()
 			}
 		} else {
-			cmd.Usage()
+			fmt.Print("You must specify the object type to get. ")
+			fmt.Println(printValidObejctTypes())
+			fmt.Println("See 'broproxctl get -h' for help")
 		}
 	},
+}
+
+func printValidObejctTypes() string {
+	var names string
+	for _, v := range util.GetObjectNames() {
+		names += fmt.Sprintf("  * %s\n", v)
+	}
+	return fmt.Sprintf("Valid object types include:\n%s\n", names)
 }
 
 func init() {
@@ -120,7 +212,7 @@ func init() {
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
 	getCmd.PersistentFlags().StringVarP(&label, "label", "l", "", "List objects by label")
-	getCmd.PersistentFlags().StringVarP(&format, "format", "f", "yaml", "Output format (json|yaml)")
+	getCmd.PersistentFlags().StringVarP(&format, "format", "f", "table", "Output format (table|json|yaml)")
 	getCmd.PersistentFlags().StringVarP(&file, "output", "o", "", "File name to write to")
 
 	// Cobra supports local flags which will only run when this command

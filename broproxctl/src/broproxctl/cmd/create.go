@@ -18,6 +18,7 @@ import (
 
 	bp "broprox"
 	"broproxctl/util"
+	"github.com/golang/protobuf/proto"
 	"github.com/spf13/cobra"
 	"golang.org/x/net/context"
 	"log"
@@ -30,12 +31,7 @@ var filename string
 var createCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create or update a config object",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Long:  ``,
 	Run: func(cmd *cobra.Command, args []string) {
 
 		if filename == "" {
@@ -50,24 +46,59 @@ to quickly create a Cobra application.`,
 			os.Exit(1)
 		}
 
-		client := util.Connect()
+		client := util.NewControllerClient()
 		for _, v := range result {
 			switch v.(type) {
-			case *bp.Seed:
-				r, err := client.SaveSeed(context.Background(), v.(*bp.Seed))
-				if err != nil {
-					log.Fatalf("Could not save %T: %v", v, err)
-				}
-				fmt.Printf("Saved %T: %v\n", r, r.Meta.Name)
 			case *bp.CrawlEntity:
 				r, err := client.SaveEntity(context.Background(), v.(*bp.CrawlEntity))
-				if err != nil {
-					log.Fatalf("Could not save %T: %v", v, err)
-				}
+				handleError(v, err)
 				fmt.Printf("Saved %T: %v\n", r, r.Meta.Name)
+			case *bp.Seed:
+				r, err := client.SaveSeed(context.Background(), v.(*bp.Seed))
+				handleError(v, err)
+				fmt.Printf("Saved %T: %v\n", r, r.Meta.Name)
+			case *bp.CrawlJob:
+				r, err := client.SaveCrawlJob(context.Background(), v.(*bp.CrawlJob))
+				handleError(v, err)
+				fmt.Printf("Saved %T: %v\n", r, r.Meta.Name)
+			case *bp.CrawlConfig:
+				r, err := client.SaveCrawlConfig(context.Background(), v.(*bp.CrawlConfig))
+				handleError(v, err)
+				fmt.Printf("Saved %T: %v\n", r, r.Meta.Name)
+			case *bp.CrawlScheduleConfig:
+				r, err := client.SaveCrawlScheduleConfig(context.Background(), v.(*bp.CrawlScheduleConfig))
+				handleError(v, err)
+				fmt.Printf("Saved %T: %v\n", r, r.Meta.Name)
+			case *bp.BrowserConfig:
+				r, err := client.SaveBrowserConfig(context.Background(), v.(*bp.BrowserConfig))
+				handleError(v, err)
+				fmt.Printf("Saved %T: %v\n", r, r.Meta.Name)
+			case *bp.PolitenessConfig:
+				r, err := client.SavePolitenessConfig(context.Background(), v.(*bp.PolitenessConfig))
+				handleError(v, err)
+				fmt.Printf("Saved %T: %v\n", r, r.Meta.Name)
+			case *bp.BrowserScript:
+				r, err := client.SaveBrowserScript(context.Background(), v.(*bp.BrowserScript))
+				handleError(v, err)
+				fmt.Printf("Saved %T: %v\n", r, r.Meta.Name)
+			case *bp.CrawlHostGroupConfig:
+				r, err := client.SaveCrawlHostGroupConfig(context.Background(), v.(*bp.CrawlHostGroupConfig))
+				handleError(v, err)
+				fmt.Printf("Saved %T: %v\n", r, r.Meta.Name)
+			case *bp.LogLevels:
+				r, err := client.SaveLogConfig(context.Background(), v.(*bp.LogLevels))
+				handleError(v, err)
+				fmt.Printf("Saved %T: Loglevels\n", r)
 			}
 		}
 	},
+}
+
+func handleError(msg proto.Message, err error) {
+	if err != nil {
+		log.Fatalf("Could not save %T: %v", msg, err)
+		os.Exit(2)
+	}
 }
 
 func init() {

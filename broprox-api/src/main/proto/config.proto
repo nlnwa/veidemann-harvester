@@ -44,7 +44,7 @@ message Seed {
 message CrawlJob {
     string id = 1;
     Meta meta = 2;
-    oneof scedule_config_or_id {
+    oneof schedule_config_or_id {
         string schedule_id = 3;
         CrawlScheduleConfig schedule = 16;
         Selector schedule_selector = 30;

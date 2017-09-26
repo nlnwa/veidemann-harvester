@@ -46,7 +46,9 @@ public class ControllerApiServer implements AutoCloseable {
                         ServerTracingInterceptor.ServerRequestAttribute.METHOD_TYPE)
                 .build();
 
-        server = serverBuilder.addService(tracingInterceptor.intercept(new ControllerService(db, frontierClient)))
+        server = serverBuilder
+                .addService(tracingInterceptor.intercept(new ControllerService(db, frontierClient)))
+                .addService(tracingInterceptor.intercept(new StatusService(db)))
                 .build();
     }
 

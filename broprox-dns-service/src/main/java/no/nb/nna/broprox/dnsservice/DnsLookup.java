@@ -39,6 +39,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.opentracing.tag.Tags;
 import no.nb.nna.broprox.commons.DbAdapter;
+import no.nb.nna.broprox.commons.ExtraStatusCodes;
 import no.nb.nna.broprox.commons.client.ContentWriterClient;
 import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
 import no.nb.nna.broprox.db.ProtoUtils;
@@ -196,7 +197,7 @@ public class DnsLookup {
                 .setRecordType("response")
                 .setRequestedUri("dns:" + host)
                 .setDiscoveryPath("P")
-                .setStatusCode(1)
+                .setStatusCode(ExtraStatusCodes.SUCCESSFUL_DNS.getCode())
                 .setFetchTimeStamp(ProtoUtils.odtToTs(state.fetchStart))
                 .setIpAddress(state.dnsIp)
                 .setContentType("text/dns")
@@ -212,7 +213,7 @@ public class DnsLookup {
 
         CrawlLog crawlLog = crawlLogBuilder.build();
         if (db != null) {
-            crawlLog = db.addCrawlLog(crawlLog);
+            crawlLog = db.saveCrawlLog(crawlLog);
         }
 
         if (contentWriterClient != null) {

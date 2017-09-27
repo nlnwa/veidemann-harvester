@@ -439,29 +439,13 @@ public class RethinkDbAdapterIT {
      * Test of addCrawlLog method, of class RethinkDbAdapter.
      */
     @Test
-    public void testAddCrawlLog() {
+    public void testSaveCrawlLog() {
         CrawlLog cl = CrawlLog.newBuilder()
                 .setContentType("text/plain")
                 .build();
-        CrawlLog result = db.addCrawlLog(cl);
+        CrawlLog result = db.saveCrawlLog(cl);
         assertThat(result.getContentType()).isEqualTo("text/plain");
         assertThat(result.getWarcId()).isNotEmpty();
-    }
-
-    /**
-     * Test of updateCrawlLog method, of class RethinkDbAdapter.
-     */
-    @Test
-    @Ignore
-    public void testUpdateCrawlLog() {
-        System.out.println("updateCrawlLog");
-        CrawlLog cl = null;
-        RethinkDbAdapter instance = null;
-        CrawlLog expResult = null;
-        CrawlLog result = instance.updateCrawlLog(cl);
-//        assertEquals(expResult, result);
-        // TODO review the generated test code and remove the default call to fail.
-        fail("The test case is a prototype.");
     }
 
     /**
@@ -528,28 +512,12 @@ public class RethinkDbAdapterIT {
      */
     @Test
     @Ignore
-    public void testAddExecutionStatus() {
+    public void testSaveExecutionStatus() {
         System.out.println("addExecutionStatus");
         CrawlExecutionStatus status = null;
         RethinkDbAdapter instance = null;
         CrawlExecutionStatus expResult = null;
-        CrawlExecutionStatus result = instance.addExecutionStatus(status);
-//        assertEquals(expResult, result);
-        // TODO review the generated test code and remove the default call to fail.
-        fail("The test case is a prototype.");
-    }
-
-    /**
-     * Test of updateExecutionStatus method, of class RethinkDbAdapter.
-     */
-    @Test
-    @Ignore
-    public void testUpdateExecutionStatus() {
-        System.out.println("updateExecutionStatus");
-        CrawlExecutionStatus status = null;
-        RethinkDbAdapter instance = null;
-        CrawlExecutionStatus expResult = null;
-        CrawlExecutionStatus result = instance.updateExecutionStatus(status);
+        CrawlExecutionStatus result = instance.saveExecutionStatus(status);
 //        assertEquals(expResult, result);
         // TODO review the generated test code and remove the default call to fail.
         fail("The test case is a prototype.");
@@ -560,28 +528,12 @@ public class RethinkDbAdapterIT {
      */
     @Test
     @Ignore
-    public void testAddQueuedUri() {
+    public void testSaveQueuedUri() {
         System.out.println("addQueuedUri");
         QueuedUri qu = null;
         RethinkDbAdapter instance = null;
         QueuedUri expResult = null;
-        QueuedUri result = instance.addQueuedUri(qu);
-//        assertEquals(expResult, result);
-        // TODO review the generated test code and remove the default call to fail.
-        fail("The test case is a prototype.");
-    }
-
-    /**
-     * Test of updateQueuedUri method, of class RethinkDbAdapter.
-     */
-    @Test
-    @Ignore
-    public void testUpdateQueuedUri() {
-        System.out.println("updateQueuedUri");
-        QueuedUri qu = null;
-        RethinkDbAdapter instance = null;
-        QueuedUri expResult = null;
-        QueuedUri result = instance.updateQueuedUri(qu);
+        QueuedUri result = instance.saveQueuedUri(qu);
 //        assertEquals(expResult, result);
         // TODO review the generated test code and remove the default call to fail.
         fail("The test case is a prototype.");
@@ -1037,7 +989,7 @@ public class RethinkDbAdapterIT {
                 .setPolitenessId("PID")
                 .setExecutionId("EID")
                 .build();
-        db.addQueuedUri(qUri);
+        db.saveQueuedUri(qUri);
 
         CrawlHostGroup chg1 = db.getOrCreateCrawlHostGroup("CHGID", "PID");
 

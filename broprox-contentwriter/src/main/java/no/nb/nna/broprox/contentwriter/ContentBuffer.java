@@ -19,12 +19,8 @@ import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.Optional;
 
 import com.google.protobuf.ByteString;
-import no.nb.nna.broprox.commons.DbAdapter;
-import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
-import no.nb.nna.broprox.model.MessagesProto.CrawledContent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,15 +42,11 @@ public class ContentBuffer {
 
     private MessageDigest headerDigest;
 
-    private final DbAdapter db;
-
     private ByteString headerBuf;
 
     private ByteString payloadBuf;
 
-    public ContentBuffer(final DbAdapter db) {
-        this.db = db;
-
+    public ContentBuffer() {
         try {
             this.blockDigest = MessageDigest.getInstance("SHA-1");
             this.payloadDigest = MessageDigest.getInstance("SHA-1");
@@ -118,54 +110,6 @@ public class ContentBuffer {
 
     public long getTotalSize() {
         return getHeaderSize() + getPayloadSize() + (hasHeader() && hasPayload() ? 2L : 0L);
-    }
-
-    public void writeRequest(CrawlLog logEntry) {
-        CrawlLog.Builder logEntryBuilder = logEntry.toBuilder();
-        if (hasPayload()) {
-            logEntryBuilder.setRecordType("request")
-                    .setBlockDigest(getBlockDigest())
-                    .setPayloadDigest(getPayloadDigest())
-                    .setSize(getTotalSize());
-        } else {
-            logEntryBuilder.setRecordType("request")
-                    .setBlockDigest(getHeaderDigest())
-                    .setSize(getTotalSize());
-        }
-        logEntry = db.addCrawlLog(logEntryBuilder.build());
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("Writing request {}", logEntryBuilder.getRequestedUri());
-        }
-    }
-
-    public void writeResponse(CrawlLog logEntry) {
-        // Storing the logEntry fills in WARC-ID
-        logEntry = db.addCrawlLog(logEntry);
-
-        CrawlLog.Builder logEntryBuilder = logEntry.toBuilder();
-
-        Optional<CrawledContent> isDuplicate = db.hasCrawledContent(CrawledContent.newBuilder()
-                .setDigest(getPayloadDigest())
-                .setWarcId(logEntry.getWarcId())
-                .build());
-
-        if (isDuplicate.isPresent()) {
-            logEntryBuilder.setRecordType("revisit")
-                    .setBlockDigest(getHeaderDigest())
-                    .setSize(getHeaderSize())
-                    .setWarcRefersTo(isDuplicate.get().getWarcId());
-
-            LOG.debug("Writing {} as a revisit of {}", logEntryBuilder.getRequestedUri(), logEntryBuilder
-                    .getWarcRefersTo());
-        } else {
-            logEntryBuilder.setRecordType("response")
-                    .setBlockDigest(getBlockDigest())
-                    .setPayloadDigest(getPayloadDigest())
-                    .setSize(getTotalSize());
-
-            LOG.debug("Writing {}", logEntryBuilder.getRequestedUri());
-        }
-        logEntry = db.updateCrawlLog(logEntryBuilder.build());
     }
 
     public ByteString getHeader() {

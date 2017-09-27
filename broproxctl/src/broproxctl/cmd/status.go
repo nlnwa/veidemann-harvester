@@ -34,7 +34,7 @@ var statusCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		client := util.NewStatusClient()
 
-		request := bp.ExecutionsRequest{PageSize: 5}
+		request := bp.ExecutionsRequest{PageSize: 50}
 
 		stream, err := client.GetRunningExecutions(context.Background(), &request)
 		if err != nil {
@@ -53,22 +53,30 @@ var statusCmd = &cobra.Command{
 
 			tm.MoveCursor(1, 1)
 
-			rest := tm.Width() - 101
-			tm.Println(tm.Background(tm.Color(fmt.Sprintf("%-36s %-18.18s %-10.10s %5s %5s %8s %6s %5s %-*s",
-				"ID", "Start time", "State", "Docs", "URIs", "Bytes", "Failed", "Queue", rest, "Seed"), tm.BLACK), tm.WHITE))
+			rest := tm.Width() - 121
+			tm.Println(
+				tm.Background(
+					tm.Color(
+						fmt.Sprintf("%-36s %-18.18s %-10.10s %5s %5s %10s %6s %5s %5s %5s %5s %-*s",
+							"ID", "Start time", "State", "Docs", "URIs", "Bytes", "Failed",
+							"OoS", "Deny", "Retry", "Queue", rest, "Seed"),
+						tm.BLACK),
+					tm.WHITE))
+
 			for _, e := range value.GetValue() {
 				s, _ := ptypes.Timestamp(e.StartTime)
 				start := s.Format("02.01.06 15:04:05Z")
-				color := tm.WHITE
+				color := tm.BLACK
 				switch e.State {
 				case bp.CrawlExecutionStatus_FETCHING:
 					color = tm.GREEN
 				case bp.CrawlExecutionStatus_SLEEPING:
 					color = tm.BLUE
 				}
-				tm.Println(tm.Color(
-					fmt.Sprintf("%-36.36s %18s %-10s %5d %5d %8d %6d %5d %-*s",
-						e.Id, start, e.State, e.DocumentsCrawled, e.UrisCrawled, e.BytesCrawled, e.DocumentsFailed, e.QueueSize, rest, e.Seed),
+				tm.Println(tm.Background(
+					fmt.Sprintf("%-36.36s %18s %-10s %5d %5d %10d %6d %5d %5d %5d %5d %-*s",
+						e.Id, start, e.State, e.DocumentsCrawled, e.UrisCrawled, e.BytesCrawled, e.DocumentsFailed,
+						e.DocumentsOutOfScope, e.DocumentsDenied, e.DocumentsRetried, e.QueueSize, rest, e.Seed),
 					color))
 			}
 			tm.Flush()

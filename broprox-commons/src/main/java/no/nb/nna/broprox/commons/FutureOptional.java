@@ -119,7 +119,11 @@ public class FutureOptional<T> {
         if (nextPossibleTime == null) {
             throw new NoSuchElementException("No future time present");
         }
-        return OffsetDateTime.now().until(nextPossibleTime, ChronoUnit.MILLIS);
+        long delay = OffsetDateTime.now().until(nextPossibleTime, ChronoUnit.MILLIS);
+        if (delay < 0L) {
+            delay = 0;
+        }
+        return delay;
     }
 
     /**

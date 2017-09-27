@@ -64,7 +64,7 @@ public class ContentWriterService extends ContentWriterGrpc.ContentWriterImplBas
     @Override
     public StreamObserver<WriteRequest> write(StreamObserver<WriteReply> responseObserver) {
         return new StreamObserver<WriteRequest>() {
-            private final ContentBuffer contentBuffer = new ContentBuffer(db);
+            private final ContentBuffer contentBuffer = new ContentBuffer();
 
             private MessagesProto.CrawlLog.Builder crawlLog;
 
@@ -108,7 +108,7 @@ public class ContentWriterService extends ContentWriterGrpc.ContentWriterImplBas
 
                     URI ref = writeRecord(contentBuffer, crawlLog);
 
-                    db.updateCrawlLog(crawlLog.build());
+                    db.saveCrawlLog(crawlLog.build());
 
                     responseObserver.onNext(WriteReply.newBuilder()
                             .setStorageRef(ref.toString())

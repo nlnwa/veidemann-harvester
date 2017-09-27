@@ -168,7 +168,7 @@ public class ContentCollector {
         CrawlLog.Builder logEntryBuilder = logEntry.toBuilder();
         logEntryBuilder.setRecordType("request")
                 .setBlockDigest(getDigest());
-        logEntry = db.addCrawlLog(logEntryBuilder.build());
+        logEntry = db.saveCrawlLog(logEntryBuilder.build());
         if (LOG.isDebugEnabled()) {
             LOG.debug("Writing request {}", logEntryBuilder.getRequestedUri());
         }
@@ -187,7 +187,7 @@ public class ContentCollector {
                 .setFetchTimeMs(Duration.between(ProtoUtils.tsToOdt(
                         logEntryBuilder.getFetchTimeStamp()), ProtoUtils.getNowOdt()).toMillis())
                 .setBlockDigest(getDigest());
-        logEntry = db.addCrawlLog(logEntryBuilder.build());
+        logEntry = db.saveCrawlLog(logEntryBuilder.build());
         if (LOG.isDebugEnabled()) {
             LOG.debug("Writing response {}", logEntryBuilder.getRequestedUri());
         }

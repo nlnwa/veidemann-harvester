@@ -127,7 +127,7 @@ public class BrowserControllerIT {
     private DbAdapter getDbMock() {
         DbAdapter db = mock(DbAdapter.class);
         when(db.hasCrawledContent(any())).thenReturn(Optional.empty());
-        when(db.addCrawlLog(any())).thenAnswer((InvocationOnMock i) -> {
+        when(db.saveCrawlLog(any())).thenAnswer((InvocationOnMock i) -> {
             return i.getArgument(0);
         });
         when(db.listBrowserScripts(any())).thenReturn(ControllerProto.BrowserScriptListReply.newBuilder()

@@ -18,10 +18,11 @@ package no.nb.nna.broprox.commons;
 import no.nb.nna.broprox.model.MessagesProto;
 
 /**
+ * Status codes in addition to those defined by http.
  *
- * @author John Erik Halse
+ * This list is stolen from Heritrix
  */
-public enum FailedFetchCodes {
+public enum ExtraStatusCodes {
     SUCCESSFUL_DNS(1, "Successful DNS lookup"),
     NEVER_TRIED(0, "Fetch never tried (perhaps protocol unsupported or illegal URI)"),
     FAILED_DNS(-1, "DNS lookup failed"),
@@ -50,7 +51,7 @@ public enum FailedFetchCodes {
 
     final String description;
 
-    private FailedFetchCodes(int code, String description) {
+    private ExtraStatusCodes(int code, String description) {
         this.code = code;
         this.description = description;
     }
@@ -61,6 +62,15 @@ public enum FailedFetchCodes {
 
     public String getDescription() {
         return description;
+    }
+
+    public static ExtraStatusCodes fromFetchError(MessagesProto.FetchErrorOrBuilder error) {
+        for (ExtraStatusCodes v : values()) {
+            if (v.getCode() == error.getCode()) {
+                return v;
+            }
+        }
+        throw new IllegalArgumentException("Unknown error code: " + error.getCode());
     }
 
     public MessagesProto.FetchError toFetchError() {

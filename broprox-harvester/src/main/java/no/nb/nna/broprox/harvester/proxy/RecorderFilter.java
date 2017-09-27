@@ -30,6 +30,7 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import no.nb.nna.broprox.commons.BroproxHeaderConstants;
 import no.nb.nna.broprox.commons.DbAdapter;
+import no.nb.nna.broprox.commons.ExtraStatusCodes;
 import no.nb.nna.broprox.commons.client.ContentWriterClient;
 import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
 import no.nb.nna.broprox.db.ProtoUtils;
@@ -239,11 +240,11 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
         MDC.put("uri", uri);
 
         crawlLog.setRecordType("response")
-                .setStatusCode(-1)
+                .setStatusCode(ExtraStatusCodes.FAILED_DNS.getCode())
                 .setFetchTimeStamp(ProtoUtils.getNowTs());
 
         if (db != null) {
-            db.addCrawlLog(crawlLog.build());
+            db.saveCrawlLog(crawlLog.build());
         }
 
         LOG.debug("DNS lookup failed for {}", hostAndPort);
@@ -255,11 +256,11 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
         MDC.put("uri", uri);
 
         crawlLog.setRecordType("response")
-                .setStatusCode(-2)
+                .setStatusCode(ExtraStatusCodes.CONNECT_FAILED.getCode())
                 .setFetchTimeStamp(ProtoUtils.getNowTs());
 
         if (db != null) {
-            db.addCrawlLog(crawlLog.build());
+            db.saveCrawlLog(crawlLog.build());
         }
 
         LOG.debug("Http connect failed");
@@ -271,11 +272,11 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
         MDC.put("uri", uri);
 
         crawlLog.setRecordType("response")
-                .setStatusCode(-4)
+                .setStatusCode(ExtraStatusCodes.HTTP_TIMEOUT.getCode())
                 .setFetchTimeStamp(ProtoUtils.getNowTs());
 
         if (db != null) {
-            db.addCrawlLog(crawlLog.build());
+            db.saveCrawlLog(crawlLog.build());
         }
 
         LOG.debug("Http connect timed out");

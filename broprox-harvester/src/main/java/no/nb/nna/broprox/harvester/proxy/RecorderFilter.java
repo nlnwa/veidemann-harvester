@@ -125,7 +125,8 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
                 if (pageRequest != null) {
                     discoveryPath = pageRequest.getDiscoveryPath();
                 } else {
-                    System.out.println("**************** NO PAGE REQUEST " + request);
+                    // This should be allowed to have browsers pointing directly to proxy.
+                    LOG.error("**************** NO PAGE REQUEST " + request);
                     return null;
                 }
             }
@@ -218,7 +219,8 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
                     }
                 }
             } else {
-                System.out.println(this.hashCode() + " :: RESP: " + response.getClass());
+                // If we get here, handling for the response type should be added
+                LOG.error("Got unknown response type '{}', this is a bug", response.getClass());
             }
 
             return response;

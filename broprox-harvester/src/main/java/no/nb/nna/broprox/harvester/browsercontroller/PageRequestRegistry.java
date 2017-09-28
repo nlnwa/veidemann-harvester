@@ -125,8 +125,6 @@ public class PageRequestRegistry {
                     "Failed fetching page: Error '{}', Blocked reason '{}', Resource type: '{}', Canceled: {}, Req: {}",
                     f.errorText, f.blockedReason, f.type, f.canceled, f.requestId);
             PageRequest request = getById(f.requestId);
-            System.out.println("URL: " + request.getUrl() + " :: " + request.getDiscoveryPath() + " :: " + request
-                    .isRenderable());
         }
         MDC.clear();
     }

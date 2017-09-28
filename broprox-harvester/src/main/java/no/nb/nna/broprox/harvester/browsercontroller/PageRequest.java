@@ -75,6 +75,7 @@ public class PageRequest {
             this.statusCode = request.redirectResponse.status.intValue();
             this.discoveryPath = parent.discoveryPath + "R";
         } else if ("script".equals(request.initiator.type)) {
+            // Resource is loaded by a script
             this.discoveryPath = parent.discoveryPath + "X";
         } else {
             this.discoveryPath = parent.discoveryPath + "E";

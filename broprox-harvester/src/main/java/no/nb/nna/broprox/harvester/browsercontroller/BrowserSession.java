@@ -146,6 +146,7 @@ public class BrowserSession implements AutoCloseable, BroproxHeaderConstants {
     }
 
     public void setBreakpoints() throws TimeoutException, ExecutionException, InterruptedException {
+        // TODO: This should be part of configuration
         CompletableFuture.allOf(
                 session.debugger
                         .setBreakpointByUrl(1, null, "https?://www.google-analytics.com/analytics.js", null, null)
@@ -158,10 +159,10 @@ public class BrowserSession implements AutoCloseable, BroproxHeaderConstants {
         //session.debugger.onBreakpointResolved(b -> breakpoints.put(b.breakpointId, b.location));
         session.debugger.onPaused(p -> {
             String scriptId = p.callFrames.get(0).location.scriptId;
-            System.out.println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>> SCRIPT BLE PAUSET: " + scriptId);
+            LOG.debug("Script paused: " + scriptId);
             session.debugger.setScriptSource(scriptId, "console.log(\"google analytics is no more!\");", null);
             session.debugger.resume();
-            System.out.println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>> SCRIPT RESUMED: " + scriptId);
+            LOG.debug("Script resumed: " + scriptId);
         });
     }
 
@@ -183,8 +184,9 @@ public class BrowserSession implements AutoCloseable, BroproxHeaderConstants {
         try {
             CompletableFuture<PageDomain.FrameStoppedLoading> loaded = session.page.onFrameStoppedLoading();
 
+            // TODO: Handling of dialogs should be configurable
             session.page.onJavascriptDialogOpening(js -> {
-                System.out.println("JS DIALOG: " + js.type + " :: " + js.message);
+                LOG.debug("JS dialog: {} :: {}", js.type, js.message);
                 boolean accept = false;
                 if ("alert".equals(js.type)) {
                     accept = true;
@@ -229,7 +231,7 @@ public class BrowserSession implements AutoCloseable, BroproxHeaderConstants {
             RuntimeDomain.Evaluate ev = session.runtime
                     .evaluate("window.scrollTo(0, 0);", null, null, null, null, null, null, null, null)
                     .get(protocolTimeout, MILLISECONDS);
-            System.out.println("Scroll to top: " + ev);
+            LOG.debug("Scroll to top: {}", ev);
         } catch (InterruptedException | ExecutionException | TimeoutException ex) {
             throw new RuntimeException(ex);
         }
@@ -347,7 +349,6 @@ public class BrowserSession implements AutoCloseable, BroproxHeaderConstants {
             RuntimeDomain.Evaluate ev = session.runtime
                     .evaluate("window.scrollTo(0, 0);", null, null, null, null, null, null, null, null)
                     .get(protocolTimeout, MILLISECONDS);
-            System.out.println("Document URL: " + ev.result.value);
         } catch (InterruptedException | ExecutionException | TimeoutException ex) {
             throw new RuntimeException(ex);
         }

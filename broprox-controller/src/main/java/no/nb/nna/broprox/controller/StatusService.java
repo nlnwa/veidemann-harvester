@@ -43,6 +43,8 @@ public class StatusService extends StatusGrpc.StatusImplBase {
         new Thread(new Runnable() {
             @Override
             public void run() {
+                // Initially send an empty state in case the change feed is empty
+                respObserver.onNext(ExecutionsListReply.getDefaultInstance());
                 try (ChangeFeed<ExecutionsListReply> c = db.getExecutionStatusStream(request);) {
                     c.stream().forEach(o -> respObserver.onNext(o));
                 } catch (Exception ex) {

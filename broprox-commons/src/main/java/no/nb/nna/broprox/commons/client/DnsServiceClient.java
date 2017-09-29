@@ -70,7 +70,7 @@ public class DnsServiceClient implements AutoCloseable {
                     InetAddress.getByAddress(reply.getHost(), reply.getRawIp().toByteArray()), reply.getPort());
             return address;
         } catch (StatusRuntimeException ex) {
-            LOG.error("RPC failed: " + ex.getStatus(), ex);
+            LOG.debug("RPC failed: " + ex.getStatus(), ex);
             throw new UnknownHostException(host);
         }
     }

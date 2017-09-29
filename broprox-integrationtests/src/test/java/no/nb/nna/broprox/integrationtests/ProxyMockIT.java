@@ -70,6 +70,7 @@ public class ProxyMockIT implements BroproxHeaderConstants {
         int contentWriterPort = Integer.parseInt(System.getProperty("contentwriter.port"));
         String dbHost = System.getProperty("db.host");
         int dbPort = Integer.parseInt(System.getProperty("db.port"));
+        System.out.println("Database address: " + dbHost + ":" + dbPort);
 
         controllerChannel = ManagedChannelBuilder.forAddress(controllerHost, controllerPort).usePlaintext(true).build();
         controllerClient = ControllerGrpc.newBlockingStub(controllerChannel).withWaitForReady();

@@ -26,13 +26,16 @@ message CrawlExecutionStatus {
     State state = 2;
     string job_id = 3;
     string seed_id = 4;
-    google.protobuf.Timestamp start_time = 5;
-    google.protobuf.Timestamp end_time = 6;
-    int64 documents_crawled = 7;
-    int64 bytes_crawled = 8;
-    int64 uris_crawled = 9;
-    int64 documents_failed = 10;
-    CrawlScope scope = 11;
+    CrawlScope scope = 5;
+    google.protobuf.Timestamp start_time = 6;
+    google.protobuf.Timestamp end_time = 7;
+    int64 documents_crawled = 8;
+    int64 bytes_crawled = 9;
+    int64 uris_crawled = 10;
+    int64 documents_failed = 11;
+    int64 documents_out_of_scope = 12;
+    int64 documents_retried = 13;
+    int64 documents_denied = 14;
 }
 
 message CrawlLog {

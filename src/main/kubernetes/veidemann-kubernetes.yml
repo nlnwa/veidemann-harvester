@@ -85,6 +85,9 @@ spec:
         volumeMounts:
         - mountPath: /data
           name: workdir
+        resources:
+            requests:
+                memory: "500Mi"
       - name: proxy
         image: norsknettarkiv/broprox-harvester:1.0.0-SNAPSHOT
         ports:
@@ -117,6 +120,9 @@ spec:
         - name: log4j-config
           mountPath: /broprox-harvester/config/log4j2.xml
           subPath: log4j2.xml
+        resources:
+            requests:
+                memory: "500Mi"
       restartPolicy: Always
       dnsPolicy: ClusterFirst
       volumes:
@@ -186,6 +192,9 @@ spec:
         - name: log4j-config
           mountPath: /broprox-contentwriter/config/log4j2.xml
           subPath: log4j2.xml
+        resources:
+            requests:
+                memory: "1Gi"
       - name: contentexplorer
         image: norsknettarkiv/broprox-contentexplorer:1.0.0-SNAPSHOT
         ports:

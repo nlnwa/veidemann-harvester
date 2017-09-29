@@ -36,5 +36,8 @@ message StatusDetail {
     int64 bytes_crawled = 8;
     int64 uris_crawled = 9;
     int64 documents_failed = 10;
-    int64 queue_size = 11;
+    int64 documents_out_of_scope = 11;
+    int64 documents_retried = 12;
+    int64 documents_denied = 13;
+    int64 queue_size = 14;
 }

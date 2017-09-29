@@ -18,6 +18,7 @@ package no.nb.nna.broprox.commons;
 import java.util.Optional;
 
 import com.google.protobuf.Empty;
+import com.google.protobuf.Timestamp;
 import no.nb.nna.broprox.api.ControllerProto.BrowserConfigListReply;
 import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListReply;
 import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListRequest;
@@ -58,25 +59,23 @@ public interface DbAdapter extends AutoCloseable {
 
     Optional<CrawledContent> hasCrawledContent(CrawledContent cc);
 
-    CrawlLog addCrawlLog(CrawlLog cl);
-
-    CrawlLog updateCrawlLog(CrawlLog cl);
+    CrawlLog saveCrawlLog(CrawlLog cl);
 
     ExtractedText addExtractedText(ExtractedText et);
 
-    CrawlExecutionStatus addExecutionStatus(CrawlExecutionStatus status);
-
-    CrawlExecutionStatus updateExecutionStatus(CrawlExecutionStatus status);
+    CrawlExecutionStatus saveExecutionStatus(CrawlExecutionStatus status);
 
     CrawlExecutionStatus getExecutionStatus(String executionId);
 
-    QueuedUri addQueuedUri(QueuedUri qu);
-
-    QueuedUri updateQueuedUri(QueuedUri qu);
+    QueuedUri saveQueuedUri(QueuedUri qu);
 
     void deleteQueuedUri(QueuedUri qu);
 
+    long deleteQueuedUrisForExecution(String executionId);
+
     long queuedUriCount(String executionId);
+
+    boolean uriNotIncludedInQueue(QueuedUri qu, Timestamp since);
 
     /**
      * Get the first URI wich is ready to be fetched for a CrawlHostGroup.

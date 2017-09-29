@@ -25,6 +25,7 @@ import java.util.function.Function;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Empty;
 import com.google.protobuf.Message;
+import com.google.protobuf.Timestamp;
 import com.google.protobuf.util.Timestamps;
 import com.rethinkdb.RethinkDB;
 import com.rethinkdb.gen.ast.Insert;
@@ -163,40 +164,11 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
-    public CrawlLog addCrawlLog(CrawlLog cl) {
-        Map rMap = ProtoUtils.protoToRethink(cl);
-        if (!rMap.containsKey("timeStamp")) {
-            rMap.put("timeStamp", r.now());
+    public CrawlLog saveCrawlLog(CrawlLog cl) {
+        if (!cl.hasTimeStamp()) {
+            cl = cl.toBuilder().setTimeStamp(ProtoUtils.getNowTs()).build();
         }
-
-        Map<String, Object> response = otw.map("db-addCrawlLog",
-                this::executeRequest, r.table(TABLES.CRAWL_LOG.name)
-                        .insert(rMap)
-                        .optArg("conflict", "error"));
-
-        String key = ((List<String>) response.get("generated_keys")).get(0);
-
-        cl = cl.toBuilder().setWarcId(key).build();
-
-        return cl;
-    }
-
-    @Override
-    public CrawlLog updateCrawlLog(CrawlLog cl) {
-        Map rMap = ProtoUtils.protoToRethink(cl);
-        if (!rMap.containsKey("timeStamp")) {
-            rMap.put("timeStamp", r.now());
-        }
-
-        Map<String, Object> response = otw.map("db-updateCrawlLog",
-                this::executeRequest, r.table(TABLES.CRAWL_LOG.name)
-                        .get(cl.getWarcId())
-                        .update(rMap)
-                        .optArg("return_changes", "always"));
-        cl = ProtoUtils.rethinkToProto(
-                ((List<Map<String, Map>>) response.get("changes")).get(0).get("new_val"), CrawlLog.class);
-
-        return cl;
+        return saveMessage(cl, TABLES.CRAWL_LOG);
     }
 
     @Override
@@ -325,29 +297,8 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
-    public CrawlExecutionStatus addExecutionStatus(CrawlExecutionStatus status) {
-        Map rMap = ProtoUtils.protoToRethink(status);
-
-        Map<String, Object> response = otw.map("db-addExecutionStatus",
-                this::executeRequest, r.table(TABLES.EXECUTIONS.name)
-                        .insert(rMap)
-                        .optArg("conflict", "error"));
-
-        String key = ((List<String>) response.get("generated_keys")).get(0);
-
-        return status.toBuilder().setId(key).build();
-    }
-
-    @Override
-    public CrawlExecutionStatus updateExecutionStatus(CrawlExecutionStatus status) {
-        Map rMap = ProtoUtils.protoToRethink(status);
-
-        Map<String, Object> response = otw.map("db-updateExecutionStatus",
-                this::executeRequest, r.table(TABLES.EXECUTIONS.name)
-                        .get(status.getId())
-                        .update(rMap));
-
-        return status;
+    public CrawlExecutionStatus saveExecutionStatus(CrawlExecutionStatus status) {
+        return saveMessage(status, TABLES.EXECUTIONS);
     }
 
     @Override
@@ -360,33 +311,11 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
-    public QueuedUri addQueuedUri(QueuedUri qu) {
+    public QueuedUri saveQueuedUri(QueuedUri qu) {
         if (!qu.hasEarliestFetchTimeStamp()) {
             qu = qu.toBuilder().setEarliestFetchTimeStamp(ProtoUtils.getNowTs()).build();
         }
-
-        Map rMap = ProtoUtils.protoToRethink(qu);
-
-        Map<String, Object> response = otw.map("db-addQueudUri",
-                this::executeRequest, r.table(TABLES.URI_QUEUE.name)
-                        .insert(rMap)
-                        .optArg("conflict", "error"));
-
-        String key = ((List<String>) response.get("generated_keys")).get(0);
-
-        return qu.toBuilder().setId(key).build();
-    }
-
-    @Override
-    public QueuedUri updateQueuedUri(QueuedUri qu) {
-        Map rMap = ProtoUtils.protoToRethink(qu);
-
-        Map<String, Object> response = otw.map("db-updateQueuedUri",
-                this::executeRequest, r.table(TABLES.URI_QUEUE.name)
-                        .get(qu.getId())
-                        .update(rMap));
-
-        return qu;
+        return saveMessage(qu, TABLES.URI_QUEUE);
     }
 
     @Override
@@ -395,11 +324,35 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
+    public long deleteQueuedUrisForExecution(String executionId) {
+        return otw.map("db-queuedUriCount",
+                this::executeRequest, r.table(TABLES.URI_QUEUE.name)
+                        .getAll(executionId).optArg("index", "executionId")
+                        .delete().pluck("deleted"));
+    }
+
+    @Override
     public long queuedUriCount(String executionId) {
         return otw.map("db-queuedUriCount",
                 this::executeRequest, r.table(TABLES.URI_QUEUE.name)
                         .getAll(executionId).optArg("index", "executionId")
                         .count());
+    }
+
+    @Override
+    public boolean uriNotIncludedInQueue(QueuedUri qu, Timestamp since) {
+        return otw.map("db-queuedUriCount",
+                this::executeRequest,
+                r.table(RethinkDbAdapter.TABLES.CRAWL_LOG.name)
+                        .between(
+                                r.array(qu.getSurt(), ProtoUtils.tsToOdt(since)),
+                                r.array(qu.getSurt(), r.maxval()))
+                        .optArg("index", "surt_time").filter(row -> row.g("statusCode").lt(500)).limit(1)
+                        .union(
+                                r.table(RethinkDbAdapter.TABLES.URI_QUEUE.name).getAll(qu.getSurt())
+                                        .optArg("index", "surt")
+                                        .limit(1)
+                        ).isEmpty());
     }
 
     @Override
@@ -458,9 +411,9 @@ public class RethinkDbAdapter implements DbAdapter {
         }
         Cursor<Map> res = executeRequest(
                 r.table(RethinkDbAdapter.TABLES.EXECUTIONS.name)
-                        .orderBy().optArg("index", "startTime")
+                        .orderBy().optArg("index", r.desc("startTime"))
                         .limit(limit)
-                        .changes().optArg("include_initial", true).optArg("include_offsets", true)
+                        .changes().optArg("include_initial", true).optArg("include_offsets", true).optArg("squash", 2)
                         .map(v -> v.g("new_val").merge(r.hashMap("newOffset", v.g("new_offset").default_((String) null))
                         .with("oldOffset", v.g("old_offset").default_((String) null))))
                         .eqJoin("seedId", r.table("seeds"))
@@ -489,6 +442,9 @@ public class RethinkDbAdapter implements DbAdapter {
                             reply.removeValue(oldOffset.intValue());
                         }
                         if (newOffset != null) {
+                            if (newOffset > reply.getValueCount()) {
+                                newOffset = (long) reply.getValueCount();
+                            }
                             reply.addValue(newOffset.intValue(), resp);
                         }
                         return reply.build();
@@ -747,6 +703,18 @@ public class RethinkDbAdapter implements DbAdapter {
                                 .with("created", old_doc.g("meta").g("created"))
                                 .with("createdBy", old_doc.g("meta").g("createdBy"))
                         ))),
+                (Class<T>) msg.getClass());
+    }
+
+    public <T extends Message> T saveMessage(T msg, TABLES table) {
+        Map rMap = ProtoUtils.protoToRethink(msg);
+        return otw.map("db-save" + msg.getClass().getSimpleName(),
+                this::executeInsert,
+                r.table(table.name)
+                        .insert(rMap)
+                        // A rethink function which copies created and createby from old doc,
+                        // and copies name if not existent in new doc
+                        .optArg("conflict", "replace"),
                 (Class<T>) msg.getClass());
     }
 

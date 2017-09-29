@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package no.nb.nna.broprox.frontier.worker;
 
 import java.math.BigInteger;
@@ -35,15 +34,14 @@ public class CrawlHostGroupCalculator {
     /**
      * Calculate the group this uri belongs to for politeness purpose.
      * <p>
-     * Check if uri's ip is within range of a crawl host group. If it is return its id. Otherwise return the hashed ip
-     * address.
+     * Check if uri's ip is within range of a crawl host group. If it is return the groups id. Otherwise return the
+     * hashed ip address.
      *
      * @param ip the ip for wich to calculate the group
      * @param crawlHostGroupConfigs the CrawlHostGroup configs to check
      * @return id of a CrawlHostGroup or the hashed IP
      */
     public static String calculateCrawlHostGroup(String ip, List<CrawlHostGroupConfig> crawlHostGroupConfigs) {
-
         BigInteger ipVal = ipAsInteger(ip);
 
         String hostGroupHash = crawlHostGroupConfigs.stream()

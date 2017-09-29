@@ -26,9 +26,9 @@ import no.nb.nna.broprox.api.ControllerProto;
 import no.nb.nna.broprox.api.HarvesterProto;
 import no.nb.nna.broprox.commons.DbAdapter;
 import no.nb.nna.broprox.commons.client.ContentWriterClient;
-import no.nb.nna.broprox.commons.client.RobotsServiceClient;
 import no.nb.nna.broprox.commons.util.ApiTools;
 import no.nb.nna.broprox.harvester.BrowserSessionRegistry;
+import no.nb.nna.broprox.harvester.proxy.InMemoryAlreadyCrawledCache;
 import no.nb.nna.broprox.harvester.proxy.RecordingProxy;
 import no.nb.nna.broprox.model.ConfigProto;
 import no.nb.nna.broprox.model.MessagesProto;
@@ -84,7 +84,8 @@ public class BrowserControllerIT {
         tmpDir.deleteOnExit();
 
         try (RecordingProxy proxy = new RecordingProxy(tmpDir, proxyPort, db, contentWriterClient,
-                new TestHostResolver(), sessionRegistry);
+                new TestHostResolver(), sessionRegistry, new InMemoryAlreadyCrawledCache());
+
                 BrowserController controller = new BrowserController(browserHost, browserPort, db,
                         sessionRegistry);) {
 

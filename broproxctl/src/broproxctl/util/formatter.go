@@ -45,29 +45,17 @@ func Marshal(filename string, format string, msg proto.Message) error {
 		w = f
 	}
 
-	values := reflect.ValueOf(msg).Elem().FieldByName("Value")
 	switch format {
 	case "json":
-		for i := 0; i < values.Len(); i++ {
-			sliceVal := values.Index(i)
-			m := sliceVal.Interface().(proto.Message)
-			err := MarshalJson(w, m)
-			if err != nil {
-				return err
-			}
+		err := MarshalJson(w, msg)
+		if err != nil {
+			return err
 		}
 		return nil
 	case "yaml":
-		for i := 0; i < values.Len(); i++ {
-			if i > 0 {
-				w.Write([]byte("---\n"))
-			}
-			sliceVal := values.Index(i)
-			m := sliceVal.Interface().(proto.Message)
-			err := MarshalYaml(w, m)
-			if err != nil {
-				return err
-			}
+		err := MarshalYaml(w, msg)
+		if err != nil {
+			return err
 		}
 		return nil
 	case "table":
@@ -80,56 +68,6 @@ func Marshal(filename string, format string, msg proto.Message) error {
 		log.Fatalf("Illegal format %s", format)
 	}
 	return nil
-}
-
-func MarshalJson(w io.Writer, msg proto.Message) error {
-	r, err := EncodeJson(msg)
-	if err != nil {
-		log.Fatalf("Could not convert %v to JSON: %v", msg, err)
-		return err
-	}
-
-	var out bytes.Buffer
-	json.Indent(&out, r, "", "  ")
-
-	fmt.Fprintln(w, out.String())
-	return nil
-}
-
-func MarshalYaml(w io.Writer, msg proto.Message) error {
-	r, err := EncodeJson(msg)
-	if err != nil {
-		log.Fatalf("Could not convert %v to JSON: %v", msg, err)
-		return err
-	}
-
-	final, err := yaml.JSONToYAML(r)
-	if err != nil {
-		fmt.Printf("err: %v\n", err)
-		return err
-	}
-
-	fmt.Fprintln(w, string(final))
-
-	return nil
-}
-
-func EncodeJson(msg proto.Message) ([]byte, error) {
-	var buf bytes.Buffer
-	if err := jsonMarshaler.Marshal(&buf, msg); err != nil {
-		log.Fatalf("Could not convert %v to YAML: %v", msg, err)
-		return nil, err
-	}
-
-	values := make(map[string]interface{})
-	json.Unmarshal(buf.Bytes(), &values)
-
-	kind := GetObjectName(msg)
-
-	values["kind"] = kind
-	b, _ := json.Marshal(values)
-
-	return b, nil
 }
 
 func Unmarshal(filename string) ([]proto.Message, error) {

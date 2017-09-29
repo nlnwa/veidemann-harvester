@@ -15,6 +15,8 @@
  */
 package no.nb.nna.broprox.harvester.proxy;
 
+import no.nb.nna.broprox.commons.AlreadyCrawledCache;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -52,9 +54,12 @@ public class RecordingProxy implements AutoCloseable {
      * @throws IOException is thrown if certificate directory could not be created
      */
     public RecordingProxy(File workDir, int port, DbAdapter db, final ContentWriterClient contentWriterClient,
-            final HostResolver hostResolver, BrowserSessionRegistry sessionRegistry) throws IOException {
+            final HostResolver hostResolver, BrowserSessionRegistry sessionRegistry,
+            AlreadyCrawledCache cache) throws IOException {
 
         LOG.info("Starting recording proxy listening on port {}.", port);
+
+        this.cache = cache;
 
         File certificateDir = new File(workDir, "certificates");
         Files.createDirectories(certificateDir.toPath());
@@ -84,8 +89,6 @@ public class RecordingProxy implements AutoCloseable {
                 .serverKeyGenerator(new ECKeyGenerator())
                 .trustAllServers(true)
                 .build();
-
-        cache = new AlreadyCrawledCache();
 
         server = DefaultHttpProxyServer.bootstrap()
                 .withAllowLocalOnly(false)

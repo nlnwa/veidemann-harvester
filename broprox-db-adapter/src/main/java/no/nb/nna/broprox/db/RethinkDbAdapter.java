@@ -93,7 +93,8 @@ public class RethinkDbAdapter implements DbAdapter {
         BROWSER_CONFIGS("browser_configs", BrowserConfig.getDefaultInstance()),
         POLITENESS_CONFIGS("politeness_configs", PolitenessConfig.getDefaultInstance()),
         CRAWL_HOST_GROUP("crawl_host_group", CrawlHostGroup.getDefaultInstance()),
-        CRAWL_HOST_GROUP_CONFIGS("crawl_host_group_configs", CrawlHostGroupConfig.getDefaultInstance());
+        CRAWL_HOST_GROUP_CONFIGS("crawl_host_group_configs", CrawlHostGroupConfig.getDefaultInstance()),
+        ALREADY_CRAWLED_CACHE("already_crawled_cache", null);
 
         public final String name;
 

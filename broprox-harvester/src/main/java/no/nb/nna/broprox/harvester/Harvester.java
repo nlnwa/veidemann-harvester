@@ -21,11 +21,13 @@ import com.typesafe.config.Config;
 import com.typesafe.config.ConfigBeanFactory;
 import com.typesafe.config.ConfigException;
 import com.typesafe.config.ConfigFactory;
+import no.nb.nna.broprox.commons.AlreadyCrawledCache;
 import no.nb.nna.broprox.commons.DbAdapter;
 import no.nb.nna.broprox.commons.client.ContentWriterClient;
 import no.nb.nna.broprox.commons.client.DnsServiceClient;
 import no.nb.nna.broprox.commons.opentracing.TracerFactory;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
+import no.nb.nna.broprox.db.RethinkDbAlreadyCrawledCache;
 import no.nb.nna.broprox.harvester.api.HarvesterApiServer;
 import no.nb.nna.broprox.harvester.browsercontroller.BrowserController;
 import no.nb.nna.broprox.harvester.proxy.DnsServiceHostResolver;
@@ -76,10 +78,13 @@ public class Harvester {
                 ContentWriterClient contentWriterClient = new ContentWriterClient(
                         SETTINGS.getContentWriterHost(), SETTINGS.getContentWriterPort());
 
+                AlreadyCrawledCache cache = new RethinkDbAlreadyCrawledCache(
+                        SETTINGS.getDbHost(), SETTINGS.getDbPort(), SETTINGS.getDbName());
+
                 RecordingProxy proxy = new RecordingProxy(
                         new File(SETTINGS.getWorkDir()),
                         SETTINGS.getProxyPort(), db, contentWriterClient,
-                        new DnsServiceHostResolver(dnsServiceClient), sessionRegistry);
+                        new DnsServiceHostResolver(dnsServiceClient), sessionRegistry, cache);
 
                 HarvesterApiServer apiServer = new HarvesterApiServer(controller, proxy).start();) {
 

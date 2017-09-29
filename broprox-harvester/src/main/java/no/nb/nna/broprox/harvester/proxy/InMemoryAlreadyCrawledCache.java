@@ -15,6 +15,8 @@
  */
 package no.nb.nna.broprox.harvester.proxy;
 
+import no.nb.nna.broprox.commons.AlreadyCrawledCache;
+
 import java.util.Objects;
 
 import com.google.protobuf.ByteString;
@@ -35,15 +37,13 @@ import org.slf4j.LoggerFactory;
 /**
  *
  */
-public class AlreadyCrawledCache {
+public class InMemoryAlreadyCrawledCache implements AlreadyCrawledCache {
 
-    private static final Logger LOG = LoggerFactory.getLogger(AlreadyCrawledCache.class);
+    private static final Logger LOG = LoggerFactory.getLogger(InMemoryAlreadyCrawledCache.class);
 
     private final Cache<CacheKey, FullHttpResponse> cache;
 
-    private final ByteBuf headerPayloadSep = Unpooled.wrappedBuffer(new byte[]{'\r', '\n'}).asReadOnly();
-
-    public AlreadyCrawledCache() {
+    public InMemoryAlreadyCrawledCache() {
         cache = new Cache2kBuilder<CacheKey, FullHttpResponse>() {
         }
                 .name("embedsCache")
@@ -68,12 +68,13 @@ public class AlreadyCrawledCache {
                 .build();
     }
 
-    public FullHttpResponse get(String uri, String exIdHeader) {
-        if (exIdHeader == null || BroproxHeaderConstants.MANUAL_EXID.equals(exIdHeader)) {
+    @Override
+    public FullHttpResponse get(String uri, String executionId) {
+        if (executionId == null || BroproxHeaderConstants.MANUAL_EXID.equals(executionId)) {
             return null;
         }
 
-        CacheKey key = new CacheKey(uri, exIdHeader);
+        CacheKey key = new CacheKey(uri, executionId);
         FullHttpResponse cacheValue = cache.peek(key);
 
         if (cacheValue != null) {
@@ -83,23 +84,25 @@ public class AlreadyCrawledCache {
         }
     }
 
+    @Override
     public void put(HttpVersion httpVersion,
             HttpResponseStatus status,
             String uri,
-            String exIdHeader,
+            String executionId,
             ByteString cacheValue) {
 
-        if (exIdHeader == null) {
+        if (executionId == null) {
             return;
         }
 
         ByteBuf data = Unpooled.wrappedBuffer(cacheValue.toByteArray());
         FullHttpResponse httpResponse = new DefaultFullHttpResponse(httpVersion, status, data);
 
-        CacheKey key = new CacheKey(uri, exIdHeader);
+        CacheKey key = new CacheKey(uri, executionId);
         cache.put(key, httpResponse);
     }
 
+    @Override
     public void cleanExecution(String executionId) {
         for (CacheKey key : cache.keys()) {
             if (key.executionId.equals(executionId)) {
@@ -109,6 +112,11 @@ public class AlreadyCrawledCache {
                 }
             }
         }
+    }
+
+    @Override
+    public void close() {
+        cache.close();
     }
 
     public static final class CacheKey {

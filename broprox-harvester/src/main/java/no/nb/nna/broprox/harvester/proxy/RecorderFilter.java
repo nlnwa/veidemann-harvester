@@ -15,6 +15,8 @@
  */
 package no.nb.nna.broprox.harvester.proxy;
 
+import no.nb.nna.broprox.commons.AlreadyCrawledCache;
+
 import java.net.InetSocketAddress;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -185,6 +187,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
         MDC.put("uri", uri);
 
         return otw.map("serverToProxyResponse", response -> {
+            boolean handled = false;
 
             if (response instanceof HttpResponse) {
                 LOG.debug("Got http response");
@@ -196,7 +199,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
                 crawlLog.setStatusCode(responseStatus.code())
                         .setContentType(res.headers().get("Content-Type"));
                 responseCollector.setResponseHeaders(res);
-
+                handled = true;
             }
 
             if (response instanceof HttpContent) {
@@ -218,7 +221,10 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
                         pageRequest.setSize(responseCollector.getSize());
                     }
                 }
-            } else {
+                handled = true;
+            }
+
+            if (!handled) {
                 // If we get here, handling for the response type should be added
                 LOG.error("Got unknown response type '{}', this is a bug", response.getClass());
             }

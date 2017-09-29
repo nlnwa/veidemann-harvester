@@ -166,6 +166,12 @@ public class DbInitializer {
         r.tableCreate(TABLES.CRAWL_HOST_GROUP.name).run(conn);
         r.table(TABLES.CRAWL_HOST_GROUP.name).indexCreate("nextFetchTime").run(conn);
 
+        r.tableCreate(TABLES.ALREADY_CRAWLED_CACHE.name)
+                .optArg("durability", "soft")
+                .optArg("shards", 3)
+                .optArg("replicas", 1)
+                .run(conn);
+
         createMetaIndexes(
                 TABLES.BROWSER_SCRIPTS,
                 TABLES.CRAWL_ENTITIES,

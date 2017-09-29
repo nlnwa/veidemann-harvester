@@ -67,11 +67,14 @@ public class CrawlExecution implements Runnable {
 
     public CrawlExecution(QueuedUri qUri, CrawlHostGroup crawlHostGroup, Frontier frontier) {
         this.status = StatusWrapper.getStatusWrapper(frontier.getDb(), qUri.getExecutionId());
+        this.status.setCurrentUri(qUri.getUri());
+
         ControllerProto.CrawlJobListRequest jobRequest = ControllerProto.CrawlJobListRequest.newBuilder()
                 .setId(status.getJobId())
                 .setExpand(true)
                 .build();
         CrawlJob job = frontier.getDb().listCrawlJobs(jobRequest).getValueList().get(0);
+
         try {
             this.qUri = QueuedUriWrapper.getQueuedUriWrapper(frontier, qUri).clearError();
         } catch (URISyntaxException ex) {
@@ -98,7 +101,8 @@ public class CrawlExecution implements Runnable {
 
     public void endCrawl(CrawlExecutionStatus.State state) {
         if (!status.isEnded()) {
-            status.setEndState(state);
+            status.setEndState(state)
+                    .clearCurrentUri();
             frontier.getHarvesterClient().cleanupExecution(getId());
         }
     }
@@ -116,8 +120,7 @@ public class CrawlExecution implements Runnable {
 
             status.incrementDocumentsCrawled()
                     .incrementBytesCrawled(harvestReply.getBytesDownloaded())
-                    .incrementUrisCrawled(harvestReply.getUriCount())
-                    .saveStatus(frontier.getDb());
+                    .incrementUrisCrawled(harvestReply.getUriCount());
 
             if (outlinks.isEmpty()) {
                 LOG.debug("No outlinks from {}", qUri.getSurt());

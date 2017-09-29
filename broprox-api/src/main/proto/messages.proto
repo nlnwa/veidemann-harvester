@@ -36,6 +36,7 @@ message CrawlExecutionStatus {
     int64 documents_out_of_scope = 12;
     int64 documents_retried = 13;
     int64 documents_denied = 14;
+    string current_uri = 20;
 }
 
 message CrawlLog {

@@ -53,13 +53,13 @@ var statusCmd = &cobra.Command{
 
 			tm.MoveCursor(1, 1)
 
-			rest := tm.Width() - 121
+			rest := tm.Width() - 142
 			tm.Println(
 				tm.Background(
 					tm.Color(
-						fmt.Sprintf("%-36s %-18.18s %-10.10s %5s %5s %10s %6s %5s %5s %5s %5s %-*s",
+						fmt.Sprintf("%-36s %-18.18s %-10.10s %5s %5s %10s %6s %5s %5s %5s %5s %-20s %-*s",
 							"ID", "Start time", "State", "Docs", "URIs", "Bytes", "Failed",
-							"OoS", "Deny", "Retry", "Queue", rest, "Seed"),
+							"OoS", "Deny", "Retry", "Queue", "Seed", rest, "Current Uri"),
 						tm.BLACK),
 					tm.WHITE))
 
@@ -74,9 +74,10 @@ var statusCmd = &cobra.Command{
 					color = tm.BLUE
 				}
 				tm.Println(tm.Background(
-					fmt.Sprintf("%-36.36s %18s %-10s %5d %5d %10d %6d %5d %5d %5d %5d %-*s",
+					fmt.Sprintf("%-36.36s %18s %-10s %5d %5d %10d %6d %5d %5d %5d %5d %-20.20s %-*.*s",
 						e.Id, start, e.State, e.DocumentsCrawled, e.UrisCrawled, e.BytesCrawled, e.DocumentsFailed,
-						e.DocumentsOutOfScope, e.DocumentsDenied, e.DocumentsRetried, e.QueueSize, rest, e.Seed),
+						e.DocumentsOutOfScope, e.DocumentsDenied, e.DocumentsRetried, e.QueueSize, e.Seed,
+						rest, rest, e.CurrentUri),
 					color))
 			}
 			tm.Flush()

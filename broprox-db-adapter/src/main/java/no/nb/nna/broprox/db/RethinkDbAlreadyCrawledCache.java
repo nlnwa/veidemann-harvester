@@ -15,6 +15,10 @@
  */
 package no.nb.nna.broprox.db;
 
+import java.math.BigInteger;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
 
@@ -62,7 +66,7 @@ public class RethinkDbAlreadyCrawledCache implements AlreadyCrawledCache {
     @Override
     public FullHttpResponse get(String uri, String executionId) {
         Map<String, Object> response = executeRequest(r.table(RethinkDbAdapter.TABLES.ALREADY_CRAWLED_CACHE.name)
-                .get(r.array(executionId, uri)));
+                .get(createKey(executionId, uri)));
 
         if (response == null) {
             return null;
@@ -88,7 +92,7 @@ public class RethinkDbAlreadyCrawledCache implements AlreadyCrawledCache {
             return;
         }
 
-        Map<String, Object> rMap = r.hashMap("id", r.array(executionId, uri))
+        Map<String, Object> rMap = r.hashMap("id", createKey(executionId, uri))
                 .with("httpVersion", httpVersion.text())
                 .with("responseStatus", status.code())
                 .with("data", r.binary(cacheValue.toByteArray()));
@@ -125,6 +129,17 @@ public class RethinkDbAlreadyCrawledCache implements AlreadyCrawledCache {
     @Override
     public void close() {
         conn.close();
+    }
+
+    private List createKey(String executionId, String uri) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-1");
+            digest.digest(uri.getBytes());
+            String uriDigest = new BigInteger(1, digest.digest()).toString(16);
+            return r.array(executionId, uriDigest);
+        } catch (NoSuchAlgorithmException ex) {
+            throw new RuntimeException(ex);
+        }
     }
 
 }

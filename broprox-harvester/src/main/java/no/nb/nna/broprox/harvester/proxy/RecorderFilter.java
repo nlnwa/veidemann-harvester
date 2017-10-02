@@ -73,10 +73,6 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
 
     private PageRequest pageRequest;
 
-    private HttpResponseStatus responseStatus;
-
-    private HttpVersion httpVersion;
-
     public RecorderFilter(final String uri, final HttpRequest originalRequest, final ChannelHandlerContext ctx,
             final DbAdapter db, final ContentWriterClient contentWriterClient,
             final BrowserSessionRegistry sessionRegistry, final AlreadyCrawledCache cache) {
@@ -193,12 +189,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
                 LOG.debug("Got http response");
 
                 HttpResponse res = (HttpResponse) response;
-                responseStatus = res.status();
-                httpVersion = res.protocolVersion();
-
-                crawlLog.setStatusCode(responseStatus.code())
-                        .setContentType(res.headers().get("Content-Type"));
-                responseCollector.setResponseHeaders(res);
+                responseCollector.setResponseHeaders(res, crawlLog);
                 handled = true;
             }
 
@@ -209,13 +200,8 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
                 responseCollector.addPayload(res.content());
 
                 if (ProxyUtils.isLastChunk(response)) {
-                    if (responseCollector.isShouldCache()) {
-                        cache.put(httpVersion,
-                                responseStatus,
-                                uri,
-                                executionId,
-                                responseCollector.getCacheValue());
-                    }
+                    responseCollector.writeCache(cache, uri, executionId);
+
                     responseCollector.writeResponse(crawlLog.build());
                     if (pageRequest != null) {
                         pageRequest.setSize(responseCollector.getSize());

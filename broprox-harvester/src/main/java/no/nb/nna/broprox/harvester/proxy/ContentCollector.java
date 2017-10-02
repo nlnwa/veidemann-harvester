@@ -28,6 +28,9 @@ import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
+import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.handler.codec.http.HttpVersion;
+import no.nb.nna.broprox.commons.AlreadyCrawledCache;
 import no.nb.nna.broprox.commons.DbAdapter;
 import no.nb.nna.broprox.commons.client.ContentWriterClient;
 import no.nb.nna.broprox.db.ProtoUtils;
@@ -55,9 +58,15 @@ public class ContentCollector {
 
     private long size;
 
-    private boolean headersSent = false;
+    private boolean shouldAddSeparator = false;
 
     private boolean shouldCache = false;
+
+    private HttpResponseStatus httpResponseStatus;
+
+    private HttpVersion httpResponseProtocolVersion;
+
+    private HttpHeaders cacheHeaders;
 
     private ByteString cacheValue;
 
@@ -86,15 +95,17 @@ public class ContentCollector {
         ByteString data = ByteString.copyFromUtf8(headers.toString());
         digest.update(data.asReadOnlyByteBuffer());
         contentWriterClient.sendHeader(data);
-        headersSent = true;
+        shouldAddSeparator = true;
         size = data.size();
-
-        if (shouldCache) {
-            cacheValue = data;
-        }
     }
 
-    public void setResponseHeaders(HttpResponse response) {
+    public void setResponseHeaders(HttpResponse response, CrawlLog.Builder crawlLog) {
+        httpResponseStatus = response.status();
+        httpResponseProtocolVersion = response.protocolVersion();
+
+        crawlLog.setStatusCode(httpResponseStatus.code())
+                .setContentType(response.headers().get("Content-Type", ""));
+
         StringBuilder headers = new StringBuilder(512)
                 .append(response.protocolVersion().text())
                 .append(" ")
@@ -106,11 +117,11 @@ public class ContentCollector {
         ByteString data = ByteString.copyFromUtf8(headers.toString());
         digest.update(data.asReadOnlyByteBuffer());
         contentWriterClient.sendHeader(data);
-        headersSent = true;
+        shouldAddSeparator = true;
         size = data.size();
 
         if (shouldCache) {
-            cacheValue = data;
+            cacheHeaders = response.headers();
         }
     }
 
@@ -126,9 +137,10 @@ public class ContentCollector {
     }
 
     public void addPayload(ByteBuf payload) {
-        if (headersSent) {
+        if (shouldAddSeparator) {
             digest.update(CRLF);
             size += 2;
+            shouldAddSeparator = false;
         }
         ByteString data = ByteString.copyFrom(payload.nioBuffer());
         digest.update(data.asReadOnlyByteBuffer());
@@ -136,10 +148,10 @@ public class ContentCollector {
         size += data.size();
 
         if (shouldCache) {
-            if (headersSent) {
-                cacheValue = cacheValue.concat(ByteString.copyFrom(CRLF)).concat(data);
-            } else {
+            if (cacheValue == null) {
                 cacheValue = data;
+            } else {
+                cacheValue = cacheValue.concat(data);
             }
         }
     }
@@ -162,6 +174,27 @@ public class ContentCollector {
 
     public ByteString getCacheValue() {
         return cacheValue;
+    }
+
+    public void writeCache(AlreadyCrawledCache cache, String uri, String executionId) {
+        if (shouldCache) {
+            String lengthHeader = cacheHeaders.get("Content-Length");
+            if (lengthHeader == null) {
+                cacheHeaders.set("Content-Length", getCacheValue().size());
+            }
+            StringBuilder headers = new StringBuilder(512);
+            addHeaders(cacheHeaders, headers);
+            headers.append(CRLF);
+
+            ByteString data = ByteString.copyFromUtf8(headers.toString());
+            data.concat(getCacheValue());
+
+            cache.put(httpResponseProtocolVersion,
+                    httpResponseStatus,
+                    uri,
+                    executionId,
+                    getCacheValue());
+        }
     }
 
     public void writeRequest(CrawlLog logEntry) {

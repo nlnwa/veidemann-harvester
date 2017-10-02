@@ -220,7 +220,7 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
         Descriptors.FieldDescriptor countField = resDescr.findFieldByName("count");
         Descriptors.FieldDescriptor valueField = resDescr.findFieldByName("value");
 
-        long count = 0;
+        long count = 0L;
         if (res instanceof Cursor) {
             if (pageSize > 0) {
                 // Set the count for the total resultset
@@ -236,7 +236,7 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
                     count++;
                 }
             }
-        } else {
+        } else if (res != null) {
             count = 1L;
             resultBuilder.addRepeatedField(valueField,
                     ProtoUtils.rethinkToProto((Map<String, Object>) res, table.schema.newBuilderForType()));

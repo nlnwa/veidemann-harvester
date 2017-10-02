@@ -103,8 +103,8 @@ public class CrawlExecution implements Runnable {
         if (!status.isEnded()) {
             status.setEndState(state)
                     .clearCurrentUri();
-            frontier.getHarvesterClient().cleanupExecution(getId());
         }
+        frontier.getHarvesterClient().cleanupExecution(getId());
     }
 
     public void fetch() {

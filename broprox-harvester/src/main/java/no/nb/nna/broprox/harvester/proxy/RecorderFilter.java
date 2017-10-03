@@ -15,8 +15,6 @@
  */
 package no.nb.nna.broprox.harvester.proxy;
 
-import no.nb.nna.broprox.commons.AlreadyCrawledCache;
-
 import java.net.InetSocketAddress;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -28,8 +26,7 @@ import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
-import io.netty.handler.codec.http.HttpResponseStatus;
-import io.netty.handler.codec.http.HttpVersion;
+import no.nb.nna.broprox.commons.AlreadyCrawledCache;
 import no.nb.nna.broprox.commons.BroproxHeaderConstants;
 import no.nb.nna.broprox.commons.DbAdapter;
 import no.nb.nna.broprox.commons.ExtraStatusCodes;
@@ -73,6 +70,8 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
 
     private PageRequest pageRequest;
 
+    private BrowserSession session;
+
     public RecorderFilter(final String uri, final HttpRequest originalRequest, final ChannelHandlerContext ctx,
             final DbAdapter db, final ContentWriterClient contentWriterClient,
             final BrowserSessionRegistry sessionRegistry, final AlreadyCrawledCache cache) {
@@ -91,7 +90,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
     }
 
     @Override
-    public HttpResponse proxyToServerRequest(HttpObject httpObject) {
+    public HttpResponse clientToProxyRequest(HttpObject httpObject) {
         if (httpObject instanceof HttpRequest) {
             HttpRequest request = (HttpRequest) httpObject;
 
@@ -101,7 +100,10 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
                 executionId = MANUAL_EXID;
             }
 
-            BrowserSession session = sessionRegistry.get(executionId);
+            session = sessionRegistry.get(executionId);
+            if (session == null && executionId != MANUAL_EXID) {
+                LOG.error("Could not find session. Probably a bug");
+            }
 
             String discoveryPath;
             String referrer = session == null ? "" : session.getReferrer();
@@ -112,12 +114,8 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
                 try {
                     pageRequest = session.getPageRequests().getByUrl(uri)
                             .get(session.getProtocolTimeout(), TimeUnit.MILLISECONDS);
-                } catch (InterruptedException ex) {
-                    throw new RuntimeException(ex);
-                } catch (ExecutionException ex) {
-                    throw new RuntimeException(ex);
-                } catch (TimeoutException ex) {
-                    throw new RuntimeException(ex);
+                } catch (InterruptedException | ExecutionException | TimeoutException | NullPointerException ex) {
+                    LOG.error(ex.toString(), ex);
                 }
 
                 if (pageRequest != null) {

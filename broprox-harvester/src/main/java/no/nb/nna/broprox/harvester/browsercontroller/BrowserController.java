@@ -109,8 +109,8 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
                 session.scrollToTop();
             }
         } finally {
-            sessionRegistry.remove(session);
             session.close();
+            sessionRegistry.remove(session);
         }
 
         MDC.clear();

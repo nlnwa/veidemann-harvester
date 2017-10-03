@@ -123,7 +123,7 @@ public class PageRequestRegistry {
         if (!f.canceled) {
             LOG.error(
                     "Failed fetching page: Error '{}', Blocked reason '{}', Resource type: '{}', Canceled: {}, Req: {}",
-                    f.errorText, f.blockedReason, f.type, f.canceled, f.requestId);
+                    f.errorText, f.blockedReason, f.type, f.canceled, getById(f.requestId).getUrl());
             PageRequest request = getById(f.requestId);
         }
         MDC.clear();

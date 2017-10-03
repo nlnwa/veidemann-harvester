@@ -99,14 +99,6 @@ public class CrawlExecution implements Runnable {
         return crawlHostGroup;
     }
 
-    public void endCrawl(CrawlExecutionStatus.State state) {
-        if (!status.isEnded()) {
-            status.setEndState(state)
-                    .clearCurrentUri();
-        }
-        frontier.getHarvesterClient().cleanupExecution(getId());
-    }
-
     public void fetch() {
         LOG.info("Fetching " + qUri.getUri());
 
@@ -217,12 +209,12 @@ public class CrawlExecution implements Runnable {
                     .saveStatus(frontier.getDb());
             frontier.getDb().deleteQueuedUri(qUri.getQueuedUri());
 
-            if (!LimitsCheck.isLimitReached(frontier, limits, status, qUri)) {
+            if (isManualAbort() || LimitsCheck.isLimitReached(frontier, limits, status, qUri)) {
+                delayMs = 0L;
+            } else {
                 new OpenTracingWrapper("CrawlExecution")
                         .addTag(Tags.HTTP_URL.getKey(), qUri.getUri())
                         .run("Fetch", this::fetch);
-            } else {
-                delayMs = 0L;
             }
         } catch (Throwable t) {
             // Errors should be handled elsewhere. Exception here indicates a bug.
@@ -239,11 +231,42 @@ public class CrawlExecution implements Runnable {
                 status.setState(CrawlExecutionStatus.State.SLEEPING);
             }
             status.saveStatus(frontier.getDb());
-            frontier.getDb().releaseCrawlHostGroup(getCrawlHostGroup(), getDelay(TimeUnit.MILLISECONDS));
+
+            // Recheck if user aborted crawl while fetching last uri.
+            if (isManualAbort()) {
+                // Save updated status
+                status.saveStatus(frontier.getDb());
+                delayMs = 0L;
+            }
         } catch (Throwable t) {
             // An error here indicates problems with DB communication. No idea how to handle that yet.
             LOG.error("Error updating status after fetch: {}", t.toString(), t);
         }
+
+        try {
+            frontier.getDb().releaseCrawlHostGroup(getCrawlHostGroup(), getDelay(TimeUnit.MILLISECONDS));
+        } catch (Throwable t) {
+            // An error here indicates problems with DB communication. No idea how to handle that yet.
+            LOG.error("Error releasing CrawlHostGroup: {}", t.toString(), t);
+        }
+    }
+
+    private void endCrawl(CrawlExecutionStatus.State state) {
+        if (!status.isEnded()) {
+            status.setEndState(state)
+                    .clearCurrentUri();
+        }
+        frontier.getHarvesterClient().cleanupExecution(getId());
+    }
+
+    private boolean isManualAbort() {
+        if (status.getState() == CrawlExecutionStatus.State.ABORTED_MANUAL) {
+            status.clearCurrentUri()
+                    .incrementDocumentsDenied(frontier.getDb().deleteQueuedUrisForExecution(status.getId()));
+            frontier.getHarvesterClient().cleanupExecution(status.getId());
+            return true;
+        }
+        return false;
     }
 
     public Span getParentSpan() {

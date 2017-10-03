@@ -143,7 +143,6 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
                     FullHttpResponse cachedResponse = cache.get(uri, executionId);
                     if (cachedResponse != null) {
                         LOG.debug("Found in cache");
-                        cachedResponse.headers().add("Connection", "close");
                         if (pageRequest != null) {
                             pageRequest.setFromCache(true);
                         }

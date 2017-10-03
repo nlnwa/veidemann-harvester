@@ -29,11 +29,11 @@ public class BrowserSessionRegistry implements BroproxHeaderConstants {
 
     Map<String, BrowserSession> executionIdToSession = new HashMap<>();
 
-    public void put(BrowserSession session) {
+    public synchronized void put(BrowserSession session) {
         executionIdToSession.put(session.getExecutionId(), session);
     }
 
-    public BrowserSession get(String executionId) {
+    public synchronized BrowserSession get(String executionId) {
         if (MANUAL_EXID.equals(executionId)) {
             return null;
         }

@@ -30,7 +30,9 @@ import com.rethinkdb.net.Connection;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
+import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import no.nb.nna.broprox.commons.AlreadyCrawledCache;
@@ -65,24 +67,36 @@ public class RethinkDbAlreadyCrawledCache implements AlreadyCrawledCache {
 
     @Override
     public FullHttpResponse get(String uri, String executionId) {
-        Map<String, Object> response = executeRequest(r.table(RethinkDbAdapter.TABLES.ALREADY_CRAWLED_CACHE.name)
-                .get(createKey(executionId, uri)));
+        try {
+            Map<String, Object> response = executeRequest(r.table(RethinkDbAdapter.TABLES.ALREADY_CRAWLED_CACHE.name)
+                    .get(createKey(executionId, uri)));
 
-        if (response == null) {
+            if (response == null) {
+                return null;
+            }
+
+            HttpVersion httpVersion = HttpVersion.valueOf((String) response.get("httpVersion"));
+            HttpResponseStatus status = HttpResponseStatus.valueOf(((Long) response.get("responseStatus")).intValue());
+            ByteBuf data = Unpooled.wrappedBuffer((byte[]) response.get("data"));
+
+            FullHttpResponse httpResponse = new DefaultFullHttpResponse(httpVersion, status, data, true);
+            HttpHeaders headers = httpResponse.headers();
+            List<List<CharSequence>> headerList = (List<List<CharSequence>>) response.get("headers");
+            headerList.forEach(
+                    header -> headers.add(header.get(0), header.get(1))
+            );
+
+            return httpResponse;
+        } catch (Throwable t) {
+            LOG.error(t.toString(), t);
             return null;
         }
-
-        HttpVersion httpVersion = HttpVersion.valueOf((String) response.get("httpVersion"));
-        HttpResponseStatus status = HttpResponseStatus.valueOf(((Long) response.get("responseStatus")).intValue());
-        ByteBuf data = Unpooled.wrappedBuffer((byte[]) response.get("data"));
-
-        FullHttpResponse httpResponse = new DefaultFullHttpResponse(httpVersion, status, data);
-
-        return httpResponse;
     }
 
     @Override
-    public void put(HttpVersion httpVersion, HttpResponseStatus status, String uri, String executionId, ByteString cacheValue) {
+    public void put(HttpVersion httpVersion, HttpResponseStatus status, String uri, String executionId,
+            HttpHeaders headers, ByteString cacheValue) {
+
         if (executionId == null) {
             return;
         }
@@ -92,14 +106,24 @@ public class RethinkDbAlreadyCrawledCache implements AlreadyCrawledCache {
             return;
         }
 
-        Map<String, Object> rMap = r.hashMap("id", createKey(executionId, uri))
-                .with("httpVersion", httpVersion.text())
-                .with("responseStatus", status.code())
-                .with("data", r.binary(cacheValue.toByteArray()));
+        try {
+            List headerList = r.array();
+            headers.iteratorCharSequence().forEachRemaining(
+                    header -> headerList.add(r.array(header.getKey(), header.getValue()))
+            );
 
-        executeRequest(r.table(RethinkDbAdapter.TABLES.ALREADY_CRAWLED_CACHE.name)
-                .insert(rMap)
-                .optArg("conflict", "replace"));
+            Map<String, Object> rMap = r.hashMap("id", createKey(executionId, uri))
+                    .with("httpVersion", httpVersion.text())
+                    .with("responseStatus", status.code())
+                    .with("headers", headerList)
+                    .with("data", r.binary(cacheValue.toByteArray()));
+
+            executeRequest(r.table(RethinkDbAdapter.TABLES.ALREADY_CRAWLED_CACHE.name)
+                    .insert(rMap)
+                    .optArg("conflict", "replace"));
+        } catch (Throwable t) {
+            LOG.error(t.toString(), t);
+        }
     }
 
     <T> T executeRequest(ReqlExpr qry) {
@@ -134,8 +158,7 @@ public class RethinkDbAlreadyCrawledCache implements AlreadyCrawledCache {
     private List createKey(String executionId, String uri) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-1");
-            digest.digest(uri.getBytes());
-            String uriDigest = new BigInteger(1, digest.digest()).toString(16);
+            String uriDigest = new BigInteger(1, digest.digest(uri.getBytes())).toString(16);
             return r.array(executionId, uriDigest);
         } catch (NoSuchAlgorithmException ex) {
             throw new RuntimeException(ex);

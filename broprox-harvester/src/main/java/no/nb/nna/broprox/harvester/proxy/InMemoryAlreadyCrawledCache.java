@@ -24,6 +24,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import no.nb.nna.broprox.commons.BroproxHeaderConstants;
@@ -89,6 +90,7 @@ public class InMemoryAlreadyCrawledCache implements AlreadyCrawledCache {
             HttpResponseStatus status,
             String uri,
             String executionId,
+            HttpHeaders headers,
             ByteString cacheValue) {
 
         if (executionId == null) {
@@ -97,6 +99,7 @@ public class InMemoryAlreadyCrawledCache implements AlreadyCrawledCache {
 
         ByteBuf data = Unpooled.wrappedBuffer(cacheValue.toByteArray());
         FullHttpResponse httpResponse = new DefaultFullHttpResponse(httpVersion, status, data);
+        httpResponse.headers().set(headers);
 
         CacheKey key = new CacheKey(uri, executionId);
         cache.put(key, httpResponse);

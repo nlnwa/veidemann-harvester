@@ -36,16 +36,13 @@ public class FrontierApiServer implements AutoCloseable {
 
     private final Server server;
 
-    private final DbAdapter db;
-
     private final Frontier frontier;
 
-    public FrontierApiServer(int port, DbAdapter db, Frontier frontier) {
-        this(ServerBuilder.forPort(port), db, frontier);
+    public FrontierApiServer(int port, Frontier frontier) {
+        this(ServerBuilder.forPort(port), frontier);
     }
 
-    public FrontierApiServer(ServerBuilder<?> serverBuilder, DbAdapter db, Frontier frontier) {
-        this.db = db;
+    public FrontierApiServer(ServerBuilder<?> serverBuilder, Frontier frontier) {
         this.frontier = frontier;
 
         ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor.Builder(GlobalTracer.get())
@@ -53,7 +50,7 @@ public class FrontierApiServer implements AutoCloseable {
                         ServerTracingInterceptor.ServerRequestAttribute.METHOD_TYPE)
                 .build();
 
-        server = serverBuilder.addService(tracingInterceptor.intercept(new FrontierService(db, frontier))).build();
+        server = serverBuilder.addService(tracingInterceptor.intercept(new FrontierService(frontier))).build();
     }
 
     public FrontierApiServer start() {
@@ -83,9 +80,6 @@ public class FrontierApiServer implements AutoCloseable {
     public void close() {
         if (server != null) {
             server.shutdown();
-        }
-        if (db != null) {
-            db.close();
         }
         System.err.println("*** server shut down");
     }

@@ -19,6 +19,7 @@ import com.google.protobuf.Empty;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import no.nb.nna.broprox.api.ControllerGrpc;
+import no.nb.nna.broprox.api.ControllerProto.AbortCrawlRequest;
 import no.nb.nna.broprox.api.ControllerProto.BrowserConfigListReply;
 import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListReply;
 import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListRequest;
@@ -34,9 +35,9 @@ import no.nb.nna.broprox.api.ControllerProto.RunCrawlReply;
 import no.nb.nna.broprox.api.ControllerProto.RunCrawlRequest;
 import no.nb.nna.broprox.api.ControllerProto.SeedListReply;
 import no.nb.nna.broprox.api.ControllerProto.SeedListRequest;
+import no.nb.nna.broprox.commons.DbAdapter;
 import no.nb.nna.broprox.commons.util.CrawlScopes;
 import no.nb.nna.broprox.controller.scheduler.FrontierClient;
-import no.nb.nna.broprox.commons.DbAdapter;
 import no.nb.nna.broprox.model.ConfigProto.BrowserConfig;
 import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
 import no.nb.nna.broprox.model.ConfigProto.CrawlConfig;
@@ -470,4 +471,17 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
         }
     }
 
+    @Override
+    public void abortCrawl(AbortCrawlRequest request, StreamObserver<Empty> respObserver) {
+        try {
+            db.setExecutionStateAborted(request.getExecutionId());
+
+            respObserver.onNext(Empty.getDefaultInstance());
+            respObserver.onCompleted();
+        } catch (Exception e) {
+            LOG.error(e.getMessage(), e);
+            Status status = Status.UNKNOWN.withDescription(e.toString());
+            respObserver.onError(status.asException());
+        }
+    }
 }

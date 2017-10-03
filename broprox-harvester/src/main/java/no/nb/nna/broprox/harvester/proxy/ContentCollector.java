@@ -178,21 +178,15 @@ public class ContentCollector {
 
     public void writeCache(AlreadyCrawledCache cache, String uri, String executionId) {
         if (shouldCache) {
-            String lengthHeader = cacheHeaders.get("Content-Length");
-            if (lengthHeader == null) {
-                cacheHeaders.set("Content-Length", getCacheValue().size());
-            }
-            StringBuilder headers = new StringBuilder(512);
-            addHeaders(cacheHeaders, headers);
-            headers.append(CRLF);
-
-            ByteString data = ByteString.copyFromUtf8(headers.toString());
-            data.concat(getCacheValue());
+            cacheHeaders.set("Content-Length", getCacheValue().size());
+            cacheHeaders.remove("Transfer-Encoding");
+            LOG.trace("Cached headers: {}", getCacheValue().size(), cacheHeaders.entries());
 
             cache.put(httpResponseProtocolVersion,
                     httpResponseStatus,
                     uri,
                     executionId,
+                    cacheHeaders,
                     getCacheValue());
         }
     }

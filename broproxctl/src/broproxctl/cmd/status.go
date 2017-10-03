@@ -74,7 +74,7 @@ var statusCmd = &cobra.Command{
 					color = tm.BLUE
 				}
 				tm.Println(tm.Background(
-					fmt.Sprintf("%-36.36s %18s %-10s %5d %5d %10d %6d %5d %5d %5d %5d %-20.20s %-*.*s",
+					fmt.Sprintf("%-36.36s %18s %-10.10s %5d %5d %10d %6d %5d %5d %5d %5d %-20.20s %-*.*s",
 						e.Id, start, e.State, e.DocumentsCrawled, e.UrisCrawled, e.BytesCrawled, e.DocumentsFailed,
 						e.DocumentsOutOfScope, e.DocumentsDenied, e.DocumentsRetried, e.QueueSize, e.Seed,
 						rest, rest, e.CurrentUri),

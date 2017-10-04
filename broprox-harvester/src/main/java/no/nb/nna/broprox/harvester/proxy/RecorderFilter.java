@@ -96,41 +96,50 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
 
             executionId = request.headers().get(EXECUTION_ID);
             if (executionId == null) {
-                LOG.info("Manual download of {}", uri);
                 executionId = MANUAL_EXID;
-            }
-
-            session = sessionRegistry.get(executionId);
-            if (session == null && executionId != MANUAL_EXID) {
-                LOG.error("Could not find session. Probably a bug");
-            }
-
-            String discoveryPath;
-            String referrer = session == null ? "" : session.getReferrer();
-
-            if (uri.endsWith("robots.txt")) {
-                discoveryPath = "P";
-            } else {
-                try {
-                    pageRequest = session.getPageRequests().getByUrl(uri)
-                            .get(session.getProtocolTimeout(), TimeUnit.MILLISECONDS);
-                } catch (InterruptedException | ExecutionException | TimeoutException | NullPointerException ex) {
-                    LOG.error(ex.toString(), ex);
-                }
-
-                if (pageRequest != null) {
-                    discoveryPath = pageRequest.getDiscoveryPath();
-                } else {
-                    // This should be allowed to have browsers pointing directly to proxy.
-                    LOG.error("**************** NO PAGE REQUEST " + request);
-                    return null;
-                }
+                LOG.info("Manual download of {}", uri);
             }
 
             MDC.put("eid", executionId);
             MDC.put("uri", uri);
 
             LOG.debug("Proxy got request");
+
+            String discoveryPath;
+            String referrer;
+
+            if (uri.endsWith("robots.txt")) {
+                referrer = "";
+                discoveryPath = "P";
+            } else if (executionId != MANUAL_EXID) {
+                referrer = request.headers().get("Referer", "");
+                discoveryPath = "";
+            } else {
+                session = sessionRegistry.get(executionId);
+
+                if (session == null) {
+                    LOG.error("Could not find session. Probably a bug");
+                    referrer = request.headers().get("Referer", "");
+                    discoveryPath = "";
+                } else {
+                    referrer = session.getReferrer();
+                    try {
+                        pageRequest = session.getPageRequests().getByUrl(uri)
+                                .get(session.getProtocolTimeout(), TimeUnit.MILLISECONDS);
+                    } catch (InterruptedException | ExecutionException | TimeoutException ex) {
+                        LOG.error("Failed getting page request from session: {}", ex.toString(), ex);
+                    } catch (Throwable ex) {
+                        LOG.error(ex.toString(), ex);
+                    }
+
+                    if (pageRequest != null) {
+                        discoveryPath = pageRequest.getDiscoveryPath();
+                    } else {
+                        discoveryPath = "";
+                        LOG.info("Could not find page request in session. Probably a bug");
+                    }
+                }
+            }
 
             OpenTracingWrapper otw = new OpenTracingWrapper("RecorderFilter").setParentSpan(OpenTracingSpans
                     .get(executionId));

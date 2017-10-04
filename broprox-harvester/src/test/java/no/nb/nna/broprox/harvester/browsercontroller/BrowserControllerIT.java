@@ -65,6 +65,9 @@ public class BrowserControllerIT {
         BrowserSessionRegistry sessionRegistry = new BrowserSessionRegistry();
 
         ContentWriterClient contentWriterClient = mock(ContentWriterClient.class);
+        ContentWriterClient.ContentWriterSession contentWriterSession = mock(ContentWriterClient.ContentWriterSession.class);
+        when(contentWriterClient.createSession()).thenReturn(contentWriterSession);
+
         DbAdapter db = getDbMock();
 
         MessagesProto.QueuedUri queuedUri = MessagesProto.QueuedUri.newBuilder()

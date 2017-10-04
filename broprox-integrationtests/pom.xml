@@ -307,7 +307,7 @@
                                                     <alias>contentexplorer</alias>
                                                 </network>
                                                 <ports>
-                                                    <port>+contentexplorer.host:contentexplorer.port:8080</port>
+                                                    <port>+contentexplorer.host:contentexplorer.port:8081</port>
                                                 </ports>
                                                 <dependsOn>
                                                     <container>db-initializer</container>
@@ -331,7 +331,7 @@
                                                     <tcp>
                                                         <mode>mapped</mode>
                                                         <ports>
-                                                            <port>8080</port>
+                                                            <port>8081</port>
                                                         </ports>
                                                     </tcp>
                                                     <time>20000</time>

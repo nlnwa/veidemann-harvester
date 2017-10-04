@@ -171,4 +171,13 @@ public class StatusWrapper {
         return status.build();
     }
 
+    public StatusWrapper setCurrentUri(String uri) {
+        status.setCurrentUri(uri);
+        return this;
+    }
+
+    public StatusWrapper clearCurrentUri() {
+        status.clearCurrentUri();
+        return this;
+    }
 }

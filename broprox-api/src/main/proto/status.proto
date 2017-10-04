@@ -40,4 +40,5 @@ message StatusDetail {
     int64 documents_retried = 12;
     int64 documents_denied = 13;
     int64 queue_size = 14;
+    string current_uri = 20;
 }

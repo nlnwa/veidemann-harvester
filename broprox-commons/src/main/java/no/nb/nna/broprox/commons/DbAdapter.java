@@ -67,6 +67,15 @@ public interface DbAdapter extends AutoCloseable {
 
     CrawlExecutionStatus getExecutionStatus(String executionId);
 
+    /**
+     * Update the state for a Crawl Execution to ABORTED_MANUAL.
+     *
+     * The frontier should detect this and abort the crawl.
+     *
+     * @param executionId id of the execution to update
+     */
+    void setExecutionStateAborted(String executionId);
+
     QueuedUri saveQueuedUri(QueuedUri qu);
 
     void deleteQueuedUri(QueuedUri qu);

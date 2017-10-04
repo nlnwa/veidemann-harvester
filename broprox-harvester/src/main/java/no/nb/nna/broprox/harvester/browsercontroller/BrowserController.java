@@ -73,7 +73,8 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
         OpenTracingWrapper otw = new OpenTracingWrapper("BrowserController", Tags.SPAN_KIND_CLIENT)
                 .setParentSpan(OpenTracingSpans.get(queuedUri.getExecutionId()));
 
-        try (BrowserSession session = new BrowserSession(chrome, config, queuedUri.getExecutionId())) {
+        BrowserSession session = new BrowserSession(chrome, config, queuedUri.getExecutionId());
+        try {
             sessionRegistry.put(session);
 
             session.setBreakpoints();
@@ -107,6 +108,8 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
 
                 session.scrollToTop();
             }
+        } finally {
+            session.close();
             sessionRegistry.remove(session);
         }
 

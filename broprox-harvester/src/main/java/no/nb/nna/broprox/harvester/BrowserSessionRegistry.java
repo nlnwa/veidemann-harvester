@@ -21,30 +21,34 @@ import java.util.Objects;
 
 import no.nb.nna.broprox.commons.BroproxHeaderConstants;
 import no.nb.nna.broprox.harvester.browsercontroller.BrowserSession;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Registry which allows both BrowserController and Proxy to access information about a request.
  */
 public class BrowserSessionRegistry implements BroproxHeaderConstants {
+    private static final Logger LOG = LoggerFactory.getLogger(BrowserSessionRegistry.class);
 
     Map<String, BrowserSession> executionIdToSession = new HashMap<>();
 
-    public void put(BrowserSession session) {
+    public synchronized void put(BrowserSession session) {
         executionIdToSession.put(session.getExecutionId(), session);
+        LOG.debug("Currently open sessions: {}", executionIdToSession.size());
     }
 
-    public BrowserSession get(String executionId) {
+    public synchronized BrowserSession get(String executionId) {
         if (MANUAL_EXID.equals(executionId)) {
             return null;
         }
         return executionIdToSession.get(executionId);
     }
 
-    public BrowserSession remove(String executionId) {
+    public synchronized BrowserSession remove(String executionId) {
         return executionIdToSession.remove(executionId);
     }
 
-    public BrowserSession remove(BrowserSession session) {
+    public synchronized BrowserSession remove(BrowserSession session) {
         Objects.requireNonNull(session);
         return executionIdToSession.remove(session.getExecutionId());
     }

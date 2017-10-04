@@ -139,7 +139,7 @@ public class Session {
             constructor.addStatement("$N = new $T($N)", field, field.type, sessionClient);
         }
 
-        constructor.addCode("\n").addStatement("$N.info($S, $N)", logger, "Browser session created: {}", contextId);
+        constructor.addCode("\n").addStatement("$N.debug($S, $N)", logger, "Browser session created: {}", contextId);
 
         classBuilder.addMethod(constructor.build());
     }
@@ -148,7 +148,7 @@ public class Session {
         classBuilder.addMethod(MethodSpec.methodBuilder("close")
                 .addModifiers(Modifier.PUBLIC)
                 .addAnnotation(Override.class)
-                .addStatement("$N.info($S, $N)", logger, "Browser session closing: {}", contextId)
+                .addStatement("$N.debug($S, $N)", logger, "Browser session closing: {}", contextId)
                 .beginControlFlow("try")
                 .addStatement("$N.close()", sessionClient)
                 .beginControlFlow("if ($N != null)", targetId)

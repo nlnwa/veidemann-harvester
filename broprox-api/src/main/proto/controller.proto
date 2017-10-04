@@ -57,6 +57,7 @@ service Controller {
     rpc SaveLogConfig (LogLevels) returns (LogLevels) {}
 
     rpc RunCrawl (RunCrawlRequest) returns (RunCrawlReply) {}
+    rpc AbortCrawl (AbortCrawlRequest) returns (google.protobuf.Empty) {}
 }
 
 // Specification of wich entities to get.
@@ -181,4 +182,8 @@ message RunCrawlRequest {
 
 message RunCrawlReply {
     repeated string seed_execution_id = 1;
+}
+
+message AbortCrawlRequest {
+    string execution_id = 1;
 }

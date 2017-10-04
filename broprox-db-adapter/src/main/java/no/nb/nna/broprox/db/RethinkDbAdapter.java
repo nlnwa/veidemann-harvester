@@ -64,6 +64,7 @@ import no.nb.nna.broprox.model.ConfigProto.PolitenessConfig;
 import no.nb.nna.broprox.model.ConfigProto.Seed;
 import no.nb.nna.broprox.model.ConfigProto.Selector;
 import no.nb.nna.broprox.model.MessagesProto.CrawlExecutionStatus;
+import no.nb.nna.broprox.model.MessagesProto.CrawlExecutionStatus.State;
 import no.nb.nna.broprox.model.MessagesProto.CrawlHostGroup;
 import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
 import no.nb.nna.broprox.model.MessagesProto.CrawledContent;
@@ -299,7 +300,19 @@ public class RethinkDbAdapter implements DbAdapter {
 
     @Override
     public CrawlExecutionStatus saveExecutionStatus(CrawlExecutionStatus status) {
-        return saveMessage(status, TABLES.EXECUTIONS);
+        Map rMap = ProtoUtils.protoToRethink(status);
+        return otw.map("db-save" + CrawlExecutionStatus.class.getSimpleName(),
+                this::executeInsert,
+                r.table(TABLES.EXECUTIONS.name)
+                        .insert(rMap)
+                        .optArg("conflict", (id, oldDoc, newDoc) -> r.branch(
+                        oldDoc.hasFields("endTime"),
+                        newDoc.merge(
+                                r.hashMap("state", oldDoc.g("state")).with("endTime", oldDoc.g("endTime"))
+                        ),
+                        newDoc
+                )),
+                CrawlExecutionStatus.class);
     }
 
     @Override
@@ -309,6 +322,19 @@ public class RethinkDbAdapter implements DbAdapter {
                         .get(executionId));
 
         return ProtoUtils.rethinkToProto(response, CrawlExecutionStatus.class);
+    }
+
+    @Override
+    public void setExecutionStateAborted(String executionId) {
+        otw.map("db-save" + CrawlExecutionStatus.class.getSimpleName(),
+                this::executeRequest,
+                r.table(TABLES.EXECUTIONS.name).get(executionId)
+                        .update(
+                                doc -> r.branch(
+                                        doc.hasFields("endTime"),
+                                        r.hashMap(),
+                                        r.hashMap("state", State.ABORTED_MANUAL.name()).with("endTime", r.now()))
+                        ));
     }
 
     @Override
@@ -329,7 +355,7 @@ public class RethinkDbAdapter implements DbAdapter {
         return otw.map("db-queuedUriCount",
                 this::executeRequest, r.table(TABLES.URI_QUEUE.name)
                         .getAll(executionId).optArg("index", "executionId")
-                        .delete().pluck("deleted"));
+                        .delete().g("deleted"));
     }
 
     @Override

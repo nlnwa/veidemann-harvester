@@ -71,7 +71,7 @@ public class FrontierService {
                         SETTINGS.getDnsResolverHost(), SETTINGS.getDnsResolverPort());
 
                 Frontier frontier = new Frontier((RethinkDbAdapter) db, harvesterClient, robotsServiceClient, dnsServiceClient);
-                FrontierApiServer apiServer = new FrontierApiServer(SETTINGS.getApiPort(), db, frontier).start();) {
+                FrontierApiServer apiServer = new FrontierApiServer(SETTINGS.getApiPort(), frontier).start();) {
 
             LOG.info("Broprox Frontier (v. {}) started",
                     FrontierService.class.getPackage().getImplementationVersion());

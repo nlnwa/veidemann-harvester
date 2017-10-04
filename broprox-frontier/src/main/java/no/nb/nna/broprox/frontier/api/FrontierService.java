@@ -21,7 +21,6 @@ import io.opentracing.tag.Tags;
 import no.nb.nna.broprox.api.FrontierGrpc;
 import no.nb.nna.broprox.api.FrontierProto.CrawlSeedRequest;
 import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
-import no.nb.nna.broprox.commons.DbAdapter;
 import no.nb.nna.broprox.frontier.worker.Frontier;
 import no.nb.nna.broprox.model.MessagesProto.CrawlExecutionStatus;
 import org.slf4j.Logger;
@@ -34,12 +33,9 @@ public class FrontierService extends FrontierGrpc.FrontierImplBase {
 
     private static final Logger LOG = LoggerFactory.getLogger(FrontierService.class);
 
-    private final DbAdapter db;
-
     private final Frontier frontier;
 
-    public FrontierService(DbAdapter db, Frontier frontier) {
-        this.db = db;
+    public FrontierService(Frontier frontier) {
         this.frontier = frontier;
     }
 

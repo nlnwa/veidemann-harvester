@@ -37,7 +37,7 @@ import javax.lang.model.element.Modifier;
 import static no.nb.nna.broprox.chrome.client.codegen.Protocol.uncap;
 
 /**
- *
+ * Generates the ChromeDebugProtocol class.
  */
 public class EntryPoint {
     static final ClassName type = ClassName.get(Codegen.PACKAGE, "ChromeDebugProtocol");
@@ -46,6 +46,8 @@ public class EntryPoint {
             .build();
 
     final TypeName sessionListType = ParameterizedTypeName.get(ClassName.get(List.class), Session.type);
+
+    final TypeName contextIdListType = ParameterizedTypeName.get(ClassName.get(List.class), ClassName.get(String.class));
 
     final FieldSpec sessions = FieldSpec
             .builder(sessionListType, "sessions", Modifier.PRIVATE, Modifier.FINAL)
@@ -92,6 +94,7 @@ public class EntryPoint {
         e.genCloseMethod();
         e.genOnSessionClosedMethod();
         e.genToStringAndVersionMethods();
+        e.genGetOpenContextsMethod();
 
         JavaFile javaFile = JavaFile.builder(Codegen.PACKAGE, e.classBuilder.build()).build();
         if (outdir == null) {
@@ -146,7 +149,7 @@ public class EntryPoint {
     void genOnSessionClosedMethod() {
         ParameterSpec session = ParameterSpec.builder(Session.type, "session", Modifier.FINAL).build();
         classBuilder.addMethod(MethodSpec.methodBuilder("onSessionClosed")
-                .addModifiers(Modifier.PUBLIC, Modifier.SYNCHRONIZED)
+                .addModifiers(Modifier.SYNCHRONIZED)
                 .addParameter(session)
                 .addStatement("$N.remove($N)", sessions, session)
                 .build());
@@ -178,6 +181,25 @@ public class EntryPoint {
                 .returns(String.class)
                 .addStatement("return $S + $N()", "Chrome Debug Protocol ", version)
                 .build());
+    }
+
+    void genGetOpenContextsMethod() {
+        MethodSpec getOpenContexts = MethodSpec.methodBuilder("getOpenContexts")
+                .addModifiers(Modifier.PUBLIC, Modifier.SYNCHRONIZED)
+                .addException(IOException.class)
+                .returns(contextIdListType)
+                .addJavadoc("Get a list of context ids opened by this client.\n\n"
+                        + "@return List of context ids\n")
+                .beginControlFlow("if ($N.get())", closed)
+                .addStatement("throw new $T($S)", IOException.class, "Client is closed")
+                .endControlFlow()
+                .addStatement("$T contextIds = new $T<>()", contextIdListType, ArrayList.class)
+                .beginControlFlow("for ($T s : $N)", Session.type, sessions)
+                .addStatement("contextIds.add(s.contextId)")
+                .endControlFlow()
+                .addStatement("return contextIds")
+                .build();
+        classBuilder.addMethod(getOpenContexts);
     }
 
     public static CodeBlock createUrl(String protocol, FieldSpec host, FieldSpec port, String path) {

@@ -17,7 +17,9 @@ package no.nb.nna.broprox.db;
 
 import com.google.protobuf.ByteString;
 import com.rethinkdb.RethinkDB;
+import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import org.junit.AfterClass;
@@ -64,6 +66,8 @@ public class RethinkDbAlreadyCrawledCacheIT {
         String uri = "http://www.example.com";
         String executionId1 = "123";
         String executionId2 = "456";
+        HttpHeaders headers1 = new DefaultHttpHeaders().add("foo1", "bar1");
+        HttpHeaders headers2 = new DefaultHttpHeaders().add("foo2", "bar2");
         ByteString cacheValue1 = ByteString.copyFromUtf8("data1");
         ByteString cacheValue2 = ByteString.copyFromUtf8("data2");
 
@@ -71,13 +75,14 @@ public class RethinkDbAlreadyCrawledCacheIT {
         result = db.get(uri, executionId1);
         assertThat(result).isNull();
 
-        db.put(httpVersion, status, uri, executionId1, cacheValue1);
-        db.put(httpVersion, status, uri, executionId2, cacheValue2);
+        db.put(httpVersion, status, uri, executionId1, headers1, cacheValue1);
+        db.put(httpVersion, status, uri, executionId2, headers2, cacheValue2);
 
         result = db.get(uri, executionId1);
         assertThat(result).isNotNull();
         assertThat(result.status().equals(status));
         assertThat(result.protocolVersion().equals(httpVersion));
+        assertThat(result.headers().equals(headers1));
         assertThat(result.content().nioBuffer()).isEqualTo(cacheValue1.asReadOnlyByteBuffer());
 
         db.cleanExecution(executionId1);
@@ -89,6 +94,7 @@ public class RethinkDbAlreadyCrawledCacheIT {
         assertThat(result).isNotNull();
         assertThat(result.status().equals(status));
         assertThat(result.protocolVersion().equals(httpVersion));
+        assertThat(result.headers().equals(headers2));
         assertThat(result.content().nioBuffer()).isEqualTo(cacheValue2.asReadOnlyByteBuffer());
     }
 

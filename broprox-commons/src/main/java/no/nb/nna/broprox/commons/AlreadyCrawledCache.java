@@ -17,6 +17,7 @@ package no.nb.nna.broprox.commons;
 
 import com.google.protobuf.ByteString;
 import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 
@@ -29,7 +30,8 @@ public interface AlreadyCrawledCache extends AutoCloseable {
 
     FullHttpResponse get(String uri, String executionId);
 
-    void put(HttpVersion httpVersion, HttpResponseStatus status, String uri, String executionId, ByteString cacheValue);
+    void put(HttpVersion httpVersion, HttpResponseStatus status, String uri, String executionId, HttpHeaders headers,
+            ByteString cacheValue);
 
     @Override
     public void close();

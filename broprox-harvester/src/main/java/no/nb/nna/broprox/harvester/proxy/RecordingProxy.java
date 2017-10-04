@@ -96,6 +96,8 @@ public class RecordingProxy implements AutoCloseable {
                 .withTransparent(true)
                 .withServerResolver(hostResolver)
                 .withManInTheMiddle(mitmManager)
+                .withMaxChunkSize(1024 * 1025)
+                .withMaxHeaderSize(1024 * 32)
                 .withFiltersSource(new RecorderFilterSourceAdapter(db, contentWriterClient, sessionRegistry, cache))
                 .start();
     }

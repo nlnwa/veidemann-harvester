@@ -21,9 +21,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
-import io.opentracing.References;
+import io.opentracing.ActiveSpan;
+import io.opentracing.tag.Tags;
+import io.opentracing.util.GlobalTracer;
 import no.nb.nna.broprox.commons.FutureOptional;
-import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
 import no.nb.nna.broprox.model.MessagesProto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -107,10 +108,7 @@ public class QueueWorker extends ThreadPoolExecutor {
                     LOG.trace("Waiting for next execution to be ready");
                     CrawlExecution exe = getNextToFetch();
 
-                    new OpenTracingWrapper("QueueWorker")
-                            .setParentSpan(exe.getParentSpan())
-                            .setParentReferenceType(References.FOLLOWS_FROM)
-                            .run("runNextFetch", this::processExecution, exe);
+                    processExecution(exe);
                 } catch (InterruptedException ex) {
                     throw new RuntimeException(ex);
                 } catch (Throwable t) {

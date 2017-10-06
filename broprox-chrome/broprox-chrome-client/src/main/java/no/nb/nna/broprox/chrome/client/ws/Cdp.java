@@ -16,7 +16,6 @@
 package no.nb.nna.broprox.chrome.client.ws;
 
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -28,6 +27,10 @@ import java.util.function.Consumer;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
+import io.opentracing.ActiveSpan;
+import io.opentracing.NoopActiveSpanSource;
+import io.opentracing.Tracer;
+import io.opentracing.tag.Tags;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,32 +53,50 @@ public class Cdp implements WebSocketCallback {
 
     final WebsocketClient websocketClient;
 
-    public Cdp(String uri) {
-        this(URI.create(uri));
+    final Tracer tracer;
+
+    final boolean withActiveSpanOnly;
+
+    public Cdp(String uri, Tracer tracer, boolean withActiveSpanOnly) {
+        this(URI.create(uri), tracer, withActiveSpanOnly);
     }
 
-    public Cdp(URI uri) {
+    public Cdp(URI uri, Tracer tracer, boolean withActiveSpanOnly) {
         this.websocketClient = new WebsocketClient(this, uri);
+        this.tracer = tracer;
+        this.withActiveSpanOnly = withActiveSpanOnly;
     }
 
     public CompletableFuture<JsonElement> call(String method, Map<String, Object> params) {
+        try (ActiveSpan span = buildSpan(method)) {
 
-        CdpRequest request = new CdpRequest(idSeq.getAndIncrement(), method, params);
-        CompletableFuture<JsonElement> future = new CompletableFuture<>();
-        methodFutures.put(request.id, future);
+            final ActiveSpan.Continuation cont = span.capture();
+            CdpRequest request = new CdpRequest(idSeq.getAndIncrement(), method, params);
+            CompletableFuture<JsonElement> future = new CompletableFuture<JsonElement>().whenComplete((json, error) -> {
+                try (ActiveSpan activeSpan = cont.activate()) {
+                    if (error != null) {
+                        activeSpan.log(error.toString());
+                    }
+                }
+            });
 
-        String msg = gson.toJson(request);
-        if (LOG.isDebugEnabled()) {
-            if (LOG.isTraceEnabled()) {
-                LOG.trace("Sent: {}", msg);
-            } else {
-                LOG.debug("Sent: id={}, method={}", request.id, request.method);
+            methodFutures.put(request.id, future);
+
+            String msg = gson.toJson(request);
+
+            span.setTag("request", msg);
+
+            if (LOG.isDebugEnabled()) {
+                if (LOG.isTraceEnabled()) {
+                    LOG.trace("Sent: {}", msg);
+                } else {
+                    LOG.debug("Sent: id={}, method={}", request.id, request.method);
+                }
             }
+
+            websocketClient.sendMessage(msg);
+            return future;
         }
-
-        websocketClient.sendMessage(msg);
-
-        return future;
     }
 
     public <T> CompletableFuture<T> call(String method, Map<String, Object> params, Class<T> resultType) {
@@ -155,6 +176,19 @@ public class Cdp implements WebSocketCallback {
         for (Consumer<JsonElement> listener : eventListeners.getOrDefault(method, Collections.emptyList())) {
             listener.accept(event);
         }
+    }
+
+    ActiveSpan buildSpan(String operationName) {
+        if (tracer == null || (withActiveSpanOnly && tracer.activeSpan() == null)) {
+            return NoopActiveSpanSource.NoopActiveSpan.INSTANCE;
+        }
+
+        Tracer.SpanBuilder spanBuilder = tracer.buildSpan(operationName)
+                .withTag(Tags.SPAN_KIND.getKey(), Tags.SPAN_KIND_CLIENT)
+                .withTag(Tags.COMPONENT.getKey(), "java-ChromeDebugProtocolClient");
+
+        ActiveSpan span = spanBuilder.startActive();
+        return span;
     }
 
     public void close() {

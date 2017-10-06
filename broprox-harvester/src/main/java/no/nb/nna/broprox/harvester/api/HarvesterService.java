@@ -18,12 +18,14 @@ package no.nb.nna.broprox.harvester.api;
 import com.google.protobuf.Empty;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
+import io.opentracing.ActiveSpan;
 import io.opentracing.contrib.OpenTracingContextKey;
+import io.opentracing.tag.Tags;
+import io.opentracing.util.GlobalTracer;
 import no.nb.nna.broprox.api.HarvesterGrpc;
 import no.nb.nna.broprox.api.HarvesterProto.CleanupExecutionRequest;
 import no.nb.nna.broprox.api.HarvesterProto.HarvestPageReply;
 import no.nb.nna.broprox.api.HarvesterProto.HarvestPageRequest;
-import no.nb.nna.broprox.harvester.OpenTracingSpans;
 import no.nb.nna.broprox.harvester.browsercontroller.BrowserController;
 import no.nb.nna.broprox.harvester.proxy.RecordingProxy;
 import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
@@ -34,6 +36,7 @@ import org.slf4j.LoggerFactory;
  *
  */
 public class HarvesterService extends HarvesterGrpc.HarvesterImplBase {
+
     private static final Logger LOG = LoggerFactory.getLogger(HarvesterService.class);
 
     private final BrowserController controller;
@@ -49,8 +52,6 @@ public class HarvesterService extends HarvesterGrpc.HarvesterImplBase {
     public void harvestPage(HarvestPageRequest request, StreamObserver<HarvestPageReply> respObserver) {
         QueuedUri fetchUri = request.getQueuedUri();
         try {
-            OpenTracingSpans.register(fetchUri.getExecutionId(), OpenTracingContextKey.activeSpan());
-
             HarvestPageReply reply = controller.render(fetchUri, request.getCrawlConfig());
 
             respObserver.onNext(reply);
@@ -59,8 +60,6 @@ public class HarvesterService extends HarvesterGrpc.HarvesterImplBase {
             LOG.error(ex.getMessage(), ex);
             Status status = Status.UNKNOWN.withDescription(ex.toString());
             respObserver.onError(status.asException());
-        } finally {
-            OpenTracingSpans.remove(fetchUri.getExecutionId());
         }
     }
 

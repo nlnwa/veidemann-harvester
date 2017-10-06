@@ -20,13 +20,12 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
-import io.opentracing.Span;
+import io.opentracing.ActiveSpan;
 import io.opentracing.tag.Tags;
+import io.opentracing.util.GlobalTracer;
 import no.nb.nna.broprox.api.ControllerProto;
 import no.nb.nna.broprox.api.HarvesterProto.HarvestPageReply;
 import no.nb.nna.broprox.commons.ExtraStatusCodes;
-import no.nb.nna.broprox.commons.opentracing.OpenTracingParentContextKey;
-import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
 import no.nb.nna.broprox.model.ConfigProto.CrawlConfig;
 import no.nb.nna.broprox.model.ConfigProto.CrawlJob;
 import no.nb.nna.broprox.model.ConfigProto.CrawlLimitsConfig;
@@ -63,8 +62,6 @@ public class CrawlExecution implements Runnable {
 
     private final AtomicLong nextSeqNum = new AtomicLong(1L);
 
-    private final Span parentSpan;
-
     public CrawlExecution(QueuedUri qUri, CrawlHostGroup crawlHostGroup, Frontier frontier) {
         this.status = StatusWrapper.getStatusWrapper(frontier.getDb(), qUri.getExecutionId());
         this.status.setCurrentUri(qUri.getUri());
@@ -83,7 +80,6 @@ public class CrawlExecution implements Runnable {
         this.crawlHostGroup = crawlHostGroup;
         this.frontier = frontier;
         this.config = job.getCrawlConfig();
-        this.parentSpan = OpenTracingParentContextKey.parentSpan();
         this.limits = job.getLimits();
     }
 
@@ -97,6 +93,10 @@ public class CrawlExecution implements Runnable {
 
     public CrawlHostGroup getCrawlHostGroup() {
         return crawlHostGroup;
+    }
+
+    public QueuedUriWrapper getqUri() {
+        return qUri;
     }
 
     public void fetch() {
@@ -203,51 +203,58 @@ public class CrawlExecution implements Runnable {
 
     @Override
     public void run() {
-        try {
-            status.setState(CrawlExecutionStatus.State.FETCHING)
-                    .setStartTimeIfUnset()
-                    .saveStatus(frontier.getDb());
-            frontier.getDb().deleteQueuedUri(qUri.getQueuedUri());
+        try (ActiveSpan span = GlobalTracer.get()
+                .buildSpan("runNextFetch")
+                .withTag(Tags.COMPONENT.getKey(), "CrawlExecution")
+                .withTag("uri", qUri.getUri())
+                .withTag("executionId", getId())
+                .ignoreActiveSpan()
+                .startActive()) {
 
-            if (isManualAbort() || LimitsCheck.isLimitReached(frontier, limits, status, qUri)) {
-                delayMs = 0L;
-            } else {
-                new OpenTracingWrapper("CrawlExecution")
-                        .addTag(Tags.HTTP_URL.getKey(), qUri.getUri())
-                        .run("Fetch", this::fetch);
+            try {
+                status.setState(CrawlExecutionStatus.State.FETCHING)
+                        .setStartTimeIfUnset()
+                        .saveStatus(frontier.getDb());
+                frontier.getDb().deleteQueuedUri(qUri.getQueuedUri());
+
+                if (isManualAbort() || LimitsCheck.isLimitReached(frontier, limits, status, qUri)) {
+                    delayMs = 0L;
+                } else {
+                    fetch();
+                }
+            } catch (Throwable t) {
+                // Errors should be handled elsewhere. Exception here indicates a bug.
+                LOG.error(t.toString(), t);
             }
-        } catch (Throwable t) {
-            // Errors should be handled elsewhere. Exception here indicates a bug.
-            LOG.error(t.toString(), t);
-        }
 
-        try {
-            if (qUri.hasError() && qUri.getDiscoveryPath().isEmpty()) {
-                // Seed failed; mark crawl as failed
-                endCrawl(CrawlExecutionStatus.State.FAILED);
-            } else if (frontier.getDb().queuedUriCount(getId()) == 0) {
-                endCrawl(CrawlExecutionStatus.State.FINISHED);
-            } else if (status.getState() == CrawlExecutionStatus.State.FETCHING) {
-                status.setState(CrawlExecutionStatus.State.SLEEPING);
-            }
-            status.saveStatus(frontier.getDb());
-
-            // Recheck if user aborted crawl while fetching last uri.
-            if (isManualAbort()) {
-                // Save updated status
+            try {
+                if (qUri.hasError() && qUri.getDiscoveryPath().isEmpty()) {
+                    // Seed failed; mark crawl as failed
+                    endCrawl(CrawlExecutionStatus.State.FAILED);
+                } else if (frontier.getDb().queuedUriCount(getId()) == 0) {
+                    endCrawl(CrawlExecutionStatus.State.FINISHED);
+                } else if (status.getState() == CrawlExecutionStatus.State.FETCHING) {
+                    status.setState(CrawlExecutionStatus.State.SLEEPING);
+                }
                 status.saveStatus(frontier.getDb());
-                delayMs = 0L;
-            }
-        } catch (Throwable t) {
-            // An error here indicates problems with DB communication. No idea how to handle that yet.
-            LOG.error("Error updating status after fetch: {}", t.toString(), t);
-        }
 
-        try {
-            frontier.getDb().releaseCrawlHostGroup(getCrawlHostGroup(), getDelay(TimeUnit.MILLISECONDS));
-        } catch (Throwable t) {
-            // An error here indicates problems with DB communication. No idea how to handle that yet.
-            LOG.error("Error releasing CrawlHostGroup: {}", t.toString(), t);
+                // Recheck if user aborted crawl while fetching last uri.
+                if (isManualAbort()) {
+                    // Save updated status
+                    status.saveStatus(frontier.getDb());
+                    delayMs = 0L;
+                }
+            } catch (Throwable t) {
+                // An error here indicates problems with DB communication. No idea how to handle that yet.
+                LOG.error("Error updating status after fetch: {}", t.toString(), t);
+            }
+
+            try {
+                frontier.getDb().releaseCrawlHostGroup(getCrawlHostGroup(), getDelay(TimeUnit.MILLISECONDS));
+            } catch (Throwable t) {
+                // An error here indicates problems with DB communication. No idea how to handle that yet.
+                LOG.error("Error releasing CrawlHostGroup: {}", t.toString(), t);
+            }
         }
     }
 
@@ -256,7 +263,11 @@ public class CrawlExecution implements Runnable {
             status.setEndState(state)
                     .clearCurrentUri();
         }
-        frontier.getHarvesterClient().cleanupExecution(getId());
+        try {
+            frontier.getHarvesterClient().cleanupExecution(getId());
+        } catch (Throwable t) {
+            LOG.error("Error cleaning up after execution. Harvester is probably dead: {}", t.toString(), t);
+        }
     }
 
     private boolean isManualAbort() {
@@ -267,10 +278,6 @@ public class CrawlExecution implements Runnable {
             return true;
         }
         return false;
-    }
-
-    public Span getParentSpan() {
-        return parentSpan;
     }
 
 }

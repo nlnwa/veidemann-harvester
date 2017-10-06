@@ -98,12 +98,12 @@ public class ProxyMockIT implements BroproxHeaderConstants {
     @After
     public void cleanup() {
         contentWriterClient.delete(Empty.getDefaultInstance());
-        db.executeRequest(r.table(RethinkDbAdapter.TABLES.CRAWLED_CONTENT.name).delete());
-        db.executeRequest(r.table(RethinkDbAdapter.TABLES.CRAWL_LOG.name).delete());
-        db.executeRequest(r.table(RethinkDbAdapter.TABLES.EXECUTIONS.name).delete());
-        db.executeRequest(r.table(RethinkDbAdapter.TABLES.EXTRACTED_TEXT.name).delete());
-        db.executeRequest(r.table(RethinkDbAdapter.TABLES.SCREENSHOT.name).delete());
-        db.executeRequest(r.table(RethinkDbAdapter.TABLES.URI_QUEUE.name).delete());
+        db.executeRequest("delete", r.table(RethinkDbAdapter.TABLES.CRAWLED_CONTENT.name).delete());
+        db.executeRequest("delete", r.table(RethinkDbAdapter.TABLES.CRAWL_LOG.name).delete());
+        db.executeRequest("delete", r.table(RethinkDbAdapter.TABLES.EXECUTIONS.name).delete());
+        db.executeRequest("delete", r.table(RethinkDbAdapter.TABLES.EXTRACTED_TEXT.name).delete());
+        db.executeRequest("delete", r.table(RethinkDbAdapter.TABLES.SCREENSHOT.name).delete());
+        db.executeRequest("delete", r.table(RethinkDbAdapter.TABLES.URI_QUEUE.name).delete());
     }
 
     @Test
@@ -133,12 +133,12 @@ public class ProxyMockIT implements BroproxHeaderConstants {
         assertThat(WarcInspector.getWarcFiles().getRecordCount()).isEqualTo(15);
         WarcInspector.getWarcFiles().getTargetUris();
 
-        Cursor c = db.executeRequest(r.table(RethinkDbAdapter.TABLES.CRAWL_LOG.name));
+        Cursor c = db.executeRequest("list", r.table(RethinkDbAdapter.TABLES.CRAWL_LOG.name));
 //        c.toList().stream().forEach(r -> System.out.println("CC:: " + r));
         assertThat(c.toList().size()).isEqualTo(15);
 
         executeJob(request).get();
-        c = db.executeRequest(r.table(RethinkDbAdapter.TABLES.CRAWL_LOG.name));
+        c = db.executeRequest("list", r.table(RethinkDbAdapter.TABLES.CRAWL_LOG.name));
 //        c.toList().stream().forEach(r -> System.out.println("CC:: " + r));
         assertThat(c.toList().size()).isEqualTo(27);
     }
@@ -179,7 +179,7 @@ public class ProxyMockIT implements BroproxHeaderConstants {
         @Override
         protected boolean exec() {
             try {
-                Cursor<Map<String, Object>> cursor = db.executeRequest(r.table(RethinkDbAdapter.TABLES.EXECUTIONS.name)
+                Cursor<Map<String, Object>> cursor = db.executeRequest("list", r.table(RethinkDbAdapter.TABLES.EXECUTIONS.name)
                         .getAll(eIds.toArray())
                         .changes());
 

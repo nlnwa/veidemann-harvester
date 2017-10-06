@@ -112,8 +112,6 @@ spec:
           value: "veidemann-dnsresolver"
         - name: DNS_RESOLVER_PORT
           value: "50052"
-        - name: TRACER_URI
-          value: "http://zipkin.zipkin:9411/api/v1/spans"
         volumeMounts:
         - mountPath: /workdir
           name: workdir
@@ -123,6 +121,19 @@ spec:
         resources:
             requests:
                 memory: "500Mi"
+      - image: jaegertracing/jaeger-agent
+        name: jaeger-agent
+        ports:
+        - containerPort: 5775
+          protocol: UDP
+        - containerPort: 5778
+        - containerPort: 6831
+          protocol: UDP
+        - containerPort: 6832
+          protocol: UDP
+        command:
+        - "/go/bin/agent-linux"
+        - "--collector.host-port=jaeger-collector.tracing:14267"
       restartPolicy: Always
       dnsPolicy: ClusterFirst
       volumes:
@@ -182,8 +193,6 @@ spec:
           value: "rethink.db"
         - name: DB_PORT
           value: "28015"
-        - name: TRACER_URI
-          value: "http://zipkin.zipkin:9411/api/v1/spans"
         volumeMounts:
         - mountPath: /workdir
           name: workdir
@@ -204,8 +213,6 @@ spec:
           value: "rethink.db"
         - name: DB_PORT
           value: "28015"
-        - name: TRACER_URI
-          value: "http://zipkin.zipkin:9411/api/v1/spans"
         volumeMounts:
         - mountPath: /workdir
           name: workdir
@@ -214,6 +221,19 @@ spec:
         - name: log4j-config
           mountPath: /broprox-contentwriter/config/log4j2.xml
           subPath: log4j2.xml
+      - image: jaegertracing/jaeger-agent
+        name: jaeger-agent
+        ports:
+        - containerPort: 5775
+          protocol: UDP
+        - containerPort: 5778
+        - containerPort: 6831
+          protocol: UDP
+        - containerPort: 6832
+          protocol: UDP
+        command:
+        - "/go/bin/agent-linux"
+        - "--collector.host-port=jaeger-collector.tracing:14267"
       restartPolicy: Always
       dnsPolicy: ClusterFirst
       volumes:
@@ -283,14 +303,25 @@ spec:
           value: "veidemann-dnsresolver"
         - name: DNS_RESOLVER_PORT
           value: "50052"
-        - name: TRACER_URI
-          value: "http://zipkin.zipkin:9411/api/v1/spans"
         volumeMounts:
         - mountPath: /workdir
           name: workdir
         - name: log4j-config
           mountPath: /broprox-frontier/config/log4j2.xml
           subPath: log4j2.xml
+      - image: jaegertracing/jaeger-agent
+        name: jaeger-agent
+        ports:
+        - containerPort: 5775
+          protocol: UDP
+        - containerPort: 5778
+        - containerPort: 6831
+          protocol: UDP
+        - containerPort: 6832
+          protocol: UDP
+        command:
+        - "/go/bin/agent-linux"
+        - "--collector.host-port=jaeger-collector.tracing:14267"
       restartPolicy: Always
       dnsPolicy: ClusterFirst
       volumes:
@@ -351,12 +382,23 @@ spec:
           value: "veidemann-frontier"
         - name: FRONTIER_PORT
           value: "7700"
-        - name: TRACER_URI
-          value: "http://zipkin.zipkin:9411/api/v1/spans"
         volumeMounts:
         - name: log4j-config
           mountPath: /broprox-controller/config/log4j2.xml
           subPath: log4j2.xml
+      - image: jaegertracing/jaeger-agent
+        name: jaeger-agent
+        ports:
+        - containerPort: 5775
+          protocol: UDP
+        - containerPort: 5778
+        - containerPort: 6831
+          protocol: UDP
+        - containerPort: 6832
+          protocol: UDP
+        command:
+        - "/go/bin/agent-linux"
+        - "--collector.host-port=jaeger-collector.tracing:14267"
       restartPolicy: Always
       dnsPolicy: ClusterFirst
       volumes:
@@ -414,12 +456,23 @@ spec:
           value: "veidemann-harvester"
         - name: PROXY_PORT
           value: "8080"
-        - name: TRACER_URI
-          value: "http://zipkin.zipkin:9411/api/v1/spans"
         volumeMounts:
         - name: log4j-config
           mountPath: /broprox-robotrules-service/config/log4j2.xml
           subPath: log4j2.xml
+      - image: jaegertracing/jaeger-agent
+        name: jaeger-agent
+        ports:
+        - containerPort: 5775
+          protocol: UDP
+        - containerPort: 5778
+        - containerPort: 6831
+          protocol: UDP
+        - containerPort: 6832
+          protocol: UDP
+        command:
+        - "/go/bin/agent-linux"
+        - "--collector.host-port=jaeger-collector.tracing:14267"
       restartPolicy: Always
       dnsPolicy: ClusterFirst
       volumes:
@@ -479,12 +532,23 @@ spec:
           value: "8080"
         - name: DNS_SERVER
           value: "8.8.8.8"
-        - name: TRACER_URI
-          value: "http://zipkin.zipkin:9411/api/v1/spans"
         volumeMounts:
         - name: log4j-config
           mountPath: /broprox-dns-service/config/log4j2.xml
           subPath: log4j2.xml
+      - image: jaegertracing/jaeger-agent
+        name: jaeger-agent
+        ports:
+        - containerPort: 5775
+          protocol: UDP
+        - containerPort: 5778
+        - containerPort: 6831
+          protocol: UDP
+        - containerPort: 6832
+          protocol: UDP
+        command:
+        - "/go/bin/agent-linux"
+        - "--collector.host-port=jaeger-collector.tracing:14267"
       restartPolicy: Always
       dnsPolicy: ClusterFirst
       volumes:

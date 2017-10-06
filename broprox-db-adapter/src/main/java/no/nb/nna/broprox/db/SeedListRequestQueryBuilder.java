@@ -18,7 +18,6 @@ package no.nb.nna.broprox.db;
 
 import no.nb.nna.broprox.api.ControllerProto.SeedListReply;
 import no.nb.nna.broprox.api.ControllerProto.SeedListRequest;
-import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
 
 import static no.nb.nna.broprox.db.RethinkDbAdapter.r;
 
@@ -55,8 +54,8 @@ public class SeedListRequestQueryBuilder extends ConfigListQueryBuilder<SeedList
         }
     }
 
-    public SeedListReply.Builder executeList(OpenTracingWrapper otw, RethinkDbAdapter db) {
-        return executeList(otw, db, SeedListReply.newBuilder());
+    public SeedListReply.Builder executeList(RethinkDbAdapter db) {
+        return executeList(db, SeedListReply.newBuilder());
     }
 
 }

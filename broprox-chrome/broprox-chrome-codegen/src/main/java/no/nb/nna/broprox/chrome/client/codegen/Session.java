@@ -123,7 +123,13 @@ public class Session {
                 .addCode("\n")
                 .addComment("Chrome is buggy and won't let us connect unless we've refreshed the json endpoint")
                 .addStatement("new $T($L).openStream().close()", URL.class, createUrl("http", host, port, "/json"))
-                .addStatement("$N = new Cdp($L + $N)", sessionClient, createUrl("ws", host, port, "/devtools/page/"), targetId)
+                .addStatement("$1N = new Cdp($2L + $3N, $4N.$5N, $4N.$6N)",
+                        sessionClient,
+                        createUrl("ws", host, port, "/devtools/page/"),
+                        targetId,
+                        entryPoint,
+                        EntryPoint.tracer,
+                        EntryPoint.withActiveSpanOnly)
                 .addCode("\n");
 
         for (Domain domain : domains) {

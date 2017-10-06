@@ -42,7 +42,7 @@ public class ContentExplorer {
         config.checkValid(ConfigFactory.defaultReference());
         SETTINGS = ConfigBeanFactory.create(config, Settings.class);
 
-        TracerFactory.init("ContentWriter", SETTINGS.getTracerUri());
+        TracerFactory.init("ContentWriter");
     }
 
     /**

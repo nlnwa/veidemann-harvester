@@ -25,7 +25,6 @@ import com.google.protobuf.Message;
 import com.rethinkdb.gen.ast.ReqlExpr;
 import com.rethinkdb.gen.ast.ReqlFunction1;
 import com.rethinkdb.net.Cursor;
-import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
 import no.nb.nna.broprox.model.ConfigProto;
 
 import static no.nb.nna.broprox.db.RethinkDbAdapter.r;
@@ -195,24 +194,24 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
         return request;
     }
 
-    public long executeCount(OpenTracingWrapper otw, RethinkDbAdapter db) {
+    public long executeCount(RethinkDbAdapter db) {
         if (id != null) {
-            if (otw.map("db-countConfigObjects", db::executeRequest, listQry) == null) {
+            if (db.executeRequest("db-countConfigObjects", listQry) == null) {
                 return 0L;
             } else {
                 return 1L;
             }
         } else {
-            return otw.map("db-countConfigObjects", db::executeRequest, countQry.count());
+            return db.executeRequest("db-countConfigObjects", countQry.count());
         }
     }
 
-    public <R extends Message.Builder> R executeList(OpenTracingWrapper otw, RethinkDbAdapter db, R resultBuilder) {
+    public <R extends Message.Builder> R executeList(RethinkDbAdapter db, R resultBuilder) {
         if (id == null) {
             listQry = listQry.skip(page * pageSize).limit(pageSize);
         }
 
-        Object res = otw.map("db-listConfigObjects", db::executeRequest, listQry);
+        Object res = db.executeRequest("db-listConfigObjects", listQry);
 
         Descriptors.Descriptor resDescr = resultBuilder.getDescriptorForType();
         Descriptors.FieldDescriptor pageSizeField = resDescr.findFieldByName("page_size");
@@ -224,7 +223,7 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
         if (res instanceof Cursor) {
             if (pageSize > 0) {
                 // Set the count for the total resultset
-                count = executeCount(otw, db);
+                count = executeCount(db);
             }
 
             Cursor<Map<String, Object>> cursor = (Cursor) res;

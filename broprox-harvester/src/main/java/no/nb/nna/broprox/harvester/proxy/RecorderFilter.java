@@ -26,17 +26,20 @@ import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
+import io.opentracing.ActiveSpan;
+import io.opentracing.Span;
+import io.opentracing.Tracer;
+import io.opentracing.tag.Tags;
+import io.opentracing.util.GlobalTracer;
 import no.nb.nna.broprox.commons.AlreadyCrawledCache;
 import no.nb.nna.broprox.commons.BroproxHeaderConstants;
 import no.nb.nna.broprox.commons.DbAdapter;
 import no.nb.nna.broprox.commons.ExtraStatusCodes;
 import no.nb.nna.broprox.commons.client.ContentWriterClient;
-import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
 import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.harvester.BrowserSessionRegistry;
-import no.nb.nna.broprox.harvester.OpenTracingSpans;
 import no.nb.nna.broprox.harvester.browsercontroller.BrowserSession;
-import no.nb.nna.broprox.harvester.browsercontroller.PageRequest;
+import no.nb.nna.broprox.harvester.browsercontroller.UriRequest;
 import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
 import org.littleshoot.proxy.HttpFiltersAdapter;
 import org.littleshoot.proxy.impl.ProxyUtils;
@@ -68,9 +71,17 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
 
     private String executionId;
 
-    private PageRequest pageRequest;
+    private UriRequest uriRequest;
 
     private BrowserSession session;
+
+    private String discoveryPath;
+
+    private String referrer;
+
+    private Span requestSpan;
+
+    private Span responseSpan;
 
     public RecorderFilter(final String uri, final HttpRequest originalRequest, final ChannelHandlerContext ctx,
             final DbAdapter db, final ContentWriterClient contentWriterClient,
@@ -105,53 +116,18 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
 
             LOG.debug("Proxy got request");
 
-            String discoveryPath;
-            String referrer;
+            initDiscoveryPathAndReferrer(request);
 
-            if (uri.endsWith("robots.txt")) {
-                referrer = "";
-                discoveryPath = "P";
-            } else if (executionId != MANUAL_EXID) {
-                referrer = request.headers().get("Referer", "");
-                discoveryPath = "";
-            } else {
-                session = sessionRegistry.get(executionId);
-
-                if (session == null) {
-                    LOG.error("Could not find session. Probably a bug");
-                    referrer = request.headers().get("Referer", "");
-                    discoveryPath = "";
-                } else {
-                    referrer = session.getReferrer();
-                    try {
-                        pageRequest = session.getPageRequests().getByUrl(uri)
-                                .get(session.getProtocolTimeout(), TimeUnit.MILLISECONDS);
-                    } catch (InterruptedException | ExecutionException | TimeoutException ex) {
-                        LOG.error("Failed getting page request from session: {}", ex.toString(), ex);
-                    } catch (Throwable ex) {
-                        LOG.error(ex.toString(), ex);
-                    }
-
-                    if (pageRequest != null) {
-                        discoveryPath = pageRequest.getDiscoveryPath();
-                    } else {
-                        discoveryPath = "";
-                        LOG.info("Could not find page request in session. Probably a bug");
-                    }
-                }
-            }
-
-            OpenTracingWrapper otw = new OpenTracingWrapper("RecorderFilter").setParentSpan(OpenTracingSpans
-                    .get(executionId));
-
-            return otw.map("clientToProxyRequest", req -> {
+            requestSpan = buildSpan("clientToProxyRequest", uriRequest);
+            try (ActiveSpan span = GlobalTracer.get().makeActive(requestSpan)) {
 
                 if (discoveryPath.endsWith("E")) {
                     FullHttpResponse cachedResponse = cache.get(uri, executionId);
                     if (cachedResponse != null) {
                         LOG.debug("Found in cache");
-                        if (pageRequest != null) {
-                            pageRequest.setFromCache(true);
+                        requestSpan.log("Loaded from cache");
+                        if (uriRequest != null) {
+                            uriRequest.setFromCache(true);
                         }
                         return cachedResponse;
                     } else {
@@ -160,69 +136,74 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
                 }
 
                 // Fix headers before sending to final destination
-                req.headers().set("Accept-Encoding", "identity");
-                req.headers().remove(EXECUTION_ID);
+                request.headers().set("Accept-Encoding", "identity");
+                request.headers().remove(EXECUTION_ID);
 
                 crawlLog.setFetchTimeStamp(ProtoUtils.getNowTs())
-                        .setReferrer(req.headers().get("referer", referrer))
+                        .setReferrer(request.headers().get("referer", referrer))
                         .setDiscoveryPath(discoveryPath)
                         .setExecutionId(executionId);
 
                 // Store request
-                requestCollector.setRequestHeaders(req);
+                requestCollector.setRequestHeaders(request);
                 requestCollector.writeRequest(crawlLog.build());
 
                 LOG.debug("Proxy is sending request to final destination.");
-                return null;
-            }, request);
+            }
+            return null;
         }
-
         return null;
     }
 
     @Override
     public HttpObject serverToProxyResponse(HttpObject httpObject) {
-        OpenTracingWrapper otw = new OpenTracingWrapper("RecorderFilter").setParentSpan(OpenTracingSpans
-                .get(executionId));
 
-        MDC.put("eid", executionId);
-        MDC.put("uri", uri);
+        responseSpan = buildSpan("serverToProxyResponse", uriRequest);
+        GlobalTracer.get().makeActive(requestSpan);
 
-        return otw.map("serverToProxyResponse", response -> {
+            MDC.put("eid", executionId);
+            MDC.put("uri", uri);
+
             boolean handled = false;
 
-            if (response instanceof HttpResponse) {
+            if (httpObject instanceof HttpResponse) {
                 LOG.debug("Got http response");
 
-                HttpResponse res = (HttpResponse) response;
+                HttpResponse res = (HttpResponse) httpObject;
                 responseCollector.setResponseHeaders(res, crawlLog);
+
+                responseSpan.log("Got response headers");
                 handled = true;
             }
 
-            if (response instanceof HttpContent) {
+            if (httpObject instanceof HttpContent) {
                 LOG.debug("Got http content");
 
-                HttpContent res = (HttpContent) response;
+                HttpContent res = (HttpContent) httpObject;
+                responseSpan.log("Got http content. Size: " + res.content().readableBytes());
                 responseCollector.addPayload(res.content());
 
-                if (ProxyUtils.isLastChunk(response)) {
-                    responseCollector.writeCache(cache, uri, executionId);
-
-                    responseCollector.writeResponse(crawlLog.build());
-                    if (pageRequest != null) {
-                        pageRequest.setSize(responseCollector.getSize());
-                    }
-                }
                 handled = true;
+            }
+
+            if (ProxyUtils.isLastChunk(httpObject)) {
+                responseCollector.writeCache(cache, uri, executionId);
+
+                responseCollector.writeResponse(crawlLog.build());
+
+                responseSpan.log("Last chunk");
+                if (uriRequest != null) {
+                    uriRequest.setSize(responseCollector.getSize());
+                    responseSpan.finish();
+                    finishSpan(uriRequest);
+                }
             }
 
             if (!handled) {
                 // If we get here, handling for the response type should be added
-                LOG.error("Got unknown response type '{}', this is a bug", response.getClass());
+                LOG.error("Got unknown response type '{}', this is a bug", httpObject.getClass());
             }
-
-            return response;
-        }, httpObject);
+        return httpObject;
     }
 
     @Override
@@ -264,6 +245,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
         }
 
         LOG.debug("Http connect failed");
+        finishSpan(uriRequest);
     }
 
     @Override
@@ -280,6 +262,66 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
         }
 
         LOG.debug("Http connect timed out");
+        finishSpan(uriRequest);
+    }
+
+    private void initDiscoveryPathAndReferrer(HttpRequest request) {
+        if (uri.endsWith("robots.txt")) {
+            referrer = "";
+            discoveryPath = "P";
+        } else if (executionId == MANUAL_EXID) {
+            referrer = request.headers().get("Referer", "");
+            discoveryPath = "";
+        } else {
+            session = sessionRegistry.get(executionId);
+
+            if (session == null) {
+                LOG.error("Could not find session. Probably a bug");
+                referrer = request.headers().get("Referer", "");
+                discoveryPath = "";
+            } else {
+                referrer = session.getReferrer();
+                try {
+                    uriRequest = session.getUriRequests().getByUrl(uri)
+                            .get(session.getProtocolTimeout(), TimeUnit.MILLISECONDS);
+                } catch (InterruptedException | ExecutionException | TimeoutException ex) {
+                    LOG.error("Failed getting page request from session: {}", ex.toString(), ex);
+                } catch (Throwable ex) {
+                    LOG.error(ex.toString(), ex);
+                }
+
+                if (uriRequest != null) {
+                    discoveryPath = uriRequest.getDiscoveryPath();
+                } else {
+                    discoveryPath = "";
+                    LOG.info("Could not find page request in session. Probably a bug");
+                }
+            }
+        }
+    }
+
+    private Span buildSpan(String operationName, UriRequest uriRequest) {
+        Tracer.SpanBuilder newSpan = GlobalTracer.get()
+                .buildSpan(operationName)
+                .withTag(Tags.COMPONENT.getKey(), "RecorderFilter")
+                .withTag("executionId", executionId)
+                .withTag("uri", uri);
+
+        if (uriRequest != null && uriRequest.getSpan() == null) {
+            LOG.error("Span is not initilized", new IllegalStateException());
+        }
+
+        if (uriRequest != null) {
+            newSpan = newSpan.asChildOf(uriRequest.getSpan());
+        }
+
+        return newSpan.startManual();
+    }
+
+    private void finishSpan(UriRequest uriRequest) {
+        if (uriRequest != null) {
+            uriRequest.getSpan().finish();
+        }
     }
 
 }

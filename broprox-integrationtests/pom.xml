@@ -223,7 +223,6 @@
                                                     <container>browser</container>
                                                     <container>contentwriter</container>
                                                     <container>testsites</container>
-                                                    <container>tracer</container>
                                                     <container>robots</container>
                                                     <container>dnsresolver</container>
                                                 </dependsOn>
@@ -239,7 +238,6 @@
                                                     <CONTENT_WRITER_PORT>8080</CONTENT_WRITER_PORT>
                                                     <DNS_RESOLVER_HOST>dnsresolver</DNS_RESOLVER_HOST>
                                                     <DNS_RESOLVER_PORT>50052</DNS_RESOLVER_PORT>
-                                                    <TRACER_URI>http://tracer:9411/api/v1/spans</TRACER_URI>
                                                 </env>
                                                 <log>
                                                     <enabled>true</enabled>
@@ -270,7 +268,6 @@
                                                 </ports>
                                                 <dependsOn>
                                                     <container>db-initializer</container>
-                                                    <container>tracer</container>
                                                 </dependsOn>
                                                 <volumes>
                                                     <bind>
@@ -280,7 +277,6 @@
                                                 </volumes>
                                                 <env>
                                                     <DB_HOST>db</DB_HOST>
-                                                    <TRACER_URI>http://tracer:9411/api/v1/spans</TRACER_URI>
                                                     <UNSAFE>true</UNSAFE>
                                                 </env>
                                                 <log>
@@ -311,7 +307,6 @@
                                                 </ports>
                                                 <dependsOn>
                                                     <container>db-initializer</container>
-                                                    <container>tracer</container>
                                                 </dependsOn>
                                                 <volumes>
                                                     <bind>
@@ -321,7 +316,6 @@
                                                 </volumes>
                                                 <env>
                                                     <DB_HOST>db</DB_HOST>
-                                                    <TRACER_URI>http://tracer:9411/api/v1/spans</TRACER_URI>
                                                     <UNSAFE>true</UNSAFE>
                                                 </env>
                                                 <log>
@@ -353,7 +347,6 @@
                                                 <dependsOn>
                                                     <container>db-initializer</container>
                                                     <container>harvester</container>
-                                                    <container>tracer</container>
                                                 </dependsOn>
                                                 <env>
                                                     <DB_HOST>db</DB_HOST>
@@ -362,7 +355,6 @@
                                                     <ROBOTS_EVALUATOR_HOST>robots</ROBOTS_EVALUATOR_HOST>
                                                     <DNS_RESOLVER_HOST>dnsresolver</DNS_RESOLVER_HOST>
                                                     <DNS_RESOLVER_PORT>50052</DNS_RESOLVER_PORT>
-                                                    <TRACER_URI>http://tracer:9411/api/v1/spans</TRACER_URI>
                                                 </env>
                                                 <log>
                                                     <enabled>true</enabled>
@@ -396,7 +388,6 @@
                                                     <container>robots</container>
                                                     <container>dnsresolver</container>
                                                     <container>frontier</container>
-                                                    <container>tracer</container>
                                                     <container>browser</container>
                                                     <container>contentwriter</container>
                                                     <container>harvester</container>
@@ -405,7 +396,6 @@
                                                 <env>
                                                     <DB_HOST>db</DB_HOST>
                                                     <FRONTIER_HOST>frontier</FRONTIER_HOST>
-                                                    <TRACER_URI>http://tracer:9411/api/v1/spans</TRACER_URI>
                                                 </env>
                                                 <log>
                                                     <enabled>true</enabled>
@@ -437,14 +427,12 @@
                                                 <dependsOn>
                                                     <container>db-initializer</container>
                                                     <container>contentwriter</container>
-                                                    <container>tracer</container>
                                                 </dependsOn>
                                                 <env>
                                                     <DB_HOST>db</DB_HOST>
                                                     <CONTENT_WRITER_HOST>contentwriter</CONTENT_WRITER_HOST>
                                                     <CONTENT_WRITER_PORT>8080</CONTENT_WRITER_PORT>
                                                     <DNS_SERVER>testsites</DNS_SERVER>
-                                                    <TRACER_URI>http://tracer:9411/api/v1/spans</TRACER_URI>
                                                 </env>
                                                 <log>
                                                     <enabled>true</enabled>
@@ -474,12 +462,10 @@
                                                 </ports>
                                                 <dependsOn>
                                                     <container>db-initializer</container>
-                                                    <container>tracer</container>
                                                 </dependsOn>
                                                 <env>
                                                     <PROXY_HOST>harvester</PROXY_HOST>
                                                     <PROXY_PORT>8080</PROXY_PORT>
-                                                    <TRACER_URI>http://tracer:9411/api/v1/spans</TRACER_URI>
                                                 </env>
                                                 <log>
                                                     <enabled>true</enabled>
@@ -489,33 +475,6 @@
                                                         <mode>mapped</mode>
                                                         <ports>
                                                             <port>50052</port>
-                                                        </ports>
-                                                    </tcp>
-                                                    <time>20000</time>
-                                                </wait>
-                                            </run>
-                                        </image>
-
-                                        <image>
-                                            <name>openzipkin/zipkin</name>
-                                            <alias>tracer</alias>
-                                            <run>
-                                                <network>
-                                                    <mode>custom</mode>
-                                                    <name>integration-test-net</name>
-                                                    <alias>tracer</alias>
-                                                </network>
-                                                <ports>
-                                                    <port>+tracer.host:tracer.port:9411</port>
-                                                </ports>
-                                                <log>
-                                                    <enabled>false</enabled>
-                                                </log>
-                                                <wait>
-                                                    <tcp>
-                                                        <mode>mapped</mode>
-                                                        <ports>
-                                                            <port>9411</port>
                                                         </ports>
                                                     </tcp>
                                                     <time>20000</time>

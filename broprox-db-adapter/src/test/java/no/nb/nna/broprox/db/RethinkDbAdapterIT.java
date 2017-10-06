@@ -90,7 +90,7 @@ public class RethinkDbAdapterIT {
         RethinkDB r = RethinkDB.r;
         for (RethinkDbAdapter.TABLES table : RethinkDbAdapter.TABLES.values()) {
             if (table != RethinkDbAdapter.TABLES.SYSTEM) {
-                db.executeRequest(r.table(table.name).delete());
+                db.executeRequest("delete", r.table(table.name).delete());
             }
         }
     }

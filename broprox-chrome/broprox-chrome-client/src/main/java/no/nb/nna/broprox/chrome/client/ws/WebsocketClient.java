@@ -70,10 +70,28 @@ public class WebsocketClient {
 
     private final URI uri;
 
+    private boolean connected = false;
+
+    private int connectionAttempts = 0;
+
+    private int maxConnectionAttempts = 10;
+
     public WebsocketClient(WebSocketCallback callback, URI uri) {
         this.callback = callback;
         this.uri = uri;
-        connect();
+        while (!connected && connectionAttempts++ < maxConnectionAttempts) {
+            try {
+                connect();
+                connected = true;
+            } catch (Throwable t) {
+                LOG.error("Connection failed: {}", t.toString());
+                try {
+                    Thread.sleep(2000);
+                } catch (InterruptedException ex) {
+                    throw new RuntimeException(ex);
+                }
+            }
+        }
     }
 
     private void connect() {

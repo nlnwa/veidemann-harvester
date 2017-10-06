@@ -15,56 +15,30 @@
  */
 package no.nb.nna.broprox.commons.opentracing;
 
-import java.io.IOException;
-
-import brave.Tracing;
-import brave.opentracing.BraveTracer;
+import com.uber.jaeger.Configuration;
+import io.opentracing.Tracer;
 import io.opentracing.util.GlobalTracer;
-import zipkin.reporter.AsyncReporter;
-import zipkin.reporter.Sender;
-import zipkin.reporter.okhttp3.OkHttpSender;
 
 /**
  *
  */
 public class TracerFactory {
-
+    private static final String JAEGER_SERVICE_NAME = "JAEGER_SERVICE_NAME";
     private TracerFactory() {
     }
 
-    public static final void init(String serviceName, String serverUri) {
-        if (serverUri == null) {
-            serverUri = "http://tracer:9411/api/v1/spans";
+    public static final void init(String serviceName) {
+        String envServiceName = System.getenv(JAEGER_SERVICE_NAME);
+        if (envServiceName == null) {
+            System.setProperty(JAEGER_SERVICE_NAME, serviceName);
         }
+        Configuration config = Configuration.fromEnv();
+        //config.setStatsFactory(...); // optional if you want to get metrics about tracer behavior
 
-        // Configure a reporter, which controls how often spans are sent
-        //   (the dependency is io.zipkin.reporter:zipkin-sender-okhttp3)
-        Sender sender = OkHttpSender.create(serverUri);
-        AsyncReporter reporter = AsyncReporter.builder(sender).build();
+        Tracer tracer = config.getTracer();
 
-        // Create a Zipkin tracer.
-        Tracing tracer = Tracing.newBuilder()
-                .localServiceName(serviceName)
-                .reporter(reporter)
-                .build();
-
-        // Wrap the Zipkin tracer as an OpenTracing tracer and register it as a global tracer
-        GlobalTracer.register(BraveTracer.create(tracer));
-
-            Runtime.getRuntime().addShutdownHook(new Thread() {
-                @Override
-                public void run() {
-                    // Use stderr here since the logger may have been reset by its JVM shutdown hook.
-                    System.err.println("*** shutting down tracer");
-                    reporter.close();
-                    try {
-                        sender.close();
-                    } catch (IOException ex) {
-                        ex.printStackTrace();
-                    }
-                }
-
-            });
+        // Register tracer as a global tracer
+        GlobalTracer.register(tracer);
     }
 
 }

@@ -45,7 +45,7 @@ public class FrontierService {
         config.checkValid(ConfigFactory.defaultReference());
         SETTINGS = ConfigBeanFactory.create(config, Settings.class);
 
-        TracerFactory.init("Frontier", SETTINGS.getTracerUri());
+        TracerFactory.init("Frontier");
     }
 
     /**

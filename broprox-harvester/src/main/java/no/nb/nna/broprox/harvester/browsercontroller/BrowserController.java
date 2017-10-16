@@ -23,15 +23,17 @@ import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 
+import io.opentracing.ActiveSpan;
+import io.opentracing.Span;
+import io.opentracing.contrib.OpenTracingContextKey;
 import io.opentracing.tag.Tags;
+import io.opentracing.util.GlobalTracer;
 import no.nb.nna.broprox.api.ControllerProto;
 import no.nb.nna.broprox.api.HarvesterProto.HarvestPageReply;
 import no.nb.nna.broprox.chrome.client.ChromeDebugProtocol;
 import no.nb.nna.broprox.commons.BroproxHeaderConstants;
 import no.nb.nna.broprox.commons.DbAdapter;
-import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
 import no.nb.nna.broprox.harvester.BrowserSessionRegistry;
-import no.nb.nna.broprox.harvester.OpenTracingSpans;
 import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
 import no.nb.nna.broprox.model.ConfigProto.CrawlConfig;
 import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
@@ -58,22 +60,28 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
             final BrowserSessionRegistry sessionRegistry)
             throws IOException {
 
-        this.chrome = new ChromeDebugProtocol(chromeHost, chromePort);
+        this.chrome = new ChromeDebugProtocol(chromeHost, chromePort, GlobalTracer.get());
         this.db = db;
         this.sessionRegistry = sessionRegistry;
     }
 
     public HarvestPageReply render(QueuedUri queuedUri, CrawlConfig config)
             throws ExecutionException, InterruptedException, IOException, TimeoutException {
+
+        Span span = GlobalTracer.get()
+                .buildSpan("render")
+                .asChildOf(OpenTracingContextKey.activeSpan())
+                .withTag(Tags.COMPONENT.getKey(), "BrowserController")
+                .withTag("executionId", queuedUri.getExecutionId())
+                .withTag("uri", queuedUri.getUri())
+                .startManual();
+
         HarvestPageReply.Builder resultBuilder = HarvestPageReply.newBuilder();
 
         MDC.put("eid", queuedUri.getExecutionId());
         MDC.put("uri", queuedUri.getUri());
 
-        OpenTracingWrapper otw = new OpenTracingWrapper("BrowserController", Tags.SPAN_KIND_CLIENT)
-                .setParentSpan(OpenTracingSpans.get(queuedUri.getExecutionId()));
-
-        BrowserSession session = new BrowserSession(chrome, config, queuedUri.getExecutionId());
+        BrowserSession session = new BrowserSession(chrome, config, queuedUri.getExecutionId(), span);
         try {
             sessionRegistry.put(session);
 
@@ -88,7 +96,7 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
 
                 if (config.getExtra().getCreateSnapshot()) {
                     LOG.debug("Save screenshot");
-                    otw.run("saveScreenshot", session::saveScreenshot, db);
+                    session.saveScreenshot(db);
                 }
 
 //                System.out.println("LINKS >>>>>>");
@@ -102,15 +110,16 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
                 LOG.debug("Extract outlinks");
 
                 List<BrowserScript> scripts = getScripts(config);
-                resultBuilder.addAllOutlinks(otw.map("extractOutlinks", session::extractOutlinks, scripts));
-                resultBuilder.setBytesDownloaded(session.getPageRequests().getBytesDownloaded());
-                resultBuilder.setUriCount(session.getPageRequests().getUriDownloadedCount());
+                resultBuilder.addAllOutlinks(session.extractOutlinks(scripts));
+                resultBuilder.setBytesDownloaded(session.getUriRequests().getBytesDownloaded());
+                resultBuilder.setUriCount(session.getUriRequests().getUriDownloadedCount());
 
                 session.scrollToTop();
             }
         } finally {
             session.close();
             sessionRegistry.remove(session);
+            span.finish();
         }
 
         MDC.clear();

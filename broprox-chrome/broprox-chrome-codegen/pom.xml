@@ -27,5 +27,10 @@
             <artifactId>annotations</artifactId>
             <version>15.0</version>
         </dependency>
+        
+        <dependency>
+            <groupId>io.opentracing</groupId>
+            <artifactId>opentracing-api</artifactId>
+        </dependency>
     </dependencies>
 </project>

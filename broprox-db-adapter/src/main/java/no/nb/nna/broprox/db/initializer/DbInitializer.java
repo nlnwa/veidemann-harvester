@@ -58,7 +58,7 @@ public class DbInitializer {
         config.checkValid(ConfigFactory.defaultReference());
         SETTINGS = ConfigBeanFactory.create(config, Settings.class);
 
-        TracerFactory.init("Controller", SETTINGS.getTracerUri());
+        TracerFactory.init("DbInitializer");
     }
 
     public DbInitializer() {

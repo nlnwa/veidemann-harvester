@@ -30,6 +30,7 @@ import java.util.stream.Collectors;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.protobuf.ByteString;
+import io.opentracing.BaseSpan;
 import no.nb.nna.broprox.chrome.client.ChromeDebugProtocol;
 import no.nb.nna.broprox.chrome.client.DebuggerDomain;
 import no.nb.nna.broprox.chrome.client.PageDomain;
@@ -43,7 +44,6 @@ import no.nb.nna.broprox.model.ConfigProto;
 import no.nb.nna.broprox.model.MessagesProto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.MDC;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
@@ -64,7 +64,7 @@ public class BrowserSession implements AutoCloseable, BroproxHeaderConstants {
 
     final Map<String, List<DebuggerDomain.Location>> breakpoints = new HashMap<>();
 
-    final PageRequestRegistry pageRequests = new PageRequestRegistry();
+    final UriRequestRegistry uriRequests;
 
     String discoveryPath;
 
@@ -73,7 +73,8 @@ public class BrowserSession implements AutoCloseable, BroproxHeaderConstants {
     // TODO: Should be configurable
     boolean followRedirects = true;
 
-    public BrowserSession(ChromeDebugProtocol chrome, ConfigProto.CrawlConfig config, String executionId) {
+    public BrowserSession(ChromeDebugProtocol chrome, ConfigProto.CrawlConfig config, String executionId, BaseSpan span) {
+        uriRequests = new UriRequestRegistry(span);
         this.executionId = Objects.requireNonNull(executionId);
         protocolTimeout = config.getBrowserConfig().getPageLoadTimeoutMs();
         sleepAfterPageLoad = config.getBrowserConfig().getSleepAfterPageloadMs();
@@ -113,9 +114,9 @@ public class BrowserSession implements AutoCloseable, BroproxHeaderConstants {
 
             // set up listeners
             session.page.onNavigationRequested(nr -> this.onNavigationRequested(nr));
-            session.network.onRequestWillBeSent(r -> pageRequests.onRequestWillBeSent(r, discoveryPath));
-            session.network.onLoadingFailed(f -> pageRequests.onLoadingFailed(f));
-            session.network.onResponseReceived(l -> pageRequests.onResponseReceived(l));
+            session.network.onRequestWillBeSent(r -> uriRequests.onRequestWillBeSent(r, discoveryPath));
+            session.network.onLoadingFailed(f -> uriRequests.onLoadingFailed(f));
+            session.network.onResponseReceived(l -> uriRequests.onResponseReceived(l));
 
             LOG.debug("Browser session configured");
         } catch (IOException ex) {
@@ -141,8 +142,8 @@ public class BrowserSession implements AutoCloseable, BroproxHeaderConstants {
         return protocolTimeout;
     }
 
-    public PageRequestRegistry getPageRequests() {
-        return pageRequests;
+    public UriRequestRegistry getUriRequests() {
+        return uriRequests;
     }
 
     public void setBreakpoints() throws TimeoutException, ExecutionException, InterruptedException {
@@ -238,7 +239,7 @@ public class BrowserSession implements AutoCloseable, BroproxHeaderConstants {
     }
 
     public boolean isPageRenderable() {
-        return pageRequests.getRootRequest().isRenderable();
+        return uriRequests.getRootRequest().isRenderable();
     }
 
     public void saveScreenshot(DbAdapter db) {
@@ -250,7 +251,7 @@ public class BrowserSession implements AutoCloseable, BroproxHeaderConstants {
             db.addScreenshot(MessagesProto.Screenshot.newBuilder()
                     .setImg(ByteString.copyFrom(img))
                     .setExecutionId(executionId)
-                    .setUri(pageRequests.getRootRequest().getUrl())
+                    .setUri(uriRequests.getRootRequest().getUrl())
                     .build());
         } catch (InterruptedException | ExecutionException | TimeoutException ex) {
             throw new RuntimeException(ex);
@@ -317,12 +318,12 @@ public class BrowserSession implements AutoCloseable, BroproxHeaderConstants {
                         String resultString = ((String) ev.result.value).trim();
                         if (!resultString.isEmpty()) {
                             String[] links = resultString.split("\n+");
-                            String path = pageRequests.getRootRequest().getDiscoveryPath() + "L";
+                            String path = uriRequests.getRootRequest().getDiscoveryPath() + "L";
                             for (int i = 0; i < links.length; i++) {
                                 outlinks.add(MessagesProto.QueuedUri.newBuilder()
                                         .setExecutionId(executionId)
                                         .setUri(links[i])
-                                        .setReferrer(pageRequests.getRootRequest().getUrl())
+                                        .setReferrer(uriRequests.getRootRequest().getUrl())
                                         .setDiscoveredTimeStamp(ProtoUtils.odtToTs(OffsetDateTime.now()))
                                         .setDiscoveryPath(path)
                                         .addAllCookies(cookies)
@@ -443,6 +444,7 @@ public class BrowserSession implements AutoCloseable, BroproxHeaderConstants {
         if (session != null) {
             session.close();
         }
+        uriRequests.close();
     }
 
 }

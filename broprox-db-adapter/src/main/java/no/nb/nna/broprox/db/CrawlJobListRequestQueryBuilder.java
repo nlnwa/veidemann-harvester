@@ -18,7 +18,6 @@ package no.nb.nna.broprox.db;
 import com.rethinkdb.RethinkDB;
 import no.nb.nna.broprox.api.ControllerProto.CrawlJobListReply;
 import no.nb.nna.broprox.api.ControllerProto.CrawlJobListRequest;
-import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
 import no.nb.nna.broprox.db.RethinkDbAdapter.TABLES;
 
 /**
@@ -63,8 +62,8 @@ public class CrawlJobListRequestQueryBuilder extends ConfigListQueryBuilder<Craw
         }
     }
 
-    public CrawlJobListReply.Builder executeList(OpenTracingWrapper otw, RethinkDbAdapter db) {
-        return executeList(otw, db, CrawlJobListReply.newBuilder());
+    public CrawlJobListReply.Builder executeList(RethinkDbAdapter db) {
+        return executeList(db, CrawlJobListReply.newBuilder());
     }
 
 }

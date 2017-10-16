@@ -26,8 +26,6 @@ public class CommonSettings {
 
     private String dbName;
 
-    private String tracerUri;
-
     public String getDbHost() {
         return dbHost;
     }
@@ -50,14 +48,6 @@ public class CommonSettings {
 
     public void setDbName(String dbName) {
         this.dbName = dbName;
-    }
-
-    public String getTracerUri() {
-        return tracerUri;
-    }
-
-    public void setTracerUri(String tracerUri) {
-        this.tracerUri = tracerUri;
     }
 
 }

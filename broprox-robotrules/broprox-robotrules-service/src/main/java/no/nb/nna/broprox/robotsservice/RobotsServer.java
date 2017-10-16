@@ -39,7 +39,7 @@ public class RobotsServer {
         config.checkValid(ConfigFactory.defaultReference());
         SETTINGS = ConfigBeanFactory.create(config, Settings.class);
 
-        TracerFactory.init("RobotsService", SETTINGS.getTracerUri());
+        TracerFactory.init("RobotsService");
     }
 
     public RobotsServer() {

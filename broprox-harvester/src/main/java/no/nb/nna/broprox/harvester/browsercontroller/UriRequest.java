@@ -15,6 +15,11 @@
  */
 package no.nb.nna.broprox.harvester.browsercontroller;
 
+import io.opentracing.BaseSpan;
+import io.opentracing.Span;
+import io.opentracing.Tracer;
+import io.opentracing.tag.Tags;
+import io.opentracing.util.GlobalTracer;
 import no.nb.nna.broprox.chrome.client.NetworkDomain;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,9 +27,9 @@ import org.slf4j.LoggerFactory;
 /**
  *
  */
-public class PageRequest {
+public class UriRequest {
 
-    private static final Logger LOG = LoggerFactory.getLogger(PageRequest.class);
+    private static final Logger LOG = LoggerFactory.getLogger(UriRequest.class);
 
     NetworkDomain.RequestWillBeSent request;
 
@@ -38,13 +43,15 @@ public class PageRequest {
 
     private String discoveryPath = "";
 
-    private PageRequest parent;
+    private UriRequest parent;
 
     private boolean renderable = false;
 
     private long size = 0L;
 
     private boolean fromCache = false;
+
+    private Span span;
 
     /**
      * True if this request is for the top level request.
@@ -53,22 +60,28 @@ public class PageRequest {
      */
     private boolean rootResource = false;
 
-    private PageRequest(NetworkDomain.RequestWillBeSent request) {
+    private UriRequest(NetworkDomain.RequestWillBeSent request, BaseSpan parentSpan) {
         this.request = request;
         this.resourceType = ResourceType.forName(request.type);
         LOG.debug("RequestId: {}, documentUrl: {}, URL: {}, initiator: {}, redirectResponse: {}, referer: {}",
                 request.requestId, request.documentURL, request.request.url, request.initiator,
                 request.redirectResponse, request.request.headers.get("Referer"));
+
+        span = buildSpan(parentSpan, request.request.url);
     }
 
-    public PageRequest(NetworkDomain.RequestWillBeSent request, String initialDiscoveryPath) {
-        this(request);
+    public UriRequest(NetworkDomain.RequestWillBeSent request, String initialDiscoveryPath,
+            BaseSpan parentSpan) {
+
+        this(request, parentSpan);
         this.discoveryPath = initialDiscoveryPath;
         this.rootResource = true;
     }
 
-    public PageRequest(NetworkDomain.RequestWillBeSent request, PageRequest parent) {
-        this(request);
+    public UriRequest(NetworkDomain.RequestWillBeSent request, UriRequest parent,
+            BaseSpan parentSpan) {
+
+        this(request, parentSpan);
         this.parent = parent;
         if (request.redirectResponse != null) {
             this.rootResource = parent.rootResource;
@@ -106,7 +119,7 @@ public class PageRequest {
         return discoveryPath;
     }
 
-    public PageRequest getParent() {
+    public UriRequest getParent() {
         return parent;
     }
 
@@ -134,7 +147,15 @@ public class PageRequest {
         this.fromCache = fromCache;
     }
 
+    public Span getSpan() {
+        return span;
+    }
+
     void addResponse(NetworkDomain.ResponseReceived response) {
+        if (this.response != null) {
+            LOG.error("Already got response, previous length: {}, new length: {}", this.response.response.encodedDataLength, response.response.encodedDataLength);
+        }
+
         this.response = response;
         if (!request.request.url.equals(response.response.url)) {
             LOG.warn("URL {} - {}", request.request.url, response.response.url);
@@ -154,7 +175,7 @@ public class PageRequest {
 //        }
     }
 
-    private static boolean mimeTypeIsConsistentWithType(PageRequest request) {
+    private static boolean mimeTypeIsConsistentWithType(UriRequest request) {
         // If status is an error, content is likely to be of an inconsistent type,
         // as it's going to be an error message. We do not want to emit a warning
         // for this, though, as this will already be reported as resource loading failure.
@@ -176,6 +197,17 @@ public class PageRequest {
         }
 
         return MimeTypes.forType(request.getMimeType()).filter(m -> m.resourceType == resourceType).isPresent();
+    }
+
+    private Span buildSpan(BaseSpan parentSpan, String uri) {
+        Tracer.SpanBuilder newSpan = GlobalTracer.get()
+                .buildSpan("newUriRequest")
+                .withTag(Tags.COMPONENT.getKey(), "UriRequest")
+                .withTag("uri", uri);
+        if (parentSpan != null) {
+            newSpan.asChildOf(parentSpan);
+        }
+        return newSpan.startManual();
     }
 
 }

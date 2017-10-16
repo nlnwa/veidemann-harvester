@@ -50,7 +50,7 @@ public class Harvester {
         config.checkValid(ConfigFactory.defaultReference());
         SETTINGS = ConfigBeanFactory.create(config, Settings.class);
 
-        TracerFactory.init("Harvester", SETTINGS.getTracerUri());
+        TracerFactory.init("Harvester");
     }
 
     /**

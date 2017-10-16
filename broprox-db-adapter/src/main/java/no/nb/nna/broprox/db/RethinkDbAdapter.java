@@ -31,9 +31,9 @@ import com.rethinkdb.RethinkDB;
 import com.rethinkdb.gen.ast.Insert;
 import com.rethinkdb.gen.ast.ReqlExpr;
 import com.rethinkdb.gen.exc.ReqlError;
+import com.rethinkdb.model.OptArgs;
 import com.rethinkdb.net.Connection;
 import com.rethinkdb.net.Cursor;
-import io.opentracing.tag.Tags;
 import no.nb.nna.broprox.api.ControllerProto.BrowserConfigListReply;
 import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListReply;
 import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListRequest;
@@ -51,7 +51,7 @@ import no.nb.nna.broprox.api.StatusProto;
 import no.nb.nna.broprox.commons.ChangeFeed;
 import no.nb.nna.broprox.commons.DbAdapter;
 import no.nb.nna.broprox.commons.FutureOptional;
-import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
+import no.nb.nna.broprox.db.opentracing.ConnectionTracingInterceptor;
 import no.nb.nna.broprox.model.ConfigProto.BrowserConfig;
 import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
 import no.nb.nna.broprox.model.ConfigProto.CrawlConfig;
@@ -112,18 +112,12 @@ public class RethinkDbAdapter implements DbAdapter {
 
     final Connection conn;
 
-    final OpenTracingWrapper otw = new OpenTracingWrapper("dbAdapter", Tags.SPAN_KIND_CLIENT)
-            .addTag(Tags.DB_TYPE.getKey(), "rethinkdb")
-            .setExtractParentSpanFromGrpcContext(false)
-            .setCreateNewGrpcContextForSpan(false)
-            .setTraceEnabled(false);
-
     public RethinkDbAdapter(String dbHost, int dbPort, String dbName) {
         this(r.connection().hostname(dbHost).port(dbPort).db(dbName).connect());
     }
 
     public RethinkDbAdapter(Connection conn) {
-        this.conn = conn;
+        this.conn = new ConnectionTracingInterceptor(conn, true);
     }
 
     @Override
@@ -132,8 +126,8 @@ public class RethinkDbAdapter implements DbAdapter {
         ensureContainsValue(cc, "warc_id");
 
         Map rMap = ProtoUtils.protoToRethink(cc);
-        Map<String, Object> response = otw.map("db-hasCrawledContent",
-                this::executeRequest, r.table(TABLES.CRAWLED_CONTENT.name)
+        Map<String, Object> response = executeRequest("db-hasCrawledContent",
+                r.table(TABLES.CRAWLED_CONTENT.name)
                         .insert(rMap)
                         .optArg("conflict", (id, old_doc, new_doc) -> old_doc)
                         .optArg("return_changes", "always")
@@ -147,8 +141,7 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     public void deleteCrawledContent(String digest) {
-        otw.map("db-deleteCrawledContent",
-                this::executeRequest, r.table(TABLES.CRAWLED_CONTENT.name).get(digest).delete());
+        executeRequest("db-deleteCrawledContent", r.table(TABLES.CRAWLED_CONTENT.name).get(digest).delete());
     }
 
     @Override
@@ -157,8 +150,8 @@ public class RethinkDbAdapter implements DbAdapter {
         ensureContainsValue(et, "text");
 
         Map rMap = ProtoUtils.protoToRethink(et);
-        Map<String, Object> response = otw.map("db-addExtractedText",
-                this::executeRequest, r.table(TABLES.EXTRACTED_TEXT.name)
+        Map<String, Object> response = executeRequest("db-addExtractedText",
+                r.table(TABLES.EXTRACTED_TEXT.name)
                         .insert(rMap)
                         .optArg("conflict", "error"));
 
@@ -187,7 +180,7 @@ public class RethinkDbAdapter implements DbAdapter {
     @Override
     public BrowserScriptListReply listBrowserScripts(BrowserScriptListRequest request) {
         BrowserScriptListRequestQueryBuilder queryBuilder = new BrowserScriptListRequestQueryBuilder(request);
-        return queryBuilder.executeList(otw, this).build();
+        return queryBuilder.executeList(this).build();
     }
 
     @Override
@@ -203,17 +196,18 @@ public class RethinkDbAdapter implements DbAdapter {
     @Override
     public CrawlHostGroupConfigListReply listCrawlHostGroupConfigs(ListRequest request) {
         ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, TABLES.CRAWL_HOST_GROUP_CONFIGS);
-        return queryBuilder.executeList(otw, this, CrawlHostGroupConfigListReply.newBuilder()).build();
+        return queryBuilder.executeList(this, CrawlHostGroupConfigListReply.newBuilder()).build();
     }
 
     @Override
     public CrawlHostGroup getOrCreateCrawlHostGroup(String crawlHostGroupId, String politenessId) {
         List key = r.array(crawlHostGroupId, politenessId);
-        Map<String, Object> response = otw.map("db-getOrCreateCrawlHostGroup",
-                this::executeRequest, r.table(TABLES.CRAWL_HOST_GROUP.name)
+        Map<String, Object> response = executeRequest("db-getOrCreateCrawlHostGroup",
+                r.table(TABLES.CRAWL_HOST_GROUP.name)
                         .insert(r.hashMap("id", key).with("nextFetchTime", r.now()).with("busy", false))
                         .optArg("conflict", (id, oldDoc, newDoc) -> oldDoc)
-                        .optArg("return_changes", "always"));
+                        .optArg("return_changes", "always")
+        );
 
         Map resultDoc = ((List<Map<String, Map>>) response.get("changes")).get(0).get("new_val");
 
@@ -229,14 +223,15 @@ public class RethinkDbAdapter implements DbAdapter {
 
     @Override
     public FutureOptional<CrawlHostGroup> borrowFirstReadyCrawlHostGroup() {
-        Map<String, Object> response = otw.map("db-borrowFirstReadyCrawlHostGroup",
-                this::executeRequest, r.table(TABLES.CRAWL_HOST_GROUP.name)
+        Map<String, Object> response = executeRequest("db-borrowFirstReadyCrawlHostGroup",
+                r.table(TABLES.CRAWL_HOST_GROUP.name)
                         .orderBy().optArg("index", "nextFetchTime")
                         .between(r.minval(), r.now()).optArg("right_bound", "closed")
                         .filter(r.hashMap("busy", false))
                         .limit(1)
                         .update(r.hashMap("busy", true))
-                        .optArg("return_changes", "always"));
+                        .optArg("return_changes", "always")
+        );
 
         long replaced = (long) response.get("replaced");
         long unchanged = (long) response.get("unchanged");
@@ -249,12 +244,13 @@ public class RethinkDbAdapter implements DbAdapter {
 
         if (replaced == 0L) {
             // No CrawlHostGroup was ready, find time when next will be ready
-            Cursor<Map<String, Object>> cursor = otw.map("db-borrowFirstReadyCrawlHostGroup",
-                    this::executeRequest, r.table(TABLES.CRAWL_HOST_GROUP.name)
+            Cursor<Map<String, Object>> cursor = executeRequest("db-borrowFirstReadyCrawlHostGroup-findNext",
+                    r.table(TABLES.CRAWL_HOST_GROUP.name)
                             .orderBy().optArg("index", "nextFetchTime")
                             .filter(r.hashMap("busy", false))
                             .limit(1)
-                            .pluck("nextFetchTime"));
+                            .pluck("nextFetchTime")
+            );
 
             if (cursor.hasNext()) {
                 return FutureOptional.emptyUntil((OffsetDateTime) cursor.next().get("nextFetchTime"));
@@ -280,11 +276,12 @@ public class RethinkDbAdapter implements DbAdapter {
         List key = r.array(crawlHostGroup.getId(), crawlHostGroup.getPolitenessId());
         double nextFetchDelayS = nextFetchDelayMs / 1000.0;
 
-        Map<String, Object> response = otw.map("db-releaseCrawlHostGroup",
-                this::executeRequest, r.table(TABLES.CRAWL_HOST_GROUP.name)
+        Map<String, Object> response = executeRequest("db-releaseCrawlHostGroup",
+                r.table(TABLES.CRAWL_HOST_GROUP.name)
                         .get(key)
                         .update(r.hashMap("busy", false).with("nextFetchTime", r.now().add(nextFetchDelayS)))
-                        .optArg("return_changes", "always"));
+                        .optArg("return_changes", "always")
+        );
 
         Map resultDoc = ((List<Map<String, Map>>) response.get("changes")).get(0).get("new_val");
 
@@ -301,8 +298,7 @@ public class RethinkDbAdapter implements DbAdapter {
     @Override
     public CrawlExecutionStatus saveExecutionStatus(CrawlExecutionStatus status) {
         Map rMap = ProtoUtils.protoToRethink(status);
-        return otw.map("db-save" + CrawlExecutionStatus.class.getSimpleName(),
-                this::executeInsert,
+        return executeInsert("db-saveExecutionStatus",
                 r.table(TABLES.EXECUTIONS.name)
                         .insert(rMap)
                         .optArg("conflict", (id, oldDoc, newDoc) -> r.branch(
@@ -317,24 +313,25 @@ public class RethinkDbAdapter implements DbAdapter {
 
     @Override
     public CrawlExecutionStatus getExecutionStatus(String executionId) {
-        Map<String, Object> response = otw.map("db-updateExecutionStatus",
-                this::executeRequest, r.table(TABLES.EXECUTIONS.name)
-                        .get(executionId));
+        Map<String, Object> response = executeRequest("db-getExecutionStatus",
+                r.table(TABLES.EXECUTIONS.name)
+                        .get(executionId)
+        );
 
         return ProtoUtils.rethinkToProto(response, CrawlExecutionStatus.class);
     }
 
     @Override
     public void setExecutionStateAborted(String executionId) {
-        otw.map("db-save" + CrawlExecutionStatus.class.getSimpleName(),
-                this::executeRequest,
+        executeRequest("db-setExecutionStateAborted",
                 r.table(TABLES.EXECUTIONS.name).get(executionId)
                         .update(
                                 doc -> r.branch(
                                         doc.hasFields("endTime"),
                                         r.hashMap(),
                                         r.hashMap("state", State.ABORTED_MANUAL.name()).with("endTime", r.now()))
-                        ));
+                        )
+        );
     }
 
     @Override
@@ -352,24 +349,25 @@ public class RethinkDbAdapter implements DbAdapter {
 
     @Override
     public long deleteQueuedUrisForExecution(String executionId) {
-        return otw.map("db-queuedUriCount",
-                this::executeRequest, r.table(TABLES.URI_QUEUE.name)
+        return executeRequest("db-deleteQueuedUrisForExecution",
+                r.table(TABLES.URI_QUEUE.name)
                         .getAll(executionId).optArg("index", "executionId")
-                        .delete().g("deleted"));
+                        .delete().g("deleted")
+        );
     }
 
     @Override
     public long queuedUriCount(String executionId) {
-        return otw.map("db-queuedUriCount",
-                this::executeRequest, r.table(TABLES.URI_QUEUE.name)
+        return executeRequest("db-queuedUriCount",
+                r.table(TABLES.URI_QUEUE.name)
                         .getAll(executionId).optArg("index", "executionId")
-                        .count());
+                        .count()
+        );
     }
 
     @Override
     public boolean uriNotIncludedInQueue(QueuedUri qu, Timestamp since) {
-        return otw.map("db-queuedUriCount",
-                this::executeRequest,
+        return executeRequest("db-uriNotIncludedInQueue",
                 r.table(RethinkDbAdapter.TABLES.CRAWL_LOG.name)
                         .between(
                                 r.array(qu.getSurt(), ProtoUtils.tsToOdt(since)),
@@ -398,8 +396,8 @@ public class RethinkDbAdapter implements DbAdapter {
                 r.maxval()
         );
 
-        try (Cursor<Map<String, Object>> cursor = otw.map("db-getNextQueuedUriToFetch",
-                this::executeRequest, r.table(TABLES.URI_QUEUE.name)
+        try (Cursor<Map<String, Object>> cursor = executeRequest("db-getNextQueuedUriToFetch",
+                r.table(TABLES.URI_QUEUE.name)
                         .orderBy().optArg("index", "crawlHostGroupKey_sequence_earliestFetch")
                         .between(fromKey, toKey)
                         .limit(1));) {
@@ -420,8 +418,8 @@ public class RethinkDbAdapter implements DbAdapter {
     public Screenshot addScreenshot(Screenshot s) {
         Map rMap = ProtoUtils.protoToRethink(s);
 
-        Map<String, Object> response = otw.map("db-addScreenshot",
-                this::executeRequest, r.table(TABLES.SCREENSHOT.name)
+        Map<String, Object> response = executeRequest("db-addScreenshot",
+                r.table(TABLES.SCREENSHOT.name)
                         .insert(rMap)
                         .optArg("conflict", "error"));
 
@@ -436,7 +434,7 @@ public class RethinkDbAdapter implements DbAdapter {
         if (limit == 0) {
             limit = 100;
         }
-        Cursor<Map> res = executeRequest(
+        Cursor<Map> res = executeRequest("db-getExecutionStatusStream",
                 r.table(RethinkDbAdapter.TABLES.EXECUTIONS.name)
                         .orderBy().optArg("index", r.desc("startTime"))
                         .limit(limit)
@@ -497,13 +495,13 @@ public class RethinkDbAdapter implements DbAdapter {
     @Override
     public CrawlEntityListReply listCrawlEntities(ListRequest request) {
         ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, TABLES.CRAWL_ENTITIES);
-        return queryBuilder.executeList(otw, this, CrawlEntityListReply.newBuilder()).build();
+        return queryBuilder.executeList(this, CrawlEntityListReply.newBuilder()).build();
     }
 
     @Override
     public SeedListReply listSeeds(SeedListRequest request) {
         SeedListRequestQueryBuilder queryBuilder = new SeedListRequestQueryBuilder(request);
-        return queryBuilder.executeList(otw, this).build();
+        return queryBuilder.executeList(this).build();
     }
 
     @Override
@@ -519,7 +517,7 @@ public class RethinkDbAdapter implements DbAdapter {
     @Override
     public CrawlJobListReply listCrawlJobs(CrawlJobListRequest request) {
         CrawlJobListRequestQueryBuilder queryBuilder = new CrawlJobListRequestQueryBuilder(request);
-        return queryBuilder.executeList(otw, this).build();
+        return queryBuilder.executeList(this).build();
     }
 
     @Override
@@ -577,7 +575,7 @@ public class RethinkDbAdapter implements DbAdapter {
     @Override
     public CrawlConfigListReply listCrawlConfigs(ListRequest request) {
         ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, TABLES.CRAWL_CONFIGS);
-        return queryBuilder.executeList(otw, this, CrawlConfigListReply.newBuilder()).build();
+        return queryBuilder.executeList(this, CrawlConfigListReply.newBuilder()).build();
     }
 
     @Override
@@ -633,7 +631,7 @@ public class RethinkDbAdapter implements DbAdapter {
     @Override
     public CrawlScheduleConfigListReply listCrawlScheduleConfigs(ListRequest request) {
         ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, TABLES.CRAWL_SCHEDULE_CONFIGS);
-        return queryBuilder.executeList(otw, this, CrawlScheduleConfigListReply.newBuilder()).build();
+        return queryBuilder.executeList(this, CrawlScheduleConfigListReply.newBuilder()).build();
     }
 
     @Override
@@ -650,7 +648,7 @@ public class RethinkDbAdapter implements DbAdapter {
     @Override
     public PolitenessConfigListReply listPolitenessConfigs(ListRequest request) {
         ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, TABLES.POLITENESS_CONFIGS);
-        return queryBuilder.executeList(otw, this, PolitenessConfigListReply.newBuilder()).build();
+        return queryBuilder.executeList(this, PolitenessConfigListReply.newBuilder()).build();
     }
 
     @Override
@@ -667,7 +665,7 @@ public class RethinkDbAdapter implements DbAdapter {
     @Override
     public BrowserConfigListReply listBrowserConfigs(ListRequest request) {
         ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, TABLES.BROWSER_CONFIGS);
-        return queryBuilder.executeList(otw, this, BrowserConfigListReply.newBuilder()).build();
+        return queryBuilder.executeList(this, BrowserConfigListReply.newBuilder()).build();
     }
 
     @Override
@@ -683,9 +681,11 @@ public class RethinkDbAdapter implements DbAdapter {
 
     @Override
     public LogLevels getLogConfig() {
-        Map<String, Object> response = executeRequest(r.table(RethinkDbAdapter.TABLES.SYSTEM.name)
-                .get("log_levels")
-                .pluck("logLevel"));
+        Map<String, Object> response = executeRequest("get-logconfig",
+                r.table(RethinkDbAdapter.TABLES.SYSTEM.name)
+                        .get("log_levels")
+                        .pluck("logLevel")
+        );
 
         return ProtoUtils.rethinkToProto(response, LogLevels.class);
     }
@@ -694,16 +694,12 @@ public class RethinkDbAdapter implements DbAdapter {
     public LogLevels saveLogConfig(LogLevels logLevels) {
         Map<String, Object> doc = ProtoUtils.protoToRethink(logLevels);
         doc.put("id", "log_levels");
-//        Map<String, Object> response = executeRequest(r.table(RethinkDbAdapter.TABLES.SYSTEM.name)
-        return executeInsert(r.table(RethinkDbAdapter.TABLES.SYSTEM.name)
-                .insert(doc)
-                .optArg("conflict", "replace"), LogLevels.class);
-//                .optArg("returnChanges", "always"));
-
-//        List<Map<String, Map>> changes = (List<Map<String, Map>>) response.get("changes");
-//
-//        Map newDoc = changes.get(0).get("new_val").;
-//        return ProtoUtils.rethinkToProto(newDoc, type);
+        return executeInsert("save-logconfig",
+                r.table(RethinkDbAdapter.TABLES.SYSTEM.name)
+                        .insert(doc)
+                        .optArg("conflict", "replace"),
+                LogLevels.class
+        );
     }
 
     public <T extends Message> T saveConfigMessage(T msg, TABLES table) {
@@ -717,8 +713,7 @@ public class RethinkDbAdapter implements DbAdapter {
 
         rMap.put("meta", updateMeta((Map) rMap.get("meta"), null));
 
-        return otw.map("db-save" + msg.getClass().getSimpleName(),
-                this::executeInsert,
+        return executeInsert("db-save" + msg.getClass().getSimpleName(),
                 r.table(table.name)
                         .insert(rMap)
                         // A rethink function which copies created and createby from old doc,
@@ -730,29 +725,31 @@ public class RethinkDbAdapter implements DbAdapter {
                                 .with("created", old_doc.g("meta").g("created"))
                                 .with("createdBy", old_doc.g("meta").g("createdBy"))
                         ))),
-                (Class<T>) msg.getClass());
+                (Class<T>) msg.getClass()
+        );
     }
 
     public <T extends Message> T saveMessage(T msg, TABLES table) {
         Map rMap = ProtoUtils.protoToRethink(msg);
-        return otw.map("db-save" + msg.getClass().getSimpleName(),
-                this::executeInsert,
+        return executeInsert("db-save" + msg.getClass().getSimpleName(),
                 r.table(table.name)
                         .insert(rMap)
                         // A rethink function which copies created and createby from old doc,
                         // and copies name if not existent in new doc
                         .optArg("conflict", "replace"),
-                (Class<T>) msg.getClass());
+                (Class<T>) msg.getClass()
+        );
     }
 
     public <T extends Message> Empty deleteConfigMessage(T entity, TABLES table) {
         Descriptors.FieldDescriptor idDescriptor = entity.getDescriptorForType().findFieldByName("id");
 
-        otw.map("db-delete" + entity.getClass().getSimpleName(),
-                this::executeRequest,
+        executeRequest("db-delete" + entity.getClass().getSimpleName(),
                 r.table(table.name)
                         .get(entity.getField(idDescriptor))
-                        .delete());
+                        .delete()
+        );
+
         return Empty.getDefaultInstance();
     }
 
@@ -778,17 +775,17 @@ public class RethinkDbAdapter implements DbAdapter {
         return meta;
     }
 
-    public <T extends Message> T executeInsert(Insert qry, Class<T> type) {
+    public <T extends Message> T executeInsert(String operationName, Insert qry, Class<T> type) {
         qry = qry.optArg("return_changes", "always");
 
-        Map<String, Object> response = executeRequest(qry);
+        Map<String, Object> response = executeRequest(operationName, qry);
         List<Map<String, Map>> changes = (List<Map<String, Map>>) response.get("changes");
 
         Map newDoc = changes.get(0).get("new_val");
         return ProtoUtils.rethinkToProto(newDoc, type);
     }
 
-    public <T> T executeRequest(ReqlExpr qry) {
+    public <T> T executeRequest(String operationName, ReqlExpr qry) {
         synchronized (this) {
             if (!conn.isOpen()) {
                 try {
@@ -800,7 +797,8 @@ public class RethinkDbAdapter implements DbAdapter {
         }
 
         try {
-            T result = qry.run(conn);
+            OptArgs globalOpts = OptArgs.of(ConnectionTracingInterceptor.OPERATION_NAME_KEY, operationName);
+            T result = qry.run(conn, globalOpts);
             if (result instanceof Map
                     && ((Map) result).containsKey("errors")
                     && !((Map) result).get("errors").equals(0L)) {
@@ -842,7 +840,7 @@ public class RethinkDbAdapter implements DbAdapter {
             qry.addFilter(j -> j.g(dependentField.getJsonName()).eq(messageToCheck.getField(messageIdField)));
         }
 
-        long dependencyCount = qry.executeCount(otw, this);
+        long dependencyCount = qry.executeCount(this);
         if (dependencyCount > 0) {
             throw new IllegalStateException("Can't delete " + messageToCheck.getClass().getSimpleName()
                     + ", there are " + dependencyCount + " " + dependentMessage.getClass().getSimpleName()

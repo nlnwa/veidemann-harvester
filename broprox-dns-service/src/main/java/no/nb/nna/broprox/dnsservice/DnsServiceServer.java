@@ -41,7 +41,7 @@ public class DnsServiceServer {
         config.checkValid(ConfigFactory.defaultReference());
         SETTINGS = ConfigBeanFactory.create(config, Settings.class);
 
-        TracerFactory.init("DnsService", SETTINGS.getTracerUri());
+        TracerFactory.init("DnsService");
     }
 
     public DnsServiceServer() {

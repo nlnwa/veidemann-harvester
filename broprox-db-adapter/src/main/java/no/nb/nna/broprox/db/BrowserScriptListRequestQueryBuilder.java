@@ -18,7 +18,6 @@ package no.nb.nna.broprox.db;
 
 import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListReply;
 import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListRequest;
-import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
 
 /**
  *
@@ -45,8 +44,8 @@ public class BrowserScriptListRequestQueryBuilder extends ConfigListQueryBuilder
         }
     }
 
-    public BrowserScriptListReply.Builder executeList(OpenTracingWrapper otw, RethinkDbAdapter db) {
-        return executeList(otw, db, BrowserScriptListReply.newBuilder());
+    public BrowserScriptListReply.Builder executeList(RethinkDbAdapter db) {
+        return executeList(db, BrowserScriptListReply.newBuilder());
     }
 
 }

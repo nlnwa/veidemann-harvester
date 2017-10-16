@@ -17,10 +17,12 @@ package no.nb.nna.broprox.frontier.api;
 
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
+import io.opentracing.ActiveSpan;
+import io.opentracing.contrib.OpenTracingContextKey;
 import io.opentracing.tag.Tags;
+import io.opentracing.util.GlobalTracer;
 import no.nb.nna.broprox.api.FrontierGrpc;
 import no.nb.nna.broprox.api.FrontierProto.CrawlSeedRequest;
-import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
 import no.nb.nna.broprox.frontier.worker.Frontier;
 import no.nb.nna.broprox.model.MessagesProto.CrawlExecutionStatus;
 import org.slf4j.Logger;
@@ -41,11 +43,14 @@ public class FrontierService extends FrontierGrpc.FrontierImplBase {
 
     @Override
     public void crawlSeed(CrawlSeedRequest request, StreamObserver<CrawlExecutionStatus> respObserver) {
-        try {
-            OpenTracingWrapper otw = new OpenTracingWrapper("Frontier_API", Tags.SPAN_KIND_SERVER)
-                    .addTag(Tags.HTTP_URL.getKey(), request.getSeed().getMeta().getName());
-            CrawlExecutionStatus reply = otw.map(
-                    "fetchSeed", frontier::newExecution, request.getJob(), request.getSeed());
+        try (ActiveSpan span = GlobalTracer.get()
+                .buildSpan("scheduleSeed")
+                .asChildOf(OpenTracingContextKey.activeSpan())
+                .withTag(Tags.COMPONENT.getKey(), "Frontier")
+                .withTag(Tags.SPAN_KIND.getKey(), Tags.SPAN_KIND_SERVER)
+                .withTag("uri", request.getSeed().getMeta().getName())
+                .startActive()) {
+            CrawlExecutionStatus reply = frontier.scheduleSeed(request.getJob(), request.getSeed());
 
             respObserver.onNext(reply);
             respObserver.onCompleted();

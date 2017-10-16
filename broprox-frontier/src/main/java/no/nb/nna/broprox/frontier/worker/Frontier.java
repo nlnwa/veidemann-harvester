@@ -18,9 +18,11 @@ package no.nb.nna.broprox.frontier.worker;
 import java.net.URISyntaxException;
 import java.util.concurrent.TimeUnit;
 
+import io.opentracing.ActiveSpan;
+import io.opentracing.tag.Tags;
+import io.opentracing.util.GlobalTracer;
 import no.nb.nna.broprox.commons.client.DnsServiceClient;
 import no.nb.nna.broprox.commons.client.RobotsServiceClient;
-import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
 import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
 import no.nb.nna.broprox.model.ConfigProto.CrawlJob;
@@ -53,11 +55,6 @@ public class Frontier implements AutoCloseable {
         this.robotsServiceClient = robotsServiceClient;
         this.dnsServiceClient = dnsServiceClient;
         this.queueWorker = new QueueWorker(this, 5);
-    }
-
-    public CrawlExecutionStatus newExecution(final CrawlJob job, final Seed seed) {
-        OpenTracingWrapper otw = new OpenTracingWrapper("Frontier");
-        return otw.map("scheduleSeed", this::scheduleSeed, job, seed);
     }
 
     public CrawlExecutionStatus scheduleSeed(final CrawlJob job, final Seed seed) {

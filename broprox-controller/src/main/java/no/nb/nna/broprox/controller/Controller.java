@@ -43,7 +43,7 @@ public class Controller {
         config.checkValid(ConfigFactory.defaultReference());
         SETTINGS = ConfigBeanFactory.create(config, Settings.class);
 
-        TracerFactory.init("Controller", SETTINGS.getTracerUri());
+        TracerFactory.init("Controller");
     }
 
     public Controller() {
@@ -60,7 +60,7 @@ public class Controller {
                         .getFrontierPort());
                 ControllerApiServer apiServer = new ControllerApiServer(SETTINGS.getApiPort(), db, frontierClient)
                         .start();
-                
+
                 CrawlJobScheduler scheduler = new CrawlJobScheduler(db, frontierClient).start();) {
 
             LOG.info("Broprox Controller (v. {}) started", Controller.class.getPackage().getImplementationVersion());

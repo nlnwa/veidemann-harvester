@@ -37,11 +37,12 @@ import com.google.protobuf.ByteString;
 import io.grpc.StatusException;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
+import io.opentracing.ActiveSpan;
 import io.opentracing.tag.Tags;
+import io.opentracing.util.GlobalTracer;
 import no.nb.nna.broprox.commons.DbAdapter;
 import no.nb.nna.broprox.commons.ExtraStatusCodes;
 import no.nb.nna.broprox.commons.client.ContentWriterClient;
-import no.nb.nna.broprox.commons.opentracing.OpenTracingWrapper;
 import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
 import org.netpreserve.commons.util.datetime.DateFormat;
@@ -126,11 +127,13 @@ public class DnsLookup {
     }
 
     public InetSocketAddress resolve(String host, int port) throws UnknownHostException {
-        OpenTracingWrapper otw = new OpenTracingWrapper("DnsLookup", Tags.SPAN_KIND_CLIENT)
-                .addTag("lookup", host + ':' + port)
-                .setExtractParentSpanFromGrpcContext(false);
-        try {
-            return otw.call("resolve", new Resolver(host, port));
+        try (ActiveSpan span = GlobalTracer.get()
+                .buildSpan("resolve")
+                .withTag(Tags.COMPONENT.getKey(), "DnsLookup")
+                .withTag(Tags.SPAN_KIND.getKey(), Tags.SPAN_KIND_SERVER)
+                .withTag("lookup", host + ':' + port)
+                .startActive()) {
+            return new Resolver(host, port).call();
         } catch (UnknownHostException ex) {
             LOG.info("Failed DNS lookup of host '{}' and port '{}'", host, port, ex);
             throw ex;

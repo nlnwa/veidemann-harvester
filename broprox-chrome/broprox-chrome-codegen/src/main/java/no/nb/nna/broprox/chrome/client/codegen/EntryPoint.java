@@ -32,6 +32,7 @@ import com.squareup.javapoet.ParameterSpec;
 import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
+import io.opentracing.Tracer;
 import javax.lang.model.element.Modifier;
 
 import static no.nb.nna.broprox.chrome.client.codegen.Protocol.uncap;
@@ -43,6 +44,13 @@ public class EntryPoint {
     static final ClassName type = ClassName.get(Codegen.PACKAGE, "ChromeDebugProtocol");
 
     static final FieldSpec protocolClient = FieldSpec.builder(Codegen.CLIENT_CLASS, "protocolClient", Modifier.FINAL)
+            .build();
+
+    static final FieldSpec tracer = FieldSpec.builder(Tracer.class, "tracer", Modifier.FINAL)
+            .build();
+
+    static final FieldSpec withActiveSpanOnly = FieldSpec
+            .builder(boolean.class, "withActiveSpanOnly", Modifier.FINAL)
             .build();
 
     final TypeName sessionListType = ParameterizedTypeName.get(ClassName.get(List.class), Session.type);
@@ -84,12 +92,14 @@ public class EntryPoint {
                 .addField(port)
                 .addField(protocolClient)
                 .addField(sessions)
-                .addField(closed);
+                .addField(closed)
+                .addField(tracer)
+                .addField(withActiveSpanOnly);
     }
 
     static void generate(List<Domain> domains, File outdir) throws IOException {
         EntryPoint e = new EntryPoint(domains, outdir);
-        e.genConstructor();
+        e.genConstructors();
         e.genNewSessionMethod();
         e.genCloseMethod();
         e.genOnSessionClosedMethod();
@@ -104,15 +114,19 @@ public class EntryPoint {
         }
     }
 
-    void genConstructor() {
+    void genConstructors() {
 
         MethodSpec.Builder constructor = MethodSpec.constructorBuilder()
                 .addModifiers(Modifier.PUBLIC)
                 .addParameter(host.type, host.name, Modifier.FINAL)
                 .addParameter(port.type, port.name, Modifier.FINAL)
+                .addParameter(tracer.type, tracer.name, Modifier.FINAL)
+                .addParameter(withActiveSpanOnly.type, withActiveSpanOnly.name, Modifier.FINAL)
                 .addStatement("this.$1N = $1N", host)
                 .addStatement("this.$1N = $1N", port)
-                .addStatement("$N = new Cdp($L)", protocolClient, createUrl("ws", host, port, "/devtools/browser"));
+                .addStatement("this.$1N = $1N", tracer)
+                .addStatement("this.$1N = $1N", withActiveSpanOnly)
+                .addStatement("$N = new Cdp($L, $N, $N)", protocolClient, createUrl("ws", host, port, "/devtools/browser"), tracer, withActiveSpanOnly);
 
         for (Domain domain : domains) {
             if ("Target".equals(domain.domain)) {
@@ -123,6 +137,23 @@ public class EntryPoint {
                 constructor.addStatement("$N = new $T($N)", field, field.type, protocolClient);
             }
         }
+
+        classBuilder.addMethod(constructor.build());
+
+        constructor = MethodSpec.constructorBuilder()
+                .addModifiers(Modifier.PUBLIC)
+                .addParameter(host.type, host.name, Modifier.FINAL)
+                .addParameter(port.type, port.name, Modifier.FINAL)
+                .addParameter(tracer.type, tracer.name, Modifier.FINAL)
+                .addStatement("this($N, $N, $N, true)", host, port, tracer);
+
+        classBuilder.addMethod(constructor.build());
+
+        constructor = MethodSpec.constructorBuilder()
+                .addModifiers(Modifier.PUBLIC)
+                .addParameter(host.type, host.name, Modifier.FINAL)
+                .addParameter(port.type, port.name, Modifier.FINAL)
+                .addStatement("this($N, $N, null, true)", host, port);
 
         classBuilder.addMethod(constructor.build());
     }

@@ -27,3 +27,4 @@ buildNumber.properties
 # IDEA
 *.iml
 .idea
+/src/main/kubernetes-auau/configmap.yml

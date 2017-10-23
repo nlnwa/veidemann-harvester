@@ -44,6 +44,13 @@
             <artifactId>jaeger-context</artifactId>
         </dependency>
 
+        <!-- Token validation -->
+        <dependency>
+            <groupId>com.nimbusds</groupId>
+            <artifactId>oauth2-oidc-sdk</artifactId>
+            <version>5.38</version>
+        </dependency>
+
         <!-- Configuration framework -->
         <dependency>
             <groupId>com.typesafe</groupId>

@@ -15,27 +15,48 @@
  */
 package no.nb.nna.broprox.controller;
 
-import java.io.IOException;
-import java.time.OffsetDateTime;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-
+import com.google.common.collect.ImmutableList;
+import com.nimbusds.jwt.JWTClaimsSet;
+import io.grpc.Attributes;
+import io.grpc.CallCredentials;
 import io.grpc.ManagedChannel;
+import io.grpc.Metadata;
+import io.grpc.MethodDescriptor;
+import io.grpc.StatusRuntimeException;
 import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
 import io.grpc.stub.StreamObserver;
+import net.minidev.json.JSONArray;
 import no.nb.nna.broprox.api.ControllerGrpc;
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;
 import no.nb.nna.broprox.api.ControllerProto.ListRequest;
 import no.nb.nna.broprox.commons.DbAdapter;
+import no.nb.nna.broprox.commons.auth.AuAuServerInterceptor;
+import no.nb.nna.broprox.commons.auth.EmailContextKey;
+import no.nb.nna.broprox.commons.auth.IdTokenAuAuServerInterceptor;
+import no.nb.nna.broprox.commons.auth.IdTokenValidator;
+import no.nb.nna.broprox.commons.auth.NoopAuAuServerInterceptor;
+import no.nb.nna.broprox.commons.auth.UserRoleMapper;
 import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.model.ConfigProto;
 import no.nb.nna.broprox.model.ConfigProto.CrawlEntity;
+import no.nb.nna.broprox.model.ConfigProto.Role;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
 
-import static org.assertj.core.api.Assertions.*;
+import java.io.IOException;
+import java.time.OffsetDateTime;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.fail;
 import static org.mockito.Mockito.*;
 
 /**
@@ -55,6 +76,9 @@ public class ControllerServiceTest {
 
     private ControllerGrpc.ControllerStub asyncStub;
 
+    @Rule
+    public ExpectedException thrown = ExpectedException.none();
+
     @Before
     public void beforeEachTest() throws InstantiationException, IllegalAccessException, IOException {
         inProcessServerBuilder = InProcessServerBuilder.forName(uniqueServerName).directExecutor();
@@ -72,7 +96,8 @@ public class ControllerServiceTest {
     @Test
     public void testSaveEntity() throws InterruptedException {
         DbAdapter dbMock = mock(DbAdapter.class);
-        inProcessServer = new ControllerApiServer(inProcessServerBuilder, dbMock, null).start();
+        AuAuServerInterceptor auau = new NoopAuAuServerInterceptor();
+        inProcessServer = new ControllerApiServer(inProcessServerBuilder, dbMock, null, auau).start();
 
         CrawlEntity request = CrawlEntity.newBuilder()
                 .setMeta(ConfigProto.Meta.newBuilder()
@@ -132,7 +157,8 @@ public class ControllerServiceTest {
     @Test
     public void testListCrawlEntities() throws InterruptedException {
         DbAdapter dbMock = mock(DbAdapter.class);
-        inProcessServer = new ControllerApiServer(inProcessServerBuilder, dbMock, null).start();
+        AuAuServerInterceptor auau = new NoopAuAuServerInterceptor();
+        inProcessServer = new ControllerApiServer(inProcessServerBuilder, dbMock, null, auau).start();
 
         ListRequest request = ListRequest.newBuilder().build();
         CrawlEntityListReply reply = CrawlEntityListReply.newBuilder().build();
@@ -167,4 +193,57 @@ public class ControllerServiceTest {
         verifyNoMoreInteractions(dbMock);
     }
 
+    @Test
+    public void testAuthorization() {
+        CallCredentials cred = new CallCredentials() {
+            @Override
+            public void applyRequestMetadata(MethodDescriptor<?, ?> method, Attributes attrs, Executor appExecutor, MetadataApplier applier) {
+                Metadata headers = new Metadata();
+                headers.put(IdTokenAuAuServerInterceptor.BEARER_TOKEN_KEY, "token1");
+                applier.apply(headers);
+            }
+
+            @Override
+            public void thisUsesUnstableApi() {
+
+            }
+        };
+
+        DbAdapter dbMock = mock(DbAdapter.class);
+        IdTokenValidator idValidatorMock = mock(IdTokenValidator.class);
+        UserRoleMapper roleMapperMock = mock(UserRoleMapper.class);
+        AuAuServerInterceptor auau = new IdTokenAuAuServerInterceptor(roleMapperMock, idValidatorMock);
+        inProcessServer = new ControllerApiServer(inProcessServerBuilder, dbMock, null, auau).start();
+
+        when(dbMock.listCrawlEntities(ListRequest.getDefaultInstance()))
+                .thenReturn(CrawlEntityListReply.getDefaultInstance());
+        when(dbMock.saveCrawlEntity(CrawlEntity.getDefaultInstance()))
+                .thenAnswer(new Answer<CrawlEntity>() {
+            @Override
+            public CrawlEntity answer(InvocationOnMock invocation) throws Throwable {
+                assertThat(EmailContextKey.email()).isEqualTo("user@example.com");
+                return CrawlEntity.getDefaultInstance();
+            }
+        });
+        when(idValidatorMock.verifyIdToken("token1"))
+                .thenReturn(new JWTClaimsSet.Builder()
+                        .claim("email", "user@example.com")
+                        .claim("groups", new JSONArray())
+                        .build());
+        when(roleMapperMock.getRolesForUser(eq("user@example.com"), anyList()))
+                .thenReturn(ImmutableList.of(Role.READONLY));
+
+
+        assertThat(blockingStub.withCallCredentials(cred).listCrawlEntities(ListRequest.getDefaultInstance()))
+                .isSameAs(CrawlEntityListReply.getDefaultInstance());
+
+
+        thrown.expect(StatusRuntimeException.class);
+        thrown.expectMessage("PERMISSION_DENIED");
+
+        blockingStub.withCallCredentials(cred).saveEntity(CrawlEntity.getDefaultInstance());
+
+        thrown.expectMessage("UNAUTHENTICATED");
+        blockingStub.saveEntity(CrawlEntity.getDefaultInstance());
+    }
 }

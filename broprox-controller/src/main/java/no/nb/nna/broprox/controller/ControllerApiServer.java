@@ -15,17 +15,18 @@
  */
 package no.nb.nna.broprox.controller;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
-
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.opentracing.contrib.ServerTracingInterceptor;
 import io.opentracing.util.GlobalTracer;
-import no.nb.nna.broprox.controller.scheduler.FrontierClient;
 import no.nb.nna.broprox.commons.DbAdapter;
+import no.nb.nna.broprox.commons.auth.AuAuServerInterceptor;
+import no.nb.nna.broprox.controller.scheduler.FrontierClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.io.UncheckedIOException;
 
 /**
  *
@@ -36,19 +37,22 @@ public class ControllerApiServer implements AutoCloseable {
 
     private final Server server;
 
-    public ControllerApiServer(int port, DbAdapter db, FrontierClient frontierClient) {
-        this(ServerBuilder.forPort(port), db, frontierClient);
+    public ControllerApiServer(int port, DbAdapter db, FrontierClient frontierClient,
+                               AuAuServerInterceptor auAuServerInterceptor) {
+        this(ServerBuilder.forPort(port), db, frontierClient, auAuServerInterceptor);
     }
 
-    public ControllerApiServer(ServerBuilder<?> serverBuilder, DbAdapter db, FrontierClient frontierClient) {
+    public ControllerApiServer(ServerBuilder<?> serverBuilder, DbAdapter db, FrontierClient frontierClient,
+                               AuAuServerInterceptor auAuServerInterceptor) {
+
         ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor.Builder(GlobalTracer.get())
                 .withTracedAttributes(ServerTracingInterceptor.ServerRequestAttribute.CALL_ATTRIBUTES,
                         ServerTracingInterceptor.ServerRequestAttribute.METHOD_TYPE)
                 .build();
 
         server = serverBuilder
-                .addService(tracingInterceptor.intercept(new ControllerService(db, frontierClient)))
-                .addService(tracingInterceptor.intercept(new StatusService(db)))
+                .addService(tracingInterceptor.intercept(auAuServerInterceptor.intercept(new ControllerService(db, frontierClient))))
+                .addService(tracingInterceptor.intercept(auAuServerInterceptor.intercept(new StatusService(db))))
                 .build();
     }
 

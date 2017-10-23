@@ -16,6 +16,7 @@
 package no.nb.nna.broprox.controller;
 
 import com.google.protobuf.Empty;
+import io.grpc.Context;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import no.nb.nna.broprox.api.ControllerGrpc;
@@ -31,13 +32,19 @@ import no.nb.nna.broprox.api.ControllerProto.CrawlJobListRequest;
 import no.nb.nna.broprox.api.ControllerProto.CrawlScheduleConfigListReply;
 import no.nb.nna.broprox.api.ControllerProto.ListRequest;
 import no.nb.nna.broprox.api.ControllerProto.PolitenessConfigListReply;
+import no.nb.nna.broprox.api.ControllerProto.RoleList;
+import no.nb.nna.broprox.api.ControllerProto.RoleMappingsListReply;
+import no.nb.nna.broprox.api.ControllerProto.RoleMappingsListRequest;
 import no.nb.nna.broprox.api.ControllerProto.RunCrawlReply;
 import no.nb.nna.broprox.api.ControllerProto.RunCrawlRequest;
 import no.nb.nna.broprox.api.ControllerProto.SeedListReply;
 import no.nb.nna.broprox.api.ControllerProto.SeedListRequest;
 import no.nb.nna.broprox.commons.DbAdapter;
+import no.nb.nna.broprox.commons.auth.AllowedRoles;
+import no.nb.nna.broprox.commons.auth.RolesContextKey;
 import no.nb.nna.broprox.commons.util.CrawlScopes;
 import no.nb.nna.broprox.controller.scheduler.FrontierClient;
+import no.nb.nna.broprox.model.ConfigProto;
 import no.nb.nna.broprox.model.ConfigProto.BrowserConfig;
 import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
 import no.nb.nna.broprox.model.ConfigProto.CrawlConfig;
@@ -47,9 +54,13 @@ import no.nb.nna.broprox.model.ConfigProto.CrawlJob;
 import no.nb.nna.broprox.model.ConfigProto.CrawlScheduleConfig;
 import no.nb.nna.broprox.model.ConfigProto.LogLevels;
 import no.nb.nna.broprox.model.ConfigProto.PolitenessConfig;
+import no.nb.nna.broprox.model.ConfigProto.Role;
+import no.nb.nna.broprox.model.ConfigProto.RoleMapping;
 import no.nb.nna.broprox.model.ConfigProto.Seed;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.Collection;
 
 /**
  *
@@ -68,6 +79,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
+    @AllowedRoles({Role.CURATOR, Role.ADMIN})
     public void saveEntity(CrawlEntity request, StreamObserver<CrawlEntity> respObserver) {
         try {
             respObserver.onNext(db.saveCrawlEntity(request));
@@ -80,6 +92,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
+    @AllowedRoles({Role.READONLY, Role.CURATOR, Role.ADMIN})
     public void listCrawlEntities(ListRequest request, StreamObserver<CrawlEntityListReply> respObserver) {
         try {
             respObserver.onNext(db.listCrawlEntities(request));
@@ -92,6 +105,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
+    @AllowedRoles({Role.CURATOR, Role.ADMIN})
     public void deleteEntity(CrawlEntity request, StreamObserver<Empty> respObserver) {
         try {
             respObserver.onNext(db.deleteCrawlEntity(request));
@@ -104,6 +118,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
+    @AllowedRoles({Role.ADMIN})
     public void deleteCrawlScheduleConfig(CrawlScheduleConfig request, StreamObserver<Empty> respObserver) {
         try {
             respObserver.onNext(db.deleteCrawlScheduleConfig(request));
@@ -117,6 +132,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
+    @AllowedRoles({Role.CURATOR, Role.ADMIN})
     public void saveCrawlScheduleConfig(CrawlScheduleConfig request, StreamObserver<CrawlScheduleConfig> respObserver) {
         try {
             respObserver.onNext(db.saveCrawlScheduleConfig(request));
@@ -129,6 +145,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
+    @AllowedRoles({Role.READONLY, Role.CURATOR, Role.ADMIN})
     public void listCrawlScheduleConfigs(ListRequest request,
             StreamObserver<CrawlScheduleConfigListReply> respObserver) {
         try {
@@ -142,6 +159,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
+    @AllowedRoles({Role.ADMIN})
     public void deleteCrawlConfig(CrawlConfig request, StreamObserver<Empty> respObserver) {
         try {
             respObserver.onNext(db.deleteCrawlConfig(request));
@@ -154,6 +172,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
+    @AllowedRoles({Role.ADMIN})
     public void saveCrawlConfig(CrawlConfig request, StreamObserver<CrawlConfig> respObserver) {
         try {
             respObserver.onNext(db.saveCrawlConfig(request));
@@ -166,6 +185,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
+    @AllowedRoles({Role.READONLY, Role.CURATOR, Role.ADMIN})
     public void listCrawlConfigs(ListRequest request, StreamObserver<CrawlConfigListReply> respObserver) {
         try {
             respObserver.onNext(db.listCrawlConfigs(request));
@@ -178,6 +198,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
+    @AllowedRoles({Role.ADMIN})
     public void deleteCrawlJob(CrawlJob request, StreamObserver<Empty> respObserver) {
         try {
             respObserver.onNext(db.deleteCrawlJob(request));
@@ -190,6 +211,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
+    @AllowedRoles({Role.ADMIN})
     public void saveCrawlJob(CrawlJob request, StreamObserver<CrawlJob> respObserver) {
         try {
             respObserver.onNext(db.saveCrawlJob(request));
@@ -202,6 +224,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
+    @AllowedRoles({Role.CURATOR, Role.ADMIN})
     public void listCrawlJobs(CrawlJobListRequest request, StreamObserver<CrawlJobListReply> respObserver) {
         try {
             respObserver.onNext(db.listCrawlJobs(request));
@@ -214,6 +237,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
+    @AllowedRoles({Role.CURATOR, Role.ADMIN})
     public void deleteSeed(Seed request, StreamObserver<Empty> respObserver) {
         try {
             respObserver.onNext(db.deleteSeed(request));
@@ -226,6 +250,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
+    @AllowedRoles({Role.CURATOR, Role.ADMIN})
     public void saveSeed(Seed request, StreamObserver<Seed> respObserver) {
         try {
             // If scope is not set, apply default scope
@@ -244,6 +269,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
+    @AllowedRoles({Role.READONLY, Role.CURATOR, Role.ADMIN})
     public void listSeeds(SeedListRequest request, StreamObserver<SeedListReply> respObserver) {
         try {
             respObserver.onNext(db.listSeeds(request));
@@ -256,6 +282,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
+    @AllowedRoles({Role.ADMIN})
     public void deleteBrowserConfig(BrowserConfig request, StreamObserver<Empty> respObserver) {
         try {
             respObserver.onNext(db.deleteBrowserConfig(request));
@@ -268,6 +295,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
+    @AllowedRoles({Role.ADMIN})
     public void saveBrowserConfig(BrowserConfig request,
             StreamObserver<BrowserConfig> respObserver) {
         try {
@@ -281,6 +309,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
+    @AllowedRoles({Role.READONLY, Role.CURATOR, Role.ADMIN})
     public void listBrowserConfigs(ListRequest request,
             StreamObserver<BrowserConfigListReply> respObserver) {
         try {
@@ -294,6 +323,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
+    @AllowedRoles({Role.ADMIN})
     public void deletePolitenessConfig(PolitenessConfig request, StreamObserver<Empty> respObserver) {
         try {
             respObserver.onNext(db.deletePolitenessConfig(request));
@@ -306,6 +336,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
+    @AllowedRoles({Role.ADMIN})
     public void savePolitenessConfig(PolitenessConfig request, StreamObserver<PolitenessConfig> respObserver) {
         try {
             respObserver.onNext(db.savePolitenessConfig(request));
@@ -318,6 +349,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
+    @AllowedRoles({Role.READONLY, Role.CURATOR, Role.ADMIN})
     public void listPolitenessConfigs(ListRequest request, StreamObserver<PolitenessConfigListReply> respObserver) {
         try {
             respObserver.onNext(db.listPolitenessConfigs(request));
@@ -330,6 +362,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
+    @AllowedRoles({Role.ADMIN})
     public void saveBrowserScript(BrowserScript request, StreamObserver<BrowserScript> respObserver) {
         try {
             respObserver.onNext(db.saveBrowserScript(request));
@@ -342,6 +375,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
+    @AllowedRoles({Role.READONLY, Role.CURATOR, Role.ADMIN})
     public void listBrowserScripts(BrowserScriptListRequest request,
             StreamObserver<BrowserScriptListReply> respObserver) {
         try {
@@ -355,6 +389,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
+    @AllowedRoles({Role.ADMIN})
     public void deleteBrowserScript(BrowserScript request, StreamObserver<Empty> respObserver) {
         try {
             respObserver.onNext(db.deleteBrowserScript(request));
@@ -367,6 +402,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
+    @AllowedRoles({Role.CURATOR, Role.ADMIN})
     public void saveCrawlHostGroupConfig(CrawlHostGroupConfig request, StreamObserver<CrawlHostGroupConfig> respObserver) {
         try {
             respObserver.onNext(db.saveCrawlHostGroupConfig(request));
@@ -379,6 +415,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
+    @AllowedRoles({Role.READONLY, Role.CURATOR, Role.ADMIN})
     public void listCrawlHostGroupConfigs(ListRequest request,
             StreamObserver<CrawlHostGroupConfigListReply> respObserver) {
         try {
@@ -392,6 +429,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
+    @AllowedRoles({Role.CURATOR, Role.ADMIN})
     public void deleteCrawlHostGroupConfig(CrawlHostGroupConfig request, StreamObserver<Empty> respObserver) {
         try {
             respObserver.onNext(db.deleteCrawlHostGroupConfig(request));
@@ -404,6 +442,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
+    @AllowedRoles({Role.CURATOR, Role.ADMIN})
     public void saveLogConfig(LogLevels request, StreamObserver<LogLevels> respObserver) {
         try {
             respObserver.onNext(db.saveLogConfig(request));
@@ -416,6 +455,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
+    @AllowedRoles({Role.READONLY, Role.CURATOR, Role.ADMIN})
     public void getLogConfig(Empty request, StreamObserver<LogLevels> respObserver) {
         try {
             respObserver.onNext(db.getLogConfig());
@@ -428,6 +468,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
+    @AllowedRoles({Role.CURATOR, Role.ADMIN})
     public void runCrawl(RunCrawlRequest request, StreamObserver<RunCrawlReply> respObserver) {
         try {
             RunCrawlReply.Builder reply = RunCrawlReply.newBuilder();
@@ -472,11 +513,68 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
+    @AllowedRoles({Role.CURATOR, Role.ADMIN})
     public void abortCrawl(AbortCrawlRequest request, StreamObserver<Empty> respObserver) {
         try {
             db.setExecutionStateAborted(request.getExecutionId());
 
             respObserver.onNext(Empty.getDefaultInstance());
+            respObserver.onCompleted();
+        } catch (Exception e) {
+            LOG.error(e.getMessage(), e);
+            Status status = Status.UNKNOWN.withDescription(e.toString());
+            respObserver.onError(status.asException());
+        }
+    }
+
+    @Override
+    @AllowedRoles({Role.ADMIN})
+    public void listRoleMappings(RoleMappingsListRequest request, StreamObserver<RoleMappingsListReply> respObserver) {
+        try {
+            respObserver.onNext(db.listRoleMappings(request));
+            respObserver.onCompleted();
+        } catch (Exception ex) {
+            LOG.error(ex.getMessage(), ex);
+            Status status = Status.UNKNOWN.withDescription(ex.toString());
+            respObserver.onError(status.asException());
+        }
+    }
+
+    @Override
+    @AllowedRoles({Role.ADMIN})
+    public void saveRoleMapping(RoleMapping request, StreamObserver<RoleMapping> respObserver) {
+        try {
+            respObserver.onNext(db.saveRoleMapping(request));
+            respObserver.onCompleted();
+        } catch (Exception ex) {
+            LOG.error(ex.getMessage(), ex);
+            Status status = Status.UNKNOWN.withDescription(ex.toString());
+            respObserver.onError(status.asException());
+        }
+    }
+
+    @Override
+    @AllowedRoles({Role.ADMIN})
+    public void deleteRoleMapping(RoleMapping request, StreamObserver<Empty> respObserver) {
+        try {
+            respObserver.onNext(db.deleteRoleMapping(request));
+            respObserver.onCompleted();
+        } catch (Exception ex) {
+            LOG.error(ex.getMessage(), ex);
+            Status status = Status.UNKNOWN.withDescription(ex.toString());
+            respObserver.onError(status.asException());
+        }
+    }
+
+    @Override
+    public void getRolesForActiveUser(Empty request, StreamObserver<RoleList> respObserver) {
+        try {
+            Collection<Role> roles = RolesContextKey.roles();
+            if (roles == null) {
+                respObserver.onNext(RoleList.newBuilder().build());
+            } else {
+                respObserver.onNext(RoleList.newBuilder().addAllRole(roles).build());
+            }
             respObserver.onCompleted();
         } catch (Exception e) {
             LOG.error(e.getMessage(), e);

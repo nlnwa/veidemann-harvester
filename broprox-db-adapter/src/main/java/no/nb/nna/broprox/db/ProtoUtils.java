@@ -15,19 +15,10 @@
  */
 package no.nb.nna.broprox.db;
 
-import java.lang.reflect.InvocationTargetException;
-import java.time.Instant;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.stream.Collectors;
-
 import com.google.common.collect.ImmutableMap;
 import com.google.protobuf.ByteString;
-import com.google.protobuf.Descriptors;
+import com.google.protobuf.Descriptors.EnumValueDescriptor;
+import com.google.protobuf.Descriptors.FieldDescriptor.Type;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.MapEntry;
 import com.google.protobuf.Message;
@@ -37,6 +28,16 @@ import com.google.protobuf.util.JsonFormat;
 import com.google.protobuf.util.Timestamps;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.lang.reflect.InvocationTargetException;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 import static no.nb.nna.broprox.db.RethinkDbAdapter.r;
 
@@ -76,14 +77,17 @@ public class ProtoUtils {
                         Object mapValue = ((MapEntry) entry).getValue();
 
                         if (f.getMessageType().findFieldByName("value").getType()
-                                == Descriptors.FieldDescriptor.Type.MESSAGE) {
+                                == Type.MESSAGE) {
                             mapValue = protoToRethink((MessageOrBuilder) mapValue);
                         }
 
                         Map map = r.hashMap(mapKey, mapValue);
                         l.add(map);
-                    } else if (f.getType() == Descriptors.FieldDescriptor.Type.MESSAGE) {
+                    } else if (f.getType() == Type.MESSAGE) {
                         l.add(protoToRethink((MessageOrBuilder) entry));
+                    } else if (f.getType() == Type.ENUM) {
+                        String enumValue = ((EnumValueDescriptor) entry).getName();
+                        l.add(enumValue);
                     } else {
                         l.add(entry);
                     }
@@ -120,8 +124,8 @@ public class ProtoUtils {
     /**
      * Convert a Map response from RethinkDb to a ProtoBuf Message.
      *
-     * @param <T> The ProtoBuf message type
-     * @param msg a Map from a RethinkDb response
+     * @param <T>  The ProtoBuf message type
+     * @param msg  a Map from a RethinkDb response
      * @param type The Class of the ProtoBuf message type
      * @return the generated ProtoBuf Message
      */
@@ -137,8 +141,8 @@ public class ProtoUtils {
     /**
      * Convert a Map response from RethinkDb to a ProtoBuf Message.
      *
-     * @param <T> The ProtoBuf message type
-     * @param msg a Map from a RethinkDb response
+     * @param <T>          The ProtoBuf message type
+     * @param msg          a Map from a RethinkDb response
      * @param protoBuilder a builder for the ProtoBuf Message type
      * @return the generated ProtoBuf Message
      */
@@ -150,18 +154,23 @@ public class ProtoUtils {
             if (value != null) {
                 if (fd.isRepeated()) {
                     ((List) value).forEach((v) -> {
-                        if (fd.getType() == Descriptors.FieldDescriptor.Type.MESSAGE) {
-                            Map valueMap = (Map) v;
+                        switch (fd.getType()) {
+                            case MESSAGE:
+                                Map valueMap = (Map) v;
 
-                            if (fd.isMapField()) {
-                                Object key = valueMap.keySet().iterator().next();
-                                valueMap = ImmutableMap.of("key", key, "value", valueMap.get(key));
-                            }
+                                if (fd.isMapField()) {
+                                    Object key = valueMap.keySet().iterator().next();
+                                    valueMap = ImmutableMap.of("key", key, "value", valueMap.get(key));
+                                }
 
-                            protoBuilder.addRepeatedField(fd, rethinkToProto(valueMap, protoBuilder
-                                    .newBuilderForField(fd)));
-                        } else {
-                            protoBuilder.addRepeatedField(fd, v);
+                                protoBuilder.addRepeatedField(fd, rethinkToProto(valueMap, protoBuilder
+                                        .newBuilderForField(fd)));
+                                break;
+                            case ENUM:
+                                protoBuilder.addRepeatedField(fd, fd.getEnumType().findValueByName((String) v));
+                                break;
+                            default:
+                                protoBuilder.addRepeatedField(fd, v);
                         }
                     });
                 } else {

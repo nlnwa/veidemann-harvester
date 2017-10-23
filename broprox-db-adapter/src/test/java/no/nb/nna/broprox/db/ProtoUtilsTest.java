@@ -26,6 +26,8 @@ import com.google.protobuf.util.Timestamps;
 import no.nb.nna.broprox.api.ControllerProto.PolitenessConfigListReply;
 import no.nb.nna.broprox.model.ConfigProto;
 import no.nb.nna.broprox.model.ConfigProto.PolitenessConfig;
+import no.nb.nna.broprox.model.ConfigProto.Role;
+import no.nb.nna.broprox.model.ConfigProto.RoleMapping;
 import org.junit.Test;
 
 import static no.nb.nna.broprox.db.RethinkDbAdapter.r;
@@ -70,6 +72,12 @@ public class ProtoUtilsTest {
         Map<String, Object> result = ProtoUtils.protoToRethink(msg);
 
         assertThat(result).isEqualTo(politenessConfigList);
+
+        // Check conversion of object with list of enums
+        Map roleMappingRethink = r.hashMap("email", "admin@example.com")
+                .with("role", r.array(Role.ADMIN.name(), Role.CURATOR.name()));
+        RoleMapping roleMappingProto = RoleMapping.newBuilder().setEmail("admin@example.com").addRole(Role.ADMIN).addRole(Role.CURATOR).build();
+        assertThat(ProtoUtils.protoToRethink(roleMappingProto)).isEqualTo(roleMappingRethink);
     }
 
     /**
@@ -107,6 +115,12 @@ public class ProtoUtilsTest {
                 .rethinkToProto(politenessConfigList, PolitenessConfigListReply.class);
 
         assertThat(result).isEqualTo(expResult);
+
+        // Check conversion of object with list of enums
+        Map roleMappingRethink = r.hashMap("email", "admin@example.com")
+                .with("role", r.array(Role.ADMIN.name(), Role.CURATOR.name()));
+        RoleMapping roleMappingProto = RoleMapping.newBuilder().setEmail("admin@example.com").addRole(Role.ADMIN).addRole(Role.CURATOR).build();
+        assertThat(ProtoUtils.rethinkToProto(roleMappingRethink, RoleMapping.class)).isEqualTo(roleMappingProto);
     }
 
     /**

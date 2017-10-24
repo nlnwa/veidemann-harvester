@@ -8,12 +8,12 @@ import (
 	"github.com/spf13/viper"
 	"golang.org/x/oauth2"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
 	"os/exec"
 	"runtime"
 	"time"
-	"math/rand"
 )
 
 type Auth struct {
@@ -116,18 +116,18 @@ func (a *Auth) VerifyCode(code string) (string, *oidc.IDToken) {
 	return rawIDToken, idToken
 }
 
-func (a *Auth) ExtractClaims(idToken *oidc.IDToken) {
+// Extract custom claims.
+type Claims struct {
+	Email    string   `json:"email"`
+	Verified bool     `json:"email_verified"`
+	Groups   []string `json:"groups"`
+}
 
-	// Extract custom claims.
-	var claims struct {
-		Email    string   `json:"email"`
-		Verified bool     `json:"email_verified"`
-		Groups   []string `json:"groups"`
-	}
+func (a *Auth) ExtractClaims(idToken *oidc.IDToken) (claims Claims) {
 	if err := idToken.Claims(&claims); err != nil {
 		log.Fatal(err)
-		// handle error
 	}
+	return claims
 }
 
 func GetRawIdToken(ipdUrl string) string {
@@ -185,23 +185,23 @@ const (
 	letterIdxMask = 1<<letterIdxBits - 1 // All 1-bits, as many as letterIdxBits
 	letterIdxMax  = 63 / letterIdxBits   // # of letter indices fitting in 63 bits
 )
+
 var src = rand.NewSource(time.Now().UnixNano())
 
 func RandStringBytesMaskImprSrc(n int) string {
-    b := make([]byte, n)
-    // A src.Int63() generates 63 random bits, enough for letterIdxMax characters!
-    for i, cache, remain := n-1, src.Int63(), letterIdxMax; i >= 0; {
-        if remain == 0 {
-            cache, remain = src.Int63(), letterIdxMax
-        }
-        if idx := int(cache & letterIdxMask); idx < len(letterBytes) {
-            b[i] = letterBytes[idx]
-            i--
-        }
-        cache >>= letterIdxBits
-        remain--
-    }
+	b := make([]byte, n)
+	// A src.Int63() generates 63 random bits, enough for letterIdxMax characters!
+	for i, cache, remain := n-1, src.Int63(), letterIdxMax; i >= 0; {
+		if remain == 0 {
+			cache, remain = src.Int63(), letterIdxMax
+		}
+		if idx := int(cache & letterIdxMask); idx < len(letterBytes) {
+			b[i] = letterBytes[idx]
+			i--
+		}
+		cache >>= letterIdxBits
+		remain--
+	}
 
-    return string(b)
+	return string(b)
 }
-

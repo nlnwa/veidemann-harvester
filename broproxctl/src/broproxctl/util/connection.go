@@ -17,10 +17,10 @@ import (
 	"broprox"
 	"fmt"
 	"github.com/spf13/viper"
-	"google.golang.org/grpc"
-	"log"
-	"google.golang.org/grpc/credentials"
 	"golang.org/x/net/context"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+	"log"
 )
 
 func NewControllerClient(idToken string) (broprox.ControllerClient, *grpc.ClientConn) {
@@ -61,7 +61,6 @@ func NewStatusClient(idToken string) (broprox.StatusClient, *grpc.ClientConn) {
 	return c, conn
 }
 
-
 type bearerTokenCred struct {
 	token string
 }
@@ -72,7 +71,7 @@ func NewFromIdToken(token string) credentials.PerRPCCredentials {
 
 func (b bearerTokenCred) GetRequestMetadata(ctx context.Context, uri ...string) (map[string]string, error) {
 	return map[string]string{
-		"bearer-token": b.token,
+		"Bearer": b.token,
 	}, nil
 }
 

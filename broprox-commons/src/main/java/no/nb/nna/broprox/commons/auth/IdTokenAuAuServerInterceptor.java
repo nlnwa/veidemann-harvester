@@ -37,7 +37,7 @@ public class IdTokenAuAuServerInterceptor implements AuAuServerInterceptor {
     private static final Logger LOG = LoggerFactory.getLogger(IdTokenAuAuServerInterceptor.class);
 
     public static final Metadata.Key<String> BEARER_TOKEN_KEY =
-            Metadata.Key.of("bearer-token", Metadata.ASCII_STRING_MARSHALLER);
+            Metadata.Key.of("Bearer", Metadata.ASCII_STRING_MARSHALLER);
 
     private final UserRoleMapper userRoleMapper;
 

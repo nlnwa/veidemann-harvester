@@ -647,6 +647,8 @@ spec:
         env:
         - name: PROXY_ADDR
           value: "veidemann-api-gateway:3010"
+        - name: EXTERNAL_HOSTNAME
+          value: "192.168.99.100"
       restartPolicy: Always
       dnsPolicy: ClusterFirst
 

@@ -23,7 +23,6 @@ import (
 	bp "broprox"
 	"broproxctl/util"
 	"github.com/golang/protobuf/ptypes/empty"
-	//"github.com/golang/protobuf/ptypes/timestamp"
 	"golang.org/x/net/context"
 )
 
@@ -49,8 +48,11 @@ var getCmd = &cobra.Command{
   broproxctl get seed -f yaml`,
 
 	Run: func(cmd *cobra.Command, args []string) {
+		idToken := util.GetRawIdToken(Idp)
 		if len(args) == 1 {
-			client := util.NewControllerClient()
+			client, conn := util.NewControllerClient(idToken)
+			defer conn.Close()
+
 			var selector *bp.Selector
 
 			if label != "" {
@@ -179,6 +181,25 @@ var getCmd = &cobra.Command{
 				r, err := client.GetLogConfig(context.Background(), &empty.Empty{})
 				if err != nil {
 					log.Fatalf("could not get log config: %v", err)
+				}
+
+				if util.Marshal(file, format, r) != nil {
+					os.Exit(1)
+				}
+			case "activerole":
+				r, err := client.GetRolesForActiveUser(context.Background(), &empty.Empty{})
+				if err != nil {
+					log.Fatalf("could not get active role: %v", err)
+				}
+
+				if util.Marshal(file, format, r) != nil {
+					os.Exit(1)
+				}
+			case "role":
+				request := bp.RoleMappingsListRequest{}
+				r, err := client.ListRoleMappings(context.Background(), &request)
+				if err != nil {
+					log.Fatalf("could not get active role: %v", err)
 				}
 
 				if util.Marshal(file, format, r) != nil {

@@ -20,6 +20,11 @@ import com.typesafe.config.Config;
 import com.typesafe.config.ConfigBeanFactory;
 import com.typesafe.config.ConfigException;
 import com.typesafe.config.ConfigFactory;
+import no.nb.nna.broprox.commons.auth.AuAuServerInterceptor;
+import no.nb.nna.broprox.commons.auth.IdTokenAuAuServerInterceptor;
+import no.nb.nna.broprox.commons.auth.IdTokenValidator;
+import no.nb.nna.broprox.commons.auth.NoopAuAuServerInterceptor;
+import no.nb.nna.broprox.commons.auth.UserRoleMapper;
 import no.nb.nna.broprox.commons.opentracing.TracerFactory;
 import no.nb.nna.broprox.controller.scheduler.CrawlJobScheduler;
 import no.nb.nna.broprox.controller.scheduler.FrontierClient;
@@ -56,12 +61,13 @@ public class Controller {
      */
     public Controller start() {
         try (DbAdapter db = new RethinkDbAdapter(SETTINGS.getDbHost(), SETTINGS.getDbPort(), SETTINGS.getDbName());
-                FrontierClient frontierClient = new FrontierClient(SETTINGS.getFrontierHost(), SETTINGS
+             FrontierClient frontierClient = new FrontierClient(SETTINGS.getFrontierHost(), SETTINGS
                         .getFrontierPort());
-                ControllerApiServer apiServer = new ControllerApiServer(SETTINGS.getApiPort(), db, frontierClient)
-                        .start();
 
-                CrawlJobScheduler scheduler = new CrawlJobScheduler(db, frontierClient).start();) {
+             ControllerApiServer apiServer = new ControllerApiServer(SETTINGS.getApiPort(), db, frontierClient,
+                     getAuAuServerInterceptor(db)).start();
+
+             CrawlJobScheduler scheduler = new CrawlJobScheduler(db, frontierClient).start();) {
 
             LOG.info("Broprox Controller (v. {}) started", Controller.class.getPackage().getImplementationVersion());
 
@@ -87,4 +93,11 @@ public class Controller {
         return SETTINGS;
     }
 
+    private AuAuServerInterceptor getAuAuServerInterceptor(DbAdapter db) {
+        if (SETTINGS.getOpenIdConnectIssuer() == null || SETTINGS.getOpenIdConnectIssuer().isEmpty()) {
+            return new NoopAuAuServerInterceptor();
+        } else {
+            return new IdTokenAuAuServerInterceptor(new UserRoleMapper(db), new IdTokenValidator());
+        }
+    }
 }

@@ -66,6 +66,7 @@
                                 <package>github.com/mitchellh/go-homedir</package>
                                 <package>github.com/ghodss/yaml</package>
                                 <package>github.com/buger/goterm</package>
+                                <package>github.com/coreos/go-oidc</package>
                             </packages>
                         </configuration>
                     </execution>

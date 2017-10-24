@@ -45,12 +45,15 @@ import no.nb.nna.broprox.api.ControllerProto.CrawlJobListRequest;
 import no.nb.nna.broprox.api.ControllerProto.CrawlScheduleConfigListReply;
 import no.nb.nna.broprox.api.ControllerProto.ListRequest;
 import no.nb.nna.broprox.api.ControllerProto.PolitenessConfigListReply;
+import no.nb.nna.broprox.api.ControllerProto.RoleMappingsListReply;
+import no.nb.nna.broprox.api.ControllerProto.RoleMappingsListRequest;
 import no.nb.nna.broprox.api.ControllerProto.SeedListReply;
 import no.nb.nna.broprox.api.ControllerProto.SeedListRequest;
 import no.nb.nna.broprox.api.StatusProto;
 import no.nb.nna.broprox.commons.ChangeFeed;
 import no.nb.nna.broprox.commons.DbAdapter;
 import no.nb.nna.broprox.commons.FutureOptional;
+import no.nb.nna.broprox.commons.auth.EmailContextKey;
 import no.nb.nna.broprox.db.opentracing.ConnectionTracingInterceptor;
 import no.nb.nna.broprox.model.ConfigProto.BrowserConfig;
 import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
@@ -61,6 +64,7 @@ import no.nb.nna.broprox.model.ConfigProto.CrawlJob;
 import no.nb.nna.broprox.model.ConfigProto.CrawlScheduleConfig;
 import no.nb.nna.broprox.model.ConfigProto.LogLevels;
 import no.nb.nna.broprox.model.ConfigProto.PolitenessConfig;
+import no.nb.nna.broprox.model.ConfigProto.RoleMapping;
 import no.nb.nna.broprox.model.ConfigProto.Seed;
 import no.nb.nna.broprox.model.ConfigProto.Selector;
 import no.nb.nna.broprox.model.MessagesProto.CrawlExecutionStatus;
@@ -95,7 +99,8 @@ public class RethinkDbAdapter implements DbAdapter {
         POLITENESS_CONFIGS("politeness_configs", PolitenessConfig.getDefaultInstance()),
         CRAWL_HOST_GROUP("crawl_host_group", CrawlHostGroup.getDefaultInstance()),
         CRAWL_HOST_GROUP_CONFIGS("crawl_host_group_configs", CrawlHostGroupConfig.getDefaultInstance()),
-        ALREADY_CRAWLED_CACHE("already_crawled_cache", null);
+        ALREADY_CRAWLED_CACHE("already_crawled_cache", null),
+        ROLE_MAPPINGS("config_role_mappings", RoleMapping.getDefaultInstance());
 
         public final String name;
 
@@ -106,7 +111,9 @@ public class RethinkDbAdapter implements DbAdapter {
             this.schema = schema;
         }
 
-    };
+    }
+
+    ;
 
     static final RethinkDB r = RethinkDB.r;
 
@@ -302,12 +309,12 @@ public class RethinkDbAdapter implements DbAdapter {
                 r.table(TABLES.EXECUTIONS.name)
                         .insert(rMap)
                         .optArg("conflict", (id, oldDoc, newDoc) -> r.branch(
-                        oldDoc.hasFields("endTime"),
-                        newDoc.merge(
-                                r.hashMap("state", oldDoc.g("state")).with("endTime", oldDoc.g("endTime"))
-                        ),
-                        newDoc
-                )),
+                                oldDoc.hasFields("endTime"),
+                                newDoc.merge(
+                                        r.hashMap("state", oldDoc.g("state")).with("endTime", oldDoc.g("endTime"))
+                                ),
+                                newDoc
+                        )),
                 CrawlExecutionStatus.class);
     }
 
@@ -440,7 +447,7 @@ public class RethinkDbAdapter implements DbAdapter {
                         .limit(limit)
                         .changes().optArg("include_initial", true).optArg("include_offsets", true).optArg("squash", 2)
                         .map(v -> v.g("new_val").merge(r.hashMap("newOffset", v.g("new_offset").default_((String) null))
-                        .with("oldOffset", v.g("old_offset").default_((String) null))))
+                                .with("oldOffset", v.g("old_offset").default_((String) null))))
                         .eqJoin("seedId", r.table("seeds"))
                         .map(v -> {
                             return v.g("left").merge(r.hashMap("seed", v.g("right").g("meta").g("name"))
@@ -680,6 +687,28 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
+    public RoleMappingsListReply listRoleMappings(RoleMappingsListRequest request) {
+        RoleMappingsListRequestQueryBuilder queryBuilder = new RoleMappingsListRequestQueryBuilder(request, TABLES.ROLE_MAPPINGS);
+        return queryBuilder.executeList(this, RoleMappingsListReply.newBuilder()).build();
+    }
+
+    @Override
+    public RoleMapping saveRoleMapping(RoleMapping roleMapping) {
+        Map<String, Object> doc = ProtoUtils.protoToRethink(roleMapping);
+        return executeInsert("save-rolemapping",
+                r.table(TABLES.ROLE_MAPPINGS.name)
+                        .insert(doc)
+                        .optArg("conflict", "replace"),
+                RoleMapping.class
+        );
+    }
+
+    @Override
+    public Empty deleteRoleMapping(RoleMapping roleMapping) {
+        return deleteConfigMessage(roleMapping, TABLES.ROLE_MAPPINGS);
+    }
+
+    @Override
     public LogLevels getLogConfig() {
         Map<String, Object> response = executeRequest("get-logconfig",
                 r.table(RethinkDbAdapter.TABLES.SYSTEM.name)
@@ -711,7 +740,7 @@ public class RethinkDbAdapter implements DbAdapter {
                     + " object, but meta.name is not set.");
         }
 
-        rMap.put("meta", updateMeta((Map) rMap.get("meta"), null));
+        rMap.put("meta", updateMeta((Map) rMap.get("meta")));
 
         return executeInsert("db-save" + msg.getClass().getSimpleName(),
                 r.table(table.name)
@@ -719,12 +748,12 @@ public class RethinkDbAdapter implements DbAdapter {
                         // A rethink function which copies created and createby from old doc,
                         // and copies name if not existent in new doc
                         .optArg("conflict", (id, old_doc, new_doc) -> new_doc.merge(
-                        r.hashMap("meta", r.hashMap()
-                                .with("name", r.branch(new_doc.g("meta").hasFields("name"),
-                                        new_doc.g("meta").g("name"), old_doc.g("meta").g("name")))
-                                .with("created", old_doc.g("meta").g("created"))
-                                .with("createdBy", old_doc.g("meta").g("createdBy"))
-                        ))),
+                                r.hashMap("meta", r.hashMap()
+                                        .with("name", r.branch(new_doc.g("meta").hasFields("name"),
+                                                new_doc.g("meta").g("name"), old_doc.g("meta").g("name")))
+                                        .with("created", old_doc.g("meta").g("created"))
+                                        .with("createdBy", old_doc.g("meta").g("createdBy"))
+                                ))),
                 (Class<T>) msg.getClass()
         );
     }
@@ -753,11 +782,12 @@ public class RethinkDbAdapter implements DbAdapter {
         return Empty.getDefaultInstance();
     }
 
-    private Map updateMeta(Map meta, String user) {
+    private Map updateMeta(Map meta) {
         if (meta == null) {
             meta = r.hashMap();
         }
 
+        String user = EmailContextKey.email();
         if (user == null || user.isEmpty()) {
             user = "anonymous";
         }
@@ -818,16 +848,16 @@ public class RethinkDbAdapter implements DbAdapter {
     /**
      * Check references to Config object.
      *
-     * @param messageToCheck the config message which other objects might refer.
-     * @param dependentTable the table containing objects which might have a dependency to the object to check.
-     * @param dependentMessage the object type in the table containing objects which might have a dependency to the
-     * object to check.
+     * @param messageToCheck     the config message which other objects might refer.
+     * @param dependentTable     the table containing objects which might have a dependency to the object to check.
+     * @param dependentMessage   the object type in the table containing objects which might have a dependency to the
+     *                           object to check.
      * @param dependentFieldName the field name in the dependent message which might contain reference to the id field
-     * in the object to check.
+     *                           in the object to check.
      * @throws IllegalStateException if there are dependencies.
      */
     private void checkDependencies(Message messageToCheck, TABLES dependentTable,
-            Message dependentMessage, String dependentFieldName) {
+                                   Message dependentMessage, String dependentFieldName) {
 
         Descriptors.FieldDescriptor messageIdField = messageToCheck.getDescriptorForType().findFieldByName("id");
         Descriptors.FieldDescriptor dependentField = dependentMessage.getDescriptorForType()

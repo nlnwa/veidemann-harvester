@@ -56,6 +56,11 @@ service Controller {
     rpc GetLogConfig (google.protobuf.Empty) returns (LogLevels) {}
     rpc SaveLogConfig (LogLevels) returns (LogLevels) {}
 
+    rpc ListRoleMappings (RoleMappingsListRequest) returns (RoleMappingsListReply) {}
+    rpc SaveRoleMapping (RoleMapping) returns (RoleMapping) {}
+    rpc DeleteRoleMapping (RoleMapping) returns (google.protobuf.Empty) {}
+    rpc GetRolesForActiveUser (google.protobuf.Empty) returns (RoleList) {}
+
     rpc RunCrawl (RunCrawlRequest) returns (RunCrawlReply) {}
     rpc AbortCrawl (AbortCrawlRequest) returns (google.protobuf.Empty) {}
 }
@@ -186,4 +191,21 @@ message RunCrawlReply {
 
 message AbortCrawlRequest {
     string execution_id = 1;
+}
+
+message RoleList {
+    repeated Role role = 1;
+}
+
+message RoleMappingsListRequest {
+    string id = 1;
+    int32 page_size = 14;
+    int32 page = 15;
+}
+
+message RoleMappingsListReply {
+    repeated RoleMapping value = 1;
+    int64 count = 2;
+    int32 page_size = 14;
+    int32 page = 15;
 }

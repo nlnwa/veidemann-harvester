@@ -28,6 +28,8 @@ public class Settings extends CommonSettings {
 
     private int frontierPort;
 
+    private String openIdConnectIssuer;
+
     public int getApiPort() {
         return apiPort;
     }
@@ -52,4 +54,11 @@ public class Settings extends CommonSettings {
         this.frontierPort = frontierPort;
     }
 
+    public String getOpenIdConnectIssuer() {
+        return openIdConnectIssuer;
+    }
+
+    public void setOpenIdConnectIssuer(String openIdConnectIssuer) {
+        this.openIdConnectIssuer = openIdConnectIssuer;
+    }
 }

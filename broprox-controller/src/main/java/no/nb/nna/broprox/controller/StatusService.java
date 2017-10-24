@@ -22,6 +22,8 @@ import no.nb.nna.broprox.api.StatusProto.ExecutionsListReply;
 import no.nb.nna.broprox.api.StatusProto.ExecutionsRequest;
 import no.nb.nna.broprox.commons.ChangeFeed;
 import no.nb.nna.broprox.commons.DbAdapter;
+import no.nb.nna.broprox.commons.auth.AllowedRoles;
+import no.nb.nna.broprox.model.ConfigProto.Role;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,6 +41,7 @@ public class StatusService extends StatusGrpc.StatusImplBase {
     }
 
     @Override
+    @AllowedRoles({Role.ADMIN, Role.CURATOR, Role.READONLY})
     public void getRunningExecutions(ExecutionsRequest request, StreamObserver<ExecutionsListReply> respObserver) {
         new Thread(new Runnable() {
             @Override

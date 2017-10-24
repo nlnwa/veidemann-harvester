@@ -14,48 +14,46 @@
 package cmd
 
 import (
-	bp "broprox"
+	"fmt"
 
 	"broproxctl/util"
-	"context"
 	"github.com/spf13/cobra"
-	"log"
 )
 
-// abortCmd represents the abort command
-var abortCmd = &cobra.Command{
-	Use:   "abort",
-	Short: "Abort one or more crawl executions",
-	Long:  `Abort one or more crawl executions.`,
+// loginCmd represents the login command
+var loginCmd = &cobra.Command{
+	Use:   "login",
+	Short: "Initiate browser session for logging in to Veidemann",
+	Long:  ``,
 	Run: func(cmd *cobra.Command, args []string) {
-		if len(args) > 0 {
-			idToken := util.GetRawIdToken(Idp)
-			client, conn := util.NewControllerClient(idToken)
-			defer conn.Close()
+		var a util.Auth
+		a.Init(Idp)
 
-			for _, arg := range args {
-				request := bp.AbortCrawlRequest{ExecutionId: arg}
-				_, err := client.AbortCrawl(context.Background(), &request)
-				if err != nil {
-					log.Fatalf("could not abort execution '%v': %v", arg, err)
-				}
-			}
-		} else {
-			cmd.Usage()
-		}
+		authCodeURL := a.CreateAuthCodeURL()
+		fmt.Println("A login screen should now open in your browser. Follow the login steps and paste the code here.")
+		fmt.Println("In case the browser window won't open, paste this uri in a browser window:")
+		fmt.Println(authCodeURL)
+		a.Openbrowser(authCodeURL)
+		fmt.Print("Code: ")
+		var code string
+		fmt.Scan(&code)
+		_, idToken := a.VerifyCode(code)
+		claims := a.ExtractClaims(idToken)
+		util.WriteConfig()
+		fmt.Printf("Hello %s\n", claims.Name)
 	},
 }
 
 func init() {
-	RootCmd.AddCommand(abortCmd)
+	RootCmd.AddCommand(loginCmd)
 
 	// Here you will define your flags and configuration settings.
 
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
-	// abortCmd.PersistentFlags().String("foo", "", "A help for foo")
+	// loginCmd.PersistentFlags().String("foo", "", "A help for foo")
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
-	// abortCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	// loginCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }

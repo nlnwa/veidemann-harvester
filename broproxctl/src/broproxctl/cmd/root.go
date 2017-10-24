@@ -17,12 +17,17 @@ import (
 	"fmt"
 	"os"
 
-	homedir "github.com/mitchellh/go-homedir"
+	"broproxctl/util"
+	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"log"
+	"net/url"
 )
 
 var cfgFile string
+var controllerAddress string
+var Idp string
 
 // RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
@@ -45,8 +50,6 @@ func Execute() {
 	}
 }
 
-var controllerAddress string
-
 func init() {
 	cobra.OnInitialize(initConfig)
 
@@ -54,6 +57,9 @@ func init() {
 
 	RootCmd.PersistentFlags().StringVarP(&controllerAddress, "controllerAddress", "c", "localhost:50051", "Address to the Controller service")
 	viper.BindPFlag("controllerAddress", RootCmd.PersistentFlags().Lookup("controllerAddress"))
+
+	RootCmd.PersistentFlags().StringVarP(&Idp, "idp", "", "", "Address to identity provider")
+	viper.BindPFlag("idp", RootCmd.PersistentFlags().Lookup("idp"))
 }
 
 // initConfig reads in config file and ENV variables if set.
@@ -79,5 +85,22 @@ func initConfig() {
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Println("Using config file:", viper.ConfigFileUsed())
+	}
+
+	if viper.GetString("idp") == "" {
+		u, err := url.Parse(viper.GetString("controllerAddress"))
+		if err != nil {
+			log.Fatal(err)
+			// handle error
+		}
+		u.Host = u.Hostname() + ":32000"
+		u.Path = "/dex"
+		Idp = u.String()
+	} else {
+		Idp = viper.GetString("idp")
+	}
+
+	if RootCmd.PersistentFlags().Changed("controllerAddress") || RootCmd.PersistentFlags().Changed("idp") {
+		util.WriteConfig()
 	}
 }

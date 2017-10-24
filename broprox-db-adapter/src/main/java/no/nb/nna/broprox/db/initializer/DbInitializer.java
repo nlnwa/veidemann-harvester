@@ -36,6 +36,8 @@ import no.nb.nna.broprox.db.RethinkDbAdapter;
 import no.nb.nna.broprox.db.RethinkDbAdapter.TABLES;
 import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
 import no.nb.nna.broprox.model.ConfigProto.CrawlJob;
+import no.nb.nna.broprox.model.ConfigProto.Role;
+import no.nb.nna.broprox.model.ConfigProto.RoleMapping;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
@@ -172,6 +174,8 @@ public class DbInitializer {
                 .optArg("replicas", 1)
                 .run(conn);
 
+        r.tableCreate(TABLES.ROLE_MAPPINGS.name).run(conn);
+
         createMetaIndexes(
                 TABLES.BROWSER_SCRIPTS,
                 TABLES.CRAWL_ENTITIES,
@@ -226,6 +230,11 @@ public class DbInitializer {
                     .getResourceAsStream("default_objects/crawl-jobs.yaml")) {
                 readYamlFile(in, CrawlJob.class)
                         .forEach(o -> db.saveCrawlJob(o));
+            }
+            try (InputStream in = getClass().getClassLoader()
+                    .getResourceAsStream("default_objects/rolemappings.yaml")) {
+                readYamlFile(in, RoleMapping.class)
+                        .forEach(o -> db.saveRoleMapping(o));
             }
         } catch (IOException ex) {
             throw new UncheckedIOException(ex);

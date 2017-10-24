@@ -15,8 +15,6 @@
  */
 package no.nb.nna.broprox.commons;
 
-import java.util.Optional;
-
 import com.google.protobuf.Empty;
 import com.google.protobuf.Timestamp;
 import no.nb.nna.broprox.api.ControllerProto.BrowserConfigListReply;
@@ -30,6 +28,8 @@ import no.nb.nna.broprox.api.ControllerProto.CrawlJobListRequest;
 import no.nb.nna.broprox.api.ControllerProto.CrawlScheduleConfigListReply;
 import no.nb.nna.broprox.api.ControllerProto.ListRequest;
 import no.nb.nna.broprox.api.ControllerProto.PolitenessConfigListReply;
+import no.nb.nna.broprox.api.ControllerProto.RoleMappingsListReply;
+import no.nb.nna.broprox.api.ControllerProto.RoleMappingsListRequest;
 import no.nb.nna.broprox.api.ControllerProto.SeedListReply;
 import no.nb.nna.broprox.api.ControllerProto.SeedListRequest;
 import no.nb.nna.broprox.api.StatusProto.ExecutionsListReply;
@@ -43,6 +43,7 @@ import no.nb.nna.broprox.model.ConfigProto.CrawlJob;
 import no.nb.nna.broprox.model.ConfigProto.CrawlScheduleConfig;
 import no.nb.nna.broprox.model.ConfigProto.LogLevels;
 import no.nb.nna.broprox.model.ConfigProto.PolitenessConfig;
+import no.nb.nna.broprox.model.ConfigProto.RoleMapping;
 import no.nb.nna.broprox.model.ConfigProto.Seed;
 import no.nb.nna.broprox.model.MessagesProto.CrawlExecutionStatus;
 import no.nb.nna.broprox.model.MessagesProto.CrawlHostGroup;
@@ -51,6 +52,8 @@ import no.nb.nna.broprox.model.MessagesProto.CrawledContent;
 import no.nb.nna.broprox.model.MessagesProto.ExtractedText;
 import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
 import no.nb.nna.broprox.model.MessagesProto.Screenshot;
+
+import java.util.Optional;
 
 /**
  * Adapter for Broprox's database.
@@ -161,6 +164,12 @@ public interface DbAdapter extends AutoCloseable {
     LogLevels saveLogConfig(LogLevels logLevels);
 
     ChangeFeed<ExecutionsListReply> getExecutionStatusStream(ExecutionsRequest request);
+
+    RoleMappingsListReply listRoleMappings(RoleMappingsListRequest request);
+
+    RoleMapping saveRoleMapping(RoleMapping roleMapping);
+
+    Empty deleteRoleMapping(RoleMapping roleMapping);
 
     @Override
     public void close();

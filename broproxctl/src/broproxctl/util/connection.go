@@ -17,32 +17,64 @@ import (
 	"broprox"
 	"fmt"
 	"github.com/spf13/viper"
+	"golang.org/x/net/context"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"log"
 )
 
-func NewControllerClient() broprox.ControllerClient {
+func NewControllerClient(idToken string) (broprox.ControllerClient, *grpc.ClientConn) {
 	address := viper.GetString("controllerAddress")
 	fmt.Printf("Connecting to %s\n", address)
 	// Set up a connection to the server.
-	conn, err := grpc.Dial(address, grpc.WithInsecure())
+	var perRPCCreds grpc.DialOption
+	if idToken == "" {
+		perRPCCreds = grpc.WithInsecure()
+	} else {
+		perRPCCreds = grpc.WithPerRPCCredentials(NewFromIdToken(idToken))
+	}
+	conn, err := grpc.Dial(address, grpc.WithInsecure(), perRPCCreds)
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 	}
 	//defer conn.Close()
 	c := broprox.NewControllerClient(conn)
-	return c
+	return c, conn
 }
 
-func NewStatusClient() broprox.StatusClient {
+func NewStatusClient(idToken string) (broprox.StatusClient, *grpc.ClientConn) {
 	address := viper.GetString("controllerAddress")
 	fmt.Printf("Connecting to %s\n", address)
 	// Set up a connection to the server.
-	conn, err := grpc.Dial(address, grpc.WithInsecure())
+	var perRPCCreds grpc.DialOption
+	if idToken == "" {
+		perRPCCreds = grpc.WithInsecure()
+	} else {
+		perRPCCreds = grpc.WithPerRPCCredentials(NewFromIdToken(idToken))
+	}
+	conn, err := grpc.Dial(address, grpc.WithInsecure(), perRPCCreds)
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 	}
 	//defer conn.Close()
 	c := broprox.NewStatusClient(conn)
-	return c
+	return c, conn
+}
+
+type bearerTokenCred struct {
+	token string
+}
+
+func NewFromIdToken(token string) credentials.PerRPCCredentials {
+	return bearerTokenCred{token}
+}
+
+func (b bearerTokenCred) GetRequestMetadata(ctx context.Context, uri ...string) (map[string]string, error) {
+	return map[string]string{
+		"Bearer": b.token,
+	}, nil
+}
+
+func (b bearerTokenCred) RequireTransportSecurity() bool {
+	return false
 }

@@ -36,9 +36,9 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
 
     private final T request;
 
-    private ReqlExpr listQry;
+    ReqlExpr listQry;
 
-    private ReqlExpr countQry;
+    ReqlExpr countQry;
 
     private int page;
 

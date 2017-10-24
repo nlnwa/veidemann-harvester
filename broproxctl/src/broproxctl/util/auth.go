@@ -121,6 +121,7 @@ type Claims struct {
 	Email    string   `json:"email"`
 	Verified bool     `json:"email_verified"`
 	Groups   []string `json:"groups"`
+	Name     string   `json:"name"`
 }
 
 func (a *Auth) ExtractClaims(idToken *oidc.IDToken) (claims Claims) {

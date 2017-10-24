@@ -65,6 +65,12 @@ data:
       - 'http://${EXTERNAL_HOSTNAME}:30890/activity'
       name: 'Veidemann Admin'
       secret: ZXhhbXBsZS1hcHAtc2VjcmV0
+      trustedPeers:
+      - veidemann-cli
+    - id: veidemann-cli
+      public: true
+      name: 'Veidemann CLI'
+      secret: cli-app-secret
 
     connectors:
     - type: pilt

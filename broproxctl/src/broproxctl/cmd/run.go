@@ -33,7 +33,10 @@ If seedId is not submitted then all the seeds wich are configured to use the sub
 
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) > 0 {
-			client := util.NewControllerClient()
+			idToken := util.GetRawIdToken(Idp)
+			client, conn := util.NewControllerClient(idToken)
+			defer conn.Close()
+
 			switch len(args) {
 			case 1:
 				// One argument (only jobId)

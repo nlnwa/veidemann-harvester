@@ -32,7 +32,9 @@ var statusCmd = &cobra.Command{
 	Short: "Get a realtime view of crawling activity",
 	Long:  `Get a realtime view of crawling activity.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		client := util.NewStatusClient()
+		idToken := util.GetRawIdToken(Idp)
+		client, conn := util.NewStatusClient(idToken)
+		defer conn.Close()
 
 		request := bp.ExecutionsRequest{PageSize: 50}
 

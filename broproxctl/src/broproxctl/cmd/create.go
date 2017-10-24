@@ -46,7 +46,10 @@ var createCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		client := util.NewControllerClient()
+		idToken := util.GetRawIdToken(Idp)
+		client, conn := util.NewControllerClient(idToken)
+		defer conn.Close()
+
 		for _, v := range result {
 			switch v.(type) {
 			case *bp.CrawlEntity:

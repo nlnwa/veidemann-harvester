@@ -35,6 +35,8 @@ var objectTypes = []struct {
 	{reflect.TypeOf(&broprox.BrowserScript{}), "script", []string{"Id", "Meta.Name", "Meta.Description", "Script", "UrlRegexp"}},
 	{reflect.TypeOf(&broprox.CrawlHostGroupConfig{}), "group", []string{"Id", "Meta.Name", "Meta.Description", "IpRange"}},
 	{reflect.TypeOf(&broprox.LogLevels{}), "loglevel", []string{"LogLevel"}},
+	{reflect.TypeOf(&broprox.RoleMapping{}), "role", []string{"Id", "EmailOrGroup.Email", "EmailOrGroup.Group", "Role"}},
+	{reflect.TypeOf(&broprox.RoleList{}), "activerole", []string{"Role"}},
 }
 
 // Get mapping from 'kind' to 'type'

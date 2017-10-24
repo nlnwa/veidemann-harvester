@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package no.nb.nna.broprox.commons;
+package no.nb.nna.broprox.commons.db;
 
 import java.util.stream.Stream;
 

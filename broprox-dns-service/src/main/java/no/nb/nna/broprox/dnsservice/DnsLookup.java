@@ -40,7 +40,7 @@ import io.netty.buffer.Unpooled;
 import io.opentracing.ActiveSpan;
 import io.opentracing.tag.Tags;
 import io.opentracing.util.GlobalTracer;
-import no.nb.nna.broprox.commons.DbAdapter;
+import no.nb.nna.broprox.commons.db.DbAdapter;
 import no.nb.nna.broprox.commons.ExtraStatusCodes;
 import no.nb.nna.broprox.commons.client.ContentWriterClient;
 import no.nb.nna.broprox.db.ProtoUtils;

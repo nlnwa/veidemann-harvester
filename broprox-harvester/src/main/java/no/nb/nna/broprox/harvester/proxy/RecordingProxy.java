@@ -26,7 +26,7 @@ import net.lightbody.bmp.mitm.CertificateInfo;
 import net.lightbody.bmp.mitm.RootCertificateGenerator;
 import net.lightbody.bmp.mitm.keys.ECKeyGenerator;
 import net.lightbody.bmp.mitm.manager.ImpersonatingMitmManager;
-import no.nb.nna.broprox.commons.DbAdapter;
+import no.nb.nna.broprox.commons.db.DbAdapter;
 import no.nb.nna.broprox.commons.client.ContentWriterClient;
 import no.nb.nna.broprox.harvester.BrowserSessionRegistry;
 import org.littleshoot.proxy.HostResolver;

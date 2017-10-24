@@ -33,7 +33,7 @@ import no.nb.nna.broprox.api.ControllerProto.RoleMappingsListReply;
 import no.nb.nna.broprox.api.ControllerProto.RoleMappingsListRequest;
 import no.nb.nna.broprox.api.ControllerProto.SeedListReply;
 import no.nb.nna.broprox.api.ControllerProto.SeedListRequest;
-import no.nb.nna.broprox.commons.FutureOptional;
+import no.nb.nna.broprox.commons.db.FutureOptional;
 import no.nb.nna.broprox.commons.util.ApiTools;
 import no.nb.nna.broprox.model.ConfigProto;
 import no.nb.nna.broprox.model.ConfigProto.BrowserScript;

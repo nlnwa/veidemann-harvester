@@ -31,7 +31,7 @@ import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import no.nb.nna.broprox.commons.AlreadyCrawledCache;
-import no.nb.nna.broprox.commons.DbAdapter;
+import no.nb.nna.broprox.commons.db.DbAdapter;
 import no.nb.nna.broprox.commons.client.ContentWriterClient;
 import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.model.MessagesProto.CrawlLog;

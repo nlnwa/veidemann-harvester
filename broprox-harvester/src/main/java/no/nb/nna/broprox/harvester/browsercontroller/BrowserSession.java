@@ -37,7 +37,7 @@ import no.nb.nna.broprox.chrome.client.PageDomain;
 import no.nb.nna.broprox.chrome.client.RuntimeDomain;
 import no.nb.nna.broprox.chrome.client.Session;
 import no.nb.nna.broprox.commons.BroproxHeaderConstants;
-import no.nb.nna.broprox.commons.DbAdapter;
+import no.nb.nna.broprox.commons.db.DbAdapter;
 import no.nb.nna.broprox.commons.util.ApiTools;
 import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.model.ConfigProto;

@@ -23,7 +23,6 @@ import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 
-import io.opentracing.ActiveSpan;
 import io.opentracing.Span;
 import io.opentracing.contrib.OpenTracingContextKey;
 import io.opentracing.tag.Tags;
@@ -32,7 +31,7 @@ import no.nb.nna.broprox.api.ControllerProto;
 import no.nb.nna.broprox.api.HarvesterProto.HarvestPageReply;
 import no.nb.nna.broprox.chrome.client.ChromeDebugProtocol;
 import no.nb.nna.broprox.commons.BroproxHeaderConstants;
-import no.nb.nna.broprox.commons.DbAdapter;
+import no.nb.nna.broprox.commons.db.DbAdapter;
 import no.nb.nna.broprox.harvester.BrowserSessionRegistry;
 import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
 import no.nb.nna.broprox.model.ConfigProto.CrawlConfig;

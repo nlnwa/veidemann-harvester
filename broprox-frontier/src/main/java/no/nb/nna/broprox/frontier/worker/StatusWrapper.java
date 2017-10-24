@@ -16,7 +16,7 @@
 package no.nb.nna.broprox.frontier.worker;
 
 import com.google.protobuf.Timestamp;
-import no.nb.nna.broprox.commons.DbAdapter;
+import no.nb.nna.broprox.commons.db.DbAdapter;
 import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.model.ConfigProto;
 import no.nb.nna.broprox.model.MessagesProto.CrawlExecutionStatus;

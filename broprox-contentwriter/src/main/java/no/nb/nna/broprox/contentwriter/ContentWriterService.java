@@ -29,7 +29,7 @@ import io.grpc.stub.StreamObserver;
 import no.nb.nna.broprox.api.ContentWriterGrpc;
 import no.nb.nna.broprox.api.ContentWriterProto.WriteReply;
 import no.nb.nna.broprox.api.ContentWriterProto.WriteRequest;
-import no.nb.nna.broprox.commons.DbAdapter;
+import no.nb.nna.broprox.commons.db.DbAdapter;
 import no.nb.nna.broprox.contentwriter.text.TextExtracter;
 import no.nb.nna.broprox.contentwriter.warc.SingleWarcWriter;
 import no.nb.nna.broprox.contentwriter.warc.WarcWriterPool;

@@ -24,7 +24,7 @@ import java.util.Optional;
 
 import no.nb.nna.broprox.api.ControllerProto;
 import no.nb.nna.broprox.api.HarvesterProto;
-import no.nb.nna.broprox.commons.DbAdapter;
+import no.nb.nna.broprox.commons.db.DbAdapter;
 import no.nb.nna.broprox.commons.client.ContentWriterClient;
 import no.nb.nna.broprox.commons.util.ApiTools;
 import no.nb.nna.broprox.harvester.BrowserSessionRegistry;

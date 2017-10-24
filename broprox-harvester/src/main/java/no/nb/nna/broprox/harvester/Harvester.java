@@ -22,7 +22,7 @@ import com.typesafe.config.ConfigBeanFactory;
 import com.typesafe.config.ConfigException;
 import com.typesafe.config.ConfigFactory;
 import no.nb.nna.broprox.commons.AlreadyCrawledCache;
-import no.nb.nna.broprox.commons.DbAdapter;
+import no.nb.nna.broprox.commons.db.DbAdapter;
 import no.nb.nna.broprox.commons.client.ContentWriterClient;
 import no.nb.nna.broprox.commons.client.DnsServiceClient;
 import no.nb.nna.broprox.commons.opentracing.TracerFactory;

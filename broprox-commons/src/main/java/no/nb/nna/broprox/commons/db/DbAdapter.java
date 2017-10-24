@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package no.nb.nna.broprox.commons;
+package no.nb.nna.broprox.commons.db;
 
 import com.google.protobuf.Empty;
 import com.google.protobuf.Timestamp;

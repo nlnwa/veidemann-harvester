@@ -17,6 +17,8 @@ package no.nb.nna.broprox.db;
 
 import no.nb.nna.broprox.api.ControllerProto.RoleMappingsListRequest;
 
+import static no.nb.nna.broprox.db.RethinkDbAdapter.r;
+
 /**
  *
  */
@@ -34,4 +36,9 @@ public class RoleMappingsListRequestQueryBuilder extends ConfigListQueryBuilder<
 
     }
 
+    @Override
+    void buildAllQuery() {
+        countQry = r.table(table.name);
+        listQry = countQry;
+    }
 }

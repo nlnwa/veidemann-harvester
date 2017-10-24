@@ -29,6 +29,8 @@ import no.nb.nna.broprox.api.ControllerProto.BrowserScriptListRequest;
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;
 import no.nb.nna.broprox.api.ControllerProto.CrawlJobListRequest;
 import no.nb.nna.broprox.api.ControllerProto.ListRequest;
+import no.nb.nna.broprox.api.ControllerProto.RoleMappingsListReply;
+import no.nb.nna.broprox.api.ControllerProto.RoleMappingsListRequest;
 import no.nb.nna.broprox.api.ControllerProto.SeedListReply;
 import no.nb.nna.broprox.api.ControllerProto.SeedListRequest;
 import no.nb.nna.broprox.commons.FutureOptional;
@@ -42,6 +44,8 @@ import no.nb.nna.broprox.model.ConfigProto.Label;
 import no.nb.nna.broprox.model.ConfigProto.LogLevels;
 import no.nb.nna.broprox.model.ConfigProto.LogLevels.LogLevel;
 import no.nb.nna.broprox.model.ConfigProto.Meta;
+import no.nb.nna.broprox.model.ConfigProto.Role;
+import no.nb.nna.broprox.model.ConfigProto.RoleMapping;
 import no.nb.nna.broprox.model.ConfigProto.Seed;
 import no.nb.nna.broprox.model.ConfigProto.Selector;
 import no.nb.nna.broprox.model.MessagesProto.CrawlExecutionStatus;
@@ -462,6 +466,30 @@ public class RethinkDbAdapterIT {
         assertThat(result.getId()).isNotEmpty();
         assertThat(result.getScript()).isEqualTo("code");
         assertThat(ApiTools.hasLabel(result.getMeta(), ApiTools.buildLabel("type", "login"))).isTrue();
+    }
+
+    @Test
+    public void testSaveListAndDeleteRoleMapping() {
+        RoleMapping rm = RoleMapping.newBuilder()
+                .setEmail("test")
+                .addRole(Role.ADMIN).build();
+
+        RoleMapping result = db.saveRoleMapping(rm);
+        assertThat(result.getId()).isNotEmpty();
+        assertThat(result.getEmail()).isEqualTo("test");
+        assertThat(result.getRoleList()).containsExactly(Role.ADMIN);
+
+        RoleMappingsListReply resultList = db.listRoleMappings(RoleMappingsListRequest.getDefaultInstance());
+        assertThat(resultList.getValueCount()).isEqualTo((int) resultList.getCount()).isEqualTo(1);
+        assertThat(resultList.getValue(0)).isEqualTo(result);
+
+        resultList = db.listRoleMappings(RoleMappingsListRequest.newBuilder().setId(result.getId()).build());
+        assertThat(resultList.getValueCount()).isEqualTo((int) resultList.getCount()).isEqualTo(1);
+        assertThat(resultList.getValue(0)).isEqualTo(result);
+
+        db.deleteRoleMapping(result);
+        resultList = db.listRoleMappings(RoleMappingsListRequest.getDefaultInstance());
+        assertThat(resultList.getValueCount()).isEqualTo((int) resultList.getCount()).isEqualTo(0);
     }
 
     /**

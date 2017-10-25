@@ -39,7 +39,7 @@ var getCmd = &cobra.Command{
 	Long: `Display one or many objects.
 
 ` +
-		printValidObejctTypes() +
+		printValidObjectTypes() +
 		`Examples:
   #List all seeds.
   broproxctl get seed
@@ -211,13 +211,13 @@ var getCmd = &cobra.Command{
 			}
 		} else {
 			fmt.Print("You must specify the object type to get. ")
-			fmt.Println(printValidObejctTypes())
+			fmt.Println(printValidObjectTypes())
 			fmt.Println("See 'broproxctl get -h' for help")
 		}
 	},
 }
 
-func printValidObejctTypes() string {
+func printValidObjectTypes() string {
 	var names string
 	for _, v := range util.GetObjectNames() {
 		names += fmt.Sprintf("  * %s\n", v)

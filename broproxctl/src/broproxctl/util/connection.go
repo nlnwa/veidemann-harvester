@@ -24,25 +24,24 @@ import (
 )
 
 func NewControllerClient(idToken string) (broprox.ControllerClient, *grpc.ClientConn) {
-	address := viper.GetString("controllerAddress")
-	fmt.Printf("Connecting to %s\n", address)
-	// Set up a connection to the server.
-	var perRPCCreds grpc.DialOption
-	if idToken == "" {
-		perRPCCreds = grpc.WithInsecure()
-	} else {
-		perRPCCreds = grpc.WithPerRPCCredentials(NewFromIdToken(idToken))
-	}
-	conn, err := grpc.Dial(address, grpc.WithInsecure(), perRPCCreds)
-	if err != nil {
-		log.Fatalf("did not connect: %v", err)
-	}
-	//defer conn.Close()
+	conn := newConnection(idToken)
 	c := broprox.NewControllerClient(conn)
 	return c, conn
 }
 
 func NewStatusClient(idToken string) (broprox.StatusClient, *grpc.ClientConn) {
+	conn := newConnection(idToken)
+	c := broprox.NewStatusClient(conn)
+	return c, conn
+}
+
+func NewReportClient(idToken string) (broprox.ReportClient, *grpc.ClientConn) {
+	conn := newConnection(idToken)
+	c := broprox.NewReportClient(conn)
+	return c, conn
+}
+
+func newConnection(idToken string) *grpc.ClientConn {
 	address := viper.GetString("controllerAddress")
 	fmt.Printf("Connecting to %s\n", address)
 	// Set up a connection to the server.
@@ -54,11 +53,9 @@ func NewStatusClient(idToken string) (broprox.StatusClient, *grpc.ClientConn) {
 	}
 	conn, err := grpc.Dial(address, grpc.WithInsecure(), perRPCCreds)
 	if err != nil {
-		log.Fatalf("did not connect: %v", err)
+		log.Fatalf("Could not connect: %v", err)
 	}
-	//defer conn.Close()
-	c := broprox.NewStatusClient(conn)
-	return c, conn
+	return conn
 }
 
 type bearerTokenCred struct {

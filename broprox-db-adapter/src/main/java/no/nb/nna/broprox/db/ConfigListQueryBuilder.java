@@ -203,7 +203,7 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
     }
 
     public long executeCount(RethinkDbAdapter db) {
-        if (id != null) {
+        if (isIdQuery()) {
             if (db.executeRequest("db-countConfigObjects", listQry) == null) {
                 return 0L;
             } else {
@@ -215,7 +215,7 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
     }
 
     public <R extends Message.Builder> R executeList(RethinkDbAdapter db, R resultBuilder) {
-        if (id == null) {
+        if (!isIdQuery()) {
             listQry = listQry.skip(page * pageSize).limit(pageSize);
         }
 
@@ -257,4 +257,7 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
         return (R) resultBuilder;
     }
 
+    boolean isIdQuery() {
+        return id != null && !id.isEmpty();
+    }
 }

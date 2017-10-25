@@ -24,10 +24,10 @@ import (
 )
 
 var (
-	warcId  string
-	executionId   string
-	pageSize int32
-	page int32
+	warcId      string
+	executionId string
+	pageSize    int32
+	page        int32
 )
 
 // reportCmd represents the report command

@@ -15,7 +15,9 @@
  */
 package no.nb.nna.broprox.db;
 
+import no.nb.nna.broprox.api.ControllerProto.RoleMappingsListReply;
 import no.nb.nna.broprox.api.ControllerProto.RoleMappingsListRequest;
+import no.nb.nna.broprox.db.RethinkDbAdapter.TABLES;
 
 import static no.nb.nna.broprox.db.RethinkDbAdapter.r;
 
@@ -24,8 +26,8 @@ import static no.nb.nna.broprox.db.RethinkDbAdapter.r;
  */
 public class RoleMappingsListRequestQueryBuilder extends ConfigListQueryBuilder<RoleMappingsListRequest> {
 
-    public RoleMappingsListRequestQueryBuilder(RoleMappingsListRequest request, RethinkDbAdapter.TABLES table) {
-        super(request, table);
+    public RoleMappingsListRequestQueryBuilder(RoleMappingsListRequest request) {
+        super(request, TABLES.ROLE_MAPPINGS);
         setPaging(request.getPageSize(), request.getPage());
 
         if (request.getId().isEmpty()) {
@@ -36,9 +38,7 @@ public class RoleMappingsListRequestQueryBuilder extends ConfigListQueryBuilder<
 
     }
 
-    @Override
-    void buildAllQuery() {
-        countQry = r.table(table.name);
-        listQry = countQry;
+    public RoleMappingsListReply.Builder executeList(RethinkDbAdapter db) {
+        return executeList(db, RoleMappingsListReply.newBuilder());
     }
 }

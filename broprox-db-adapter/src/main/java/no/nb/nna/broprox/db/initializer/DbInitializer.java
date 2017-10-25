@@ -125,6 +125,10 @@ public class DbInitializer {
         r.table(TABLES.CRAWL_LOG.name)
                 .indexCreate("surt_time", row -> r.array(row.g("surt"), row.g("timeStamp")))
                 .run(conn);
+        r.table(TABLES.CRAWL_LOG.name).indexCreate("executionId").run(conn);
+
+        r.tableCreate(TABLES.PAGE_LOG.name).optArg("primary_key", "warcId").run(conn);
+        r.table(TABLES.PAGE_LOG.name).indexCreate("executionId").run(conn);
 
         r.tableCreate(TABLES.CRAWLED_CONTENT.name).optArg("primary_key", "digest").run(conn);
 
@@ -190,7 +194,8 @@ public class DbInitializer {
         r.table(TABLES.URI_QUEUE.name)
                 .indexWait("surt", "executionId", "crawlHostGroupKey_sequence_earliestFetch")
                 .run(conn);
-        r.table(TABLES.CRAWL_LOG.name).indexWait("surt_time").run(conn);
+        r.table(TABLES.CRAWL_LOG.name).indexWait("surt_time", "executionId").run(conn);
+        r.table(TABLES.PAGE_LOG.name).indexWait("executionId").run(conn);
         r.table(TABLES.SEEDS.name).indexWait("jobId", "entityId").run(conn);
         r.table(TABLES.CRAWL_HOST_GROUP.name).indexWait("nextFetchTime").run(conn);
         r.table(TABLES.EXECUTIONS.name).indexWait("startTime").run(conn);

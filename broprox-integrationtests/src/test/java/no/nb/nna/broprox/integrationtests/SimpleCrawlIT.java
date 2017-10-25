@@ -15,16 +15,6 @@
  */
 package no.nb.nna.broprox.integrationtests;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.ForkJoinTask;
-import java.util.concurrent.RunnableFuture;
-import java.util.stream.StreamSupport;
-
 import com.google.protobuf.Empty;
 import com.rethinkdb.RethinkDB;
 import com.rethinkdb.net.Cursor;
@@ -33,6 +23,10 @@ import io.grpc.ManagedChannelBuilder;
 import no.nb.nna.broprox.api.ContentWriterGrpc;
 import no.nb.nna.broprox.api.ControllerGrpc;
 import no.nb.nna.broprox.api.ControllerProto;
+import no.nb.nna.broprox.api.ReportProto.CrawlLogListReply;
+import no.nb.nna.broprox.api.ReportProto.CrawlLogListRequest;
+import no.nb.nna.broprox.api.ReportProto.PageLogListReply;
+import no.nb.nna.broprox.api.ReportProto.PageLogListRequest;
 import no.nb.nna.broprox.commons.BroproxHeaderConstants;
 import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
@@ -43,12 +37,22 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import static org.assertj.core.api.Assertions.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinTask;
+import java.util.concurrent.RunnableFuture;
+import java.util.stream.StreamSupport;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  *
  */
-public class ProxyMockIT implements BroproxHeaderConstants {
+public class SimpleCrawlIT implements BroproxHeaderConstants {
 
     static ManagedChannel contentWriterChannel;
 
@@ -100,6 +104,7 @@ public class ProxyMockIT implements BroproxHeaderConstants {
         contentWriterClient.delete(Empty.getDefaultInstance());
         db.executeRequest("delete", r.table(RethinkDbAdapter.TABLES.CRAWLED_CONTENT.name).delete());
         db.executeRequest("delete", r.table(RethinkDbAdapter.TABLES.CRAWL_LOG.name).delete());
+        db.executeRequest("delete", r.table(RethinkDbAdapter.TABLES.PAGE_LOG.name).delete());
         db.executeRequest("delete", r.table(RethinkDbAdapter.TABLES.EXECUTIONS.name).delete());
         db.executeRequest("delete", r.table(RethinkDbAdapter.TABLES.EXTRACTED_TEXT.name).delete());
         db.executeRequest("delete", r.table(RethinkDbAdapter.TABLES.SCREENSHOT.name).delete());
@@ -136,6 +141,14 @@ public class ProxyMockIT implements BroproxHeaderConstants {
         Cursor c = db.executeRequest("list", r.table(RethinkDbAdapter.TABLES.CRAWL_LOG.name));
 //        c.toList().stream().forEach(r -> System.out.println("CC:: " + r));
         assertThat(c.toList().size()).isEqualTo(15);
+        try {
+            CrawlLogListReply crawlLog = db.listCrawlLogs(CrawlLogListRequest.getDefaultInstance());
+            PageLogListReply pageLog = db.listPageLogs(PageLogListRequest.getDefaultInstance());
+            crawlLog.getValueList().forEach(l -> System.out.println(l));
+            pageLog.getValueList().forEach(l -> System.out.println(l));
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
 
         executeJob(request).get();
         c = db.executeRequest("list", r.table(RethinkDbAdapter.TABLES.CRAWL_LOG.name));
@@ -186,7 +199,7 @@ public class ProxyMockIT implements BroproxHeaderConstants {
                 StreamSupport.stream(cursor.spliterator(), false)
                         .filter(e -> e.containsKey("new_val"))
                         .map(e -> ProtoUtils
-                        .rethinkToProto((Map<String, Object>) e.get("new_val"), CrawlExecutionStatus.class))
+                                .rethinkToProto((Map<String, Object>) e.get("new_val"), CrawlExecutionStatus.class))
                         .forEach(e -> {
                             executions.put(e.getId(), e);
                             if (isEnded(e)) {

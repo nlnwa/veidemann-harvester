@@ -36,9 +36,9 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
 
     private final T request;
 
-    ReqlExpr listQry;
+    private ReqlExpr listQry;
 
-    ReqlExpr countQry;
+    private ReqlExpr countQry;
 
     private int page;
 
@@ -147,11 +147,19 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
     }
 
     /**
+     * Build a query returning all values ordered by name.
+     */
+    void buildAllOrderedOnNameQuery() {
+        countQry = r.table(table.name);
+        listQry = countQry.orderBy().optArg("index", "name");
+    }
+
+    /**
      * Build a query returning all values.
      */
     void buildAllQuery() {
         countQry = r.table(table.name);
-        listQry = countQry.orderBy().optArg("index", "name");
+        listQry = countQry;
     }
 
     void addFilter(ReqlFunction1... filter) {

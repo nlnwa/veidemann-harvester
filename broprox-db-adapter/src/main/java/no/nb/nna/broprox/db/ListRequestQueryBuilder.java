@@ -37,7 +37,7 @@ public class ListRequestQueryBuilder extends ConfigListQueryBuilder<ListRequest>
                 buildSelectorQuery(request.getSelector());
                 break;
             default:
-                buildAllQuery();
+                buildAllOrderedOnNameQuery();
                 break;
         }
 

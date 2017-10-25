@@ -49,7 +49,7 @@ public class SeedListRequestQueryBuilder extends ConfigListQueryBuilder<SeedList
                 setListQry(getCountQry());
                 break;
             default:
-                buildAllQuery();
+                buildAllOrderedOnNameQuery();
                 break;
         }
     }

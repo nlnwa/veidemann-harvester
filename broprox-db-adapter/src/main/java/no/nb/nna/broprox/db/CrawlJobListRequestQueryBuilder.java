@@ -42,7 +42,7 @@ public class CrawlJobListRequestQueryBuilder extends ConfigListQueryBuilder<Craw
                 buildSelectorQuery(request.getSelector());
                 break;
             default:
-                buildAllQuery();
+                buildAllOrderedOnNameQuery();
                 break;
         }
 

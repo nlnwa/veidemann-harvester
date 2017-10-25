@@ -32,11 +32,14 @@ import no.nb.nna.broprox.harvester.proxy.InMemoryAlreadyCrawledCache;
 import no.nb.nna.broprox.harvester.proxy.RecordingProxy;
 import no.nb.nna.broprox.model.ConfigProto;
 import no.nb.nna.broprox.model.MessagesProto;
+import no.nb.nna.broprox.model.MessagesProto.PageLog;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.littleshoot.proxy.HostResolver;
 import org.mockito.invocation.InvocationOnMock;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.fail;
 import static org.mockito.Mockito.*;
 
 /**
@@ -61,42 +64,53 @@ public class BrowserControllerIT {
      * Test of render method, of class BrowserController.
      */
     @Test
-    public void testRender() throws Exception {
-        BrowserSessionRegistry sessionRegistry = new BrowserSessionRegistry();
+    public void testRender() {
+        try {
+            BrowserSessionRegistry sessionRegistry = new BrowserSessionRegistry();
 
-        ContentWriterClient contentWriterClient = mock(ContentWriterClient.class);
-        ContentWriterClient.ContentWriterSession contentWriterSession = mock(ContentWriterClient.ContentWriterSession.class);
-        when(contentWriterClient.createSession()).thenReturn(contentWriterSession);
+            ContentWriterClient contentWriterClient = mock(ContentWriterClient.class);
+            ContentWriterClient.ContentWriterSession contentWriterSession = mock(ContentWriterClient.ContentWriterSession.class);
+            when(contentWriterClient.createSession()).thenReturn(contentWriterSession);
+            when(contentWriterSession.finish()).thenReturn("WARC_ID");
 
-        DbAdapter db = getDbMock();
+            DbAdapter db = getDbMock();
+            when(db.savePageLog(any(PageLog.class))).then(a -> {
+                PageLog o = a.getArgument(0);
+                System.out.println(o);
+                return o;
+            });
 
-        MessagesProto.QueuedUri queuedUri = MessagesProto.QueuedUri.newBuilder()
-                //.setUri("https://158.39.129.50/wp-content/uploads/2016/09/Avtale-om-Bokhylla-2012.pdf")
-                //.setUri("http://nbdcms.nb.no/wp-content/uploads/2016/09/Avtale-om-Bokhylla-2012.pdf")
-                //.setUri("http://nbdcms.nb.no/index.php/om-nb/hva-og-hvem-er-vi/avtalar-og-samarbeid/")
-                //.setUri("https://nbdcms.nb.no")
-                .setUri("https://example.com")
-                .setExecutionId("testId")
-                .setDiscoveryPath("L")
-                .setReferrer("http://example.org/")
-                .build();
+            MessagesProto.QueuedUri queuedUri = MessagesProto.QueuedUri.newBuilder()
+                    //.setUri("https://158.39.129.50/wp-content/uploads/2016/09/Avtale-om-Bokhylla-2012.pdf")
+                    //.setUri("http://nbdcms.nb.no/wp-content/uploads/2016/09/Avtale-om-Bokhylla-2012.pdf")
+                    //.setUri("http://nbdcms.nb.no/index.php/om-nb/hva-og-hvem-er-vi/avtalar-og-samarbeid/")
+                    //.setUri("https://nbdcms.nb.no")
+                    .setUri("https://example.com")
+                    .setExecutionId("testId")
+                    .setDiscoveryPath("L")
+                    .setReferrer("http://example.org/")
+                    .build();
 
-        ConfigProto.CrawlConfig config = getDefaultConfig();
+            ConfigProto.CrawlConfig config = getDefaultConfig();
 
-        File tmpDir = Files.createDirectories(Paths.get("target", "it-workdir")).toFile();
-        tmpDir.deleteOnExit();
+            File tmpDir = Files.createDirectories(Paths.get("target", "it-workdir")).toFile();
+            tmpDir.deleteOnExit();
 
-        try (RecordingProxy proxy = new RecordingProxy(tmpDir, proxyPort, db, contentWriterClient,
-                new TestHostResolver(), sessionRegistry, new InMemoryAlreadyCrawledCache());
+            try (RecordingProxy proxy = new RecordingProxy(tmpDir, proxyPort, db, contentWriterClient,
+                    new TestHostResolver(), sessionRegistry, new InMemoryAlreadyCrawledCache());
 
-                BrowserController controller = new BrowserController(browserHost, browserPort, db,
-                        sessionRegistry);) {
+                 BrowserController controller = new BrowserController(browserHost, browserPort, db,
+                         sessionRegistry);) {
 
-            HarvesterProto.HarvestPageReply result = controller.render(queuedUri, config);
+                HarvesterProto.HarvestPageReply result = controller.render(queuedUri, config);
 
-            System.out.println("=========\n" + result);
-            // TODO review the generated test code and remove the default call to fail.
+                System.out.println("=========\n" + result);
+                // TODO review the generated test code and remove the default call to fail.
 //            fail("The test case is a prototype.");
+            }
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            fail("Exception was not expected", ex);
         }
     }
 

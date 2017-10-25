@@ -43,7 +43,7 @@ public class ReportService extends ReportGrpc.ReportImplBase {
 
     @Override
     @AllowedRoles({Role.CURATOR, Role.ADMIN})
-    public void getCrawlLogs(CrawlLogListRequest request, StreamObserver<CrawlLogListReply> respObserver) {
+    public void listCrawlLogs(CrawlLogListRequest request, StreamObserver<CrawlLogListReply> respObserver) {
         try {
             respObserver.onNext(db.listCrawlLogs(request));
             respObserver.onCompleted();
@@ -56,7 +56,7 @@ public class ReportService extends ReportGrpc.ReportImplBase {
 
     @Override
     @AllowedRoles({Role.CURATOR, Role.ADMIN})
-    public void getPageLogs(PageLogListRequest request, StreamObserver<PageLogListReply> respObserver) {
+    public void listPageLogs(PageLogListRequest request, StreamObserver<PageLogListReply> respObserver) {
         try {
             respObserver.onNext(db.listPageLogs(request));
             respObserver.onCompleted();

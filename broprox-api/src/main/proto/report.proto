@@ -10,8 +10,8 @@ import "google/protobuf/timestamp.proto";
 
 // Service for crawler reports.
 service Report {
-    rpc GetCrawlLogs (CrawlLogListRequest) returns (stream CrawlLogListReply) {}
-    rpc GetPageLogs (PageLogListRequest) returns (stream PageLogListReply) {}
+    rpc ListCrawlLogs (CrawlLogListRequest) returns (CrawlLogListReply) {}
+    rpc ListPageLogs (PageLogListRequest) returns (PageLogListReply) {}
 }
 
 message CrawlLogListRequest {

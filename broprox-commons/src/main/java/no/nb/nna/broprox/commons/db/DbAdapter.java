@@ -32,6 +32,10 @@ import no.nb.nna.broprox.api.ControllerProto.RoleMappingsListReply;
 import no.nb.nna.broprox.api.ControllerProto.RoleMappingsListRequest;
 import no.nb.nna.broprox.api.ControllerProto.SeedListReply;
 import no.nb.nna.broprox.api.ControllerProto.SeedListRequest;
+import no.nb.nna.broprox.api.ReportProto.CrawlLogListReply;
+import no.nb.nna.broprox.api.ReportProto.CrawlLogListRequest;
+import no.nb.nna.broprox.api.ReportProto.PageLogListReply;
+import no.nb.nna.broprox.api.ReportProto.PageLogListRequest;
 import no.nb.nna.broprox.api.StatusProto.ExecutionsListReply;
 import no.nb.nna.broprox.api.StatusProto.ExecutionsRequest;
 import no.nb.nna.broprox.model.ConfigProto.BrowserConfig;
@@ -50,6 +54,7 @@ import no.nb.nna.broprox.model.MessagesProto.CrawlHostGroup;
 import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
 import no.nb.nna.broprox.model.MessagesProto.CrawledContent;
 import no.nb.nna.broprox.model.MessagesProto.ExtractedText;
+import no.nb.nna.broprox.model.MessagesProto.PageLog;
 import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
 import no.nb.nna.broprox.model.MessagesProto.Screenshot;
 
@@ -63,6 +68,12 @@ public interface DbAdapter extends AutoCloseable {
     Optional<CrawledContent> hasCrawledContent(CrawledContent cc);
 
     CrawlLog saveCrawlLog(CrawlLog cl);
+
+    CrawlLogListReply listCrawlLogs(CrawlLogListRequest request);
+
+    PageLog savePageLog(PageLog pageLog);
+
+    PageLogListReply listPageLogs(PageLogListRequest request);
 
     ExtractedText addExtractedText(ExtractedText et);
 

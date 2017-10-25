@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Stream;
 
 import io.opentracing.ActiveSpan;
 import io.opentracing.BaseSpan;
@@ -28,6 +29,7 @@ import io.opentracing.Span;
 import io.opentracing.tag.Tags;
 import io.opentracing.util.GlobalTracer;
 import no.nb.nna.broprox.chrome.client.NetworkDomain;
+import no.nb.nna.broprox.model.MessagesProto.PageLog.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -95,33 +97,46 @@ public class UriRequestRegistry implements AutoCloseable {
         return (int) allRequests.stream().filter(r -> !r.isFromCache()).count();
     }
 
+    public Stream<Resource> getPageLogResources() {
+        return allRequests.stream().map(r -> Resource.newBuilder()
+                .setUri(r.getUrl())
+                .setFromCache(r.isFromCache())
+                .setRenderable(r.isRenderable())
+                .setResourceType(r.getResourceType().category.shortTitle + "/" + r.getResourceType().title)
+                .setMimeType(r.getMimeType())
+                .setStatusCode(r.getStatusCode())
+                .setDiscoveryPath(r.getDiscoveryPath())
+                .setWarcId(r.getWarcId())
+                .build());
+    }
+
     void onRequestWillBeSent(NetworkDomain.RequestWillBeSent request, String rootDiscoveryPath) {
         UriRequest uriRequest = getById(request.requestId);
 
-            if (uriRequest != null) {
-                // Already got request for this id
-                if (request.redirectResponse == null) {
-                    return;
-                } else {
-                    // Redirect response
-                    // TODO: write crawl log
-                    //this.responseReceived(requestId, loaderId, time, Protocol.Page.ResourceType.Other, redirectResponse, frameId);
-                    //networkRequest = this._appendRedirect(requestId, time, request.url);
-                    uriRequest = new UriRequest(request, uriRequest, span);
-                    allRequests.add(uriRequest);
-                }
+        if (uriRequest != null) {
+            // Already got request for this id
+            if (request.redirectResponse == null) {
+                return;
             } else {
-                String referrer = (String) request.request.headers.get("Referer");
-                if (referrer != null) {
-                    UriRequest parent = getByUrl(referrer).getNow(null);
-                    uriRequest = new UriRequest(request, parent, span);
-                } else {
-                    // New request
-                    uriRequest = new UriRequest(request, rootDiscoveryPath, span);
-                }
+                // Redirect response
+                // TODO: write crawl log
+                //this.responseReceived(requestId, loaderId, time, Protocol.Page.ResourceType.Other, redirectResponse, frameId);
+                //networkRequest = this._appendRedirect(requestId, time, request.url);
+                uriRequest = new UriRequest(request, uriRequest, span);
                 allRequests.add(uriRequest);
             }
-            add(uriRequest);
+        } else {
+            String referrer = (String) request.request.headers.get("Referer");
+            if (referrer != null) {
+                UriRequest parent = getByUrl(referrer).getNow(null);
+                uriRequest = new UriRequest(request, parent, span);
+            } else {
+                // New request
+                uriRequest = new UriRequest(request, rootDiscoveryPath, span);
+            }
+            allRequests.add(uriRequest);
+        }
+        add(uriRequest);
     }
 
     void onLoadingFailed(NetworkDomain.LoadingFailed f) {

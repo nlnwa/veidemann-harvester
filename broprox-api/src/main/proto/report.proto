@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package broprox;
+option java_package = "no.nb.nna.broprox.api";
+//option java_multiple_files = true;
+option java_outer_classname = "ReportProto";
+
+import "messages.proto";
+import "google/protobuf/timestamp.proto";
+
+// Service for crawler reports.
+service Report {
+    rpc GetCrawlLogs (CrawlLogListRequest) returns (stream CrawlLogListReply) {}
+    rpc GetPageLogs (PageLogListRequest) returns (stream PageLogListReply) {}
+}
+
+message CrawlLogListRequest {
+    oneof qry {
+        string warc_id = 1;
+        string execution_id = 2;
+    }
+    int32 page_size = 14;
+    int32 page = 15;
+}
+
+message CrawlLogListReply {
+    repeated CrawlLog value = 1;
+    int64 count = 2;
+    int32 page_size = 14;
+    int32 page = 15;
+}
+
+message PageLogListRequest {
+    oneof qry {
+        string warc_id = 1;
+        string execution_id = 2;
+    }
+    int32 page_size = 14;
+    int32 page = 15;
+}
+
+message PageLogListReply {
+    repeated PageLog value = 1;
+    int64 count = 2;
+    int32 page_size = 14;
+    int32 page = 15;
+}

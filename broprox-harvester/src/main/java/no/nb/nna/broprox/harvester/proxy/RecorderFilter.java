@@ -189,13 +189,14 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
             if (ProxyUtils.isLastChunk(httpObject)) {
                 responseCollector.writeCache(cache, uri, executionId);
 
-                responseCollector.writeResponse(crawlLog.build());
+                String warcId = responseCollector.writeResponse(crawlLog.build());
 
                 responseSpan.log("Last chunk");
                 if (uriRequest != null) {
                     uriRequest.setSize(responseCollector.getSize());
                     responseSpan.finish();
                     finishSpan(uriRequest);
+                    uriRequest.setWarcId(warcId);
                 }
             }
 

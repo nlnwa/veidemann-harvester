@@ -37,7 +37,7 @@ public class UriRequest {
 
     private ResourceType resourceType;
 
-    private String mimeType;
+    private String mimeType = "";
 
     private int statusCode;
 
@@ -50,6 +50,8 @@ public class UriRequest {
     private long size = 0L;
 
     private boolean fromCache = false;
+
+    private String warcId = "";
 
     private Span span;
 
@@ -145,6 +147,14 @@ public class UriRequest {
 
     public void setFromCache(boolean fromCache) {
         this.fromCache = fromCache;
+    }
+
+    public String getWarcId() {
+        return warcId;
+    }
+
+    public void setWarcId(String warcId) {
+        this.warcId = warcId;
     }
 
     public Span getSpan() {

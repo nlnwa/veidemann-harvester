@@ -35,6 +35,7 @@ import no.nb.nna.broprox.commons.db.DbAdapter;
 import no.nb.nna.broprox.harvester.BrowserSessionRegistry;
 import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
 import no.nb.nna.broprox.model.ConfigProto.CrawlConfig;
+import no.nb.nna.broprox.model.MessagesProto.PageLog;
 import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -114,6 +115,15 @@ public class BrowserController implements AutoCloseable, BroproxHeaderConstants 
                 resultBuilder.setUriCount(session.getUriRequests().getUriDownloadedCount());
 
                 session.scrollToTop();
+
+                PageLog.Builder pageLog = PageLog.newBuilder()
+                        .setUri(queuedUri.getUri())
+                        .setExecutionId(queuedUri.getExecutionId())
+                        .setWarcId(session.getUriRequests().getRootRequest().getWarcId());
+
+                session.getUriRequests().getPageLogResources().forEach(r -> pageLog.addResource(r));
+                resultBuilder.getOutlinksOrBuilderList().forEach(o -> pageLog.addOutlink(o.getUri()));
+                db.savePageLog(pageLog.build());
             }
         } finally {
             session.close();

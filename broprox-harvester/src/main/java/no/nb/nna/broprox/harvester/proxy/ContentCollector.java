@@ -191,7 +191,7 @@ public class ContentCollector {
         }
     }
 
-    public void writeRequest(CrawlLog logEntry) {
+    public String writeRequest(CrawlLog logEntry) {
         CrawlLog.Builder logEntryBuilder = logEntry.toBuilder();
         logEntryBuilder.setRecordType("request")
                 .setBlockDigest(getDigest());
@@ -201,14 +201,14 @@ public class ContentCollector {
         }
         contentWriterClient.sendCrawlLog(logEntry);
         try {
-            contentWriterClient.finish();
+            return contentWriterClient.finish();
         } catch (InterruptedException | StatusException ex) {
             // TODO: Do something reasonable with the exception
             throw new RuntimeException(ex);
         }
     }
 
-    public void writeResponse(CrawlLog logEntry) {
+    public String writeResponse(CrawlLog logEntry) {
         CrawlLog.Builder logEntryBuilder = logEntry.toBuilder();
         logEntryBuilder.setRecordType("response")
                 .setFetchTimeMs(Duration.between(ProtoUtils.tsToOdt(
@@ -220,7 +220,7 @@ public class ContentCollector {
         }
         contentWriterClient.sendCrawlLog(logEntry);
         try {
-            contentWriterClient.finish();
+            return contentWriterClient.finish();
         } catch (InterruptedException | StatusException ex) {
             // TODO: Do something reasonable with the exception
             throw new RuntimeException(ex);

@@ -76,7 +76,7 @@ data:
       secret: VerySecret
       trustedPeers:
       - veidemann-cli
-      - veidemann-admin
+      - veidemann-gui
 
     connectors:
     - type: pilt

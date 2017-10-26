@@ -1,7 +1,21 @@
+// Copyright © 2017 National Library of Norway.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package util
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"github.com/coreos/go-oidc"
 	"github.com/ghodss/yaml"
@@ -10,16 +24,18 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
-	"os"
 	"os/exec"
 	"runtime"
 	"time"
 )
 
-type Auth struct {
+type auth struct {
 	clientID     string
 	clientSecret string
 	redirectURI  string
+	rawIdToken   string
+	idToken      *oidc.IDToken
+	oauth2Token  *oauth2.Token
 
 	idTokenVerifier *oidc.IDTokenVerifier
 	provider        *oidc.Provider
@@ -32,7 +48,8 @@ type Auth struct {
 	state  string
 }
 
-func (a *Auth) Init(idpUrl string) {
+func NewAuth() *auth {
+	a := auth{}
 	a.offlineAsScope = true
 	a.clientID = "veidemann-cli"
 	a.clientSecret = "cli-app-secret"
@@ -42,7 +59,7 @@ func (a *Auth) Init(idpUrl string) {
 	ctx := oidc.ClientContext(context.Background(), a.client)
 
 	// Initialize a provider by specifying dex's issuer URL.
-	p, err := oidc.NewProvider(ctx, idpUrl)
+	p, err := oidc.NewProvider(ctx, viper.GetString("idp"))
 	if err != nil {
 		log.Fatal(err)
 		// handle error
@@ -50,19 +67,20 @@ func (a *Auth) Init(idpUrl string) {
 	a.provider = p
 	oc := oidc.Config{ClientID: a.clientID}
 	a.idTokenVerifier = a.provider.Verifier(&oc)
+	return &a
 }
 
-func (a *Auth) oauth2Config() *oauth2.Config {
+func (a *auth) oauth2Config() *oauth2.Config {
 	return &oauth2.Config{
 		ClientID:     a.clientID,
 		ClientSecret: a.clientSecret,
 		Endpoint:     a.provider.Endpoint(),
-		Scopes:       []string{oidc.ScopeOpenID, "profile", "email", "groups", "offline_access", "audience:server:client_id:veidemann-admin"},
+		Scopes:       []string{oidc.ScopeOpenID, "profile", "email", "groups", "offline_access", "audience:server:client_id:veidemann-api"},
 		RedirectURL:  a.redirectURI,
 	}
 }
 
-func (a *Auth) CreateAuthCodeURL() string {
+func (a *auth) CreateAuthCodeURL() string {
 	a.state = RandStringBytesMaskImprSrc(16)
 	viper.Set("nonce", a.state)
 
@@ -70,7 +88,7 @@ func (a *Auth) CreateAuthCodeURL() string {
 	return a.oauth2Config().AuthCodeURL(a.state, nonce)
 }
 
-func (a *Auth) Openbrowser(authCodeURL string) {
+func (a *auth) Openbrowser(authCodeURL string) {
 	var err error
 
 	switch runtime.GOOS {
@@ -88,32 +106,55 @@ func (a *Auth) Openbrowser(authCodeURL string) {
 	}
 }
 
-func (a *Auth) VerifyCode(code string) (string, *oidc.IDToken) {
+func (a *auth) VerifyCode(code string) {
 	ctx := context.Background()
 	oauth2Token, err := a.oauth2Config().Exchange(ctx, code)
 	if err != nil {
 		log.Fatal(err)
-		// handle error
 	}
+	a.oauth2Token = oauth2Token
 
 	// Extract the ID Token from OAuth2 token.
 	rawIDToken, ok := oauth2Token.Extra("id_token").(string)
 	if !ok {
 		log.Fatal("No token found")
 	}
+	a.rawIdToken = rawIDToken
 
+	a.verifyIdToken(ctx)
+
+	viper.Set("accessToken", marshlAccessToken(oauth2Token))
+}
+
+func (a *auth) verifyIdToken(ctx context.Context) {
 	// Parse and verify ID Token payload.
-	idToken, err := a.idTokenVerifier.Verify(ctx, rawIDToken)
+	idToken, err := a.idTokenVerifier.Verify(ctx, a.rawIdToken)
 	if err != nil {
 		log.Fatal(err)
 	}
-	viper.Set("idToken", rawIDToken)
 
 	if idToken.Nonce != viper.GetString("nonce") {
 		log.Fatal("Nonce did not match")
 	}
+	a.idToken = idToken
+}
 
-	return rawIDToken, idToken
+func (a *auth) CheckStoredAccessToken() {
+	accessToken := viper.GetString("accessToken")
+	if accessToken == "" {
+		return
+	}
+
+	a.oauth2Token = unmarshalAccessToken(accessToken)
+
+	// Extract the ID Token from OAuth2 token.
+	rawIdToken, ok := a.oauth2Token.Extra("id_token").(string)
+	if !ok {
+		log.Fatal("No token found")
+	}
+	a.rawIdToken = rawIdToken
+
+	a.verifyIdToken(context.Background())
 }
 
 // Extract custom claims.
@@ -124,60 +165,75 @@ type Claims struct {
 	Name     string   `json:"name"`
 }
 
-func (a *Auth) ExtractClaims(idToken *oidc.IDToken) (claims Claims) {
-	if err := idToken.Claims(&claims); err != nil {
+func (a *auth) Claims() (claims Claims) {
+	if err := a.idToken.Claims(&claims); err != nil {
 		log.Fatal(err)
 	}
 	return claims
 }
 
-func GetRawIdToken(ipdUrl string) string {
-	rawIdToken := viper.GetString("idToken")
-	if rawIdToken == "" {
-		return ""
-	}
+type yamlToken struct {
+	// AccessToken is the token that authorizes and authenticates
+	// the requests.
+	AccessToken string
 
-	var a Auth
-	a.Init(ipdUrl)
-	// Parse and verify ID Token payload.
-	_, err := a.idTokenVerifier.Verify(context.Background(), rawIdToken)
-	if err != nil {
-		log.Fatal(err)
-		// handle error
-	}
-	return rawIdToken
+	// TokenType is the type of token.
+	// The Type method returns either this or "Bearer", the default.
+	TokenType string
+
+	// RefreshToken is a token that's used by the application
+	// (as opposed to the user) to refresh the access token
+	// if it expires.
+	RefreshToken string
+
+	// Expiry is the optional expiration time of the access token.
+	//
+	// If zero, TokenSource implementations will reuse the same
+	// token forever and RefreshToken or equivalent
+	// mechanisms for that TokenSource will not be used.
+	Expiry time.Time
+
+	// Raw optionally contains extra metadata from the server
+	// when updating a token.
+	IdToken interface{}
 }
 
-type config struct {
-	ControllerAddress string `json:"controllerAddress"`
-	Idp               string `json:"idp"`
-	IdToken           string `json:"idToken"`
-	Nonce             string `json:"nonce"`
+func marshlAccessToken(token *oauth2.Token) string {
+	tmp := yamlToken{
+		AccessToken:  token.AccessToken,
+		TokenType:    token.Type(),
+		RefreshToken: token.RefreshToken,
+		Expiry:       token.Expiry,
+		IdToken:      token.Extra("id_token"),
+	}
+	r, err := yaml.Marshal(tmp)
+	if err != nil {
+		log.Fatalf("Could not marshal Access Token: %v", err)
+	}
+	s := base64.StdEncoding.EncodeToString(r)
+	return s
 }
 
-func WriteConfig() {
-	log.Println("Writing config")
-
-	c := config{
-		viper.GetString("controllerAddress"),
-		viper.GetString("idp"),
-		viper.GetString("idToken"),
-		viper.GetString("nonce"),
-	}
-
-	y, err := yaml.Marshal(c)
+func unmarshalAccessToken(accessToken string) *oauth2.Token {
+	s, err := base64.StdEncoding.DecodeString(accessToken)
 	if err != nil {
-		log.Fatalf("err: %v\n", err)
-		os.Exit(2)
+		log.Fatalf("Could not unmarshal Access Token: %v", err)
 	}
-	f, err := os.Create(viper.ConfigFileUsed())
-	if err != nil {
-		log.Fatalf("Could not create file '%s': %v", viper.ConfigFileUsed(), err)
-		os.Exit(2)
+	var tmp yamlToken
+	if err := yaml.Unmarshal(s, &tmp); err != nil {
+		log.Fatalf("Could not unmarshal Access Token: %v", err)
 	}
-	f.Chmod(0600)
-	defer f.Close()
-	f.Write(y)
+
+	at := &oauth2.Token{
+		AccessToken:  tmp.AccessToken,
+		TokenType:    tmp.TokenType,
+		RefreshToken: tmp.RefreshToken,
+		Expiry:       tmp.Expiry,
+	}
+	extra := map[string]interface{}{"id_token": tmp.IdToken}
+	at = at.WithExtra(extra)
+
+	return at
 }
 
 const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"

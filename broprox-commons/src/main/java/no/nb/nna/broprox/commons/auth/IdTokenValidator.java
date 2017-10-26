@@ -38,7 +38,7 @@ import java.util.List;
 
 public class IdTokenValidator {
     private static final Logger LOG = LoggerFactory.getLogger(IdTokenValidator.class);
-    public static final String CLIENT_ID = "veidemann-cli";
+    public static final String CLIENT_ID = "veidemann-api";
 
     OIDCProviderMetadata providerMetadata;
 

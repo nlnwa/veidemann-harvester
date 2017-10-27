@@ -23,35 +23,33 @@ import (
 	"log"
 )
 
-func NewControllerClient(idToken string) (broprox.ControllerClient, *grpc.ClientConn) {
-	conn := newConnection(idToken)
+func NewControllerClient() (broprox.ControllerClient, *grpc.ClientConn) {
+	conn := newConnection()
 	c := broprox.NewControllerClient(conn)
 	return c, conn
 }
 
-func NewStatusClient(idToken string) (broprox.StatusClient, *grpc.ClientConn) {
-	conn := newConnection(idToken)
+func NewStatusClient() (broprox.StatusClient, *grpc.ClientConn) {
+	conn := newConnection()
 	c := broprox.NewStatusClient(conn)
 	return c, conn
 }
 
-func NewReportClient(idToken string) (broprox.ReportClient, *grpc.ClientConn) {
-	conn := newConnection(idToken)
+func NewReportClient() (broprox.ReportClient, *grpc.ClientConn) {
+	conn := newConnection()
 	c := broprox.NewReportClient(conn)
 	return c, conn
 }
 
-func newConnection(idToken string) *grpc.ClientConn {
+func newConnection() *grpc.ClientConn {
 	address := viper.GetString("controllerAddress")
 	fmt.Printf("Connecting to %s\n", address)
+
+	dialOptions := []grpc.DialOption{grpc.WithInsecure()}
+	dialOptions = AddCredentials(dialOptions)
+
 	// Set up a connection to the server.
-	var perRPCCreds grpc.DialOption
-	if idToken == "" {
-		perRPCCreds = grpc.WithInsecure()
-	} else {
-		perRPCCreds = grpc.WithPerRPCCredentials(NewFromIdToken(idToken))
-	}
-	conn, err := grpc.Dial(address, grpc.WithInsecure(), perRPCCreds)
+	conn, err := grpc.Dial(address, dialOptions...)
 	if err != nil {
 		log.Fatalf("Could not connect: %v", err)
 	}
@@ -59,16 +57,24 @@ func newConnection(idToken string) *grpc.ClientConn {
 }
 
 type bearerTokenCred struct {
-	token string
+	tokenType string
+	token     string
 }
 
-func NewFromIdToken(token string) credentials.PerRPCCredentials {
-	return bearerTokenCred{token}
+func AddCredentials(opts []grpc.DialOption) []grpc.DialOption {
+	a := NewAuth()
+	a.CheckStoredAccessToken()
+	if a.rawIdToken == "" {
+		return opts
+	}
+
+	var bt credentials.PerRPCCredentials = &bearerTokenCred{a.oauth2Token.TokenType, a.rawIdToken}
+	return append(opts, grpc.WithPerRPCCredentials(bt))
 }
 
 func (b bearerTokenCred) GetRequestMetadata(ctx context.Context, uri ...string) (map[string]string, error) {
 	return map[string]string{
-		"Bearer": b.token,
+		"authorization": b.tokenType + " " + b.token,
 	}, nil
 }
 

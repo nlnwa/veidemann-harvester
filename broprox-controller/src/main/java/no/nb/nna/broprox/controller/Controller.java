@@ -94,10 +94,11 @@ public class Controller {
     }
 
     private AuAuServerInterceptor getAuAuServerInterceptor(DbAdapter db) {
-        if (SETTINGS.getOpenIdConnectIssuer() == null || SETTINGS.getOpenIdConnectIssuer().isEmpty()) {
+        String issuerUrl = SETTINGS.getOpenIdConnectIssuer();
+        if (issuerUrl == null || issuerUrl.isEmpty()) {
             return new NoopAuAuServerInterceptor();
         } else {
-            return new IdTokenAuAuServerInterceptor(new UserRoleMapper(db), new IdTokenValidator());
+            return new IdTokenAuAuServerInterceptor(new UserRoleMapper(db), new IdTokenValidator(issuerUrl));
         }
     }
 }

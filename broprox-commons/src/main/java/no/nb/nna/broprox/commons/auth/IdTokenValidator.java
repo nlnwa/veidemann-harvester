@@ -38,18 +38,18 @@ import java.util.List;
 
 public class IdTokenValidator {
     private static final Logger LOG = LoggerFactory.getLogger(IdTokenValidator.class);
-    public static final String CLIENT_ID = "veidemann-admin";
+    public static final String CLIENT_ID = "veidemann-api";
 
     OIDCProviderMetadata providerMetadata;
 
 
-    public IdTokenValidator() {
-        providerMetadata = providerDiscovery();
+    public IdTokenValidator(String issuerUrl) {
+        providerMetadata = providerDiscovery(issuerUrl);
     }
 
-    private OIDCProviderMetadata providerDiscovery() {
+    private OIDCProviderMetadata providerDiscovery(String issuerUrl) {
         try {
-            Issuer issuer = new Issuer("http://johnh.nb.no:32000/dex/");
+            Issuer issuer = new Issuer(issuerUrl);
             return OIDCProviderMetadata.resolve(issuer);
         } catch (IOException | GeneralException ex) {
             LOG.error(ex.getMessage(), ex);

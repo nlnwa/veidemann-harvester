@@ -199,7 +199,7 @@ public class ControllerServiceTest {
             @Override
             public void applyRequestMetadata(MethodDescriptor<?, ?> method, Attributes attrs, Executor appExecutor, MetadataApplier applier) {
                 Metadata headers = new Metadata();
-                headers.put(IdTokenAuAuServerInterceptor.BEARER_TOKEN_KEY, "token1");
+                headers.put(IdTokenAuAuServerInterceptor.BEARER_TOKEN_KEY, "Bearer token1");
                 applier.apply(headers);
             }
 

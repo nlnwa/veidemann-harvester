@@ -21,6 +21,7 @@ import io.grpc.Context;
 import io.grpc.Contexts;
 import io.grpc.Metadata;
 import io.grpc.ServerCall;
+import io.grpc.ServerCall.Listener;
 import io.grpc.ServerCallHandler;
 import io.grpc.ServerInterceptors;
 import io.grpc.ServerServiceDefinition;
@@ -37,7 +38,10 @@ public class IdTokenAuAuServerInterceptor implements AuAuServerInterceptor {
     private static final Logger LOG = LoggerFactory.getLogger(IdTokenAuAuServerInterceptor.class);
 
     public static final Metadata.Key<String> BEARER_TOKEN_KEY =
-            Metadata.Key.of("Bearer", Metadata.ASCII_STRING_MARSHALLER);
+            Metadata.Key.of("authorization", Metadata.ASCII_STRING_MARSHALLER);
+
+    public static final Listener NOOP_LISTENER = new Listener() {
+    };
 
     private final UserRoleMapper userRoleMapper;
 
@@ -74,25 +78,17 @@ public class IdTokenAuAuServerInterceptor implements AuAuServerInterceptor {
             Metadata requestHeaders,
             ServerCallHandler<ReqT, RespT> next) {
 
-        String bearerToken = requestHeaders.get(BEARER_TOKEN_KEY);
         String method = call.getMethodDescriptor().getFullMethodName();
-        LOG.trace("Bearer token: {}", bearerToken);
         LOG.debug("Method: {}", method);
 
-        if (bearerToken == null) {
-            if (grants.isRequireAuthenticatedUser(method)) {
-                call.close(Status.UNAUTHENTICATED, new Metadata());
-            }
-            return next.startCall(call, requestHeaders);
-        }
-
-        JWTClaimsSet claims = idTokenValidator.verifyIdToken(requestHeaders.get(BEARER_TOKEN_KEY));
-        LOG.trace("Claims: {}", claims);
+        JWTClaimsSet claims = validateBearerToken(requestHeaders);
         if (claims == null) {
             if (grants.isRequireAuthenticatedUser(method)) {
                 call.close(Status.UNAUTHENTICATED, new Metadata());
+                return NOOP_LISTENER;
+            } else {
+                return next.startCall(call, requestHeaders);
             }
-            return next.startCall(call, requestHeaders);
         }
 
         String email = (String) claims.getClaim("email");
@@ -105,6 +101,7 @@ public class IdTokenAuAuServerInterceptor implements AuAuServerInterceptor {
         LOG.debug("Roles: {}", roles);
         if (!grants.isAllowed(method, roles)) {
             call.close(Status.PERMISSION_DENIED, new Metadata());
+            return NOOP_LISTENER;
         }
 
         Context contextWithEmailAndRoles = Context.current()
@@ -113,4 +110,18 @@ public class IdTokenAuAuServerInterceptor implements AuAuServerInterceptor {
         return Contexts.interceptCall(contextWithEmailAndRoles, call, requestHeaders, next);
     }
 
+    private JWTClaimsSet validateBearerToken(Metadata requestHeaders) {
+        String bearerToken = requestHeaders.get(BEARER_TOKEN_KEY);
+        LOG.trace("Bearer token: {}", bearerToken);
+
+        if (bearerToken != null && !bearerToken.isEmpty()) {
+            String[] parts = bearerToken.split("\\s+", 2);
+            if (parts.length == 2 && "bearer".equalsIgnoreCase(parts[0])) {
+                JWTClaimsSet claims = idTokenValidator.verifyIdToken(parts[1]);
+                LOG.trace("Claims: {}", claims);
+                return claims;
+            }
+        }
+        return null;
+    }
 }

@@ -39,9 +39,8 @@ var reportCmd = &cobra.Command{
 ` + printValidReportTypes(),
 
 	Run: func(cmd *cobra.Command, args []string) {
-		idToken := util.GetRawIdToken(Idp)
 		if len(args) == 1 {
-			client, conn := util.NewReportClient(idToken)
+			client, conn := util.NewReportClient()
 			defer conn.Close()
 
 			switch args[0] {

@@ -60,17 +60,23 @@ data:
     #
     # If this option isn't chosen clients may be added through the gRPC API.
     staticClients:
-    - id: veidemann-admin
+    - id: veidemann-gui
       redirectURIs:
       - 'http://${EXTERNAL_HOSTNAME}:30890/activity'
-      name: 'Veidemann Admin'
+      name: 'Veidemann Admin GUI'
       secret: ZXhhbXBsZS1hcHAtc2VjcmV0
-      trustedPeers:
-      - veidemann-cli
     - id: veidemann-cli
       public: true
       name: 'Veidemann CLI'
       secret: cli-app-secret
+    - id: veidemann-api
+      redirectURIs:
+      - 'http://${EXTERNAL_HOSTNAME}:30890/activity'
+      name: 'Veidemann API'
+      secret: VerySecret
+      trustedPeers:
+      - veidemann-cli
+      - veidemann-gui
 
     connectors:
     - type: pilt

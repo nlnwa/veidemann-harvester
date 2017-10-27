@@ -46,8 +46,7 @@ var createCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		idToken := util.GetRawIdToken(Idp)
-		client, conn := util.NewControllerClient(idToken)
+		client, conn := util.NewControllerClient()
 		defer conn.Close()
 
 		for _, v := range result {

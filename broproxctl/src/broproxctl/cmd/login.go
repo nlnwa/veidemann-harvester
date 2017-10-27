@@ -26,8 +26,7 @@ var loginCmd = &cobra.Command{
 	Short: "Initiate browser session for logging in to Veidemann",
 	Long:  ``,
 	Run: func(cmd *cobra.Command, args []string) {
-		var a util.Auth
-		a.Init(Idp)
+		a := util.NewAuth()
 
 		authCodeURL := a.CreateAuthCodeURL()
 		fmt.Println("A login screen should now open in your browser. Follow the login steps and paste the code here.")
@@ -37,8 +36,8 @@ var loginCmd = &cobra.Command{
 		fmt.Print("Code: ")
 		var code string
 		fmt.Scan(&code)
-		_, idToken := a.VerifyCode(code)
-		claims := a.ExtractClaims(idToken)
+		a.VerifyCode(code)
+		claims := a.Claims()
 		util.WriteConfig()
 		fmt.Printf("Hello %s\n", claims.Name)
 	},

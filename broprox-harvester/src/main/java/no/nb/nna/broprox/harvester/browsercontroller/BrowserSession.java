@@ -248,7 +248,7 @@ public class BrowserSession implements AutoCloseable, BroproxHeaderConstants {
                     .get(protocolTimeout, MILLISECONDS);
             byte[] img = Base64.getDecoder().decode(screenshot.data);
 
-            db.addScreenshot(MessagesProto.Screenshot.newBuilder()
+            db.saveScreenshot(MessagesProto.Screenshot.newBuilder()
                     .setImg(ByteString.copyFrom(img))
                     .setExecutionId(executionId)
                     .setUri(uriRequests.getRootRequest().getUrl())

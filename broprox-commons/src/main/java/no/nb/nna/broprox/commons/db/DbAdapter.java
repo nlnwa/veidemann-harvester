@@ -36,6 +36,8 @@ import no.nb.nna.broprox.api.ReportProto.CrawlLogListReply;
 import no.nb.nna.broprox.api.ReportProto.CrawlLogListRequest;
 import no.nb.nna.broprox.api.ReportProto.PageLogListReply;
 import no.nb.nna.broprox.api.ReportProto.PageLogListRequest;
+import no.nb.nna.broprox.api.ReportProto.ScreenshotListReply;
+import no.nb.nna.broprox.api.ReportProto.ScreenshotListRequest;
 import no.nb.nna.broprox.api.StatusProto.ExecutionsListReply;
 import no.nb.nna.broprox.api.StatusProto.ExecutionsRequest;
 import no.nb.nna.broprox.model.ConfigProto.BrowserConfig;
@@ -83,7 +85,7 @@ public interface DbAdapter extends AutoCloseable {
 
     /**
      * Update the state for a Crawl Execution to ABORTED_MANUAL.
-     *
+     * <p>
      * The frontier should detect this and abort the crawl.
      *
      * @param executionId id of the execution to update
@@ -114,7 +116,11 @@ public interface DbAdapter extends AutoCloseable {
 
     CrawlHostGroup releaseCrawlHostGroup(CrawlHostGroup crawlHostGroup, long nextFetchDelayMs);
 
-    Screenshot addScreenshot(Screenshot s);
+    ScreenshotListReply listScreenshots(ScreenshotListRequest request);
+
+    Screenshot saveScreenshot(Screenshot screenshot);
+
+    Empty deleteScreenshot(Screenshot screenshot);
 
     CrawlEntity saveCrawlEntity(CrawlEntity msg);
 

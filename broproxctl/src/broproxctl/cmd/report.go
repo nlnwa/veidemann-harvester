@@ -21,11 +21,15 @@ import (
 	"context"
 	"github.com/spf13/cobra"
 	"log"
+	"os"
 )
 
 var (
 	warcId      string
 	executionId string
+	id          string
+	uri         string
+	img         bool
 	pageSize    int32
 	page        int32
 )
@@ -82,6 +86,32 @@ var reportCmd = &cobra.Command{
 				for _, pageLog := range r.Value {
 					printPageLogLine(pageLog)
 				}
+			case "screenshot":
+				request := bp.ScreenshotListRequest{}
+				if id != "" {
+					request.Qry = &bp.ScreenshotListRequest_Id{id}
+				}
+				if executionId != "" {
+					request.Qry = &bp.ScreenshotListRequest_ExecutionId{executionId}
+				}
+				if uri != "" {
+					request.Qry = &bp.ScreenshotListRequest_Uri{uri}
+				}
+				request.Page = page
+				request.PageSize = pageSize
+
+				r, err := client.ListScreenshots(context.Background(), &request)
+				if err != nil {
+					log.Fatalf("could not get page log: %v", err)
+				}
+
+				if img {
+					printScreenshot(r.Value[0])
+				} else {
+					for _, screenshot := range r.Value {
+						printScreenshotLine(screenshot)
+					}
+				}
 			default:
 				fmt.Printf("Unknown report type\n")
 				cmd.Usage()
@@ -108,12 +138,15 @@ func init() {
 	// reportCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 	reportCmd.Flags().StringVarP(&warcId, "warcid", "w", "", "Single object by Warc ID")
 	reportCmd.PersistentFlags().StringVarP(&executionId, "executionid", "e", "", "All objects by Execution ID")
+	reportCmd.PersistentFlags().StringVarP(&id, "id", "", "", "Single screenshot by ID")
+	reportCmd.PersistentFlags().StringVarP(&uri, "uri", "", "", "All screenshots by URI")
+	reportCmd.PersistentFlags().BoolVarP(&img, "img", "", false, "Image binary")
 	reportCmd.PersistentFlags().Int32VarP(&pageSize, "pagesize", "s", 5, "Number of objects to get")
 	reportCmd.PersistentFlags().Int32VarP(&page, "page", "p", 0, "The page number")
 }
 
 func printValidReportTypes() string {
-	reportNames := []string{"crawllog", "pagelog"}
+	reportNames := []string{"crawllog", "pagelog", "screenshot"}
 	var names string
 	for _, v := range reportNames {
 		names += fmt.Sprintf("  * %s\n", v)
@@ -134,4 +167,12 @@ func printPageLogLine(pageLog *bp.PageLog) {
 	for _, r := range pageLog.Outlink {
 		fmt.Printf(" - %s\n", r)
 	}
+}
+
+func printScreenshotLine(screenshot *bp.Screenshot) {
+	fmt.Printf("---\n%s %s %s\n", screenshot.Id, screenshot.ExecutionId, screenshot.Uri)
+}
+
+func printScreenshot(screenshot *bp.Screenshot) {
+	os.Stdout.Write(screenshot.Img)
 }

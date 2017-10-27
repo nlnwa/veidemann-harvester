@@ -46,6 +46,8 @@ import no.nb.nna.broprox.api.ReportProto.CrawlLogListReply;
 import no.nb.nna.broprox.api.ReportProto.CrawlLogListRequest;
 import no.nb.nna.broprox.api.ReportProto.PageLogListReply;
 import no.nb.nna.broprox.api.ReportProto.PageLogListRequest;
+import no.nb.nna.broprox.api.ReportProto.ScreenshotListReply;
+import no.nb.nna.broprox.api.ReportProto.ScreenshotListRequest;
 import no.nb.nna.broprox.api.StatusProto;
 import no.nb.nna.broprox.commons.auth.EmailContextKey;
 import no.nb.nna.broprox.commons.db.ChangeFeed;
@@ -445,7 +447,7 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
-    public Screenshot addScreenshot(Screenshot s) {
+    public Screenshot saveScreenshot(Screenshot s) {
         Map rMap = ProtoUtils.protoToRethink(s);
 
         Map<String, Object> response = executeRequest("db-addScreenshot",
@@ -456,6 +458,17 @@ public class RethinkDbAdapter implements DbAdapter {
         String key = ((List<String>) response.get("generated_keys")).get(0);
 
         return s.toBuilder().setId(key).build();
+    }
+
+    @Override
+    public ScreenshotListReply listScreenshots(ScreenshotListRequest request) {
+        ScreenshotListRequestQueryBuilder queryBuilder = new ScreenshotListRequestQueryBuilder(request);
+        return queryBuilder.executeList(this).build();
+    }
+
+    @Override
+    public Empty deleteScreenshot(Screenshot screenshot) {
+        return deleteConfigMessage(screenshot, TABLES.SCREENSHOT);
     }
 
     @Override

@@ -577,7 +577,7 @@ public class RethinkDbAdapterIT {
         Screenshot s = null;
         RethinkDbAdapter instance = null;
         Screenshot expResult = null;
-        Screenshot result = instance.addScreenshot(s);
+        Screenshot result = instance.saveScreenshot(s);
 //        assertEquals(expResult, result);
         // TODO review the generated test code and remove the default call to fail.
         fail("The test case is a prototype.");

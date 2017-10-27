@@ -22,6 +22,8 @@ import no.nb.nna.broprox.api.ReportProto.CrawlLogListReply;
 import no.nb.nna.broprox.api.ReportProto.CrawlLogListRequest;
 import no.nb.nna.broprox.api.ReportProto.PageLogListReply;
 import no.nb.nna.broprox.api.ReportProto.PageLogListRequest;
+import no.nb.nna.broprox.api.ReportProto.ScreenshotListReply;
+import no.nb.nna.broprox.api.ReportProto.ScreenshotListRequest;
 import no.nb.nna.broprox.commons.auth.AllowedRoles;
 import no.nb.nna.broprox.commons.db.DbAdapter;
 import no.nb.nna.broprox.model.ConfigProto.Role;
@@ -67,4 +69,16 @@ public class ReportService extends ReportGrpc.ReportImplBase {
         }
     }
 
+    @Override
+    @AllowedRoles({Role.CURATOR, Role.ADMIN})
+    public void listScreenshots(ScreenshotListRequest request, StreamObserver<ScreenshotListReply> respObserver) {
+        try {
+            respObserver.onNext(db.listScreenshots(request));
+            respObserver.onCompleted();
+        } catch (Exception e) {
+            LOG.error(e.getMessage(), e);
+            Status status = Status.UNKNOWN.withDescription(e.toString());
+            respObserver.onError(status.asException());
+        }
+    }
 }

@@ -6,12 +6,12 @@ option java_package = "no.nb.nna.broprox.api";
 option java_outer_classname = "ReportProto";
 
 import "messages.proto";
-import "google/protobuf/timestamp.proto";
 
 // Service for crawler reports.
 service Report {
     rpc ListCrawlLogs (CrawlLogListRequest) returns (CrawlLogListReply) {}
     rpc ListPageLogs (PageLogListRequest) returns (PageLogListReply) {}
+    rpc ListScreenshots (ScreenshotListRequest) returns (ScreenshotListReply) {}
 }
 
 message CrawlLogListRequest {
@@ -41,6 +41,23 @@ message PageLogListRequest {
 
 message PageLogListReply {
     repeated PageLog value = 1;
+    int64 count = 2;
+    int32 page_size = 14;
+    int32 page = 15;
+}
+
+message ScreenshotListRequest {
+    oneof qry {
+        string id = 1;
+        string execution_id = 2;
+        string uri = 3;
+    }
+    int32 page_size = 14;
+    int32 page = 15;
+}
+
+message ScreenshotListReply {
+    repeated Screenshot value = 1;
     int64 count = 2;
     int32 page_size = 14;
     int32 page = 15;

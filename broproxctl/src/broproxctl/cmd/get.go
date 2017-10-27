@@ -48,9 +48,8 @@ var getCmd = &cobra.Command{
   broproxctl get seed -f yaml`,
 
 	Run: func(cmd *cobra.Command, args []string) {
-		idToken := util.GetRawIdToken(Idp)
 		if len(args) == 1 {
-			client, conn := util.NewControllerClient(idToken)
+			client, conn := util.NewControllerClient()
 			defer conn.Close()
 
 			var selector *bp.Selector

@@ -67,6 +67,7 @@
                                 <package>github.com/ghodss/yaml</package>
                                 <package>github.com/buger/goterm</package>
                                 <package>github.com/coreos/go-oidc</package>
+                                <package>github.com/sirupsen/logrus</package>
                             </packages>
                         </configuration>
                     </execution>

@@ -15,12 +15,11 @@ package util
 
 import (
 	"broprox"
-	"fmt"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
-	"log"
 )
 
 func NewControllerClient() (broprox.ControllerClient, *grpc.ClientConn) {
@@ -43,7 +42,7 @@ func NewReportClient() (broprox.ReportClient, *grpc.ClientConn) {
 
 func newConnection() *grpc.ClientConn {
 	address := viper.GetString("controllerAddress")
-	fmt.Printf("Connecting to %s\n", address)
+	log.Debugf("Connecting to %s", address)
 
 	dialOptions := []grpc.DialOption{grpc.WithInsecure()}
 	dialOptions = AddCredentials(dialOptions)

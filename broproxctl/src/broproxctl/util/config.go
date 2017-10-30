@@ -15,8 +15,8 @@ package util
 
 import (
 	"github.com/ghodss/yaml"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
-	"log"
 	"os"
 )
 
@@ -28,7 +28,7 @@ type config struct {
 }
 
 func WriteConfig() {
-	log.Println("Writing config")
+	log.Debug("Writing config")
 
 	c := config{
 		viper.GetString("controllerAddress"),

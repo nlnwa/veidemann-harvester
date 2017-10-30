@@ -15,46 +15,44 @@ package util
 
 import (
 	"broprox"
-	"fmt"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
-	"log"
 )
 
 func NewControllerClient() (broprox.ControllerClient, *grpc.ClientConn) {
-	address := viper.GetString("controllerAddress")
-	fmt.Printf("Connecting to %s\n", address)
-
-	dialOptions := []grpc.DialOption{grpc.WithInsecure()}
-	dialOptions = AddCredentials(dialOptions)
-
-	// Set up a connection to the server.
-	conn, err := grpc.Dial(address, dialOptions...)
-	if err != nil {
-		log.Fatalf("did not connect: %v", err)
-	}
-	//defer conn.Close()
+	conn := newConnection()
 	c := broprox.NewControllerClient(conn)
 	return c, conn
 }
 
 func NewStatusClient() (broprox.StatusClient, *grpc.ClientConn) {
+	conn := newConnection()
+	c := broprox.NewStatusClient(conn)
+	return c, conn
+}
+
+func NewReportClient() (broprox.ReportClient, *grpc.ClientConn) {
+	conn := newConnection()
+	c := broprox.NewReportClient(conn)
+	return c, conn
+}
+
+func newConnection() *grpc.ClientConn {
 	address := viper.GetString("controllerAddress")
-	fmt.Printf("Connecting to %s\n", address)
-	// Set up a connection to the server.
+	log.Debugf("Connecting to %s", address)
+
 	dialOptions := []grpc.DialOption{grpc.WithInsecure()}
 	dialOptions = AddCredentials(dialOptions)
 
 	// Set up a connection to the server.
 	conn, err := grpc.Dial(address, dialOptions...)
 	if err != nil {
-		log.Fatalf("did not connect: %v", err)
+		log.Fatalf("Could not connect: %v", err)
 	}
-	//defer conn.Close()
-	c := broprox.NewStatusClient(conn)
-	return c, conn
+	return conn
 }
 
 type bearerTokenCred struct {

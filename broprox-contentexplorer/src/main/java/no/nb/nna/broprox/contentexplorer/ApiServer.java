@@ -21,7 +21,7 @@ import java.net.URI;
 
 import io.netty.channel.Channel;
 import javax.ws.rs.core.UriBuilder;
-import no.nb.nna.broprox.commons.DbAdapter;
+import no.nb.nna.broprox.commons.db.DbAdapter;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.netty.httpserver.NettyHttpContainerProvider;
 import org.glassfish.jersey.server.ResourceConfig;

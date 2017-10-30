@@ -19,15 +19,18 @@ import (
 
 	"broproxctl/util"
 	"github.com/mitchellh/go-homedir"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"log"
 	"net/url"
 )
 
-var cfgFile string
-var controllerAddress string
-var Idp string
+var (
+	cfgFile           string
+	controllerAddress string
+	Idp               string
+	debug             bool
+)
 
 // RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
@@ -60,10 +63,16 @@ func init() {
 
 	RootCmd.PersistentFlags().StringVarP(&Idp, "idp", "", "", "Address to identity provider")
 	viper.BindPFlag("idp", RootCmd.PersistentFlags().Lookup("idp"))
+
+	RootCmd.PersistentFlags().BoolVarP(&debug, "debug", "d", false, "Turn on debugging")
 }
 
 // initConfig reads in config file and ENV variables if set.
 func initConfig() {
+	if debug {
+		log.SetLevel(log.DebugLevel)
+	}
+
 	if cfgFile != "" {
 		// Use config file from the flag.
 		viper.SetConfigFile(cfgFile)
@@ -84,7 +93,7 @@ func initConfig() {
 
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
-		fmt.Println("Using config file:", viper.ConfigFileUsed())
+		log.Debugf("Using config file: %s", viper.ConfigFileUsed())
 	}
 
 	if viper.GetString("idp") == "" {

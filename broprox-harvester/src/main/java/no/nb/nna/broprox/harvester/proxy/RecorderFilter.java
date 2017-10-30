@@ -33,7 +33,7 @@ import io.opentracing.tag.Tags;
 import io.opentracing.util.GlobalTracer;
 import no.nb.nna.broprox.commons.AlreadyCrawledCache;
 import no.nb.nna.broprox.commons.BroproxHeaderConstants;
-import no.nb.nna.broprox.commons.DbAdapter;
+import no.nb.nna.broprox.commons.db.DbAdapter;
 import no.nb.nna.broprox.commons.ExtraStatusCodes;
 import no.nb.nna.broprox.commons.client.ContentWriterClient;
 import no.nb.nna.broprox.db.ProtoUtils;
@@ -189,13 +189,14 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
             if (ProxyUtils.isLastChunk(httpObject)) {
                 responseCollector.writeCache(cache, uri, executionId);
 
-                responseCollector.writeResponse(crawlLog.build());
+                String warcId = responseCollector.writeResponse(crawlLog.build()).getWarcId();
 
                 responseSpan.log("Last chunk");
                 if (uriRequest != null) {
                     uriRequest.setSize(responseCollector.getSize());
                     responseSpan.finish();
                     finishSpan(uriRequest);
+                    uriRequest.setWarcId(warcId);
                 }
             }
 

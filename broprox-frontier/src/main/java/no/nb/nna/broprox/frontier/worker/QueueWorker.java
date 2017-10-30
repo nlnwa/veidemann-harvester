@@ -21,10 +21,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
-import io.opentracing.ActiveSpan;
-import io.opentracing.tag.Tags;
-import io.opentracing.util.GlobalTracer;
-import no.nb.nna.broprox.commons.FutureOptional;
+import no.nb.nna.broprox.commons.db.FutureOptional;
 import no.nb.nna.broprox.model.MessagesProto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -14,47 +14,33 @@
 package cmd
 
 import (
-	bp "broprox"
-
 	"broproxctl/util"
-	"context"
 	"github.com/spf13/cobra"
-	"log"
+	"github.com/spf13/viper"
 )
 
-// abortCmd represents the abort command
-var abortCmd = &cobra.Command{
-	Use:   "abort",
-	Short: "Abort one or more crawl executions",
-	Long:  `Abort one or more crawl executions.`,
+// logoutCmd represents the logout command
+var logoutCmd = &cobra.Command{
+	Use:   "logout",
+	Short: "Log out of Veidemann",
+	Long:  `Log out of Veidemann.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		if len(args) > 0 {
-			client, conn := util.NewControllerClient()
-			defer conn.Close()
-
-			for _, arg := range args {
-				request := bp.AbortCrawlRequest{ExecutionId: arg}
-				_, err := client.AbortCrawl(context.Background(), &request)
-				if err != nil {
-					log.Fatalf("could not abort execution '%v': %v", arg, err)
-				}
-			}
-		} else {
-			cmd.Usage()
-		}
+		viper.Set("idToken", "")
+		viper.Set("nonce", "")
+		util.WriteConfig()
 	},
 }
 
 func init() {
-	RootCmd.AddCommand(abortCmd)
+	RootCmd.AddCommand(logoutCmd)
 
 	// Here you will define your flags and configuration settings.
 
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
-	// abortCmd.PersistentFlags().String("foo", "", "A help for foo")
+	// logoutCmd.PersistentFlags().String("foo", "", "A help for foo")
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
-	// abortCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	// logoutCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }

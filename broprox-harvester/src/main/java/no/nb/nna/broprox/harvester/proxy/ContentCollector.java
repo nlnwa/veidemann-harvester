@@ -31,7 +31,7 @@ import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import no.nb.nna.broprox.commons.AlreadyCrawledCache;
-import no.nb.nna.broprox.commons.DbAdapter;
+import no.nb.nna.broprox.commons.db.DbAdapter;
 import no.nb.nna.broprox.commons.client.ContentWriterClient;
 import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
@@ -191,7 +191,7 @@ public class ContentCollector {
         }
     }
 
-    public void writeRequest(CrawlLog logEntry) {
+    public CrawlLog writeRequest(CrawlLog logEntry) {
         CrawlLog.Builder logEntryBuilder = logEntry.toBuilder();
         logEntryBuilder.setRecordType("request")
                 .setBlockDigest(getDigest());
@@ -202,13 +202,14 @@ public class ContentCollector {
         contentWriterClient.sendCrawlLog(logEntry);
         try {
             contentWriterClient.finish();
+            return logEntry;
         } catch (InterruptedException | StatusException ex) {
             // TODO: Do something reasonable with the exception
             throw new RuntimeException(ex);
         }
     }
 
-    public void writeResponse(CrawlLog logEntry) {
+    public CrawlLog writeResponse(CrawlLog logEntry) {
         CrawlLog.Builder logEntryBuilder = logEntry.toBuilder();
         logEntryBuilder.setRecordType("response")
                 .setFetchTimeMs(Duration.between(ProtoUtils.tsToOdt(
@@ -221,6 +222,7 @@ public class ContentCollector {
         contentWriterClient.sendCrawlLog(logEntry);
         try {
             contentWriterClient.finish();
+            return logEntry;
         } catch (InterruptedException | StatusException ex) {
             // TODO: Do something reasonable with the exception
             throw new RuntimeException(ex);

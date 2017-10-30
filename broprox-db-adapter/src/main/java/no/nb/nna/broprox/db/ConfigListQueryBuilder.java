@@ -36,9 +36,9 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
 
     private final T request;
 
-    ReqlExpr listQry;
+    private ReqlExpr listQry;
 
-    ReqlExpr countQry;
+    private ReqlExpr countQry;
 
     private int page;
 
@@ -147,11 +147,19 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
     }
 
     /**
+     * Build a query returning all values ordered by name.
+     */
+    void buildAllOrderedOnNameQuery() {
+        countQry = r.table(table.name);
+        listQry = countQry.orderBy().optArg("index", "name");
+    }
+
+    /**
      * Build a query returning all values.
      */
     void buildAllQuery() {
         countQry = r.table(table.name);
-        listQry = countQry.orderBy().optArg("index", "name");
+        listQry = countQry;
     }
 
     void addFilter(ReqlFunction1... filter) {
@@ -195,7 +203,7 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
     }
 
     public long executeCount(RethinkDbAdapter db) {
-        if (id != null) {
+        if (isIdQuery()) {
             if (db.executeRequest("db-countConfigObjects", listQry) == null) {
                 return 0L;
             } else {
@@ -207,7 +215,7 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
     }
 
     public <R extends Message.Builder> R executeList(RethinkDbAdapter db, R resultBuilder) {
-        if (id == null) {
+        if (!isIdQuery()) {
             listQry = listQry.skip(page * pageSize).limit(pageSize);
         }
 
@@ -249,4 +257,7 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
         return (R) resultBuilder;
     }
 
+    boolean isIdQuery() {
+        return id != null && !id.isEmpty();
+    }
 }

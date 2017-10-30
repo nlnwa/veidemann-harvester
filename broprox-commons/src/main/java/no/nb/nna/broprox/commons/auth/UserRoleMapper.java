@@ -16,7 +16,7 @@
 package no.nb.nna.broprox.commons.auth;
 
 import no.nb.nna.broprox.api.ControllerProto.RoleMappingsListRequest;
-import no.nb.nna.broprox.commons.DbAdapter;
+import no.nb.nna.broprox.commons.db.DbAdapter;
 import no.nb.nna.broprox.model.ConfigProto.Role;
 import no.nb.nna.broprox.model.ConfigProto.RoleMapping;
 import org.slf4j.Logger;

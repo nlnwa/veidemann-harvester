@@ -39,7 +39,7 @@ public class BrowserScriptListRequestQueryBuilder extends ConfigListQueryBuilder
                 buildSelectorQuery(request.getSelector());
                 break;
             default:
-                buildAllQuery();
+                buildAllOrderedOnNameQuery();
                 break;
         }
     }

@@ -13,8 +13,15 @@
 
 package main
 
-import "broproxctl/cmd"
+import (
+	"broproxctl/cmd"
+	log "github.com/sirupsen/logrus"
+)
 
 func main() {
 	cmd.Execute()
+}
+
+func init() {
+	log.SetLevel(log.WarnLevel)
 }

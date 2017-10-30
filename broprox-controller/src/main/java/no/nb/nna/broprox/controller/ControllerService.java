@@ -16,7 +16,6 @@
 package no.nb.nna.broprox.controller;
 
 import com.google.protobuf.Empty;
-import io.grpc.Context;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import no.nb.nna.broprox.api.ControllerGrpc;
@@ -39,12 +38,11 @@ import no.nb.nna.broprox.api.ControllerProto.RunCrawlReply;
 import no.nb.nna.broprox.api.ControllerProto.RunCrawlRequest;
 import no.nb.nna.broprox.api.ControllerProto.SeedListReply;
 import no.nb.nna.broprox.api.ControllerProto.SeedListRequest;
-import no.nb.nna.broprox.commons.DbAdapter;
+import no.nb.nna.broprox.commons.db.DbAdapter;
 import no.nb.nna.broprox.commons.auth.AllowedRoles;
 import no.nb.nna.broprox.commons.auth.RolesContextKey;
 import no.nb.nna.broprox.commons.util.CrawlScopes;
 import no.nb.nna.broprox.controller.scheduler.FrontierClient;
-import no.nb.nna.broprox.model.ConfigProto;
 import no.nb.nna.broprox.model.ConfigProto.BrowserConfig;
 import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
 import no.nb.nna.broprox.model.ConfigProto.CrawlConfig;

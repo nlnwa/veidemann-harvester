@@ -15,13 +15,6 @@
  */
 package no.nb.nna.broprox.db;
 
-import java.time.OffsetDateTime;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.TimeoutException;
-import java.util.function.Function;
-
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Empty;
 import com.google.protobuf.Message;
@@ -49,11 +42,17 @@ import no.nb.nna.broprox.api.ControllerProto.RoleMappingsListReply;
 import no.nb.nna.broprox.api.ControllerProto.RoleMappingsListRequest;
 import no.nb.nna.broprox.api.ControllerProto.SeedListReply;
 import no.nb.nna.broprox.api.ControllerProto.SeedListRequest;
+import no.nb.nna.broprox.api.ReportProto.CrawlLogListReply;
+import no.nb.nna.broprox.api.ReportProto.CrawlLogListRequest;
+import no.nb.nna.broprox.api.ReportProto.PageLogListReply;
+import no.nb.nna.broprox.api.ReportProto.PageLogListRequest;
+import no.nb.nna.broprox.api.ReportProto.ScreenshotListReply;
+import no.nb.nna.broprox.api.ReportProto.ScreenshotListRequest;
 import no.nb.nna.broprox.api.StatusProto;
-import no.nb.nna.broprox.commons.ChangeFeed;
-import no.nb.nna.broprox.commons.DbAdapter;
-import no.nb.nna.broprox.commons.FutureOptional;
 import no.nb.nna.broprox.commons.auth.EmailContextKey;
+import no.nb.nna.broprox.commons.db.ChangeFeed;
+import no.nb.nna.broprox.commons.db.DbAdapter;
+import no.nb.nna.broprox.commons.db.FutureOptional;
 import no.nb.nna.broprox.db.opentracing.ConnectionTracingInterceptor;
 import no.nb.nna.broprox.model.ConfigProto.BrowserConfig;
 import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
@@ -73,8 +72,16 @@ import no.nb.nna.broprox.model.MessagesProto.CrawlHostGroup;
 import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
 import no.nb.nna.broprox.model.MessagesProto.CrawledContent;
 import no.nb.nna.broprox.model.MessagesProto.ExtractedText;
+import no.nb.nna.broprox.model.MessagesProto.PageLog;
 import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
 import no.nb.nna.broprox.model.MessagesProto.Screenshot;
+
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
 
 /**
  * An implementation of DbAdapter for RethinkDb.
@@ -84,6 +91,7 @@ public class RethinkDbAdapter implements DbAdapter {
     public static enum TABLES {
         SYSTEM("system", null),
         CRAWL_LOG("crawl_log", CrawlLog.getDefaultInstance()),
+        PAGE_LOG("page_log", PageLog.getDefaultInstance()),
         CRAWLED_CONTENT("crawled_content", CrawledContent.getDefaultInstance()),
         EXTRACTED_TEXT("extracted_text", ExtractedText.getDefaultInstance()),
         BROWSER_SCRIPTS("browser_scripts", BrowserScript.getDefaultInstance()),
@@ -171,6 +179,23 @@ public class RethinkDbAdapter implements DbAdapter {
             cl = cl.toBuilder().setTimeStamp(ProtoUtils.getNowTs()).build();
         }
         return saveMessage(cl, TABLES.CRAWL_LOG);
+    }
+
+    @Override
+    public CrawlLogListReply listCrawlLogs(CrawlLogListRequest request) {
+        CrawlLogListRequestQueryBuilder queryBuilder = new CrawlLogListRequestQueryBuilder(request);
+        return queryBuilder.executeList(this).build();
+    }
+
+    @Override
+    public PageLog savePageLog(PageLog pageLog) {
+        return saveMessage(pageLog, TABLES.PAGE_LOG);
+    }
+
+    @Override
+    public PageLogListReply listPageLogs(PageLogListRequest request) {
+        PageLogListRequestQueryBuilder queryBuilder = new PageLogListRequestQueryBuilder(request);
+        return queryBuilder.executeList(this).build();
     }
 
     @Override
@@ -422,7 +447,7 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
-    public Screenshot addScreenshot(Screenshot s) {
+    public Screenshot saveScreenshot(Screenshot s) {
         Map rMap = ProtoUtils.protoToRethink(s);
 
         Map<String, Object> response = executeRequest("db-addScreenshot",
@@ -433,6 +458,17 @@ public class RethinkDbAdapter implements DbAdapter {
         String key = ((List<String>) response.get("generated_keys")).get(0);
 
         return s.toBuilder().setId(key).build();
+    }
+
+    @Override
+    public ScreenshotListReply listScreenshots(ScreenshotListRequest request) {
+        ScreenshotListRequestQueryBuilder queryBuilder = new ScreenshotListRequestQueryBuilder(request);
+        return queryBuilder.executeList(this).build();
+    }
+
+    @Override
+    public Empty deleteScreenshot(Screenshot screenshot) {
+        return deleteConfigMessage(screenshot, TABLES.SCREENSHOT);
     }
 
     @Override
@@ -688,8 +724,8 @@ public class RethinkDbAdapter implements DbAdapter {
 
     @Override
     public RoleMappingsListReply listRoleMappings(RoleMappingsListRequest request) {
-        RoleMappingsListRequestQueryBuilder queryBuilder = new RoleMappingsListRequestQueryBuilder(request, TABLES.ROLE_MAPPINGS);
-        return queryBuilder.executeList(this, RoleMappingsListReply.newBuilder()).build();
+        RoleMappingsListRequestQueryBuilder queryBuilder = new RoleMappingsListRequestQueryBuilder(request);
+        return queryBuilder.executeList(this).build();
     }
 
     @Override

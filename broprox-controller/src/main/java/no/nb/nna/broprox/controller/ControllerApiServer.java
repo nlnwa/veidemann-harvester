@@ -19,7 +19,7 @@ import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.opentracing.contrib.ServerTracingInterceptor;
 import io.opentracing.util.GlobalTracer;
-import no.nb.nna.broprox.commons.DbAdapter;
+import no.nb.nna.broprox.commons.db.DbAdapter;
 import no.nb.nna.broprox.commons.auth.AuAuServerInterceptor;
 import no.nb.nna.broprox.controller.scheduler.FrontierClient;
 import org.slf4j.Logger;
@@ -53,6 +53,7 @@ public class ControllerApiServer implements AutoCloseable {
         server = serverBuilder
                 .addService(tracingInterceptor.intercept(auAuServerInterceptor.intercept(new ControllerService(db, frontierClient))))
                 .addService(tracingInterceptor.intercept(auAuServerInterceptor.intercept(new StatusService(db))))
+                .addService(tracingInterceptor.intercept(auAuServerInterceptor.intercept(new ReportService(db))))
                 .build();
     }
 

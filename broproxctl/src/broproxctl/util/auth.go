@@ -1,4 +1,4 @@
-// Copyright © 2017 National Library of Norway.
+// Copyright © 2017 National Library of Norway
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -19,9 +19,9 @@ import (
 	"fmt"
 	"github.com/coreos/go-oidc"
 	"github.com/ghodss/yaml"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"golang.org/x/oauth2"
-	"log"
 	"math/rand"
 	"net/http"
 	"os/exec"
@@ -62,7 +62,6 @@ func NewAuth() *auth {
 	p, err := oidc.NewProvider(ctx, viper.GetString("idp"))
 	if err != nil {
 		log.Fatal(err)
-		// handle error
 	}
 	a.provider = p
 	oc := oidc.Config{ClientID: a.clientID}

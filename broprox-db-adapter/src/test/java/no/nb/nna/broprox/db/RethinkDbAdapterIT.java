@@ -33,7 +33,7 @@ import no.nb.nna.broprox.api.ControllerProto.RoleMappingsListReply;
 import no.nb.nna.broprox.api.ControllerProto.RoleMappingsListRequest;
 import no.nb.nna.broprox.api.ControllerProto.SeedListReply;
 import no.nb.nna.broprox.api.ControllerProto.SeedListRequest;
-import no.nb.nna.broprox.commons.FutureOptional;
+import no.nb.nna.broprox.commons.db.FutureOptional;
 import no.nb.nna.broprox.commons.util.ApiTools;
 import no.nb.nna.broprox.model.ConfigProto;
 import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
@@ -577,7 +577,7 @@ public class RethinkDbAdapterIT {
         Screenshot s = null;
         RethinkDbAdapter instance = null;
         Screenshot expResult = null;
-        Screenshot result = instance.addScreenshot(s);
+        Screenshot result = instance.saveScreenshot(s);
 //        assertEquals(expResult, result);
         // TODO review the generated test code and remove the default call to fail.
         fail("The test case is a prototype.");

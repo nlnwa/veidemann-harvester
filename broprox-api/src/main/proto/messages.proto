@@ -72,6 +72,27 @@ message CrawlLog {
     FetchError error = 21; // Contains the error reason if fetch failed
 }
 
+// Log for each page including discovered resources and links
+message PageLog {
+    // A resource used to complete a page. It might be embedded images, javascripts, stylesheets etc.
+    message Resource {
+        string uri = 1;
+        bool from_cache = 2;
+        bool renderable = 3;
+        string resource_type = 4;
+        string mime_type = 5;
+        int32 status_code = 6;
+        string discovery_path = 7;
+        string warc_id = 8;
+    }
+
+    string warc_id = 1;
+    string uri = 2;
+    string execution_id = 3;
+    repeated Resource resource = 10;
+    repeated string outlink = 11;
+}
+
 message CrawledContent {
     string digest = 1;
     string warc_id = 2;

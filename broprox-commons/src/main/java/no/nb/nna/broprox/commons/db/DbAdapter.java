@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package no.nb.nna.broprox.commons;
+package no.nb.nna.broprox.commons.db;
 
 import com.google.protobuf.Empty;
 import com.google.protobuf.Timestamp;
@@ -32,6 +32,12 @@ import no.nb.nna.broprox.api.ControllerProto.RoleMappingsListReply;
 import no.nb.nna.broprox.api.ControllerProto.RoleMappingsListRequest;
 import no.nb.nna.broprox.api.ControllerProto.SeedListReply;
 import no.nb.nna.broprox.api.ControllerProto.SeedListRequest;
+import no.nb.nna.broprox.api.ReportProto.CrawlLogListReply;
+import no.nb.nna.broprox.api.ReportProto.CrawlLogListRequest;
+import no.nb.nna.broprox.api.ReportProto.PageLogListReply;
+import no.nb.nna.broprox.api.ReportProto.PageLogListRequest;
+import no.nb.nna.broprox.api.ReportProto.ScreenshotListReply;
+import no.nb.nna.broprox.api.ReportProto.ScreenshotListRequest;
 import no.nb.nna.broprox.api.StatusProto.ExecutionsListReply;
 import no.nb.nna.broprox.api.StatusProto.ExecutionsRequest;
 import no.nb.nna.broprox.model.ConfigProto.BrowserConfig;
@@ -50,6 +56,7 @@ import no.nb.nna.broprox.model.MessagesProto.CrawlHostGroup;
 import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
 import no.nb.nna.broprox.model.MessagesProto.CrawledContent;
 import no.nb.nna.broprox.model.MessagesProto.ExtractedText;
+import no.nb.nna.broprox.model.MessagesProto.PageLog;
 import no.nb.nna.broprox.model.MessagesProto.QueuedUri;
 import no.nb.nna.broprox.model.MessagesProto.Screenshot;
 
@@ -64,6 +71,12 @@ public interface DbAdapter extends AutoCloseable {
 
     CrawlLog saveCrawlLog(CrawlLog cl);
 
+    CrawlLogListReply listCrawlLogs(CrawlLogListRequest request);
+
+    PageLog savePageLog(PageLog pageLog);
+
+    PageLogListReply listPageLogs(PageLogListRequest request);
+
     ExtractedText addExtractedText(ExtractedText et);
 
     CrawlExecutionStatus saveExecutionStatus(CrawlExecutionStatus status);
@@ -72,7 +85,7 @@ public interface DbAdapter extends AutoCloseable {
 
     /**
      * Update the state for a Crawl Execution to ABORTED_MANUAL.
-     *
+     * <p>
      * The frontier should detect this and abort the crawl.
      *
      * @param executionId id of the execution to update
@@ -103,7 +116,11 @@ public interface DbAdapter extends AutoCloseable {
 
     CrawlHostGroup releaseCrawlHostGroup(CrawlHostGroup crawlHostGroup, long nextFetchDelayMs);
 
-    Screenshot addScreenshot(Screenshot s);
+    ScreenshotListReply listScreenshots(ScreenshotListRequest request);
+
+    Screenshot saveScreenshot(Screenshot screenshot);
+
+    Empty deleteScreenshot(Screenshot screenshot);
 
     CrawlEntity saveCrawlEntity(CrawlEntity msg);
 

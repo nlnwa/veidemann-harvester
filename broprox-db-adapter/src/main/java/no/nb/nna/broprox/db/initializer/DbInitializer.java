@@ -29,14 +29,13 @@ import com.rethinkdb.net.Connection;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigBeanFactory;
 import com.typesafe.config.ConfigFactory;
-import no.nb.nna.broprox.commons.DbAdapter;
+import no.nb.nna.broprox.commons.db.DbAdapter;
 import no.nb.nna.broprox.commons.opentracing.TracerFactory;
 import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.db.RethinkDbAdapter;
 import no.nb.nna.broprox.db.RethinkDbAdapter.TABLES;
 import no.nb.nna.broprox.model.ConfigProto.BrowserScript;
 import no.nb.nna.broprox.model.ConfigProto.CrawlJob;
-import no.nb.nna.broprox.model.ConfigProto.Role;
 import no.nb.nna.broprox.model.ConfigProto.RoleMapping;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -126,6 +125,10 @@ public class DbInitializer {
         r.table(TABLES.CRAWL_LOG.name)
                 .indexCreate("surt_time", row -> r.array(row.g("surt"), row.g("timeStamp")))
                 .run(conn);
+        r.table(TABLES.CRAWL_LOG.name).indexCreate("executionId").run(conn);
+
+        r.tableCreate(TABLES.PAGE_LOG.name).optArg("primary_key", "warcId").run(conn);
+        r.table(TABLES.PAGE_LOG.name).indexCreate("executionId").run(conn);
 
         r.tableCreate(TABLES.CRAWLED_CONTENT.name).optArg("primary_key", "digest").run(conn);
 
@@ -191,7 +194,8 @@ public class DbInitializer {
         r.table(TABLES.URI_QUEUE.name)
                 .indexWait("surt", "executionId", "crawlHostGroupKey_sequence_earliestFetch")
                 .run(conn);
-        r.table(TABLES.CRAWL_LOG.name).indexWait("surt_time").run(conn);
+        r.table(TABLES.CRAWL_LOG.name).indexWait("surt_time", "executionId").run(conn);
+        r.table(TABLES.PAGE_LOG.name).indexWait("executionId").run(conn);
         r.table(TABLES.SEEDS.name).indexWait("jobId", "entityId").run(conn);
         r.table(TABLES.CRAWL_HOST_GROUP.name).indexWait("nextFetchTime").run(conn);
         r.table(TABLES.EXECUTIONS.name).indexWait("startTime").run(conn);

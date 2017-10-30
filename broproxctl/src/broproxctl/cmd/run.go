@@ -1,4 +1,4 @@
-// Copyright © 2017 NAME HERE <EMAIL ADDRESS>
+// Copyright © 2017 National Library of Norway
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -21,6 +21,7 @@ import (
 	"golang.org/x/net/context"
 
 	"github.com/spf13/cobra"
+	"fmt"
 )
 
 // runCmd represents the run command
@@ -42,19 +43,22 @@ If seedId is not submitted then all the seeds wich are configured to use the sub
 				request := bp.RunCrawlRequest{JobId: args[0]}
 				r, err := client.RunCrawl(context.Background(), &request)
 				if err != nil {
-					log.Fatalf("could not get entity: %v", err)
+					log.Fatalf("could not run job: %v", err)
 				}
 
-				println(r)
+				println(r.GetSeedExecutionId())
 			case 2:
 				// Two arguments (jobId and seedId)
 				request := bp.RunCrawlRequest{JobId: args[0], SeedId: args[1]}
 				r, err := client.RunCrawl(context.Background(), &request)
 				if err != nil {
-					log.Fatalf("could not get entity: %v", err)
+					log.Fatalf("could not run job: %v", err)
 				}
 
-				println(r)
+				fmt.Println("Started executions: ")
+				for _, eid := range r.GetSeedExecutionId() {
+					fmt.Printf("  %s\n", eid)
+				}
 			}
 		} else {
 			cmd.Usage()

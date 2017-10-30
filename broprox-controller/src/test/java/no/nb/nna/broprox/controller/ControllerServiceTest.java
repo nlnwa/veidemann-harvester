@@ -30,7 +30,7 @@ import net.minidev.json.JSONArray;
 import no.nb.nna.broprox.api.ControllerGrpc;
 import no.nb.nna.broprox.api.ControllerProto.CrawlEntityListReply;
 import no.nb.nna.broprox.api.ControllerProto.ListRequest;
-import no.nb.nna.broprox.commons.DbAdapter;
+import no.nb.nna.broprox.commons.db.DbAdapter;
 import no.nb.nna.broprox.commons.auth.AuAuServerInterceptor;
 import no.nb.nna.broprox.commons.auth.EmailContextKey;
 import no.nb.nna.broprox.commons.auth.IdTokenAuAuServerInterceptor;

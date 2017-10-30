@@ -22,7 +22,7 @@ import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 import com.rethinkdb.net.Cursor;
-import no.nb.nna.broprox.commons.ChangeFeed;
+import no.nb.nna.broprox.commons.db.ChangeFeed;
 
 /**
  *

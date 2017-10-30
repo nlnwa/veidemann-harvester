@@ -21,6 +21,7 @@ import (
 	"golang.org/x/net/context"
 
 	"github.com/spf13/cobra"
+	"fmt"
 )
 
 // runCmd represents the run command
@@ -54,7 +55,10 @@ If seedId is not submitted then all the seeds wich are configured to use the sub
 					log.Fatalf("could not run job: %v", err)
 				}
 
-				println(r.GetSeedExecutionId())
+				fmt.Println("Started executions: ")
+				for _, eid := range r.GetSeedExecutionId() {
+					fmt.Printf("  %s\n", eid)
+				}
 			}
 		} else {
 			cmd.Usage()

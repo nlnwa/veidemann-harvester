@@ -61,26 +61,4 @@ public class WarcFileSet {
         return getContentRecordStream().count();
     }
 
-    public void getTargetUris() {
-        getContentRecordStream()
-                .forEach(r -> {
-
-                    // TODO: Should be turned into something checkable
-                    System.out.println("  TYPE: " + r.header.warcTypeStr + ", URI: " + r.header.warcTargetUriStr);
-                    if ("warcinfo".equals(r.header.warcTypeStr)
-                            || "metadata".equals(r.header.warcTypeStr)
-                            || r.header.warcTargetUriStr.endsWith("robots.txt")) {
-                        System.out.println("    HE: " + new String(r.header.headerBytes));
-                        if (r.hasPayload()) {
-                            try {
-                                System.out.println("    PL: " + new String(ByteStreams
-                                        .toByteArray(r.getPayloadContent())) + "----------");
-                            } catch (IOException ex) {
-                                ex.printStackTrace();
-                            }
-                        }
-                    }
-                });
-    }
-
 }

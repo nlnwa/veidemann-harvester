@@ -67,8 +67,12 @@ public class WarcFile {
             Response response = WarcInspector.CLIENT.newCall(request).execute();
             if (response.isSuccessful()) {
                 WarcReader warcReader = WarcReaderFactory.getReader(response.body().byteStream());
+                warcReader.setBlockDigestEnabled(true);
+                warcReader.setPayloadDigestEnabled(true);
                 return StreamSupport.stream(Spliterators.spliteratorUnknownSize(warcReader.iterator(), 0), false)
                         .onClose(() -> {
+                            System.out.println("ERRORS: " + warcReader.diagnostics.getErrors());
+                            System.out.println("WARNINGS: " + warcReader.diagnostics.getWarnings());
                             warcReader.close();
                             response.close();
                         });

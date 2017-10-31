@@ -87,4 +87,40 @@ public class WarcInspector {
             throw new UncheckedIOException(ex);
         }
     }
+
+    public static String getWarcHeadersForStorageRef(String storageRef) {
+        HttpUrl url = WARC_SERVER_URL.resolve("storageref/" + storageRef + "/warcheader");
+
+        Request request = new Request.Builder()
+                .url(url)
+                .build();
+
+        try (Response response = CLIENT.newCall(request).execute();) {
+            if (response.isSuccessful()) {
+                return response.body().string();
+            } else {
+                throw new IOException("Unexpected code " + response);
+            }
+        } catch(IOException ex) {
+            throw new UncheckedIOException(ex);
+        }
+    }
+
+    public static byte[] getWarcContentForStorageRef(String storageRef) {
+        HttpUrl url = WARC_SERVER_URL.resolve("storageref/" + storageRef);
+
+        Request request = new Request.Builder()
+                .url(url)
+                .build();
+
+        try (Response response = CLIENT.newCall(request).execute();) {
+            if (response.isSuccessful()) {
+                return response.body().bytes();
+            } else {
+                throw new IOException("Unexpected code " + response);
+            }
+        } catch(IOException ex) {
+            throw new UncheckedIOException(ex);
+        }
+    }
 }

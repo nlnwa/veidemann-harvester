@@ -48,7 +48,7 @@ public class ContentCollector {
 
     private static final Logger LOG = LoggerFactory.getLogger(ContentCollector.class);
 
-    static final byte[] CRLF = {CR, LF};
+    static final char[] CRLF = {CR, LF};
 
     private final MessageDigest digest;
 
@@ -138,7 +138,8 @@ public class ContentCollector {
 
     public void addPayload(ByteBuf payload) {
         if (shouldAddSeparator) {
-            digest.update(CRLF);
+            digest.update(CR);
+            digest.update(LF);
             size += 2;
             shouldAddSeparator = false;
         }

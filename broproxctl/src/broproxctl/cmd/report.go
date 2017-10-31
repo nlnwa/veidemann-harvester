@@ -17,21 +17,28 @@ import (
 	bp "broprox"
 	"fmt"
 
+	"broproxctl/bindata"
 	"broproxctl/util"
 	"context"
+	"github.com/golang/protobuf/proto"
+	"github.com/golang/protobuf/ptypes"
+	tspb "github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/spf13/cobra"
+	"io/ioutil"
 	"log"
 	"os"
+	"strings"
+	"text/template"
 )
 
 var (
-	warcId      string
 	executionId string
-	id          string
 	uri         string
 	img         bool
 	pageSize    int32
 	page        int32
+	goTemplate  string
+	filter      []string
 )
 
 // reportCmd represents the report command
@@ -43,19 +50,20 @@ var reportCmd = &cobra.Command{
 ` + printValidReportTypes(),
 
 	Run: func(cmd *cobra.Command, args []string) {
-		if len(args) == 1 {
+		if len(args) > 0 {
 			client, conn := util.NewReportClient()
 			defer conn.Close()
 
 			switch args[0] {
 			case "crawllog":
 				request := bp.CrawlLogListRequest{}
-				if warcId != "" {
-					request.Qry = &bp.CrawlLogListRequest_WarcId{warcId}
+				if len(args) > 1 {
+					request.WarcId = args[1:]
 				}
 				if executionId != "" {
-					request.Qry = &bp.CrawlLogListRequest_ExecutionId{executionId}
+					request.ExecutionId = executionId
 				}
+				request.Filter = applyFilter(filter)
 				request.Page = page
 				request.PageSize = pageSize
 
@@ -64,17 +72,16 @@ var reportCmd = &cobra.Command{
 					log.Fatalf("could not get crawl log: %v", err)
 				}
 
-				for _, crawlLog := range r.Value {
-					printCrawlLogLine(crawlLog)
-				}
+				applyTemplate(r, "crawllog.template")
 			case "pagelog":
 				request := bp.PageLogListRequest{}
-				if warcId != "" {
-					request.Qry = &bp.PageLogListRequest_WarcId{warcId}
+				if len(args) > 1 {
+					request.WarcId = args[1:]
 				}
 				if executionId != "" {
-					request.Qry = &bp.PageLogListRequest_ExecutionId{executionId}
+					request.ExecutionId = executionId
 				}
+				request.Filter = applyFilter(filter)
 				request.Page = page
 				request.PageSize = pageSize
 
@@ -83,20 +90,19 @@ var reportCmd = &cobra.Command{
 					log.Fatalf("could not get page log: %v", err)
 				}
 
-				for _, pageLog := range r.Value {
-					printPageLogLine(pageLog)
-				}
+				applyTemplate(r, "pagelog.template")
 			case "screenshot":
 				request := bp.ScreenshotListRequest{}
-				if id != "" {
-					request.Qry = &bp.ScreenshotListRequest_Id{id}
+				if len(args) > 1 {
+					request.Id = args[1:]
 				}
 				if executionId != "" {
-					request.Qry = &bp.ScreenshotListRequest_ExecutionId{executionId}
+					request.ExecutionId = executionId
 				}
-				if uri != "" {
-					request.Qry = &bp.ScreenshotListRequest_Uri{uri}
+				if img {
+					request.ImgData = true
 				}
+				request.Filter = applyFilter(filter)
 				request.Page = page
 				request.PageSize = pageSize
 
@@ -108,9 +114,7 @@ var reportCmd = &cobra.Command{
 				if img {
 					printScreenshot(r.Value[0])
 				} else {
-					for _, screenshot := range r.Value {
-						printScreenshotLine(screenshot)
-					}
+					applyTemplate(r, "screenshot.template")
 				}
 			default:
 				fmt.Printf("Unknown report type\n")
@@ -136,13 +140,23 @@ func init() {
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	// reportCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
-	reportCmd.Flags().StringVarP(&warcId, "warcid", "w", "", "Single object by Warc ID")
 	reportCmd.PersistentFlags().StringVarP(&executionId, "executionid", "e", "", "All objects by Execution ID")
-	reportCmd.PersistentFlags().StringVarP(&id, "id", "", "", "Single screenshot by ID")
 	reportCmd.PersistentFlags().StringVarP(&uri, "uri", "", "", "All screenshots by URI")
 	reportCmd.PersistentFlags().BoolVarP(&img, "img", "", false, "Image binary")
-	reportCmd.PersistentFlags().Int32VarP(&pageSize, "pagesize", "s", 5, "Number of objects to get")
+	reportCmd.PersistentFlags().Int32VarP(&pageSize, "pagesize", "s", 10, "Number of objects to get")
 	reportCmd.PersistentFlags().Int32VarP(&page, "page", "p", 0, "The page number")
+	reportCmd.PersistentFlags().StringVarP(&goTemplate, "template", "t", "", "A Go template used to format the output")
+	reportCmd.PersistentFlags().StringSliceVarP(&filter, "filter", "f", nil, "Filters")
+}
+
+func applyFilter(filter []string) []*bp.Filter {
+	var result []*bp.Filter
+	for _, f := range filter {
+		tokens := strings.SplitN(f, " ", 3)
+		op := bp.Filter_Operator(bp.Filter_Operator_value[strings.ToUpper(tokens[1])])
+		result = append(result, &bp.Filter{tokens[0], op, tokens[2]})
+	}
+	return result
 }
 
 func printValidReportTypes() string {
@@ -154,8 +168,51 @@ func printValidReportTypes() string {
 	return fmt.Sprintf("Valid report types include:\n%s\n", names)
 }
 
-func printCrawlLogLine(crawlLog *bp.CrawlLog) {
-	fmt.Printf("---\n%s\n", crawlLog)
+func applyTemplate(msg proto.Message, defaultTemplate string) {
+	var data []byte
+	var err error
+	if goTemplate == "" {
+		data, err = bindata.Asset(defaultTemplate)
+		if err != nil {
+			panic(err)
+		}
+	} else {
+		data, err = ioutil.ReadFile(goTemplate)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	ESC := string(0x1b)
+	funcMap := template.FuncMap{
+		"reset":         func() string { return ESC + "[0m" },
+		"bold":          func() string { return ESC + "[1m" },
+		"inverse":       func() string { return ESC + "[7m" },
+		"red":           func() string { return ESC + "[31m" },
+		"green":         func() string { return ESC + "[32m" },
+		"yellow":        func() string { return ESC + "[33m" },
+		"blue":          func() string { return ESC + "[34m" },
+		"magenta":       func() string { return ESC + "[35m" },
+		"cyan":          func() string { return ESC + "[36m" },
+		"brightred":     func() string { return ESC + "[1;31m" },
+		"brightgreen":   func() string { return ESC + "[1;32m" },
+		"brightyellow":  func() string { return ESC + "[1;33m" },
+		"brightblue":    func() string { return ESC + "[1;34m" },
+		"brightmagenta": func() string { return ESC + "[1;35m" },
+		"brightcyan":    func() string { return ESC + "[1;36m" },
+		"bgwhite":       func() string { return ESC + "[47m" },
+		"bgbrightblack": func() string { return ESC + "[100m" },
+		"time":          func(ts *tspb.Timestamp) string { return ptypes.TimestampString(ts) },
+	}
+
+	tmpl, err := template.New(defaultTemplate).Funcs(funcMap).Parse(string(data))
+	if err != nil {
+		panic(err)
+	}
+	err = tmpl.Execute(os.Stdout, msg)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func printPageLogLine(pageLog *bp.PageLog) {
@@ -167,10 +224,6 @@ func printPageLogLine(pageLog *bp.PageLog) {
 	for _, r := range pageLog.Outlink {
 		fmt.Printf(" - %s\n", r)
 	}
-}
-
-func printScreenshotLine(screenshot *bp.Screenshot) {
-	fmt.Printf("---\n%s %s %s\n", screenshot.Id, screenshot.ExecutionId, screenshot.Uri)
 }
 
 func printScreenshot(screenshot *bp.Screenshot) {

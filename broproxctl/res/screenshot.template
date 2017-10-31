@@ -1,0 +1,5 @@
+{{define "LINE" -}}{{printf `%36s %36s %-123.123s` .Id .ExecutionId .Uri}}{{end -}}
+{{inverse}}{{printf `%-36.36s %-36.36s %-123s` "Id" "ExecutionId" "Uri"}}{{reset}}
+{{range .Value}}{{template "LINE" .}}
+{{end}}
+TOTAL {{print .Count}}

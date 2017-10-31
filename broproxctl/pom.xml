@@ -68,6 +68,7 @@
                                 <package>github.com/buger/goterm</package>
                                 <package>github.com/coreos/go-oidc</package>
                                 <package>github.com/sirupsen/logrus</package>
+                                <package>github.com/jteeuwen/go-bindata/...</package>
                             </packages>
                         </configuration>
                     </execution>

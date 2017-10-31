@@ -15,6 +15,7 @@
  */
 package no.nb.nna.broprox.integrationtests;
 
+import com.google.common.io.ByteStreams;
 import com.google.protobuf.Empty;
 import com.rethinkdb.RethinkDB;
 import com.rethinkdb.net.Cursor;
@@ -37,6 +38,7 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -136,24 +138,21 @@ public class SimpleCrawlIT implements BroproxHeaderConstants {
         executeJob(request).get();
 
         assertThat(WarcInspector.getWarcFiles().getRecordCount()).isEqualTo(15);
-        WarcInspector.getWarcFiles().getTargetUris();
 
-        Cursor c = db.executeRequest("list", r.table(RethinkDbAdapter.TABLES.CRAWL_LOG.name));
-//        c.toList().stream().forEach(r -> System.out.println("CC:: " + r));
-        assertThat(c.toList().size()).isEqualTo(15);
+        CrawlLogListReply crawlLog = db.listCrawlLogs(CrawlLogListRequest.getDefaultInstance());
+        PageLogListReply pageLog = db.listPageLogs(PageLogListRequest.getDefaultInstance());
+        assertThat(crawlLog.getCount()).isEqualTo(15);
+        assertThat(pageLog.getCount()).isEqualTo(6);
+
         try {
-            CrawlLogListReply crawlLog = db.listCrawlLogs(CrawlLogListRequest.getDefaultInstance());
-            PageLogListReply pageLog = db.listPageLogs(PageLogListRequest.getDefaultInstance());
-            crawlLog.getValueList().forEach(l -> System.out.println(l));
-            pageLog.getValueList().forEach(l -> System.out.println(l));
+            new CrawlExecutionValidator(db).validate();
         } catch (Exception ex) {
             ex.printStackTrace();
         }
 
         executeJob(request).get();
-        c = db.executeRequest("list", r.table(RethinkDbAdapter.TABLES.CRAWL_LOG.name));
-//        c.toList().stream().forEach(r -> System.out.println("CC:: " + r));
-        assertThat(c.toList().size()).isEqualTo(27);
+        crawlLog = db.listCrawlLogs(CrawlLogListRequest.getDefaultInstance());
+        assertThat(crawlLog.getCount()).isEqualTo(27);
     }
 
     JobCompletion executeJob(ControllerProto.RunCrawlRequest crawlRequest) {

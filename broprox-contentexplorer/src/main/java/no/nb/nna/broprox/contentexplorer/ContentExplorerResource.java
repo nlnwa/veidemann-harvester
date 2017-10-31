@@ -15,10 +15,31 @@
  */
 package no.nb.nna.broprox.contentexplorer;
 
+import com.google.common.io.ByteStreams;
+import com.google.gson.Gson;
+import no.nb.nna.broprox.commons.db.DbAdapter;
+import org.jwat.warc.WarcReader;
+import org.jwat.warc.WarcReaderFactory;
+import org.jwat.warc.WarcRecord;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
+import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import javax.ws.rs.core.Response.Status;
+import javax.ws.rs.core.UriInfo;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -28,24 +49,6 @@ import java.util.Spliterators;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
-
-import com.google.common.io.ByteStreams;
-import com.google.gson.Gson;
-import javax.ws.rs.GET;
-import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.Produces;
-import javax.ws.rs.WebApplicationException;
-import javax.ws.rs.core.Context;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
-import javax.ws.rs.core.UriInfo;
-import no.nb.nna.broprox.commons.db.DbAdapter;
-import org.jwat.warc.WarcReader;
-import org.jwat.warc.WarcReaderFactory;
-import org.jwat.warc.WarcRecord;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  *
@@ -86,7 +89,7 @@ public class ContentExplorerResource {
     public String getFilesJson() {
         List<WarcFileDescriptor> files = Arrays.stream(warcDir.listFiles())
                 .map(f -> new WarcFileDescriptor(f.getName(),
-                f.length(), uriInfo.getPath() + "/" + f.getName()))
+                        f.length(), uriInfo.getPath() + "/" + f.getName()))
                 .collect(Collectors.toList());
         Gson gson = new Gson();
         return gson.toJson(files);
@@ -136,7 +139,7 @@ public class ContentExplorerResource {
                 .append("</h3><table><tr><th>ID</th><th>URI</th><th>Type</th><th>WARC Headers</th><th>HTTP Headers</th></tr>");
 
         String path = "/" + (uriInfo.getPath().replaceFirst("/toc/?", "/"));
-        try (Stream<WarcRecord> s = getContent(fileName);) {
+        try (Stream<WarcRecord> s = getRecords(fileName);) {
             s.forEach(r -> {
                 String recordUrl;
                 try {
@@ -182,14 +185,14 @@ public class ContentExplorerResource {
     @Produces(MediaType.TEXT_HTML)
     public String getWarcHeader(@PathParam("fileName") String fileName, @PathParam("id") String id) {
         StringBuilder html = new StringBuilder(htmlHeader)
-                .append("<h3>WARC headers for for ")
-                .append(fileName).append(" :: ").append(id)
+                .append("<h3>WARC headers for ")
+                .append(fileName).append(" :: ").append(id.replaceAll("<", "&lt;"))
                 .append("</h3><pre>");
 
-        try (Stream<WarcRecord> s = getContent(fileName);) {
+        try (Stream<WarcRecord> s = getRecords(fileName);) {
             s.filter(r -> id.equals(r.header.warcRecordIdStr))
                     .forEach(r -> {
-                        html.append(new String(r.header.headerBytes, StandardCharsets.UTF_8));
+                        html.append(new String(r.header.headerBytes, StandardCharsets.UTF_8).replaceAll("<", "&lt;"));
                     });
         } catch (Exception ex) {
             LOG.error(ex.toString(), ex);
@@ -204,11 +207,11 @@ public class ContentExplorerResource {
     @Produces(MediaType.TEXT_HTML)
     public String getHttpHeader(@PathParam("fileName") String fileName, @PathParam("id") String id) {
         StringBuilder html = new StringBuilder(htmlHeader)
-                .append("<h3>HTTP headers for for ")
-                .append(fileName).append(" :: ").append(id)
+                .append("<h3>HTTP headers for ")
+                .append(fileName).append(" :: ").append(id.replaceAll("<", "&lt;"))
                 .append("</h3><pre>");
 
-        try (Stream<WarcRecord> s = getContent(fileName);) {
+        try (Stream<WarcRecord> s = getRecords(fileName);) {
             s.filter(r -> id.equals(r.header.warcRecordIdStr))
                     .forEach(r -> {
                         html.append(r.getHttpHeader().toString());
@@ -225,7 +228,7 @@ public class ContentExplorerResource {
     @Path("warcs/{fileName}/{id}")
 //    @Produces(MediaType.TEXT_PLAIN)
     public Response getContent(@PathParam("fileName") String fileName, @PathParam("id") String id) {
-        try (Stream<WarcRecord> s = getContent(fileName);) {
+        try (Stream<WarcRecord> s = getRecords(fileName);) {
             List<Response> resp = s.filter(r -> id.equals(r.header.warcRecordIdStr))
                     .map(r -> {
                         String type = MediaType.TEXT_PLAIN;
@@ -258,7 +261,47 @@ public class ContentExplorerResource {
         }
     }
 
-    public Stream<WarcRecord> getContent(String fileName) {
+    @GET
+    @Path("storageref/{ref}")
+    @Produces(MediaType.TEXT_PLAIN)
+    public Response getContentForRef(@PathParam("ref") String storageRef) {
+        try (WarcRecordContainer r = getRecord(storageRef);) {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            try {
+                ByteStreams.copy(r.warcRecord.getPayloadContent(), baos);
+            } catch (IOException ex) {
+                LOG.error(ex.toString(), ex);
+                throw new RuntimeException(ex);
+            }
+
+            String type = MediaType.TEXT_PLAIN;
+            return Response.ok(baos.toByteArray(), type).build();
+        } catch (Exception ex) {
+            LOG.error(ex.toString(), ex);
+            throw new WebApplicationException(ex, 404);
+        }
+    }
+
+    @GET
+    @Path("storageref/{ref}/warcheader")
+    @Produces(MediaType.TEXT_HTML)
+    public String getWarcHeaderForRef(@PathParam("ref") String storageRef) {
+        try (WarcRecordContainer r = getRecord(storageRef);) {
+            StringBuilder html = new StringBuilder(htmlHeader)
+                    .append("<h3>WARC headers for ")
+                    .append(storageRef.replaceAll("<", "&lt;"))
+                    .append("</h3><pre>");
+
+            html.append(new String(r.warcRecord.header.headerBytes, StandardCharsets.UTF_8).replaceAll("<", "&lt;"));
+            html.append("</pre>");
+            return html.append(htmlFooter).toString();
+        } catch (Exception ex) {
+            LOG.error(ex.toString(), ex);
+            throw new WebApplicationException(ex, 404);
+        }
+    }
+
+    public Stream<WarcRecord> getRecords(String fileName) {
         File warcFile = new File(warcDir, fileName);
         try {
             FileInputStream in = new FileInputStream(warcFile);
@@ -279,4 +322,61 @@ public class ContentExplorerResource {
         return null;
     }
 
+    public WarcRecordContainer getRecord(String storageRef) {
+        if (storageRef.startsWith("warcfile:")) {
+            String storageRefNoScheme = storageRef.substring(9);
+            if (!storageRefNoScheme.contains(":")) {
+                throw new WebApplicationException("Invalid storageref: " + storageRef, Status.BAD_REQUEST);
+            }
+            String fileName = storageRefNoScheme.substring(0, storageRefNoScheme.lastIndexOf(":"));
+            long offset = Long.parseLong(storageRefNoScheme.substring(storageRefNoScheme.lastIndexOf(":") + 1));
+            File warcFile = new File(warcDir, fileName);
+            try {
+                FileInputStream in;
+                try {
+                    in = new FileInputStream(warcFile);
+                } catch (FileNotFoundException ex) {
+                    in = new FileInputStream(warcFile + ".open");
+                }
+                in.skip(offset);
+                WarcReader warcReader = WarcReaderFactory.getReaderCompressed();
+                WarcRecord record = warcReader.getNextRecordFrom(in, offset);
+                return new WarcRecordContainer(in, warcReader, record);
+            } catch (Exception e) {
+                System.out.println("---------------");
+                e.printStackTrace();
+            }
+            return null;
+        } else {
+            throw new WebApplicationException("Unknown scheme: " + storageRef, Status.BAD_REQUEST);
+        }
+    }
+
+    private class WarcRecordContainer implements AutoCloseable {
+        private final InputStream in;
+        private final WarcReader warcReader;
+        private final WarcRecord warcRecord;
+
+        public WarcRecordContainer(InputStream in, WarcReader warcReader, WarcRecord warcRecord) {
+            this.in = in;
+            this.warcReader = warcReader;
+            this.warcRecord = warcRecord;
+        }
+
+        @Override
+        public void close() {
+            try {
+                warcRecord.close();
+            } catch (Exception ex) {
+            }
+            try {
+                warcReader.close();
+            } catch (Exception ex) {
+            }
+            try {
+                in.close();
+            } catch (Exception ex) {
+            }
+        }
+    }
 }

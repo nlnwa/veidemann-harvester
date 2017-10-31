@@ -31,18 +31,15 @@ public class CrawlLogListRequestQueryBuilder extends ConfigListQueryBuilder<Craw
         super(request, TABLES.CRAWL_LOG);
         setPaging(request.getPageSize(), request.getPage());
 
-        switch (request.getQryCase()) {
-            case WARC_ID:
-                buildIdQuery(request.getWarcId());
-                break;
-            case EXECUTION_ID:
-                buildExecutionIdQuery(request.getExecutionId());
-                break;
-            default:
-                buildAllQuery();
-                break;
+        if (request.getWarcIdCount() > 0) {
+            buildIdQuery(request.getWarcIdList());
+        } else if (!request.getExecutionId().isEmpty()) {
+            buildExecutionIdQuery(request.getExecutionId());
+        } else {
+            buildAllQuery();
         }
 
+        addFilter(request.getFilterList());
     }
 
     public CrawlLogListReply.Builder executeList(RethinkDbAdapter db) {

@@ -20,8 +20,8 @@ import (
 	"broproxctl/util"
 	"golang.org/x/net/context"
 
-	"github.com/spf13/cobra"
 	"fmt"
+	"github.com/spf13/cobra"
 )
 
 // runCmd represents the run command

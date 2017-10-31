@@ -18,6 +18,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+//go:generate go-bindata -prefix "../../res/" -pkg bindata -o bindata/templates.go ../../res/...
 func main() {
 	cmd.Execute()
 }

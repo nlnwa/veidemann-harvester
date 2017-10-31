@@ -15,17 +15,20 @@
  */
 package no.nb.nna.broprox.db;
 
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
 import com.rethinkdb.gen.ast.ReqlExpr;
 import com.rethinkdb.gen.ast.ReqlFunction1;
 import com.rethinkdb.net.Cursor;
+import no.nb.nna.broprox.api.ReportProto.Filter;
 import no.nb.nna.broprox.model.ConfigProto;
+
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 import static no.nb.nna.broprox.db.RethinkDbAdapter.r;
 
@@ -44,7 +47,7 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
 
     private int pageSize;
 
-    private String id;
+    private List<String> id;
 
     final RethinkDbAdapter.TABLES table;
 
@@ -54,17 +57,33 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
     }
 
     /**
+     * Build a query for a list of objects.
+     * <p>
+     * When this method returns, both {@link #getListQry()} and {@link #getCountQry()} will return the generated
+     * queries.
+     *
+     * @param id the object id
+     */
+    void buildIdQuery(List<String> id) {
+        this.id = id.stream().filter(i -> !i.isEmpty()).collect(Collectors.toList());
+        countQry = r.table(table.name).getAll(this.id.toArray());
+        listQry = r.table(table.name).getAll(this.id.toArray());
+    }
+
+    /**
      * Build a query for a single object.
      * <p>
-     * When this method returns, {@link #getListQry()} will return the generated query.
-     * <p>
-     * In case of a id query the {@link #getCountQry()} should not be used.
+     * When this method returns, both {@link #getListQry()} and {@link #getCountQry()} will return the generated
+     * queries.
      *
      * @param id the object id
      */
     void buildIdQuery(String id) {
-        listQry = r.table(table.name).get(id);
-        this.id = id;
+        if (id != null && !id.isEmpty()) {
+            this.id = Collections.singletonList(id);
+        }
+        countQry = r.table(table.name).getAll(this.id.toArray());
+        listQry = r.table(table.name).getAll(this.id.toArray());
     }
 
     /**
@@ -82,7 +101,9 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
         countQry = r.table(table.name)
                 .orderBy().optArg("index", "name")
                 .filter(doc -> doc.g("meta").g("name").match(qry));
-        listQry = countQry;
+        listQry = r.table(table.name)
+                .orderBy().optArg("index", "name")
+                .filter(doc -> doc.g("meta").g("name").match(qry));
     }
 
     /**
@@ -143,7 +164,11 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
                         .pluck("id").group("id").count().ungroup()
                         .filter(row -> row.g("reduction").eq(selector.getLabelCount()))
                         .g("group").union(spanQry.toArray()).distinct()));
-        listQry = countQry;
+        listQry = r.table(table.name).getAll(r.args(
+                r.table(table.name).getAll(exactQry.toArray()).optArg("index", "label")
+                        .pluck("id").group("id").count().ungroup()
+                        .filter(row -> row.g("reduction").eq(selector.getLabelCount()))
+                        .g("group").union(spanQry.toArray()).distinct()));
     }
 
     /**
@@ -151,7 +176,7 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
      */
     void buildAllOrderedOnNameQuery() {
         countQry = r.table(table.name);
-        listQry = countQry.orderBy().optArg("index", "name");
+        listQry = r.table(table.name).orderBy().optArg("index", "name");
     }
 
     /**
@@ -159,13 +184,35 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
      */
     void buildAllQuery() {
         countQry = r.table(table.name);
-        listQry = countQry;
+        listQry = r.table(table.name);
     }
 
     void addFilter(ReqlFunction1... filter) {
         Arrays.stream(filter).forEach(f -> {
             countQry = countQry.filter(f);
             listQry = listQry.filter(f);
+        });
+    }
+
+    void addFilter(List<Filter> filter) {
+        filter.forEach(f -> {
+            switch (f.getOp()) {
+                case EQ:
+                    addFilter(row -> row.g(f.getFieldName()).eq(f.getValue()));
+                    break;
+                case NE:
+                    addFilter(row -> row.g(f.getFieldName()).ne(f.getValue()));
+                    break;
+                case MATCH:
+                    addFilter(row -> row.g(f.getFieldName()).match(f.getValue()));
+                    break;
+                case LT:
+                    addFilter(row -> row.g(f.getFieldName()).lt(f.getValue()));
+                    break;
+                case GT:
+                    addFilter(row -> row.g(f.getFieldName()).gt(f.getValue()));
+                    break;
+            }
         });
     }
 
@@ -203,21 +250,11 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
     }
 
     public long executeCount(RethinkDbAdapter db) {
-        if (isIdQuery()) {
-            if (db.executeRequest("db-countConfigObjects", listQry) == null) {
-                return 0L;
-            } else {
-                return 1L;
-            }
-        } else {
-            return db.executeRequest("db-countConfigObjects", countQry.count());
-        }
+        return db.executeRequest("db-countConfigObjects", countQry.count());
     }
 
     public <R extends Message.Builder> R executeList(RethinkDbAdapter db, R resultBuilder) {
-        if (!isIdQuery()) {
-            listQry = listQry.skip(page * pageSize).limit(pageSize);
-        }
+        listQry = listQry.skip(page * pageSize).limit(pageSize);
 
         Object res = db.executeRequest("db-listConfigObjects", listQry);
 
@@ -255,9 +292,5 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
                 .setField(countField, count);
 
         return (R) resultBuilder;
-    }
-
-    boolean isIdQuery() {
-        return id != null && !id.isEmpty();
     }
 }

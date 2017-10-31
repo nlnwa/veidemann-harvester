@@ -31,18 +31,15 @@ public class PageLogListRequestQueryBuilder extends ConfigListQueryBuilder<PageL
         super(request, TABLES.PAGE_LOG);
         setPaging(request.getPageSize(), request.getPage());
 
-        switch (request.getQryCase()) {
-            case WARC_ID:
-                buildIdQuery(request.getWarcId());
-                break;
-            case EXECUTION_ID:
-                buildExecutionIdQuery(request.getExecutionId());
-                break;
-            default:
-                buildAllQuery();
-                break;
+        if (request.getWarcIdCount() > 0) {
+            buildIdQuery(request.getWarcIdList());
+        } else if (!request.getExecutionId().isEmpty()) {
+            buildExecutionIdQuery(request.getExecutionId());
+        } else {
+            buildAllQuery();
         }
 
+        addFilter(request.getFilterList());
     }
 
     public PageLogListReply.Builder executeList(RethinkDbAdapter db) {

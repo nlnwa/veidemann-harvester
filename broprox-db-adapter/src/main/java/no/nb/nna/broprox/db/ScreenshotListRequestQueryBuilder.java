@@ -16,8 +16,6 @@
 package no.nb.nna.broprox.db;
 
 import com.rethinkdb.gen.ast.ReqlExpr;
-import no.nb.nna.broprox.api.ReportProto.PageLogListReply;
-import no.nb.nna.broprox.api.ReportProto.PageLogListRequest;
 import no.nb.nna.broprox.api.ReportProto.ScreenshotListReply;
 import no.nb.nna.broprox.api.ReportProto.ScreenshotListRequest;
 import no.nb.nna.broprox.db.RethinkDbAdapter.TABLES;
@@ -33,23 +31,24 @@ public class ScreenshotListRequestQueryBuilder extends ConfigListQueryBuilder<Sc
         super(request, TABLES.SCREENSHOT);
         setPaging(request.getPageSize(), request.getPage());
 
-        switch (request.getQryCase()) {
-            case ID:
-                buildIdQuery(request.getId());
-                break;
-            case EXECUTION_ID:
-                buildAllQuery();
-                addFilter(row -> row.g("executionId").equals(request.getExecutionId()));
-                break;
-            case URI:
-                buildAllQuery();
-                addFilter(row -> row.g("uri").equals(request.getUri()));
-                break;
-            default:
-                buildAllQuery();
-                break;
+        if (request.getIdCount() > 0) {
+            buildIdQuery(request.getIdList());
+            if (!request.getImgData()) {
+                withoutImg();
+            }
+        } else if (!request.getExecutionId().isEmpty()) {
+            buildExecutionIdQuery(request.getExecutionId());
+            if (!request.getImgData()) {
+                withoutImg();
+            }
+        } else {
+            buildAllQuery();
+            if (!request.getImgData()) {
+                withoutImg();
+            }
         }
 
+        addFilter(request.getFilterList());
     }
 
     public ScreenshotListReply.Builder executeList(RethinkDbAdapter db) {
@@ -62,5 +61,9 @@ public class ScreenshotListRequestQueryBuilder extends ConfigListQueryBuilder<Sc
                 .optArg("index", "executionId");
         setListQry(qry);
         setCountQry(qry);
+    }
+
+    void withoutImg() {
+        setListQry(getListQry().without("img"));
     }
 }

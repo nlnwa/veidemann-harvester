@@ -149,6 +149,7 @@ public class DbInitializer {
         r.table(TABLES.EXECUTIONS.name).indexCreate("startTime").run(conn);
 
         r.tableCreate(TABLES.SCREENSHOT.name).run(conn);
+        r.table(TABLES.SCREENSHOT.name).indexCreate("executionId").run(conn);
 
         r.tableCreate(TABLES.CRAWL_ENTITIES.name).run(conn);
 
@@ -196,6 +197,7 @@ public class DbInitializer {
                 .run(conn);
         r.table(TABLES.CRAWL_LOG.name).indexWait("surt_time", "executionId").run(conn);
         r.table(TABLES.PAGE_LOG.name).indexWait("executionId").run(conn);
+        r.table(TABLES.SCREENSHOT.name).indexWait("executionId").run(conn);
         r.table(TABLES.SEEDS.name).indexWait("jobId", "entityId").run(conn);
         r.table(TABLES.CRAWL_HOST_GROUP.name).indexWait("nextFetchTime").run(conn);
         r.table(TABLES.EXECUTIONS.name).indexWait("startTime").run(conn);

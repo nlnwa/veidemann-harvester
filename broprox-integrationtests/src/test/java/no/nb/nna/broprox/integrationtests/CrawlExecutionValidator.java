@@ -33,6 +33,7 @@ public class CrawlExecutionValidator {
 
         checkConsistency();
         checkValidWarc();
+        checkChecksum();
         checkIp();
    }
 
@@ -72,13 +73,32 @@ public class CrawlExecutionValidator {
         });
     }
 
+    private void checkChecksum() {
+        crawlLogs.forEach(cl -> {
+            assertThat(cl.getBlockDigest())
+                    .as("Block digest for crawllog entry %s was empty", cl.getWarcId())
+                    .isNotEmpty();
+            assertThat(cl.getPayloadDigest())
+                    .as("Payload digest for crawllog entry %s was empty", cl.getWarcId())
+                    .isNotEmpty();
+        });
+        warcRecords.values().forEach(w -> {
+            assertThat(w.header.warcBlockDigestStr)
+                    .as("Block digest for WARC entry %s was empty", w.header.warcRecordIdStr)
+                    .isNotEmpty();
+            assertThat(w.header.warcPayloadDigestStr)
+                    .as("Payload digest for WARC entry %s was empty", w.header.warcRecordIdStr)
+                    .isNotEmpty();
+        });
+    }
+
     private void checkValidWarc() {
         warcRecords.values().forEach(r -> {
             System.out.println("----\n");
             System.out.println(r.header.warcTypeStr + ":  " + r.header.warcTargetUriStr);
             System.out.println("IS COMPLIANT: " + r.isCompliant());
             HttpHeader p = r.getHttpHeader();
-            System.out.println("Header: " + p);
+            System.out.println("Http Header: " + p);
             if (p != null) {
                 System.out.println("Valid: " + p.isValid());
                 p.getHeaderList().forEach(h -> System.out.println(h.line));

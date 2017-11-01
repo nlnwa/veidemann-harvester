@@ -15,25 +15,24 @@
  */
 package no.nb.nna.broprox.harvester.proxy;
 
-import no.nb.nna.broprox.commons.AlreadyCrawledCache;
-
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.util.Date;
-
 import net.lightbody.bmp.mitm.CertificateInfo;
 import net.lightbody.bmp.mitm.RootCertificateGenerator;
 import net.lightbody.bmp.mitm.keys.ECKeyGenerator;
 import net.lightbody.bmp.mitm.manager.ImpersonatingMitmManager;
-import no.nb.nna.broprox.commons.db.DbAdapter;
+import no.nb.nna.broprox.commons.AlreadyCrawledCache;
 import no.nb.nna.broprox.commons.client.ContentWriterClient;
+import no.nb.nna.broprox.commons.db.DbAdapter;
 import no.nb.nna.broprox.harvester.BrowserSessionRegistry;
 import org.littleshoot.proxy.HostResolver;
 import org.littleshoot.proxy.HttpProxyServer;
 import org.littleshoot.proxy.impl.DefaultHttpProxyServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.util.Date;
 
 /**
  * A Recording proxy.

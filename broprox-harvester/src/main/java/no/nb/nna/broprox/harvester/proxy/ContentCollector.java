@@ -15,13 +15,6 @@
  */
 package no.nb.nna.broprox.harvester.proxy;
 
-import java.math.BigInteger;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.time.Duration;
-import java.util.Iterator;
-import java.util.Map;
-
 import com.google.protobuf.ByteString;
 import io.grpc.StatusException;
 import io.netty.buffer.ByteBuf;
@@ -31,12 +24,17 @@ import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import no.nb.nna.broprox.commons.AlreadyCrawledCache;
-import no.nb.nna.broprox.commons.db.DbAdapter;
 import no.nb.nna.broprox.commons.client.ContentWriterClient;
+import no.nb.nna.broprox.commons.db.DbAdapter;
+import no.nb.nna.broprox.commons.util.Sha1Digest;
 import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.time.Duration;
+import java.util.Iterator;
+import java.util.Map;
 
 import static io.netty.handler.codec.http.HttpConstants.CR;
 import static io.netty.handler.codec.http.HttpConstants.LF;
@@ -45,12 +43,15 @@ import static io.netty.handler.codec.http.HttpConstants.LF;
  *
  */
 public class ContentCollector {
+    public static final String RECORD_CONTENT_TYPE_REQUEST = "application/http; msgtype=request";
+
+    public static final String RECORD_CONTENT_TYPE_RESPONSE = "application/http; msgtype=response";
 
     private static final Logger LOG = LoggerFactory.getLogger(ContentCollector.class);
 
     static final char[] CRLF = {CR, LF};
 
-    private final MessageDigest digest;
+    private final Sha1Digest digest;
 
     private final DbAdapter db;
 
@@ -73,15 +74,13 @@ public class ContentCollector {
     public ContentCollector(final DbAdapter db, final ContentWriterClient contentWriterClient) {
         this.db = db;
         this.contentWriterClient = contentWriterClient.createSession();
-
-        try {
-            this.digest = MessageDigest.getInstance("SHA-1");
-        } catch (NoSuchAlgorithmException ex) {
-            throw new RuntimeException(ex);
-        }
+        this.digest = new Sha1Digest();
     }
 
-    public void setRequestHeaders(HttpRequest request) {
+    public void setRequestHeaders(HttpRequest request, CrawlLog.Builder crawlLog) {
+        crawlLog.setContentType(request.headers().get("Content-Type", ""))
+                .setRecordContentType(RECORD_CONTENT_TYPE_REQUEST);
+
         StringBuilder headers = new StringBuilder(512)
                 .append(request.method().toString())
                 .append(" ")
@@ -93,7 +92,7 @@ public class ContentCollector {
         addHeaders(request.headers(), headers);
 
         ByteString data = ByteString.copyFromUtf8(headers.toString());
-        digest.update(data.asReadOnlyByteBuffer());
+        digest.update(data);
         contentWriterClient.sendHeader(data);
         shouldAddSeparator = true;
         size = data.size();
@@ -104,7 +103,8 @@ public class ContentCollector {
         httpResponseProtocolVersion = response.protocolVersion();
 
         crawlLog.setStatusCode(httpResponseStatus.code())
-                .setContentType(response.headers().get("Content-Type", ""));
+                .setContentType(response.headers().get("Content-Type", ""))
+                .setRecordContentType(RECORD_CONTENT_TYPE_RESPONSE);
 
         StringBuilder headers = new StringBuilder(512)
                 .append(response.protocolVersion().text())
@@ -115,7 +115,7 @@ public class ContentCollector {
         addHeaders(response.headers(), headers);
 
         ByteString data = ByteString.copyFromUtf8(headers.toString());
-        digest.update(data.asReadOnlyByteBuffer());
+        digest.update(data);
         contentWriterClient.sendHeader(data);
         shouldAddSeparator = true;
         size = data.size();
@@ -138,13 +138,12 @@ public class ContentCollector {
 
     public void addPayload(ByteBuf payload) {
         if (shouldAddSeparator) {
-            digest.update(CR);
-            digest.update(LF);
+            digest.update(CRLF);
             size += 2;
             shouldAddSeparator = false;
         }
         ByteString data = ByteString.copyFrom(payload.nioBuffer());
-        digest.update(data.asReadOnlyByteBuffer());
+        digest.update(data);
         contentWriterClient.sendPayload(data);
         size += data.size();
 
@@ -158,7 +157,7 @@ public class ContentCollector {
     }
 
     public String getDigest() {
-        return "sha1:" + new BigInteger(1, digest.digest()).toString(16);
+        return digest.getPrefixedDigestString();
     }
 
     public long getSize() {

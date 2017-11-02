@@ -15,12 +15,8 @@
  */
 package no.nb.nna.broprox.contentwriter;
 
-import java.math.BigInteger;
-import java.nio.ByteBuffer;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-
 import com.google.protobuf.ByteString;
+import no.nb.nna.broprox.commons.util.Sha1Digest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,23 +32,17 @@ public class ContentBuffer {
 
     static final byte[] CRLF = {CR, LF};
 
-    private final MessageDigest blockDigest;
-
-    private final MessageDigest payloadDigest;
-
-    private MessageDigest headerDigest;
+    private final Sha1Digest blockDigest;
+    private final Sha1Digest payloadDigest;
+    private Sha1Digest headerDigest;
 
     private ByteString headerBuf;
 
     private ByteString payloadBuf;
 
     public ContentBuffer() {
-        try {
-            this.blockDigest = MessageDigest.getInstance("SHA-1");
-            this.payloadDigest = MessageDigest.getInstance("SHA-1");
-        } catch (NoSuchAlgorithmException ex) {
-            throw new RuntimeException(ex);
-        }
+        this.blockDigest = new Sha1Digest();
+        this.payloadDigest = new Sha1Digest();
     }
 
     public void setHeader(ByteString header) {
@@ -60,11 +50,7 @@ public class ContentBuffer {
         updateDigest(headerBuf, blockDigest);
 
         // Get the partial result after creating a digest of the headers
-        try {
-            headerDigest = (MessageDigest) blockDigest.clone();
-        } catch (CloneNotSupportedException cnse) {
-            throw new RuntimeException("Couldn't make digest of partial content");
-        }
+        headerDigest = blockDigest.clone();
     }
 
     public void addPayload(ByteString payload) {
@@ -80,24 +66,22 @@ public class ContentBuffer {
         updateDigest(payload, blockDigest, payloadDigest);
     }
 
-    private void updateDigest(ByteString buf, MessageDigest... digests) {
-        for (MessageDigest d : digests) {
-            for (ByteBuffer b : buf.asReadOnlyByteBufferList()) {
-                d.update(b);
-            }
+    private void updateDigest(ByteString buf, Sha1Digest... digests) {
+        for (Sha1Digest d : digests) {
+            d.update(buf);
         }
     }
 
     public String getBlockDigest() {
-        return "sha1:" + new BigInteger(1, blockDigest.digest()).toString(16);
+        return blockDigest.getPrefixedDigestString();
     }
 
     public String getPayloadDigest() {
-        return "sha1:" + new BigInteger(1, payloadDigest.digest()).toString(16);
+        return payloadDigest.getPrefixedDigestString();
     }
 
     public String getHeaderDigest() {
-        return "sha1:" + new BigInteger(1, headerDigest.digest()).toString(16);
+        return headerDigest.getPrefixedDigestString();
     }
 
     public long getPayloadSize() {

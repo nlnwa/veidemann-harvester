@@ -147,7 +147,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
                         .setExecutionId(executionId);
 
                 // Store request
-                requestCollector.setRequestHeaders(request);
+                requestCollector.setRequestHeaders(request, crawlLog);
                 requestCollector.writeRequest(crawlLog.build());
 
                 LOG.debug("Proxy is sending request to final destination.");

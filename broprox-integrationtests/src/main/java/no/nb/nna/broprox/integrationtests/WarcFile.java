@@ -15,20 +15,18 @@
  */
 package no.nb.nna.broprox.integrationtests;
 
-import java.io.IOException;
-import java.time.OffsetDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.Map;
-import java.util.Spliterators;
-import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
-
 import okhttp3.HttpUrl;
 import okhttp3.Request;
 import okhttp3.Response;
 import org.jwat.warc.WarcReader;
 import org.jwat.warc.WarcReaderFactory;
 import org.jwat.warc.WarcRecord;
+
+import java.io.IOException;
+import java.util.Map;
+import java.util.Spliterators;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 /**
  *
@@ -71,10 +69,14 @@ public class WarcFile {
                 warcReader.setPayloadDigestEnabled(true);
                 return StreamSupport.stream(Spliterators.spliteratorUnknownSize(warcReader.iterator(), 0), false)
                         .onClose(() -> {
-                            System.out.println("ERRORS: " + warcReader.diagnostics.getErrors());
-                            System.out.println("WARNINGS: " + warcReader.diagnostics.getWarnings());
                             warcReader.close();
                             response.close();
+                            if (!(warcReader.diagnostics.getErrors().isEmpty() && warcReader.diagnostics.getWarnings().isEmpty())) {
+                                System.err.println("WARC file '" + getName() + "' is not valid:");
+                                System.err.println("  Errors: " + warcReader.diagnostics.getErrors());
+                                System.err.println("  Warnings: " + warcReader.diagnostics.getWarnings());
+                                throw new RuntimeException("WARC file '" + getName() + "' is not valid");
+                            }
                         });
             } else {
                 throw new IOException("Unexpected code " + response);

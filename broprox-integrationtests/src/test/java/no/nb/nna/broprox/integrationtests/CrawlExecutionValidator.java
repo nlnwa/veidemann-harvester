@@ -43,6 +43,11 @@ public class CrawlExecutionValidator {
             assertThat(warcRecords.keySet())
                     .as("Missing WARC record for crawllog entry %s", cl.getWarcId())
                     .contains(cl.getWarcId());
+            if (!cl.getWarcRefersTo().isEmpty()) {
+                assertThat(crawlLogs.stream().map(c -> c.getWarcId()))
+                        .as("Missing crawllog entry for record %s's warcRefersTo", cl)
+                        .contains(cl.getWarcRefersTo());
+            }
         });
         pageLogs.forEach(pl -> {
             assertThat(warcRecords.keySet())
@@ -60,6 +65,16 @@ public class CrawlExecutionValidator {
                     assertThat(crawlLogs.stream().map(c -> c.getWarcId()))
                             .as("Missing crawllog entry for WARC record %s", wid)
                             .contains(wid.header.warcRecordIdStr.substring(10, wid.header.warcRecordIdStr.lastIndexOf(">")));
+
+                    String refersTo = stripWarcId(wid.header.warcRefersToStr);
+                    if (!refersTo.isEmpty()) {
+                        assertThat(crawlLogs.stream().map(c -> c.getWarcId()))
+                                .as("Missing crawllog entry for WARC record %s's warcRefersTo", wid)
+                                .contains(refersTo);
+                        assertThat(warcRecords.keySet().stream())
+                                .as("Missing crawllog entry for WARC record %s", wid)
+                                .contains(refersTo);
+                    }
                 });
     }
 
@@ -143,5 +158,12 @@ public class CrawlExecutionValidator {
                     }
                     warcRecords.put(r.header.warcRecordIdStr.substring(10, r.header.warcRecordIdStr.lastIndexOf(">")), r);
                 });
+    }
+
+    private String stripWarcId(String warcUrn) {
+        if (warcUrn == null || warcUrn.isEmpty()) {
+            return "";
+        }
+        return warcUrn.substring(10, warcUrn.lastIndexOf(">"));
     }
 }

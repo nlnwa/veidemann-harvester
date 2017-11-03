@@ -77,19 +77,14 @@ public class SingleWarcWriter implements AutoCloseable {
             }
 
             record.header.addHeader(FN_WARC_IP_ADDRESS, logEntry.getIpAddress());
-//        record.header.addHeader(FN_WARC_WARCINFO_ID, "<urn:uuid:" + warcinfoUuid + ">");
-            if (logEntry.getBlockDigest() != null) {
-                record.header.addHeader(FN_WARC_BLOCK_DIGEST, logEntry.getBlockDigest());
-            }
-            if (logEntry.getPayloadDigest() != null) {
-                record.header.addHeader(FN_WARC_PAYLOAD_DIGEST, logEntry.getPayloadDigest());
-            }
+            record.header.addHeader(FN_WARC_WARCINFO_ID, "<" + warcFileWriter.warcinfoRecordId + ">");
+            record.header.addHeader(FN_WARC_BLOCK_DIGEST, logEntry.getBlockDigest());
+            record.header.addHeader(FN_WARC_PAYLOAD_DIGEST, logEntry.getPayloadDigest());
 
-//        contentLength = managedPayload.httpHeaderLength + managedPayload.payloadLength;
             record.header.addHeader(FN_CONTENT_LENGTH, logEntry.getSize(), null);
 
-            if (logEntry.getContentType() != null) {
-                record.header.addHeader(FN_CONTENT_TYPE, logEntry.getContentType());
+            if (logEntry.getSize() > 0) {
+                record.header.addHeader(FN_CONTENT_TYPE, logEntry.getRecordContentType());
             }
 
             writer.writeHeader(record);
@@ -153,7 +148,7 @@ public class SingleWarcWriter implements AutoCloseable {
         record = WarcRecord.createRecord(writer);
         record.header.addHeader(FN_WARC_TYPE, RT_METADATA);
 //                record.header.addHeader(FN_WARC_TARGET_URI, arcRecord.header.urlUri, arcRecord.header.urlStr);
-        record.header.addHeader(FN_WARC_DATE, OffsetDateTime.now().format(DateTimeFormatter.ISO_DATE));
+        record.header.addHeader(FN_WARC_DATE, cal.getTime(), null);
         String fileDescUuid = "<urn:uuid:" + UUID.randomUUID() + ">";
         record.header.addHeader(FN_WARC_RECORD_ID, fileDescUuid);
         record.header.addHeader(FN_WARC_CONCURRENT_TO, "<" + warcFileWriter.warcinfoRecordId + ">");

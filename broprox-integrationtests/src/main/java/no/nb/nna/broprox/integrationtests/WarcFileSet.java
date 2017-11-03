@@ -15,13 +15,11 @@
  */
 package no.nb.nna.broprox.integrationtests;
 
-import java.io.IOException;
+import org.jwat.warc.WarcRecord;
+
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
-import com.google.common.io.ByteStreams;
-import org.jwat.warc.WarcRecord;
 
 /**
  *

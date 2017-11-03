@@ -70,6 +70,7 @@ message CrawlLog {
     string execution_id = 19;
     int32 retries = 20; // Number of times this uri has been retried. Zero means success on first attempt.
     FetchError error = 21; // Contains the error reason if fetch failed
+    string record_content_type = 22; // The WARC-records content type
 }
 
 // Log for each page including discovered resources and links

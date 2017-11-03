@@ -162,7 +162,9 @@ public class ContentWriterService extends ContentWriterGrpc.ContentWriterImplBas
 
                 if (isDuplicate.isPresent()) {
                     crawlLog.setRecordType("revisit")
+                            .setRecordContentType("application/http")
                             .setBlockDigest(contentBuffer.getHeaderDigest())
+                            .setPayloadDigest(isDuplicate.get().getDigest())
                             .setSize(contentBuffer.getHeaderSize())
                             .setWarcRefersTo(isDuplicate.get().getWarcId());
 
@@ -184,14 +186,9 @@ public class ContentWriterService extends ContentWriterGrpc.ContentWriterImplBas
                 break;
 
             default:
-                if (contentBuffer.getPayloadSize() == 0L) {
-                    crawlLog.setBlockDigest(contentBuffer.getHeaderDigest())
-                            .setSize(contentBuffer.getTotalSize());
-                } else {
-                    crawlLog.setBlockDigest(contentBuffer.getBlockDigest())
-                            .setPayloadDigest(contentBuffer.getPayloadDigest())
-                            .setSize(contentBuffer.getTotalSize());
-                }
+                crawlLog.setBlockDigest(contentBuffer.getBlockDigest())
+                        .setPayloadDigest(contentBuffer.getPayloadDigest())
+                        .setSize(contentBuffer.getTotalSize());
                 break;
         }
     }

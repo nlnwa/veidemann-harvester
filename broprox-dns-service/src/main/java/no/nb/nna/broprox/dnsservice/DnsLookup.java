@@ -204,6 +204,7 @@ public class DnsLookup {
                 .setFetchTimeStamp(ProtoUtils.odtToTs(state.fetchStart))
                 .setIpAddress(state.dnsIp)
                 .setContentType("text/dns")
+                .setRecordContentType("text/dns")
                 .setSize(payload.readableBytes());
 
         // Shall we get a digest on the content downloaded?

@@ -15,11 +15,6 @@
  */
 package no.nb.nna.broprox.harvester.proxy;
 
-import java.net.InetSocketAddress;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpContent;
@@ -33,9 +28,9 @@ import io.opentracing.tag.Tags;
 import io.opentracing.util.GlobalTracer;
 import no.nb.nna.broprox.commons.AlreadyCrawledCache;
 import no.nb.nna.broprox.commons.BroproxHeaderConstants;
-import no.nb.nna.broprox.commons.db.DbAdapter;
 import no.nb.nna.broprox.commons.ExtraStatusCodes;
 import no.nb.nna.broprox.commons.client.ContentWriterClient;
+import no.nb.nna.broprox.commons.db.DbAdapter;
 import no.nb.nna.broprox.db.ProtoUtils;
 import no.nb.nna.broprox.harvester.BrowserSessionRegistry;
 import no.nb.nna.broprox.harvester.browsercontroller.BrowserSession;
@@ -43,10 +38,16 @@ import no.nb.nna.broprox.harvester.browsercontroller.UriRequest;
 import no.nb.nna.broprox.model.MessagesProto.CrawlLog;
 import org.littleshoot.proxy.HttpFiltersAdapter;
 import org.littleshoot.proxy.impl.ProxyUtils;
+import org.netpreserve.commons.uri.Uri;
 import org.netpreserve.commons.uri.UriConfigs;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+
+import java.net.InetSocketAddress;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  *
@@ -84,16 +85,17 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
     private Span responseSpan;
 
     public RecorderFilter(final String uri, final HttpRequest originalRequest, final ChannelHandlerContext ctx,
-            final DbAdapter db, final ContentWriterClient contentWriterClient,
-            final BrowserSessionRegistry sessionRegistry, final AlreadyCrawledCache cache) {
+                          final DbAdapter db, final ContentWriterClient contentWriterClient,
+                          final BrowserSessionRegistry sessionRegistry, final AlreadyCrawledCache cache) {
 
         super(originalRequest, ctx);
         this.db = db;
         this.uri = uri;
 
+        Uri surtUri = UriConfigs.SURT_KEY.buildUri(uri);
         this.crawlLog = CrawlLog.newBuilder()
                 .setRequestedUri(uri)
-                .setSurt(UriConfigs.SURT_KEY.buildUri(uri).toString());
+                .setSurt(surtUri.toString());
         this.requestCollector = new ContentCollector(db, contentWriterClient);
         this.responseCollector = new ContentCollector(db, contentWriterClient);
         this.sessionRegistry = sessionRegistry;
@@ -101,7 +103,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
     }
 
     @Override
-    public HttpResponse clientToProxyRequest(HttpObject httpObject) {
+    public HttpResponse proxyToServerRequest(HttpObject httpObject) {
         if (httpObject instanceof HttpRequest) {
             HttpRequest request = (HttpRequest) httpObject;
 
@@ -145,7 +147,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
                         .setExecutionId(executionId);
 
                 // Store request
-                requestCollector.setRequestHeaders(request);
+                requestCollector.setRequestHeaders(request, crawlLog);
                 requestCollector.writeRequest(crawlLog.build());
 
                 LOG.debug("Proxy is sending request to final destination.");
@@ -161,49 +163,49 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
         responseSpan = buildSpan("serverToProxyResponse", uriRequest);
         GlobalTracer.get().makeActive(requestSpan);
 
-            MDC.put("eid", executionId);
-            MDC.put("uri", uri);
+        MDC.put("eid", executionId);
+        MDC.put("uri", uri);
 
-            boolean handled = false;
+        boolean handled = false;
 
-            if (httpObject instanceof HttpResponse) {
-                LOG.debug("Got http response");
+        if (httpObject instanceof HttpResponse) {
+            LOG.debug("Got http response");
 
-                HttpResponse res = (HttpResponse) httpObject;
-                responseCollector.setResponseHeaders(res, crawlLog);
+            HttpResponse res = (HttpResponse) httpObject;
+            responseCollector.setResponseHeaders(res, crawlLog);
 
-                responseSpan.log("Got response headers");
-                handled = true;
+            responseSpan.log("Got response headers");
+            handled = true;
+        }
+
+        if (httpObject instanceof HttpContent) {
+            LOG.debug("Got http content");
+
+            HttpContent res = (HttpContent) httpObject;
+            responseSpan.log("Got http content. Size: " + res.content().readableBytes());
+            responseCollector.addPayload(res.content());
+
+            handled = true;
+        }
+
+        if (ProxyUtils.isLastChunk(httpObject)) {
+            responseCollector.writeCache(cache, uri, executionId);
+
+            String warcId = responseCollector.writeResponse(crawlLog.build()).getWarcId();
+
+            responseSpan.log("Last chunk");
+            if (uriRequest != null) {
+                uriRequest.setSize(responseCollector.getSize());
+                responseSpan.finish();
+                finishSpan(uriRequest);
+                uriRequest.setWarcId(warcId);
             }
+        }
 
-            if (httpObject instanceof HttpContent) {
-                LOG.debug("Got http content");
-
-                HttpContent res = (HttpContent) httpObject;
-                responseSpan.log("Got http content. Size: " + res.content().readableBytes());
-                responseCollector.addPayload(res.content());
-
-                handled = true;
-            }
-
-            if (ProxyUtils.isLastChunk(httpObject)) {
-                responseCollector.writeCache(cache, uri, executionId);
-
-                String warcId = responseCollector.writeResponse(crawlLog.build()).getWarcId();
-
-                responseSpan.log("Last chunk");
-                if (uriRequest != null) {
-                    uriRequest.setSize(responseCollector.getSize());
-                    responseSpan.finish();
-                    finishSpan(uriRequest);
-                    uriRequest.setWarcId(warcId);
-                }
-            }
-
-            if (!handled) {
-                // If we get here, handling for the response type should be added
-                LOG.error("Got unknown response type '{}', this is a bug", httpObject.getClass());
-            }
+        if (!handled) {
+            // If we get here, handling for the response type should be added
+            LOG.error("Got unknown response type '{}', this is a bug", httpObject.getClass());
+        }
         return httpObject;
     }
 
@@ -211,7 +213,6 @@ public class RecorderFilter extends HttpFiltersAdapter implements BroproxHeaderC
     public void proxyToServerResolutionSucceeded(String serverHostAndPort, InetSocketAddress resolvedRemoteAddress) {
         MDC.put("eid", executionId);
         MDC.put("uri", uri);
-
         LOG.debug("Resolved {} to {}", serverHostAndPort, resolvedRemoteAddress);
         crawlLog.setIpAddress(resolvedRemoteAddress.getAddress().getHostAddress());
     }

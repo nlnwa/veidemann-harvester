@@ -1,0 +1,202 @@
+syntax = "proto3";
+
+package veidemann.api;
+option go_package = "veidemann_api";
+option java_package = "no.nb.nna.veidemann.api";
+option java_outer_classname = "ConfigProto";
+
+import "google/protobuf/timestamp.proto";
+
+message Meta {
+    string name = 1;
+    string description = 2;
+    google.protobuf.Timestamp created = 3;
+    string created_by = 4;
+    google.protobuf.Timestamp last_modified = 5;
+    string last_modified_by = 6;
+    repeated Label label = 7;
+}
+
+message Selector {
+    repeated Label label = 1;
+}
+
+message Label {
+    string key = 1;
+    string value = 2;
+}
+
+// A crawl entity (might be an organisation with one or more seeds)
+message CrawlEntity {
+    string id = 1;
+    Meta meta = 2;
+}
+
+message Seed {
+    string id = 1;
+    Meta meta = 2;
+    string entity_id = 3;
+    CrawlScope scope = 4;
+    repeated string job_id = 5;
+    bool disabled = 18;
+}
+
+message CrawlJob {
+    string id = 1;
+    Meta meta = 2;
+    oneof schedule_config_or_id {
+        string schedule_id = 3;
+        CrawlScheduleConfig schedule = 16;
+        Selector schedule_selector = 30;
+    }
+    CrawlLimitsConfig limits = 4;
+    oneof crawl_config_or_id {
+        string crawl_config_id = 5;
+        CrawlConfig crawl_config = 17;
+        Selector crawl_config_selector = 31;
+    }
+    bool disabled = 18;
+}
+
+message CrawlConfig {
+    string id = 1;
+    Meta meta = 2;
+    oneof browser_config_or_id {
+        string browser_config_id = 7;
+        BrowserConfig browser_config = 16;
+        Selector browser_config_selector = 17;
+    }
+    oneof politeness_or_id {
+        string politeness_id = 8;
+        PolitenessConfig politeness = 18;
+        Selector politeness_selector = 19;
+    }
+    ExtraConfig extra = 9;
+    int32 minimum_dns_ttl_s = 10; // Not implemented
+    bool depth_first = 20;
+}
+
+message CrawlScheduleConfig {
+    string id = 1;
+    Meta meta = 2;
+    string cron_expression = 3;
+    google.protobuf.Timestamp valid_from = 4;
+    google.protobuf.Timestamp valid_to = 5;
+}
+
+message CrawlScope {
+    string surt_prefix = 1;
+}
+
+message CrawlLimitsConfig {
+    // How deep from a seed to crawl
+    int32 depth = 1;
+    // Maximum time in seconds allowed for crawl to finish
+    int64 max_duration_s = 2;
+    // Maximum number of bytes to fetch before ending crawl
+    int64 max_bytes = 3;
+}
+
+message BrowserConfig {
+    string id = 1;
+    Meta meta = 2;
+    string user_agent = 3;
+    int32 window_width = 4;
+    int32 window_height = 5;
+    int64 page_load_timeout_ms = 6;
+    Selector script_selector = 7;
+    repeated string script_id = 8;
+    map<string, string> headers = 16;
+    map<string, string> script_parameters = 17; // Not implemented
+    int64 sleep_after_pageload_ms = 18;
+}
+
+message PolitenessConfig {
+    enum RobotsPolicy {
+        OBEY_ROBOTS = 0;
+        IGNORE_ROBOTS = 1;
+        CUSTOM_ROBOTS = 2;
+    }
+    string id = 1;
+    Meta meta = 2;
+    RobotsPolicy robots_policy = 3;
+    int32 minimum_robots_validity_duration_s = 11;
+    string custom_robots = 20;
+    int64 min_time_between_page_load_ms = 4;
+    int64 max_time_between_page_load_ms = 5;
+    /**
+     * The fetch time of the URI is multiplied with this value to get the delay time before fetching the next URI.
+     * If min_time_between_page_load_ms and/or max_time_between_page_load_ms are set, then those values are used as
+     * the upper/lower limits for delay.
+     * If delay_factor is unset or zero, then a delay_facor of one is assumed. If delay_factor is negative,
+     * a delay_factor of zero is assumed.
+     */
+    float delay_factor = 6;
+    int32 max_retries = 7; // The maximum number of retries before giving up fetching a uri
+    int32 retry_delay_seconds = 8;
+    Selector crawl_host_group_selector = 9;
+}
+
+message ExtraConfig {
+    bool extract_text = 5; // Not implemented
+    bool create_snapshot = 6;
+}
+
+// Message containing a javascript to be run in a browser
+message BrowserScript {
+    string id = 1;
+    Meta meta = 2;
+    string script = 3;
+    string url_regexp = 4; // Not implemented
+}
+
+message CrawlHostGroupConfig {
+    message IpRange {
+        string ip_from = 1;
+        string ip_to = 2;
+    }
+    string id = 1;
+    Meta meta = 2;
+    repeated IpRange ip_range = 3;
+}
+
+message LogLevels {
+    enum Level {
+        UNDEFINED = 0;
+        ALL = 1;
+        TRACE = 2;
+        DEBUG = 3;
+        INFO = 4;
+        WARN = 5;
+        ERROR = 6;
+        FATAL = 7;
+        OFF = 8;
+    }
+    message LogLevel {
+        string logger = 1;
+        Level level = 2;
+    }
+    repeated LogLevel log_level = 1;
+}
+
+enum Role {
+    // Any authenticated user
+    ANY_USER = 0;
+    // Any user including unauthenticated users
+    ANY = 1;
+    // Administrator
+    ADMIN = 2;
+    // Curator
+    CURATOR = 3;
+    // A user with permission to read internal data
+    READONLY = 4;
+}
+
+message RoleMapping {
+    string id = 1;
+    oneof email_or_group {
+        string email = 2;
+        string group = 3;
+    }
+    repeated Role role = 4;
+}

@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package veidemann.api;
+option go_package = "veidemann_api";
+option java_package = "no.nb.nna.veidemann.api";
+option java_outer_classname = "FrontierProto";
+
+import "config.proto";
+import "messages.proto";
+
+// Service for controlling frontier.
+service Frontier {
+    rpc CrawlSeed (CrawlSeedRequest) returns (CrawlExecutionStatus) {}
+}
+
+message CrawlSeedRequest {
+    CrawlJob job = 5;
+    Seed seed = 6;
+}

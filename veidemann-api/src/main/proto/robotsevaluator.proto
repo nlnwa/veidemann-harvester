@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package veidemann.api;
+option go_package = "veidemann_api";
+option java_package = "no.nb.nna.veidemann.api";
+option java_outer_classname = "RobotsEvaluatorProto";
+
+import "config.proto";
+
+// Service for checking robots.txt rules.
+service RobotsEvaluator {
+    rpc isAllowed (IsAllowedRequest) returns (IsAllowedReply) {}
+}
+
+message IsAllowedRequest {
+    string execution_id = 1;
+    string uri = 2;
+    string user_agent = 3;
+    PolitenessConfig politeness = 4;
+}
+
+message IsAllowedReply {
+    bool is_allowed = 1;
+}

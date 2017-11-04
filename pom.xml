@@ -2,7 +2,7 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <groupId>no.nb.nna</groupId>
-    <artifactId>broprox</artifactId>
+    <artifactId>veidemann</artifactId>
     <version>1.0.0-SNAPSHOT</version>
     <packaging>pom</packaging>
 
@@ -20,19 +20,19 @@
     </licenses>
 
     <modules>
-        <module>broprox-harvester</module>
-        <module>broprox-db-adapter</module>
-        <module>broprox-chrome</module>
-        <module>broprox-contentwriter</module>
-        <module>broprox-contentexplorer</module>
-        <module>broprox-frontier</module>
-        <module>broprox-integrationtests</module>
-        <module>broprox-controller</module>
-        <module>broprox-api</module>
-        <module>broprox-commons</module>
-        <module>broprox-dns-service</module>
-        <module>broprox-robotrules</module>
-        <module>broproxctl</module>
+        <module>veidemann-harvester</module>
+        <module>veidemann-dbadapter</module>
+        <module>veidemann-chrome</module>
+        <module>veidemann-contentwriter</module>
+        <module>veidemann-contentexplorer</module>
+        <module>veidemann-frontier</module>
+        <module>veidemann-integrationtests</module>
+        <module>veidemann-controller</module>
+        <module>veidemann-api</module>
+        <module>veidemann-commons</module>
+        <module>veidemann-dnsresolver</module>
+        <module>veidemann-robotsevaluator</module>
+        <module>veidemannctl</module>
     </modules>
 
     <properties>

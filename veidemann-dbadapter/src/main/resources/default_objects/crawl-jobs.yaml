@@ -1,0 +1,111 @@
+id: "c856d12d-14e0-4554-9bc8-11189b8ab01f"
+meta:
+    name: "Default"
+    description: "The default job definition"
+    label:
+        - key: "type"
+          value: "default"
+schedule:
+    id: "5604f0cc-315d-4091-8d6e-1b17a7eb990b"
+    meta:
+        name: "Every minute"
+        description: "A schedule which triggers every minute"
+    cronExpression: "* * * * *"
+limits:
+    maxDurationS: 60
+crawlConfig:
+    id: "f8609d3f-9bf2-416c-ad50-7774b7d2dd95"
+    meta:
+        name: "Default"
+        description: "Default crawl configuration"
+        label:
+        - key: "type"
+          value: "default"
+
+    browserConfig:
+        id: "407a9600-4f25-4f17-8cff-ee1b8ee950f6"
+        meta:
+            name: "Default"
+            description: "Default browser configuration"
+        userAgent: "veidemann/1.0"
+        windowWidth: 900
+        windowHeight: 900
+        pageLoadTimeoutMs: 180000
+        sleepAfterPageLoadMs: 500
+        scriptSelector:
+            label:
+            - key: "scope"
+              value: "default"
+
+    politeness:
+        id: "3c80fe91-98ca-44a1-b240-ead10990b686"
+        meta:
+            name: "Default"
+            description: "Default politeness configuration"
+        robotsPolicy: OBEY_ROBOTS
+        minimumRobotsValidityDurationS: 86400
+        minTimeBetweenPageLoadMs: 1000
+        maxTimeBetweenPageLoadMs: 30000
+        delayFactor: 1
+        maxRetries: 3
+        retryDelaySeconds: 60
+    extra:
+        extractText: true
+        createSnapshot: true
+    depthFirst: false
+---
+id: "8a260b58-2877-462f-b0b7-b5e4a8dde507"
+meta:
+    name: "Every day"
+    description: "A job running every day"
+    label:
+        - key: "type"
+          value: "default"
+schedule:
+    id: "1960663c-4bfa-4002-bc1b-24338bb66aa4"
+    meta:
+        name: "Every day"
+        description: "A schedule which triggers every day"
+    cronExpression: "0 6 * * *"
+limits:
+    maxDurationS: 86400
+crawlConfigSelector:
+    label:
+    - key: "type"
+      value: "default"
+---
+id: "64ea2951-014a-4c74-b68f-d5f7855dcb04"
+meta:
+    name: "Work hours"
+    description: "A job running every hour between 7 and 15 UTC, Monday through Friday"
+    label:
+        - key: "type"
+          value: "default"
+schedule:
+    id: "846cbc1e-540b-460b-bc75-2d2a2d4193c5"
+    meta:
+        name: "Work hours"
+        description: "A schedule which triggers every hour between 7 and 15 UTC, Monday through Friday"
+    cronExpression: "0 7-15 * * 1-5"
+limits:
+    maxDurationS: 86400
+crawlConfigSelector:
+    label:
+    - key: "type"
+      value: "default"
+---
+id: "e46863ae-d076-46ca-8be3-8a8ef72e709e"
+meta:
+    name: "Unscheduled"
+    description: "A job which will never trigger. Suitable for manual runs"
+    label:
+        - key: "type"
+          value: "default"
+limits:
+    depth: 10
+    maxDurationS: 86400
+    maxBytes: 1073741824
+crawlConfigSelector:
+    label:
+    - key: "type"
+      value: "default"

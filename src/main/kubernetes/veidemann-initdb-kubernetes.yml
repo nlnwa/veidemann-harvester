@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: initdb
-        image: norsknettarkiv/broprox-db-initializer:1.0.0-SNAPSHOT
+        image: norsknettarkiv/veidemann-db-initializer:1.0.0-SNAPSHOT
         env:
         - name: DB_HOST
           value: "rethink.db"

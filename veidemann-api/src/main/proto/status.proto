@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package veidemann.api;
+option go_package = "veidemann_api";
+option java_package = "no.nb.nna.veidemann.api";
+option java_outer_classname = "StatusProto";
+
+import "messages.proto";
+import "google/protobuf/timestamp.proto";
+
+// Service for crawler status.
+service Status {
+    rpc GetRunningExecutions (ExecutionsRequest) returns (stream ExecutionsListReply) {}
+}
+
+message ExecutionsRequest {
+    int32 page_size = 14;
+    int32 page = 15;
+}
+
+message ExecutionsListReply {
+    repeated StatusDetail value = 1;
+    int64 count = 2;
+    int32 page_size = 14;
+    int32 page = 15;
+}
+
+message StatusDetail {
+    string id = 1;
+    CrawlExecutionStatus.State state = 2;
+    string jobId = 3;
+    string seed = 4;
+    google.protobuf.Timestamp start_time = 5;
+    google.protobuf.Timestamp end_time = 6;
+    int64 documents_crawled = 7;
+    int64 bytes_crawled = 8;
+    int64 uris_crawled = 9;
+    int64 documents_failed = 10;
+    int64 documents_out_of_scope = 11;
+    int64 documents_retried = 12;
+    int64 documents_denied = 13;
+    int64 queue_size = 14;
+    string current_uri = 20;
+}

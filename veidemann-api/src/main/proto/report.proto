@@ -1,0 +1,74 @@
+syntax = "proto3";
+
+package veidemann.api;
+option go_package = "veidemann_api";
+option java_package = "no.nb.nna.veidemann.api";
+option java_outer_classname = "ReportProto";
+
+import "messages.proto";
+
+// Service for crawler reports.
+service Report {
+    rpc ListCrawlLogs (CrawlLogListRequest) returns (CrawlLogListReply) {}
+    rpc ListPageLogs (PageLogListRequest) returns (PageLogListReply) {}
+    rpc ListScreenshots (ScreenshotListRequest) returns (ScreenshotListReply) {}
+}
+
+message Filter {
+    enum Operator {
+        EQ = 0;
+        NE = 1;
+        MATCH = 2;
+        LT = 3;
+        GT = 4;
+    }
+    string field_name = 1;
+    Operator op = 2;
+    string value = 3;
+}
+
+message CrawlLogListRequest {
+    repeated string warc_id = 1;
+    string execution_id = 2;
+    repeated Filter filter = 3;
+    int32 page_size = 14;
+    int32 page = 15;
+}
+
+message CrawlLogListReply {
+    repeated CrawlLog value = 1;
+    int64 count = 2;
+    int32 page_size = 14;
+    int32 page = 15;
+}
+
+message PageLogListRequest {
+    repeated string warc_id = 1;
+    string execution_id = 2;
+    repeated Filter filter = 3;
+    int32 page_size = 14;
+    int32 page = 15;
+}
+
+message PageLogListReply {
+    repeated PageLog value = 1;
+    int64 count = 2;
+    int32 page_size = 14;
+    int32 page = 15;
+}
+
+message ScreenshotListRequest {
+    repeated string id = 1;
+    string execution_id = 2;
+    repeated Filter filter = 3;
+    bool img_data = 4;
+    int32 page_size = 14;
+    int32 page = 15;
+}
+
+message ScreenshotListReply {
+    repeated Screenshot value = 1;
+    int64 count = 2;
+    int32 page_size = 14;
+    int32 page = 15;
+}

@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package veidemann.api;
+option go_package = "veidemann_api";
+option java_package = "no.nb.nna.veidemann.api";
+option java_outer_classname = "DnsResolverProto";
+
+// Service for resolving, caching and logging dns requests.
+service DnsResolver {
+    rpc resolve (ResolveRequest) returns (ResolveReply) {}
+}
+
+message ResolveRequest {
+    string host = 1;
+    int32 port = 2;
+}
+
+message ResolveReply {
+    string host = 1;
+    int32 port = 2;
+    string textual_ip = 3;
+    bytes raw_ip = 4;
+}

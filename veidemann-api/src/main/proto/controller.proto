@@ -1,0 +1,211 @@
+syntax = "proto3";
+
+package veidemann.api;
+option go_package = "veidemann_api";
+option java_package = "no.nb.nna.veidemann.api";
+option java_outer_classname = "ControllerProto";
+
+import "config.proto";
+import "google/protobuf/empty.proto";
+
+// Service for communicating with controller.
+service Controller {
+    // List a set of entities
+    rpc ListCrawlEntities (ListRequest) returns (CrawlEntityListReply) {}
+    rpc SaveEntity (CrawlEntity) returns (CrawlEntity) {}
+    rpc DeleteEntity (CrawlEntity) returns (google.protobuf.Empty) {}
+
+    // List a set of seeds
+    rpc ListSeeds (SeedListRequest) returns (SeedListReply) {}
+    rpc SaveSeed (Seed) returns (Seed) {}
+    rpc DeleteSeed (Seed) returns (google.protobuf.Empty) {}
+
+    // List a set of crawl jobs
+    rpc ListCrawlJobs (CrawlJobListRequest) returns (CrawlJobListReply) {}
+    rpc SaveCrawlJob (CrawlJob) returns (CrawlJob) {}
+    rpc DeleteCrawlJob (CrawlJob) returns (google.protobuf.Empty) {}
+
+    // List a set of crawl configs
+    rpc ListCrawlConfigs (ListRequest) returns (CrawlConfigListReply) {}
+    rpc SaveCrawlConfig (CrawlConfig) returns (CrawlConfig) {}
+    rpc DeleteCrawlConfig (CrawlConfig) returns (google.protobuf.Empty) {}
+
+    // List a set of crawl schedule configs
+    rpc ListCrawlScheduleConfigs (ListRequest) returns (CrawlScheduleConfigListReply) {}
+    rpc SaveCrawlScheduleConfig (CrawlScheduleConfig) returns (CrawlScheduleConfig) {}
+    rpc DeleteCrawlScheduleConfig (CrawlScheduleConfig) returns (google.protobuf.Empty) {}
+
+    // List a set of politeness configs
+    rpc ListPolitenessConfigs (ListRequest) returns (PolitenessConfigListReply) {}
+    rpc SavePolitenessConfig (PolitenessConfig) returns (PolitenessConfig) {}
+    rpc DeletePolitenessConfig (PolitenessConfig) returns (google.protobuf.Empty) {}
+
+    // List a set of browser configs
+    rpc ListBrowserConfigs (ListRequest) returns (BrowserConfigListReply) {}
+    rpc SaveBrowserConfig (BrowserConfig) returns (BrowserConfig) {}
+    rpc DeleteBrowserConfig (BrowserConfig) returns (google.protobuf.Empty) {}
+
+    rpc ListBrowserScripts (BrowserScriptListRequest) returns (BrowserScriptListReply) {}
+    rpc SaveBrowserScript (BrowserScript) returns (BrowserScript) {}
+    rpc DeleteBrowserScript (BrowserScript) returns (google.protobuf.Empty) {}
+
+    rpc ListCrawlHostGroupConfigs (ListRequest) returns (CrawlHostGroupConfigListReply) {}
+    rpc SaveCrawlHostGroupConfig (CrawlHostGroupConfig) returns (CrawlHostGroupConfig) {}
+    rpc DeleteCrawlHostGroupConfig (CrawlHostGroupConfig) returns (google.protobuf.Empty) {}
+
+    rpc GetLogConfig (google.protobuf.Empty) returns (LogLevels) {}
+    rpc SaveLogConfig (LogLevels) returns (LogLevels) {}
+
+    rpc ListRoleMappings (RoleMappingsListRequest) returns (RoleMappingsListReply) {}
+    rpc SaveRoleMapping (RoleMapping) returns (RoleMapping) {}
+    rpc DeleteRoleMapping (RoleMapping) returns (google.protobuf.Empty) {}
+    rpc GetRolesForActiveUser (google.protobuf.Empty) returns (RoleList) {}
+
+    rpc RunCrawl (RunCrawlRequest) returns (RunCrawlReply) {}
+    rpc AbortCrawl (AbortCrawlRequest) returns (google.protobuf.Empty) {}
+}
+
+// Specification of wich entities to get.
+message ListRequest {
+    oneof qry {
+        string id = 1;
+        string name = 2;
+        Selector selector = 3;
+    }
+    int32 page_size = 14;
+    int32 page = 15;
+}
+
+// A list of entities
+message CrawlEntityListReply {
+    repeated CrawlEntity value = 1;
+    int64 count = 2;
+    int32 page_size = 14;
+    int32 page = 15;
+}
+
+message SeedListRequest {
+    oneof qry {
+        string id = 1;
+        string name = 2;
+        string crawl_job_id = 3;
+        Selector selector = 4;
+        string entity_id = 5;
+    }
+    int32 page_size = 14;
+    int32 page = 15;
+}
+
+message SeedListReply {
+    repeated Seed value = 1;
+    int64 count = 2;
+    int32 page_size = 14;
+    int32 page = 15;
+}
+
+message CrawlJobListRequest {
+    oneof qry {
+        string id = 1;
+        string name = 2;
+        Selector selector = 3;
+    }
+    // Expand dependencies (i.e. include the complete object graph)
+    bool expand = 13;
+    int32 page_size = 14;
+    int32 page = 15;
+}
+
+message CrawlJobListReply {
+    repeated CrawlJob value = 1;
+    int64 count = 2;
+    int32 page_size = 14;
+    int32 page = 15;
+}
+
+message CrawlConfigListReply {
+    repeated CrawlConfig value = 1;
+    int64 count = 2;
+    int32 page_size = 14;
+    int32 page = 15;
+}
+
+message CrawlScheduleConfigListReply {
+    repeated CrawlScheduleConfig value = 1;
+    int64 count = 2;
+    int32 page_size = 14;
+    int32 page = 15;
+}
+
+message PolitenessConfigListReply {
+    repeated PolitenessConfig value = 1;
+    int64 count = 2;
+    int32 page_size = 14;
+    int32 page = 15;
+}
+
+message BrowserConfigListReply {
+    repeated BrowserConfig value = 1;
+    int64 count = 2;
+    int32 page_size = 14;
+    int32 page = 15;
+}
+
+// Specification of wich browserscripts to get.
+message BrowserScriptListRequest {
+    oneof qry {
+        string id = 1;
+        string name = 2;
+        Selector selector = 4;
+    }
+    int32 page_size = 14;
+    int32 page = 15;
+}
+
+// A list of browserscripts
+message BrowserScriptListReply {
+    repeated BrowserScript value = 1;
+    int64 count = 2;
+    int32 page_size = 14;
+    int32 page = 15;
+}
+
+// A list of CrawlHostGroupConfigs
+message CrawlHostGroupConfigListReply {
+    repeated CrawlHostGroupConfig value = 1;
+    int64 count = 2;
+    int32 page_size = 14;
+    int32 page = 15;
+}
+
+// Cick of a crawl job immediately
+message RunCrawlRequest {
+    string job_id = 5;
+    // If seed id is submitted, only this seed will be harvested.
+    // If empty, all seeds configured with the submitted job id will be harvested.
+    string seed_id = 6;
+}
+
+message RunCrawlReply {
+    repeated string seed_execution_id = 1;
+}
+
+message AbortCrawlRequest {
+    string execution_id = 1;
+}
+
+message RoleList {
+    repeated Role role = 1;
+}
+
+message RoleMappingsListRequest {
+    string id = 1;
+    int32 page_size = 14;
+    int32 page = 15;
+}
+
+message RoleMappingsListReply {
+    repeated RoleMapping value = 1;
+    int64 count = 2;
+    int32 page_size = 14;
+    int32 page = 15;
+}

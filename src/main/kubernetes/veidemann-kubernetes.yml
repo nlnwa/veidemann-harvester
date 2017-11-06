@@ -18,7 +18,7 @@ data:
             </Console>
         </Appenders>
         <Loggers>
-            <Logger name="no.nb.nna.broprox" level="info" additivity="false">
+            <Logger name="no.nb.nna.veidemann" level="info" additivity="false">
                 <AppenderRef ref="Console"/>
             </Logger>
             <Root level="error">
@@ -89,7 +89,7 @@ spec:
             requests:
                 memory: "500Mi"
       - name: proxy
-        image: norsknettarkiv/broprox-harvester:1.0.0-SNAPSHOT
+        image: norsknettarkiv/veidemann-harvester:1.0.0-SNAPSHOT
         ports:
         - name: proxy
           containerPort: 8080
@@ -116,7 +116,7 @@ spec:
         - mountPath: /workdir
           name: workdir
         - name: log4j-config
-          mountPath: /broprox-harvester/config/log4j2.xml
+          mountPath: /veidemann-harvester/config/log4j2.xml
           subPath: log4j2.xml
         resources:
             requests:
@@ -185,7 +185,7 @@ spec:
     spec:
       containers:
       - name: contentwriter
-        image: norsknettarkiv/broprox-contentwriter:1.0.0-SNAPSHOT
+        image: norsknettarkiv/veidemann-contentwriter:1.0.0-SNAPSHOT
         ports:
         - containerPort: 8080
         env:
@@ -199,13 +199,13 @@ spec:
         - mountPath: /warcs
           name: warcs
         - name: log4j-config
-          mountPath: /broprox-contentwriter/config/log4j2.xml
+          mountPath: /veidemann-contentwriter/config/log4j2.xml
           subPath: log4j2.xml
         resources:
             requests:
                 memory: "1Gi"
       - name: contentexplorer
-        image: norsknettarkiv/broprox-contentexplorer:1.0.0-SNAPSHOT
+        image: norsknettarkiv/veidemann-contentexplorer:1.0.0-SNAPSHOT
         ports:
         - containerPort: 8081
         env:
@@ -219,7 +219,7 @@ spec:
         - mountPath: /warcs
           name: warcs
         - name: log4j-config
-          mountPath: /broprox-contentwriter/config/log4j2.xml
+          mountPath: /veidemann-contentwriter/config/log4j2.xml
           subPath: log4j2.xml
       - image: jaegertracing/jaeger-agent
         name: jaeger-agent
@@ -283,7 +283,7 @@ spec:
     spec:
       containers:
       - name: frontier
-        image: norsknettarkiv/broprox-frontier:1.0.0-SNAPSHOT
+        image: norsknettarkiv/veidemann-frontier:1.0.0-SNAPSHOT
         ports:
         - containerPort: 7700
         env:
@@ -307,7 +307,7 @@ spec:
         - mountPath: /workdir
           name: workdir
         - name: log4j-config
-          mountPath: /broprox-frontier/config/log4j2.xml
+          mountPath: /veidemann-frontier/config/log4j2.xml
           subPath: log4j2.xml
       - image: jaegertracing/jaeger-agent
         name: jaeger-agent
@@ -370,7 +370,7 @@ spec:
     spec:
       containers:
       - name: controller
-        image: norsknettarkiv/broprox-controller:1.0.0-SNAPSHOT
+        image: norsknettarkiv/veidemann-controller:1.0.0-SNAPSHOT
         ports:
         - containerPort: 50051
         env:
@@ -384,7 +384,7 @@ spec:
           value: "7700"
         volumeMounts:
         - name: log4j-config
-          mountPath: /broprox-controller/config/log4j2.xml
+          mountPath: /veidemann-controller/config/log4j2.xml
           subPath: log4j2.xml
       - image: jaegertracing/jaeger-agent
         name: jaeger-agent
@@ -444,7 +444,7 @@ spec:
     spec:
       containers:
       - name: robots
-        image: norsknettarkiv/broprox-robotrules-service:1.0.0-SNAPSHOT
+        image: norsknettarkiv/veidemann-robotrules-service:1.0.0-SNAPSHOT
         ports:
         - containerPort: 50052
         env:
@@ -458,7 +458,7 @@ spec:
           value: "8080"
         volumeMounts:
         - name: log4j-config
-          mountPath: /broprox-robotrules-service/config/log4j2.xml
+          mountPath: /veidemann-robotrules-service/config/log4j2.xml
           subPath: log4j2.xml
       - image: jaegertracing/jaeger-agent
         name: jaeger-agent
@@ -518,7 +518,7 @@ spec:
     spec:
       containers:
       - name: robots
-        image: norsknettarkiv/broprox-dns-service:1.0.0-SNAPSHOT
+        image: norsknettarkiv/veidemann-dnsresolver:1.0.0-SNAPSHOT
         ports:
         - containerPort: 50052
         env:
@@ -534,7 +534,7 @@ spec:
           value: "8.8.8.8"
         volumeMounts:
         - name: log4j-config
-          mountPath: /broprox-dns-service/config/log4j2.xml
+          mountPath: /veidemann-dnsresolver/config/log4j2.xml
           subPath: log4j2.xml
       - image: jaegertracing/jaeger-agent
         name: jaeger-agent

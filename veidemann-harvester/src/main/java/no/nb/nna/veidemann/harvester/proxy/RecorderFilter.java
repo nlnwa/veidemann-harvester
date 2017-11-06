@@ -104,107 +104,114 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
 
     @Override
     public HttpResponse proxyToServerRequest(HttpObject httpObject) {
-        if (httpObject instanceof HttpRequest) {
-            HttpRequest request = (HttpRequest) httpObject;
+        try {
+            if (httpObject instanceof HttpRequest) {
+                HttpRequest request = (HttpRequest) httpObject;
 
-            executionId = request.headers().get(EXECUTION_ID);
-            if (executionId == null) {
-                executionId = MANUAL_EXID;
-                LOG.info("Manual download of {}", uri);
-            }
-
-            MDC.put("eid", executionId);
-            MDC.put("uri", uri);
-
-            LOG.debug("Proxy got request");
-
-            initDiscoveryPathAndReferrer(request);
-
-            requestSpan = buildSpan("clientToProxyRequest", uriRequest);
-            try (ActiveSpan span = GlobalTracer.get().makeActive(requestSpan)) {
-
-                if (discoveryPath.endsWith("E")) {
-                    FullHttpResponse cachedResponse = cache.get(uri, executionId);
-                    if (cachedResponse != null) {
-                        LOG.debug("Found in cache");
-                        requestSpan.log("Loaded from cache");
-                        if (uriRequest != null) {
-                            uriRequest.setFromCache(true);
-                        }
-                        return cachedResponse;
-                    } else {
-                        responseCollector.setShouldCache(true);
-                    }
+                executionId = request.headers().get(EXECUTION_ID);
+                if (executionId == null) {
+                    executionId = MANUAL_EXID;
+                    LOG.info("Manual download of {}", uri);
                 }
 
-                // Fix headers before sending to final destination
-                request.headers().set("Accept-Encoding", "identity");
-                request.headers().remove(EXECUTION_ID);
+                MDC.put("eid", executionId);
+                MDC.put("uri", uri);
 
-                crawlLog.setFetchTimeStamp(ProtoUtils.getNowTs())
-                        .setReferrer(request.headers().get("referer", referrer))
-                        .setDiscoveryPath(discoveryPath)
-                        .setExecutionId(executionId);
+                LOG.debug("Proxy got request");
 
-                // Store request
-                requestCollector.setRequestHeaders(request, crawlLog);
-                requestCollector.writeRequest(crawlLog.build());
+                initDiscoveryPathAndReferrer(request);
 
-                LOG.debug("Proxy is sending request to final destination.");
+                requestSpan = buildSpan("clientToProxyRequest", uriRequest);
+                try (ActiveSpan span = GlobalTracer.get().makeActive(requestSpan)) {
+
+                    if (discoveryPath.endsWith("E")) {
+                        FullHttpResponse cachedResponse = cache.get(uri, executionId);
+                        if (cachedResponse != null) {
+                            LOG.debug("Found in cache");
+                            requestSpan.log("Loaded from cache");
+                            if (uriRequest != null) {
+                                uriRequest.setFromCache(true);
+                            }
+                            return cachedResponse;
+                        } else {
+                            responseCollector.setShouldCache(true);
+                        }
+                    }
+
+                    // Fix headers before sending to final destination
+                    request.headers().set("Accept-Encoding", "identity");
+                    request.headers().remove(EXECUTION_ID);
+
+                    crawlLog.setFetchTimeStamp(ProtoUtils.getNowTs())
+                            .setReferrer(request.headers().get("referer", referrer))
+                            .setDiscoveryPath(discoveryPath)
+                            .setExecutionId(executionId);
+
+                    // Store request
+                    requestCollector.setRequestHeaders(request, crawlLog);
+                    requestCollector.writeRequest(crawlLog.build());
+
+                    LOG.debug("Proxy is sending request to final destination.");
+                }
+                return null;
             }
-            return null;
+        } catch (Throwable t) {
+            LOG.error("Error handling request", t);
         }
         return null;
     }
 
     @Override
     public HttpObject serverToProxyResponse(HttpObject httpObject) {
+        try {
+            responseSpan = buildSpan("serverToProxyResponse", uriRequest);
+            GlobalTracer.get().makeActive(requestSpan);
 
-        responseSpan = buildSpan("serverToProxyResponse", uriRequest);
-        GlobalTracer.get().makeActive(requestSpan);
+            MDC.put("eid", executionId);
+            MDC.put("uri", uri);
 
-        MDC.put("eid", executionId);
-        MDC.put("uri", uri);
+            boolean handled = false;
 
-        boolean handled = false;
+            if (httpObject instanceof HttpResponse) {
+                LOG.debug("Got http response");
 
-        if (httpObject instanceof HttpResponse) {
-            LOG.debug("Got http response");
+                HttpResponse res = (HttpResponse) httpObject;
+                responseCollector.setResponseHeaders(res, crawlLog);
 
-            HttpResponse res = (HttpResponse) httpObject;
-            responseCollector.setResponseHeaders(res, crawlLog);
-
-            responseSpan.log("Got response headers");
-            handled = true;
-        }
-
-        if (httpObject instanceof HttpContent) {
-            LOG.debug("Got http content");
-
-            HttpContent res = (HttpContent) httpObject;
-            responseSpan.log("Got http content. Size: " + res.content().readableBytes());
-            responseCollector.addPayload(res.content());
-
-            handled = true;
-        }
-
-        if (ProxyUtils.isLastChunk(httpObject)) {
-            responseCollector.writeCache(cache, uri, executionId);
-
-            String warcId = responseCollector.writeResponse(crawlLog.build()).getWarcId();
-
-            responseSpan.log("Last chunk");
-            if (uriRequest != null) {
-                uriRequest.setSize(responseCollector.getSize());
-                responseSpan.finish();
-                finishSpan(uriRequest);
-                uriRequest.setWarcId(warcId);
+                responseSpan.log("Got response headers");
+                handled = true;
             }
-        }
 
-        if (!handled) {
-            // If we get here, handling for the response type should be added
-            LOG.error("Got unknown response type '{}', this is a bug", httpObject.getClass());
+            if (httpObject instanceof HttpContent) {
+                LOG.debug("Got http content");
+
+                HttpContent res = (HttpContent) httpObject;
+                responseSpan.log("Got http content. Size: " + res.content().readableBytes());
+                responseCollector.addPayload(res.content());
+
+                handled = true;
+            }
+
+            if (ProxyUtils.isLastChunk(httpObject)) {
+                responseCollector.writeCache(cache, uri, executionId);
+
+                String warcId = responseCollector.writeResponse(crawlLog.build()).getWarcId();
+
+                responseSpan.log("Last chunk");
+                if (uriRequest != null) {
+                    uriRequest.setSize(responseCollector.getSize());
+                    responseSpan.finish();
+                    finishSpan(uriRequest);
+                    uriRequest.setWarcId(warcId);
+                }
+            }
+
+            if (!handled) {
+                // If we get here, handling for the response type should be added
+                LOG.error("Got unknown response type '{}', this is a bug", httpObject.getClass());
+            }
+        } catch (Throwable t) {
+            LOG.error("Error handling response", t);
         }
         return httpObject;
     }

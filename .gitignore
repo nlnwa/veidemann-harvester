@@ -12,7 +12,7 @@ target/
 **/nbproject/*
 /veidemannctl/bin/
 /veidemannctl/src/veidemann_api/
-/veidemannctl/src/bindata/
+/veidemannctl/src/veidemannctl/bindata/
 /veidemannctl/tmp/
 /veidemannctl/pkg/
 

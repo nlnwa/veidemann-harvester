@@ -109,13 +109,21 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
 //                System.out.println("<<<<<<");
                 LOG.debug("Extract outlinks");
 
-                List<BrowserScript> scripts = getScripts(config);
-                resultBuilder.addAllOutlinks(session.extractOutlinks(scripts));
-                resultBuilder.setBytesDownloaded(session.getUriRequests().getBytesDownloaded());
-                resultBuilder.setUriCount(session.getUriRequests().getUriDownloadedCount());
+                try {
+                    List<BrowserScript> scripts = getScripts(config);
+                    resultBuilder.addAllOutlinks(session.extractOutlinks(scripts));
+                    resultBuilder.setBytesDownloaded(session.getUriRequests().getBytesDownloaded());
+                    resultBuilder.setUriCount(session.getUriRequests().getUriDownloadedCount());
+                } catch (Throwable t) {
+                    LOG.error("Failed extracting outlinks", t);
+                }
 
                 session.scrollToTop();
 
+            } else {
+                LOG.info("Page is not renderable");
+            }
+            try {
                 PageLog.Builder pageLog = PageLog.newBuilder()
                         .setUri(queuedUri.getUri())
                         .setExecutionId(queuedUri.getExecutionId())
@@ -124,7 +132,11 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
                 session.getUriRequests().getPageLogResources().forEach(r -> pageLog.addResource(r));
                 resultBuilder.getOutlinksOrBuilderList().forEach(o -> pageLog.addOutlink(o.getUri()));
                 db.savePageLog(pageLog.build());
+            } catch (Throwable t) {
+                LOG.error("Failed writing pagelog", t);
             }
+        } catch (Throwable t) {
+            LOG.error("Failed loading page", t);
         } finally {
             session.close();
             sessionRegistry.remove(session);

@@ -31,6 +31,7 @@
                     <grammars>useragent.g4,robotstxt.g4</grammars>
                     <visitor>true</visitor>
                     <listener>true</listener>
+                    <outputDirectory>${project.build.directory}/generated-sources/antlr4/no/nb/nna/veidemann/robots</outputDirectory>
                 </configuration>
                 <executions>
                     <execution>

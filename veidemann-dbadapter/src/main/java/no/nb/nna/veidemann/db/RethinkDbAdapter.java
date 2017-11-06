@@ -482,7 +482,7 @@ public class RethinkDbAdapter implements DbAdapter {
                         .changes().optArg("include_initial", true).optArg("include_offsets", true).optArg("squash", 2)
                         .map(v -> v.g("new_val").merge(r.hashMap("newOffset", v.g("new_offset").default_((String) null))
                                 .with("oldOffset", v.g("old_offset").default_((String) null))))
-                        .eqJoin("seedId", r.table("seeds"))
+                        .eqJoin("seedId", r.table(TABLES.SEEDS.name))
                         .map(v -> {
                             return v.g("left").merge(r.hashMap("seed", v.g("right").g("meta").g("name"))
                                     .with("queueSize",

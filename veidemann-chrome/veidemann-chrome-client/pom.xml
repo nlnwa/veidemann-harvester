@@ -54,7 +54,7 @@
                     <mainClass>no.nb.nna.veidemann.chrome.client.codegen.Codegen</mainClass>
                     <includePluginDependencies>true</includePluginDependencies>
                     <arguments>
-                        <argument>${project.build.directory}/generated-sources/</argument>
+                        <argument>${project.build.directory}/generated-sources/cdp</argument>
                     </arguments>
                     <executableDependency>
                         <groupId>${project.groupId}</groupId>
@@ -81,7 +81,7 @@
                         </goals>
                         <configuration>
                             <sources>
-                                <source>${project.build.directory}/generated-sources/</source>
+                                <source>${project.build.directory}/generated-sources/cdp</source>
                             </sources>
                         </configuration>
                     </execution>

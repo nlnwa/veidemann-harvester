@@ -136,7 +136,7 @@ public class ContentExplorerResource {
         StringBuilder html = new StringBuilder(htmlHeader)
                 .append("<h3>Table of contents for ")
                 .append(fileName)
-                .append("</h3><table><tr><th>ID</th><th>URI</th><th>Type</th><th>WARC Headers</th><th>HTTP Headers</th></tr>");
+                .append("</h3><table><tr><th>ID</th><th>Type</th><th>WARC Headers</th><th>HTTP Headers</th><th>URI</th></tr>");
 
         String path = "/" + (uriInfo.getPath().replaceFirst("/toc/?", "/"));
         try (Stream<WarcRecord> s = getRecords(fileName);) {
@@ -152,8 +152,6 @@ public class ContentExplorerResource {
                         .append("'>")
                         .append(r.header.warcRecordIdStr.replace("<", "&lt;"))
                         .append("</a></td><td>")
-                        .append(r.header.warcTargetUriStr)
-                        .append("</td><td>")
                         .append(r.header.warcTypeStr)
                         .append("</td><td><a href='")
                         .append(recordUrl).append("/warcheader")
@@ -169,7 +167,12 @@ public class ContentExplorerResource {
                             .append("'>")
                             .append("http header")
                             .append("</a></td>");
+                } else {
+                    html.append("</td>");
                 }
+                html.append("<td>")
+                        .append(r.header.warcTargetUriStr)
+                        .append("</td>");
                 html.append("</tr>");
             });
         } catch (Exception ex) {
@@ -214,7 +217,7 @@ public class ContentExplorerResource {
         try (Stream<WarcRecord> s = getRecords(fileName);) {
             s.filter(r -> id.equals(r.header.warcRecordIdStr))
                     .forEach(r -> {
-                        html.append(r.getHttpHeader().toString());
+                        html.append("<pre>").append(new String(r.getHttpHeader().getHeader())).append("</pre>");
                     });
         } catch (Exception ex) {
             LOG.error(ex.toString(), ex);

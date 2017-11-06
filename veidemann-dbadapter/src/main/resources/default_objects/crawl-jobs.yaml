@@ -8,9 +8,9 @@ meta:
 schedule:
     id: "5604f0cc-315d-4091-8d6e-1b17a7eb990b"
     meta:
-        name: "Every minute"
-        description: "A schedule which triggers every minute"
-    cronExpression: "* * * * *"
+        name: "Every hour"
+        description: "A schedule which triggers once an hour"
+    cronExpression: "0 * * * *"
 limits:
     maxDurationS: 60
 crawlConfig:
@@ -31,7 +31,7 @@ crawlConfig:
         windowWidth: 900
         windowHeight: 900
         pageLoadTimeoutMs: 180000
-        sleepAfterPageLoadMs: 500
+        sleepAfterPageLoadMs: 2000
         scriptSelector:
             label:
             - key: "scope"
@@ -44,7 +44,7 @@ crawlConfig:
             description: "Default politeness configuration"
         robotsPolicy: OBEY_ROBOTS
         minimumRobotsValidityDurationS: 86400
-        minTimeBetweenPageLoadMs: 1000
+        minTimeBetweenPageLoadMs: 5000
         maxTimeBetweenPageLoadMs: 30000
         delayFactor: 1
         maxRetries: 3

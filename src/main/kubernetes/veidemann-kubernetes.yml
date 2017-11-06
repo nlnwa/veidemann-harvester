@@ -121,7 +121,7 @@ spec:
         resources:
             requests:
                 memory: "500Mi"
-      - image: jaegertracing/jaeger-agent
+      - image: jaegertracing/jaeger-agent:0.9.0
         name: jaeger-agent
         ports:
         - containerPort: 5775
@@ -221,7 +221,7 @@ spec:
         - name: log4j-config
           mountPath: /veidemann-contentwriter/config/log4j2.xml
           subPath: log4j2.xml
-      - image: jaegertracing/jaeger-agent
+      - image: jaegertracing/jaeger-agent:0.9.0
         name: jaeger-agent
         ports:
         - containerPort: 5775
@@ -309,7 +309,7 @@ spec:
         - name: log4j-config
           mountPath: /veidemann-frontier/config/log4j2.xml
           subPath: log4j2.xml
-      - image: jaegertracing/jaeger-agent
+      - image: jaegertracing/jaeger-agent:0.9.0
         name: jaeger-agent
         ports:
         - containerPort: 5775
@@ -386,7 +386,7 @@ spec:
         - name: log4j-config
           mountPath: /veidemann-controller/config/log4j2.xml
           subPath: log4j2.xml
-      - image: jaegertracing/jaeger-agent
+      - image: jaegertracing/jaeger-agent:0.9.0
         name: jaeger-agent
         ports:
         - containerPort: 5775
@@ -444,7 +444,7 @@ spec:
     spec:
       containers:
       - name: robots
-        image: norsknettarkiv/veidemann-robotrules-service:1.0.0-SNAPSHOT
+        image: norsknettarkiv/veidemann-robotsevaluator-service:1.0.0-SNAPSHOT
         ports:
         - containerPort: 50052
         env:
@@ -458,9 +458,9 @@ spec:
           value: "8080"
         volumeMounts:
         - name: log4j-config
-          mountPath: /veidemann-robotrules-service/config/log4j2.xml
+          mountPath: /veidemann-robotsevaluator-service/config/log4j2.xml
           subPath: log4j2.xml
-      - image: jaegertracing/jaeger-agent
+      - image: jaegertracing/jaeger-agent:0.9.0
         name: jaeger-agent
         ports:
         - containerPort: 5775
@@ -536,7 +536,7 @@ spec:
         - name: log4j-config
           mountPath: /veidemann-dnsresolver/config/log4j2.xml
           subPath: log4j2.xml
-      - image: jaegertracing/jaeger-agent
+      - image: jaegertracing/jaeger-agent:0.9.0
         name: jaeger-agent
         ports:
         - containerPort: 5775

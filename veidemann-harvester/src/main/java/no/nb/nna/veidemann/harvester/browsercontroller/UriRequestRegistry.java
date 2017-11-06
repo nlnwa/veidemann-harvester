@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Stream;
 
 import io.opentracing.BaseSpan;
@@ -42,17 +43,17 @@ public class UriRequestRegistry implements AutoCloseable {
 
     private final Map<String, UriRequest> requestsById = new HashMap<>();
 
-    private final Map<String, CompletableFuture<UriRequest>> requestsByUrl = new ConcurrentHashMap<>();
+    private final Map<String, CompletableFuture<UriRequest>> requestsByUrl = new HashMap<>();
 
     private UriRequest rootRequest;
 
-    private BaseSpan span;
+    private final BaseSpan span;
 
-    public UriRequestRegistry(BaseSpan span) {
+    public UriRequestRegistry(final BaseSpan span) {
         this.span = span;
     }
 
-    private UriRequest getById(String requestId) {
+    private synchronized UriRequest getById(String requestId) {
         return requestsById.get(requestId);
     }
 
@@ -81,19 +82,19 @@ public class UriRequestRegistry implements AutoCloseable {
         });
     }
 
-    public UriRequest getRootRequest() {
+    public synchronized UriRequest getRootRequest() {
         return rootRequest;
     }
 
-    public long getBytesDownloaded() {
+    public synchronized long getBytesDownloaded() {
         return allRequests.stream().mapToLong(r -> r.getSize()).sum();
     }
 
-    public int getUriDownloadedCount() {
+    public synchronized int getUriDownloadedCount() {
         return (int) allRequests.stream().filter(r -> !r.isFromCache()).count();
     }
 
-    public Stream<Resource> getPageLogResources() {
+    public synchronized Stream<Resource> getPageLogResources() {
         return allRequests.stream().map(r -> Resource.newBuilder()
                 .setUri(r.getUrl())
                 .setFromCache(r.isFromCache())
@@ -106,7 +107,7 @@ public class UriRequestRegistry implements AutoCloseable {
                 .build());
     }
 
-    void onRequestWillBeSent(NetworkDomain.RequestWillBeSent request, String rootDiscoveryPath) {
+    synchronized void onRequestWillBeSent(NetworkDomain.RequestWillBeSent request, String rootDiscoveryPath) {
         UriRequest uriRequest = getById(request.requestId);
 
         if (uriRequest != null) {
@@ -135,7 +136,7 @@ public class UriRequestRegistry implements AutoCloseable {
         add(uriRequest);
     }
 
-    void onLoadingFailed(NetworkDomain.LoadingFailed f) {
+    synchronized void onLoadingFailed(NetworkDomain.LoadingFailed f) {
         // net::ERR_EMPTY_RESPONSE
         // net::ERR_CONNECTION_TIMED_OUT
         // net::ERR_CONTENT_LENGTH_MISMATCH
@@ -153,7 +154,7 @@ public class UriRequestRegistry implements AutoCloseable {
         request.getSpan().finish();
     }
 
-    void onResponseReceived(NetworkDomain.ResponseReceived r) {
+    synchronized void onResponseReceived(NetworkDomain.ResponseReceived r) {
         UriRequest request = getById(r.requestId);
         if (request == null) {
             LOG.error(
@@ -165,7 +166,7 @@ public class UriRequestRegistry implements AutoCloseable {
     }
 
     @Override
-    public void close() {
+    public synchronized void close() {
         // Ensure that potensially unfinished spans are finshed
         allRequests.forEach(r -> r.getSpan().finish());
     }

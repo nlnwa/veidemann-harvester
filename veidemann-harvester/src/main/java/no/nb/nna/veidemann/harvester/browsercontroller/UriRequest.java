@@ -168,7 +168,7 @@ public class UriRequest {
 
         this.response = response;
         if (!request.request.url.equals(response.response.url)) {
-            LOG.warn("URL {} - {}", request.request.url, response.response.url);
+            LOG.warn("URL for request and response mismatched {} - {}", request.request.url, response.response.url);
         }
 
         resourceType = ResourceType.forName(response.type);

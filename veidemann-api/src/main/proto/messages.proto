@@ -85,11 +85,13 @@ message PageLog {
         int32 status_code = 6;
         string discovery_path = 7;
         string warc_id = 8;
+        string referrer = 9;
     }
 
     string warc_id = 1;
     string uri = 2;
     string execution_id = 3;
+    string referrer = 4;
     repeated Resource resource = 10;
     repeated string outlink = 11;
 }

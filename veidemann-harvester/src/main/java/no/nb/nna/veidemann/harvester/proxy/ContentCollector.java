@@ -25,6 +25,7 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import no.nb.nna.veidemann.commons.AlreadyCrawledCache;
 import no.nb.nna.veidemann.commons.client.ContentWriterClient;
+import no.nb.nna.veidemann.commons.client.ContentWriterClient.ContentWriterSession;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.util.Sha1Digest;
 import no.nb.nna.veidemann.db.ProtoUtils;
@@ -55,7 +56,9 @@ public class ContentCollector {
 
     private final DbAdapter db;
 
-    private final ContentWriterClient.ContentWriterSession contentWriterClient;
+    private final ContentWriterClient contentWriterClient;
+
+    private ContentWriterClient.ContentWriterSession contentWriterSession;
 
     private long size;
 
@@ -73,7 +76,7 @@ public class ContentCollector {
 
     public ContentCollector(final DbAdapter db, final ContentWriterClient contentWriterClient) {
         this.db = db;
-        this.contentWriterClient = contentWriterClient.createSession();
+        this.contentWriterClient = contentWriterClient;
         this.digest = new Sha1Digest();
     }
 
@@ -93,7 +96,7 @@ public class ContentCollector {
 
         ByteString data = ByteString.copyFromUtf8(headers.toString());
         digest.update(data);
-        contentWriterClient.sendHeader(data);
+        getContentWriterSession().sendHeader(data);
         shouldAddSeparator = true;
         size = data.size();
     }
@@ -116,7 +119,7 @@ public class ContentCollector {
 
         ByteString data = ByteString.copyFromUtf8(headers.toString());
         digest.update(data);
-        contentWriterClient.sendHeader(data);
+        getContentWriterSession().sendHeader(data);
         shouldAddSeparator = true;
         size = data.size();
 
@@ -144,7 +147,7 @@ public class ContentCollector {
         }
         ByteString data = ByteString.copyFrom(payload.nioBuffer());
         digest.update(data);
-        contentWriterClient.sendPayload(data);
+        getContentWriterSession().sendPayload(data);
         size += data.size();
 
         if (shouldCache) {
@@ -154,6 +157,13 @@ public class ContentCollector {
                 cacheValue = cacheValue.concat(data);
             }
         }
+    }
+
+    private synchronized ContentWriterSession getContentWriterSession() {
+        if (contentWriterSession == null) {
+            contentWriterSession = contentWriterClient.createSession();
+        }
+        return contentWriterSession;
     }
 
     public String getDigest() {
@@ -199,11 +209,12 @@ public class ContentCollector {
         if (LOG.isDebugEnabled()) {
             LOG.debug("Writing request {}", logEntryBuilder.getRequestedUri());
         }
-        contentWriterClient.sendCrawlLog(logEntry);
+        getContentWriterSession().sendCrawlLog(logEntry);
         try {
-            contentWriterClient.finish();
+            getContentWriterSession().finish();
             return logEntry;
         } catch (InterruptedException | StatusException ex) {
+            LOG.error("Failed finishing write request", ex);
             // TODO: Do something reasonable with the exception
             throw new RuntimeException(ex);
         }
@@ -219,14 +230,14 @@ public class ContentCollector {
         if (LOG.isDebugEnabled()) {
             LOG.debug("Writing response {}", logEntryBuilder.getRequestedUri());
         }
-        contentWriterClient.sendCrawlLog(logEntry);
+        getContentWriterSession().sendCrawlLog(logEntry);
         try {
-            contentWriterClient.finish();
+            getContentWriterSession().finish();
             return logEntry;
         } catch (InterruptedException | StatusException ex) {
+            LOG.error("Failed finishing write response", ex);
             // TODO: Do something reasonable with the exception
             throw new RuntimeException(ex);
         }
     }
-
 }

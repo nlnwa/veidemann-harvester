@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>no.nb.nna</groupId>
@@ -101,6 +102,157 @@
                     </archive>
                 </configuration>
             </plugin>
+
+            <plugin>
+                <groupId>io.fabric8</groupId>
+                <artifactId>docker-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>docker-build</id>
+                    </execution>
+                </executions>
+            <configuration>
+                <autoCreateCustomNetworks>true</autoCreateCustomNetworks>
+                <images>
+                    <image>
+                        <name>norsknettarkiv/${project.artifactId}</name>
+                        <alias>harvester</alias>
+                        <run><skip>true</skip></run>
+                        <build>
+                            <from>java:8</from>
+                            <maintainer>National Library of Norway</maintainer>
+                            <tags>
+                                <tag>latest</tag>
+                                <tag>${project.version}</tag>
+                            </tags>
+                            <runCmds>
+                                <run>mkdir /workdir</run>
+                            </runCmds>
+                            <volumes>
+                                <volume>/workdir</volume>
+                            </volumes>
+                            <env>
+                                <WORK_DIR>/workdir</WORK_DIR>
+                            </env>
+                            <ports>
+                                <port>8080</port>
+                                <port>9090</port>
+                            </ports>
+                            <cmd>
+                                <exec>
+                                    <arg>/${project.artifactId}/bin/${project.artifactId}</arg>
+                                </exec>
+                            </cmd>
+                            <assembly>
+                                <targetDir>/${project.artifactId}</targetDir>
+
+                                <inline>
+                                    <includeBaseDirectory>true</includeBaseDirectory>
+                                    <fileSets>
+                                        <fileSet>
+                                            <directory>target/appassembler/bin</directory>
+                                            <outputDirectory>bin</outputDirectory>
+                                            <includes>
+                                                <include>${project.artifactId}</include>
+                                            </includes>
+                                            <fileMode>0755</fileMode>
+                                        </fileSet>
+                                        <fileSet>
+                                            <directory>target/appassembler/bin</directory>
+                                            <outputDirectory>bin</outputDirectory>
+                                            <excludes>
+                                                <exclude>${project.artifactId}</exclude>
+                                            </excludes>
+                                            <fileMode>0644</fileMode>
+                                        </fileSet>
+                                        <fileSet>
+                                            <directory>target/appassembler</directory>
+                                            <outputDirectory>/</outputDirectory>
+                                            <excludes>
+                                                <exclude>bin</exclude>
+                                            </excludes>
+                                        </fileSet>
+                                    </fileSets>
+                                    <files>
+                                        <file>
+                                            <source>../LICENSE</source>
+                                            <outputDirectory></outputDirectory>
+                                            <fileMode>0644</fileMode>
+                                        </file>
+                                    </files>
+                                </inline>
+                            </assembly>
+                        </build>
+                    </image>
+                    <image>
+                        <name>norsknettarkiv/testsites</name>
+                        <alias>testsites</alias>
+                        <run>
+                            <network>
+                                <mode>custom</mode>
+                                <name>harvester-test-net</name>
+                                <alias>testsites</alias>
+                            </network>
+                            <ports>
+                                <port>+test.http.host:test.http.port:80</port>
+                                <port>+test.dns.host:test.dns.port:53</port>
+                            </ports>
+                            <log>
+                                <enabled>false</enabled>
+                            </log>
+                            <wait>
+                                <tcp>
+                                    <mode>mapped</mode>
+                                    <ports>
+                                        <port>80</port>
+                                        <port>53</port>
+                                    </ports>
+                                </tcp>
+                                <time>20000</time>
+                            </wait>
+                        </run>
+                    </image>
+                    <image>
+                        <name>norsknettarkiv/chrome-headless</name>
+                        <alias>browser</alias>
+                        <run>
+                            <user>${uid}</user>
+                            <network>
+                                <mode>custom</mode>
+                                <name>harvester-test-net</name>
+                                <alias>browser</alias>
+                            </network>
+                            <ports>
+                                <port>+browser.host:browser.port:9222</port>
+                            </ports>
+                            <env>
+                                <CHROME_OPTS>--ignore-certificate-errors --disable-web-security --allow-running-insecure-content --proxy-server=${proxy.ip}:${proxy.port}</CHROME_OPTS>
+                            </env>
+                            <volumes>
+                                <bind>
+                                    <volume>${project.build.directory}/it-workdir:/data</volume>
+                                </bind>
+                            </volumes>
+                            <log>
+                                <enabled>true</enabled>
+                            </log>
+                            <wait>
+                                <tcp>
+                                    <mode>mapped</mode>
+                                    <ports>
+                                        <port>9222</port>
+                                    </ports>
+                                </tcp>
+                                <time>20000</time>
+                            </wait>
+                            <dependsOn>
+                                <container>testsites</container>
+                            </dependsOn>
+                        </run>
+                    </image>
+                </images>
+            </configuration>
+            </plugin>
         </plugins>
     </build>
 
@@ -152,79 +304,6 @@
                                 </goals>
                             </execution>
                         </executions>
-                        <configuration>
-                            <images>
-                                <image>
-                                    <name>norsknettarkiv/${project.artifactId}</name>
-                                    <alias>harvester</alias>
-                                    <build>
-                                        <from>java:8</from>
-                                        <maintainer>National Library of Norway</maintainer>
-                                        <tags>
-                                            <tag>latest</tag>
-                                            <tag>${project.version}</tag>
-                                        </tags>
-                                        <runCmds>
-                                            <run>mkdir /workdir</run>
-                                        </runCmds>
-                                        <volumes>
-                                            <volume>/workdir</volume>
-                                        </volumes>
-                                        <env>
-                                            <WORK_DIR>/workdir</WORK_DIR>
-                                        </env>
-                                        <ports>
-                                            <port>8080</port>
-                                            <port>9090</port>
-                                        </ports>
-                                        <cmd>
-                                            <exec>
-                                                <arg>/${project.artifactId}/bin/${project.artifactId}</arg>
-                                            </exec>
-                                        </cmd>
-                                        <assembly>
-                                            <targetDir>/${project.artifactId}</targetDir>
-
-                                            <inline>
-                                                <includeBaseDirectory>true</includeBaseDirectory>
-                                                <fileSets>
-                                                    <fileSet>
-                                                        <directory>target/appassembler/bin</directory>
-                                                        <outputDirectory>bin</outputDirectory>
-                                                        <includes>
-                                                            <include>${project.artifactId}</include>
-                                                        </includes>
-                                                        <fileMode>0755</fileMode>
-                                                    </fileSet>
-                                                    <fileSet>
-                                                        <directory>target/appassembler/bin</directory>
-                                                        <outputDirectory>bin</outputDirectory>
-                                                        <excludes>
-                                                            <exclude>${project.artifactId}</exclude>
-                                                        </excludes>
-                                                        <fileMode>0644</fileMode>
-                                                    </fileSet>
-                                                    <fileSet>
-                                                        <directory>target/appassembler</directory>
-                                                        <outputDirectory>/</outputDirectory>
-                                                        <excludes>
-                                                            <exclude>bin</exclude>
-                                                        </excludes>
-                                                    </fileSet>
-                                                </fileSets>
-                                                <files>
-                                                    <file>
-                                                        <source>../LICENSE</source>
-                                                        <outputDirectory></outputDirectory>
-                                                        <fileMode>0644</fileMode>
-                                                    </file>
-                                                </files>
-                                            </inline>
-                                        </assembly>
-                                    </build>
-                                </image>
-                            </images>
-                        </configuration>
                     </plugin>
                 </plugins>
             </build>
@@ -299,46 +378,6 @@
                                 <goals>
                                     <goal>start</goal>
                                 </goals>
-                                <configuration>
-                                    <autoCreateCustomNetworks>true</autoCreateCustomNetworks>
-                                    <images>
-                                        <image>
-                                            <name>norsknettarkiv/chrome-headless</name>
-                                            <alias>browser</alias>
-                                            <run>
-                                                <user>${uid}</user>
-                                                <network>
-                                                    <mode>custom</mode>
-                                                    <name>harvester-test-net</name>
-                                                    <alias>browser</alias>
-                                                </network>
-                                                <ports>
-                                                    <port>+browser.host:browser.port:9222</port>
-                                                </ports>
-                                                <env>
-                                                    <CHROME_OPTS>--ignore-certificate-errors --disable-web-security --allow-running-insecure-content --proxy-server=${proxy.ip}:${proxy.port}</CHROME_OPTS>
-                                                </env>
-                                                <volumes>
-                                                    <bind>
-                                                        <volume>${project.build.directory}/it-workdir:/data</volume>
-                                                    </bind>
-                                                </volumes>
-                                                <log>
-                                                    <enabled>true</enabled>
-                                                </log>
-                                                <wait>
-                                                    <tcp>
-                                                        <mode>mapped</mode>
-                                                        <ports>
-                                                            <port>9222</port>
-                                                        </ports>
-                                                    </tcp>
-                                                    <time>20000</time>
-                                                </wait>
-                                            </run>
-                                        </image>
-                                    </images>
-                                </configuration>
                             </execution>
                             <execution>
                                 <id>remove-tests</id>
@@ -368,6 +407,10 @@
                                 <browser.host>${browser.host}</browser.host>
                                 <browser.port>${browser.port}</browser.port>
                                 <proxy.port>${proxy.port}</proxy.port>
+                                <testsites.http.host>${test.http.host}</testsites.http.host>
+                                <testsites.http.port>${test.http.port}</testsites.http.port>
+                                <testsites.dns.host>${test.dns.host}</testsites.dns.host>
+                                <testsites.dns.port>${test.dns.port}</testsites.dns.port>
                             </systemPropertyVariables>
                         </configuration>
                     </plugin>

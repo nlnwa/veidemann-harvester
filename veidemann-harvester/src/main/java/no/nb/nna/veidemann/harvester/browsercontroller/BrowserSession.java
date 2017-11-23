@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +34,9 @@ import com.google.protobuf.ByteString;
 import io.opentracing.BaseSpan;
 import no.nb.nna.veidemann.chrome.client.ChromeDebugProtocol;
 import no.nb.nna.veidemann.chrome.client.DebuggerDomain;
+import no.nb.nna.veidemann.chrome.client.NetworkDomain;
+import no.nb.nna.veidemann.chrome.client.NetworkDomain.AuthChallengeResponse;
+import no.nb.nna.veidemann.chrome.client.NetworkDomain.RequestPattern;
 import no.nb.nna.veidemann.chrome.client.PageDomain;
 import no.nb.nna.veidemann.chrome.client.RuntimeDomain;
 import no.nb.nna.veidemann.chrome.client.Session;
@@ -66,15 +70,13 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
 
     final UriRequestRegistry uriRequests;
 
-    String discoveryPath;
-
-    String referrer;
+    MessagesProto.QueuedUri queuedUri;
 
     // TODO: Should be configurable
     boolean followRedirects = true;
 
     public BrowserSession(ChromeDebugProtocol chrome, ConfigProto.CrawlConfig config, String executionId, BaseSpan span) {
-        uriRequests = new UriRequestRegistry(span);
+        uriRequests = new UriRequestRegistry(executionId, span);
         this.executionId = Objects.requireNonNull(executionId);
         protocolTimeout = config.getBrowserConfig().getPageLoadTimeoutMs();
         sleepAfterPageLoad = config.getBrowserConfig().getSleepAfterPageloadMs();
@@ -104,19 +106,29 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
 
             CompletableFuture.allOf(
                     session.debugger.enable(),
+                    session.debugger.setBreakpointsActive(true),
+                    session.debugger.setAsyncCallStackDepth(32),
                     session.page.enable(),
                     session.runtime.enable(),
+                    session.security.enable(),
+                    session.security.setOverrideCertificateErrors(true),
                     session.network.enable(null, null),
                     session.network.setCacheDisabled(true),
                     setUserAgent,
-                    session.page.setControlNavigations(Boolean.TRUE)
+                    session.network.setRequestInterception(Collections.singletonList(new RequestPattern()))
             ).get(config.getBrowserConfig().getPageLoadTimeoutMs(), MILLISECONDS);
 
             // set up listeners
-            session.page.onNavigationRequested(nr -> this.onNavigationRequested(nr));
-            session.network.onRequestWillBeSent(r -> uriRequests.onRequestWillBeSent(r, discoveryPath));
+            session.network.onRequestIntercepted(nr -> this.onNavigationRequested(nr));
+            session.network.onRequestWillBeSent(r -> {
+                uriRequests.onRequestWillBeSent(r);
+            });
             session.network.onLoadingFailed(f -> uriRequests.onLoadingFailed(f));
             session.network.onResponseReceived(l -> uriRequests.onResponseReceived(l));
+            session.security.onCertificateError(se -> {
+                LOG.info("Certificate error: " + se);
+                session.security.handleCertificateError(se.eventId, "continue");
+            });
 
             LOG.debug("Browser session configured");
         } catch (IOException ex) {
@@ -134,10 +146,6 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
         return executionId;
     }
 
-    public String getReferrer() {
-        return referrer;
-    }
-
     public long getProtocolTimeout() {
         return protocolTimeout;
     }
@@ -150,10 +158,10 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
         // TODO: This should be part of configuration
         CompletableFuture.allOf(
                 session.debugger
-                        .setBreakpointByUrl(1, null, "https?://www.google-analytics.com/analytics.js", null, null)
+                        .setBreakpointByUrl(1, null, "https?://www.google-analytics.com/analytics.js", null, null, null)
                         .thenAccept(b -> breakpoints.put(b.breakpointId, b.locations)),
                 session.debugger
-                        .setBreakpointByUrl(1, null, "https?://www.google-analytics.com/ga.js", null, null)
+                        .setBreakpointByUrl(1, null, "https?://www.google-analytics.com/ga.js", null, null, null)
                         .thenAccept(b -> breakpoints.put(b.breakpointId, b.locations))
         ).get(protocolTimeout, MILLISECONDS);
 
@@ -170,8 +178,8 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
     public void setCookies(MessagesProto.QueuedUri queuedUri) throws TimeoutException, ExecutionException, InterruptedException {
         CompletableFuture.allOf(queuedUri.getCookiesList().stream()
                 .map(c -> session.network
-                .setCookie(queuedUri.getUri(), c.getName(), c.getValue(), c.getDomain(),
-                        c.getPath(), c.getSecure(), c.getHttpOnly(), c.getSameSite(), c.getExpires()))
+                        .setCookie(queuedUri.getUri(), c.getName(), c.getValue(), c.getDomain(),
+                                c.getPath(), c.getSecure(), c.getHttpOnly(), c.getSameSite(), c.getExpires()))
                 .collect(Collectors.toList()).toArray(new CompletableFuture[]{}))
                 .get(protocolTimeout, MILLISECONDS);
 
@@ -179,8 +187,7 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
     }
 
     public void loadPage(MessagesProto.QueuedUri queuedUri) {
-        discoveryPath = queuedUri.getDiscoveryPath();
-        referrer = queuedUri.getReferrer();
+        this.queuedUri = queuedUri;
 
         try {
             CompletableFuture<PageDomain.FrameStoppedLoading> loaded = session.page.onFrameStoppedLoading();
@@ -197,7 +204,7 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
 
             session.network.setExtraHTTPHeaders(ImmutableMap.of(EXECUTION_ID, queuedUri.getExecutionId()))
                     .get(protocolTimeout, MILLISECONDS);
-            session.page.navigate(queuedUri.getUri()).get(protocolTimeout, MILLISECONDS);
+            session.page.navigate(queuedUri.getUri(), queuedUri.getReferrer(), "link").get(protocolTimeout, MILLISECONDS);
 
             loaded.get(protocolTimeout, MILLISECONDS);
 
@@ -208,11 +215,27 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
         }
     }
 
-    void onNavigationRequested(PageDomain.NavigationRequested nr) {
-        if (!nr.isRedirect || followRedirects) {
-            session.page.processNavigation("Proceed", nr.navigationId);
-        } else {
-            session.page.processNavigation("CancelAndIgnore", nr.navigationId);
+    void onNavigationRequested(NetworkDomain.RequestIntercepted nr) {
+        try {
+            if (nr.authChallenge != null) {
+                uriRequests.onRequestIntercepted(nr, queuedUri, false);
+
+                // TODO: Add option for filling in user/passwd
+                AuthChallengeResponse authChallengeResponse = new AuthChallengeResponse();
+                authChallengeResponse.response = "Default";
+                session.network.continueInterceptedRequest(nr.interceptionId, null, null, null, null, null, null, authChallengeResponse);
+            } else if (!followRedirects && nr.isNavigationRequest && nr.redirectUrl != null) {
+                // Request is a redirect and we are configured to not follow it.
+                LOG.debug("Aborting follow redirect");
+                uriRequests.onRequestIntercepted(nr, queuedUri, true);
+                session.network.continueInterceptedRequest(nr.interceptionId, "Aborted", null, null, null, null, null, null);
+            } else {
+                uriRequests.onRequestIntercepted(nr, queuedUri, false);
+                session.network.continueInterceptedRequest(nr.interceptionId, null, null, null,
+                        null, null, null, null);
+            }
+        } catch (Throwable ex) {
+            ex.printStackTrace();
         }
     }
 
@@ -244,7 +267,7 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
 
     public void saveScreenshot(DbAdapter db) {
         try {
-            PageDomain.CaptureScreenshot screenshot = session.page.captureScreenshot()
+            PageDomain.CaptureScreenshot screenshot = session.page.captureScreenshot("png", null, null, null)
                     .get(protocolTimeout, MILLISECONDS);
             byte[] img = Base64.getDecoder().decode(screenshot.data);
 
@@ -260,7 +283,7 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
 
     List<MessagesProto.Cookie> extractCookies() {
         try {
-            return session.network.getCookies().get(protocolTimeout, MILLISECONDS).cookies.stream()
+            return session.network.getAllCookies().get(protocolTimeout, MILLISECONDS).cookies.stream()
                     .map(c -> {
                         MessagesProto.Cookie.Builder cb = MessagesProto.Cookie.newBuilder();
                         if (c.name != null) {
@@ -320,14 +343,16 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
                             String[] links = resultString.split("\n+");
                             String path = uriRequests.getRootRequest().getDiscoveryPath() + "L";
                             for (int i = 0; i < links.length; i++) {
-                                outlinks.add(MessagesProto.QueuedUri.newBuilder()
-                                        .setExecutionId(executionId)
-                                        .setUri(links[i])
-                                        .setReferrer(uriRequests.getRootRequest().getUrl())
-                                        .setDiscoveredTimeStamp(ProtoUtils.odtToTs(OffsetDateTime.now()))
-                                        .setDiscoveryPath(path)
-                                        .addAllCookies(cookies)
-                                        .build());
+                                if (!uriRequests.getInitialRequest().getUrl().equals(links[i])) {
+                                    outlinks.add(MessagesProto.QueuedUri.newBuilder()
+                                            .setExecutionId(executionId)
+                                            .setUri(links[i])
+                                            .setReferrer(uriRequests.getRootRequest().getUrl())
+                                            .setDiscoveredTimeStamp(ProtoUtils.odtToTs(OffsetDateTime.now()))
+                                            .setDiscoveryPath(path)
+                                            .addAllCookies(cookies)
+                                            .build());
+                                }
                             }
                         }
                     }
@@ -355,7 +380,7 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
         }
     }
 
-//    def run_behavior(self, behavior_script, timeout=900):
+    //    def run_behavior(self, behavior_script, timeout=900):
 //        self.send_to_chrome(
 //                method='Runtime.evaluate', suppress_logging=True,
 //                params={'expression': behavior_script})

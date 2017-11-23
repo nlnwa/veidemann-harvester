@@ -16,14 +16,19 @@
 package no.nb.nna.veidemann.harvester.browsercontroller;
 
 import java.io.File;
+import java.net.Inet4Address;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.URL;
 import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Optional;
 
+import com.google.common.net.InetAddresses;
 import no.nb.nna.veidemann.api.ControllerProto;
 import no.nb.nna.veidemann.api.HarvesterProto;
+import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.client.ContentWriterClient;
 import no.nb.nna.veidemann.commons.util.ApiTools;
@@ -34,6 +39,7 @@ import no.nb.nna.veidemann.api.ConfigProto;
 import no.nb.nna.veidemann.api.MessagesProto;
 import no.nb.nna.veidemann.api.MessagesProto.PageLog;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.littleshoot.proxy.HostResolver;
 import org.mockito.invocation.InvocationOnMock;
@@ -53,11 +59,23 @@ public class BrowserControllerIT {
 
     static int proxyPort;
 
+    static String testSitesHttpHost;
+
+    static int testSitesHttpPort;
+
+    static String testSitesDnsHost;
+
+    static int testSitesDnsPort;
+
     @BeforeClass
     public static void init() {
         browserHost = System.getProperty("browser.host");
         browserPort = Integer.parseInt(System.getProperty("browser.port"));
         proxyPort = Integer.parseInt(System.getProperty("proxy.port"));
+        testSitesHttpHost = System.getProperty("testsites.http.host");
+        testSitesHttpPort = Integer.parseInt(System.getProperty("testsites.http.port"));
+        testSitesDnsHost = System.getProperty("testsites.dns.host");
+        testSitesDnsPort = Integer.parseInt(System.getProperty("testsites.dns.port"));
     }
 
     /**
@@ -74,18 +92,14 @@ public class BrowserControllerIT {
             when(contentWriterSession.finish()).thenReturn("WARC_ID");
 
             DbAdapter db = getDbMock();
-            when(db.savePageLog(any(PageLog.class))).then(a -> {
-                PageLog o = a.getArgument(0);
-                System.out.println(o);
-                return o;
-            });
 
             MessagesProto.QueuedUri queuedUri = MessagesProto.QueuedUri.newBuilder()
                     //.setUri("https://158.39.129.50/wp-content/uploads/2016/09/Avtale-om-Bokhylla-2012.pdf")
                     //.setUri("http://nbdcms.nb.no/wp-content/uploads/2016/09/Avtale-om-Bokhylla-2012.pdf")
                     //.setUri("http://nbdcms.nb.no/index.php/om-nb/hva-og-hvem-er-vi/avtalar-og-samarbeid/")
                     //.setUri("https://nbdcms.nb.no")
-                    .setUri("https://example.com")
+                    .setUri("http://a1.com")
+//                    .setUri("http://redirect.com/apache-icon.gif")
                     .setExecutionId("testId")
                     .setDiscoveryPath("L")
                     .setReferrer("http://example.org/")
@@ -104,7 +118,7 @@ public class BrowserControllerIT {
 
                 HarvesterProto.HarvestPageReply result = controller.render(queuedUri, config);
 
-                System.out.println("=========\n" + result);
+                System.out.println("=========*\n" + result);
                 // TODO review the generated test code and remove the default call to fail.
 //            fail("The test case is a prototype.");
             }
@@ -121,7 +135,7 @@ public class BrowserControllerIT {
                 .setWindowHeight(900)
                 .setWindowWidth(900)
                 .setPageLoadTimeoutMs(10000)
-                .setSleepAfterPageloadMs(500)
+                .setSleepAfterPageloadMs(1500)
                 .setScriptSelector(ConfigProto.Selector.newBuilder().addLabel(ApiTools.buildLabel("scope", "default")))
                 .build();
 
@@ -146,27 +160,37 @@ public class BrowserControllerIT {
         DbAdapter db = mock(DbAdapter.class);
         when(db.hasCrawledContent(any())).thenReturn(Optional.empty());
         when(db.saveCrawlLog(any())).thenAnswer((InvocationOnMock i) -> {
-            return i.getArgument(0);
+            CrawlLog cl = i.getArgument(0);
+            System.out.println("CL: " + cl);
+            return cl;
+        });
+        when(db.savePageLog(any(PageLog.class))).then(a -> {
+            PageLog o = a.getArgument(0);
+            System.out.println("PageLOG::::");
+            System.out.println(o);
+            System.out.println("::::PageLOG");
+            return o;
         });
         when(db.listBrowserScripts(any())).thenReturn(ControllerProto.BrowserScriptListReply.newBuilder()
                 .addValue(ConfigProto.BrowserScript.newBuilder()
                         .setMeta(ApiTools.buildMeta("extract-outlinks.js", "", ApiTools
                                 .buildLabel("type", "extract_outlinks")))
-                        .setScript("    var __brzl_framesDone = new Set();\n"
-                                + "    var __brzl_compileOutlinks = function(frame) {\n"
-                                + "        __brzl_framesDone.add(frame);\n"
-                                + "        if (frame && frame.document) {\n"
-                                + "            var outlinks = Array.prototype.slice.call(frame.document.querySelectorAll('a[href]'));\n"
-                                + "            for (var i = 0; i < frame.frames.length; i++) {\n"
-                                + "                if (frame.frames[i] && !__brzl_framesDone.has(frame.frames[i])) {\n"
-                                + "                    outlinks = outlinks.concat(__brzl_compileOutlinks(frame.frames[i]));\n"
-                                + "                }\n"
-                                + "            }\n"
-                                + "        }\n"
-                                + "        return outlinks;\n"
+                        .setScript("var __brzl_framesDone = new Set();\n"
+                                + "var __brzl_compileOutlinks = function(frame) {\n"
+                                + "  __brzl_framesDone.add(frame);\n"
+                                + "  if (frame && frame.document) {\n"
+                                + "    var outlinks = Array.prototype.slice.call(frame.document.querySelectorAll('a[href]'));\n"
+                                + "    for (var i = 0; i < frame.frames.length; i++) {\n"
+                                + "      if (frame.frames[i] && !__brzl_framesDone.has(frame.frames[i])) {\n"
+                                + "        outlinks = outlinks.concat(__brzl_compileOutlinks(frame.frames[i]));\n"
+                                + "      }\n"
                                 + "    }\n"
-                                + "    __brzl_compileOutlinks(window).join('\\n');\n"
-                                + "").build()).build());
+                                + "  }\n"
+                                + "  return outlinks;\n"
+                                + "}\n"
+                                + "__brzl_compileOutlinks(window).join('\\n');\n")
+                        .build())
+                .build());
         return db;
     }
 
@@ -174,7 +198,9 @@ public class BrowserControllerIT {
 
         @Override
         public InetSocketAddress resolve(String host, int port) throws UnknownHostException {
-            return new InetSocketAddress(host, port);
+            System.out.println("H: " + testSitesHttpHost);
+            System.out.println("H: " + host + ":" + port + " => " + new InetSocketAddress(InetAddresses.forString("127.0.0.1"), testSitesHttpPort));
+            return new InetSocketAddress(InetAddresses.forString("127.0.0.1"), testSitesHttpPort);
         }
 
     }

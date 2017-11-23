@@ -133,7 +133,8 @@
                                         </ports>
                                         <cmd>
                                             <exec>
-                                                <arg>/${project.artifactId}/bin/${project.artifactId}</arg>
+                                                <!--<arg>/${project.artifactId}/bin/${project.artifactId}</arg>-->
+                                                <arg>/${project.artifactId}/bin/start.sh</arg>
                                             </exec>
                                         </cmd>
                                         <assembly>
@@ -147,6 +148,7 @@
                                                         <outputDirectory>bin</outputDirectory>
                                                         <includes>
                                                             <include>${project.artifactId}</include>
+                                                            <include>start.sh</include>
                                                         </includes>
                                                         <fileMode>0755</fileMode>
                                                     </fileSet>
@@ -155,6 +157,7 @@
                                                         <outputDirectory>bin</outputDirectory>
                                                         <excludes>
                                                             <exclude>${project.artifactId}</exclude>
+                                                            <exclude>start.sh</exclude>
                                                         </excludes>
                                                         <fileMode>0644</fileMode>
                                                     </fileSet>

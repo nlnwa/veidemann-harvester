@@ -69,6 +69,7 @@ public class ContentWriterClient implements AutoCloseable {
         try {
             channel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
         } catch (InterruptedException ex) {
+            LOG.error(ex.getMessage(), ex);
             throw new RuntimeException(ex);
         }
     }
@@ -138,6 +139,7 @@ public class ContentWriterClient implements AutoCloseable {
             if (finishLatch.getCount() == 0) {
                 // RPC completed or errored before we finished sending.
                 // Sending further requests won't error, but they will just be thrown away.
+                LOG.info("RPC completed or errored before we finished sending.");
                 return;
             }
 

@@ -15,6 +15,8 @@ package util
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/base64"
 	"fmt"
 	"github.com/coreos/go-oidc"
@@ -23,11 +25,37 @@ import (
 	"github.com/spf13/viper"
 	"golang.org/x/oauth2"
 	"math/rand"
+	"net"
 	"net/http"
 	"os/exec"
 	"runtime"
 	"time"
 )
+
+// return an HTTP client which trusts the provided root CAs.
+func httpClientForRootCAs() *http.Client {
+	tlsConfig := tls.Config{RootCAs: x509.NewCertPool()}
+	if viper.GetString("rootCAs") == "" {
+		return nil
+	}
+	rootCABytes := []byte(viper.GetString("rootCAs"))
+	if !tlsConfig.RootCAs.AppendCertsFromPEM(rootCABytes) {
+		log.Warn("no certs found in root CA file")
+		return nil
+	}
+	return &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tlsConfig,
+			Proxy:           http.ProxyFromEnvironment,
+			Dial: (&net.Dialer{
+				Timeout:   30 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}).Dial,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+		},
+	}
+}
 
 type auth struct {
 	clientID     string
@@ -45,6 +73,7 @@ type auth struct {
 	offlineAsScope bool
 
 	client  *http.Client
+	ctx     context.Context
 	state   string
 	enabled bool
 }
@@ -57,14 +86,19 @@ func NewAuth() *auth {
 	a.clientSecret = "cli-app-secret"
 	a.redirectURI = "urn:ietf:wg:oauth:2.0:oob"
 
-	a.client = http.DefaultClient
-	ctx := oidc.ClientContext(context.Background(), a.client)
+	a.client = httpClientForRootCAs()
+
+	if a.client == nil {
+		a.client = http.DefaultClient
+	}
+
+	a.ctx = oidc.ClientContext(context.Background(), a.client)
 
 	// Initialize a provider by specifying dex's issuer URL.
 	idp := viper.GetString("idp")
-	p, err := oidc.NewProvider(ctx, idp)
+	p, err := oidc.NewProvider(a.ctx, idp)
 	if err != nil {
-		log.Warn("Could not connect to authentication server '" + idp + "'. Proceeding without authentication")
+		log.Warn(fmt.Errorf("Could not connect to authentication server '%s': %v. Proceeding without authentication", idp, err))
 		a.enabled = false
 	} else {
 		a.provider = p
@@ -111,8 +145,7 @@ func (a *auth) Openbrowser(authCodeURL string) {
 }
 
 func (a *auth) VerifyCode(code string) {
-	ctx := context.Background()
-	oauth2Token, err := a.oauth2Config().Exchange(ctx, code)
+	oauth2Token, err := a.oauth2Config().Exchange(a.ctx, code)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -125,17 +158,18 @@ func (a *auth) VerifyCode(code string) {
 	}
 	a.rawIdToken = rawIDToken
 
-	a.verifyIdToken(ctx)
+	a.verifyIdToken()
 
 	viper.Set("accessToken", marshlAccessToken(oauth2Token))
 }
 
-func (a *auth) verifyIdToken(ctx context.Context) {
+func (a *auth) verifyIdToken() {
 	// Parse and verify ID Token payload.
-	idToken, err := a.idTokenVerifier.Verify(ctx, a.rawIdToken)
+	idToken, err := a.idTokenVerifier.Verify(a.ctx, a.rawIdToken)
 	if err != nil {
 		log.Fatal(err)
 	}
+	log.Debugf("IdToken: %s", idToken)
 
 	if idToken.Nonce != viper.GetString("nonce") {
 		log.Fatal("Nonce did not match")
@@ -146,10 +180,12 @@ func (a *auth) verifyIdToken(ctx context.Context) {
 func (a *auth) CheckStoredAccessToken() {
 	accessToken := viper.GetString("accessToken")
 	if accessToken == "" {
+		log.Debugf("No accessToken")
 		return
 	}
 
 	a.oauth2Token = unmarshalAccessToken(accessToken)
+	log.Debugf("AccessToken: %v", a.oauth2Token)
 
 	// Extract the ID Token from OAuth2 token.
 	rawIdToken, ok := a.oauth2Token.Extra("id_token").(string)
@@ -158,7 +194,7 @@ func (a *auth) CheckStoredAccessToken() {
 	}
 	a.rawIdToken = rawIdToken
 
-	a.verifyIdToken(context.Background())
+	a.verifyIdToken()
 }
 
 // Extract custom claims.

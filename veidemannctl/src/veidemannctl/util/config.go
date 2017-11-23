@@ -25,6 +25,7 @@ type config struct {
 	Idp               string `json:"idp"`
 	AccessToken       string `json:"accessToken"`
 	Nonce             string `json:"nonce"`
+	RootCAs           string `json:"rootCAs"`
 }
 
 func WriteConfig() {
@@ -35,6 +36,7 @@ func WriteConfig() {
 		viper.GetString("idp"),
 		viper.GetString("accessToken"),
 		viper.GetString("nonce"),
+		viper.GetString("rootCAs"),
 	}
 
 	y, err := yaml.Marshal(c)

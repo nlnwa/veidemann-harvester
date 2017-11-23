@@ -66,6 +66,12 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 
 /**
  *
@@ -88,13 +94,15 @@ public class DnsLookup {
 
     private final ContentWriterClient contentWriterClient;
 
+    private final ConcurrentHashMap<String, Future<InetSocketAddress>> activeResolvers = new ConcurrentHashMap<>();
+
+    private final Executor threadPool = Executors.newCachedThreadPool();
+
     /**
      * If a DNS lookup fails, whether or not to fallback to InetAddress resolution, which may use local 'hosts' files or
      * other mechanisms.
      */
     protected boolean acceptNonDnsResolves = false;
-
-    InetAddress serverInetAddr = null;
 
     private final SimpleResolver[] resolvers;
 
@@ -133,13 +141,23 @@ public class DnsLookup {
                 .withTag(Tags.SPAN_KIND.getKey(), Tags.SPAN_KIND_SERVER)
                 .withTag("lookup", host + ':' + port)
                 .startActive()) {
-            return new Resolver(host, port).call();
-        } catch (UnknownHostException ex) {
-            LOG.info("Failed DNS lookup of host '{}' and port '{}'", host, port, ex);
-            throw ex;
+
+            // Keep track of running resolvers and avoid starting a resolver for host/port which is already in
+            // the process of beeing resolved.
+            Future<InetSocketAddress> result = activeResolvers.computeIfAbsent(host, k -> {
+                FutureTask<InetSocketAddress> f = new FutureTask(new Resolver(host, port));
+                threadPool.execute(f);
+                return f;
+            });
+            return result.get();
         } catch (Exception ex) {
-            LOG.info("Failed DNS lookup of host '{}' and port '{}'", host, port, ex);
-            throw (UnknownHostException) new UnknownHostException(host).initCause(ex);
+            if (ex instanceof ExecutionException && ex.getCause() instanceof UnknownHostException) {
+                LOG.info("Failed DNS lookup of host '{}' and port '{}'", host, port, ex);
+                throw (UnknownHostException) ex.getCause();
+            } else {
+                LOG.info("Failed DNS lookup of host '{}' and port '{}'", host, port, ex);
+                throw (UnknownHostException) new UnknownHostException(host).initCause(ex);
+            }
         }
     }
 
@@ -422,9 +440,9 @@ public class DnsLookup {
 
     private class Resolver implements Callable<InetSocketAddress> {
 
-        String host;
+        final String host;
 
-        Integer port;
+        final Integer port;
 
         public Resolver(String host, Integer port) {
             this.host = host;
@@ -436,6 +454,7 @@ public class DnsLookup {
             // Check if host is already an ip address
             if (InetAddresses.isInetAddress(host)) {
                 LOG.debug("Host '{}' is IP address, return as is");
+                activeResolvers.remove(host);
                 return new InetSocketAddress(InetAddresses.forString(host), port);
             }
 
@@ -452,10 +471,12 @@ public class DnsLookup {
                             storeDnsRecord(host, state);
                         } catch (IOException | NoSuchAlgorithmException | InterruptedException | StatusException ex) {
                             LOG.error("Could not store DNS lookup", ex);
+                            activeResolvers.remove(host);
                             throw new RuntimeException(ex);
                         }
                     }
                     LOG.debug("Resolved '{}' to '{}'", host, address);
+                    activeResolvers.remove(host);
                     return address;
                 }
             }
@@ -464,10 +485,12 @@ public class DnsLookup {
                 // Do lookup that bypasses javadns.
                 address = new InetSocketAddress(InetAddress.getByName(host), port);
                 LOG.debug("Found address '{}' for '{}' using native dns.", address, host);
+                activeResolvers.remove(host);
                 return address;
             }
 
             LOG.error("Could not lookup host '{}'", host);
+            activeResolvers.remove(host);
             throw new UnknownHostException(host);
         }
 

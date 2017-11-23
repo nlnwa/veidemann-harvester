@@ -24,6 +24,7 @@ import java.util.concurrent.ForkJoinTask;
 
 import com.google.protobuf.Empty;
 import io.grpc.Status;
+import io.grpc.Status.Code;
 import io.grpc.StatusException;
 import io.grpc.stub.StreamObserver;
 import no.nb.nna.veidemann.api.ContentWriterGrpc;
@@ -36,6 +37,7 @@ import no.nb.nna.veidemann.contentwriter.warc.WarcWriterPool;
 import no.nb.nna.veidemann.api.MessagesProto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 import static io.netty.handler.codec.http.HttpConstants.CR;
 import static io.netty.handler.codec.http.HttpConstants.LF;
@@ -87,17 +89,29 @@ public class ContentWriterService extends ContentWriterGrpc.ContentWriterImplBas
 
             @Override
             public void onError(Throwable t) {
-                LOG.error(t.getMessage(), t);
+                Status status = Status.fromThrowable(t);
+                if (status.getCode().equals(Code.CANCELLED)) {
+                    if (crawlLog != null) {
+                        MDC.put("uri", crawlLog.getRequestedUri());
+                        MDC.put("recordType", crawlLog.getRecordType());
+                    }
+                    LOG.info("Request cancelled before WARC record written");
+                } else {
+                    LOG.error("Error caught: {}", t.getMessage(), t);
+                }
             }
 
             @Override
             public void onCompleted() {
                 if (crawlLog == null) {
+                    LOG.error("Missing CrawlLog object");
                     Status status = Status.INVALID_ARGUMENT.withDescription("Missing CrawlLog object");
                     responseObserver.onError(status.asException());
                     return;
                 }
                 if (contentBuffer.getTotalSize() == 0L) {
+                    MDC.put("uri", crawlLog.getRequestedUri());
+                    LOG.error("Nothing to store");
                     Status status = Status.INVALID_ARGUMENT.withDescription("Nothing to store");
                     responseObserver.onError(status.asException());
                     return;
@@ -115,7 +129,11 @@ public class ContentWriterService extends ContentWriterGrpc.ContentWriterImplBas
                             .build());
                     responseObserver.onCompleted();
                 } catch (StatusException ex) {
+                    LOG.error("Failed write: {}", ex.getMessage(), ex);
                     responseObserver.onError(ex);
+                } catch (Throwable ex) {
+                    LOG.error("Failed write: {}", ex.getMessage(), ex);
+                    responseObserver.onError(Status.fromThrowable(ex).asException());
                 }
             }
 
@@ -129,8 +147,8 @@ public class ContentWriterService extends ContentWriterGrpc.ContentWriterImplBas
             responseObserver.onNext(Empty.getDefaultInstance());
             responseObserver.onCompleted();
         } catch (Exception ex) {
+            LOG.error("Failed flush: {}", ex.getMessage(), ex);
             responseObserver.onError(Status.UNKNOWN.withDescription(ex.toString()).asException());
-            LOG.error(ex.getMessage(), ex);
         }
     }
 
@@ -145,8 +163,8 @@ public class ContentWriterService extends ContentWriterGrpc.ContentWriterImplBas
                 responseObserver.onError(Status.PERMISSION_DENIED.withDescription("Deletion not allowed").asException());
             }
         } catch (Exception ex) {
+            LOG.error("Failed delete: {}", ex.getMessage(), ex);
             responseObserver.onError(Status.UNKNOWN.withDescription(ex.toString()).asException());
-            LOG.error(ex.getMessage(), ex);
         }
     }
 

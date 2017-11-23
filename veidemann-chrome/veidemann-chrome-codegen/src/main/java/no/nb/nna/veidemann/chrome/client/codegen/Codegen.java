@@ -30,7 +30,7 @@ public class Codegen {
 
     static ClassName CLIENT_CLASS = ClassName.get(PACKAGE + ".ws", "Cdp");
 
-    static String CHROME_VERSION = "56.0.2924.76";
+    static String CHROME_VERSION = "64.0.3260.2";
 
     public static void main(String args[]) throws IOException {
         String browserProtocol = "https://chromium.googlesource.com/chromium/src/+/"

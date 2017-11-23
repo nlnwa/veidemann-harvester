@@ -113,7 +113,7 @@ public class Session {
                 .beginControlFlow("try")
                 .addStatement("$N = $N.target.createBrowserContext().$L.browserContextId",
                         contextId, entryPoint, timeoutGet)
-                .addStatement("$N = $N.target.createTarget(\"about:blank\", $N, $N, $N).$L.targetId", targetId,
+                .addStatement("$N = $N.target.createTarget(\"about:blank\", $N, $N, $N, false).$L.targetId", targetId,
                         entryPoint, clientWidth, clientHeight, contextId, timeoutGet)
                 .endControlFlow()
                 .beginControlFlow("catch ($T | $T | $T ex)",
@@ -123,13 +123,11 @@ public class Session {
                 .addCode("\n")
                 .addComment("Chrome is buggy and won't let us connect unless we've refreshed the json endpoint")
                 .addStatement("new $T($L).openStream().close()", URL.class, createUrl("http", host, port, "/json"))
-                .addStatement("$1N = new Cdp($2L + $3N, $4N.$5N, $4N.$6N)",
+                .addStatement("$N = $N.$N.createSessionClient($N)",
                         sessionClient,
-                        createUrl("ws", host, port, "/devtools/page/"),
-                        targetId,
                         entryPoint,
-                        EntryPoint.tracer,
-                        EntryPoint.withActiveSpanOnly)
+                        EntryPoint.protocolClient,
+                        targetId)
                 .addCode("\n");
 
         for (Domain domain : domains) {

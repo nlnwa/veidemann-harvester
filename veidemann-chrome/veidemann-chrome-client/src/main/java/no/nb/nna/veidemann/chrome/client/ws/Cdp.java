@@ -15,16 +15,6 @@
  */
 package no.nb.nna.veidemann.chrome.client.ws;
 
-import java.net.URI;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Consumer;
-
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import io.opentracing.ActiveSpan;
@@ -33,6 +23,21 @@ import io.opentracing.Tracer;
 import io.opentracing.tag.Tags;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
 
 /**
  *
@@ -53,18 +58,56 @@ public class Cdp implements WebSocketCallback {
 
     final WebsocketClient websocketClient;
 
+    final String host;
+
+    final int port;
+
+    final String scheme;
+
     final Tracer tracer;
 
     final boolean withActiveSpanOnly;
 
-    public Cdp(String uri, Tracer tracer, boolean withActiveSpanOnly) {
-        this(URI.create(uri), tracer, withActiveSpanOnly);
+    public Cdp(final String host, final int port, final Tracer tracer, final boolean withActiveSpanOnly) {
+        this.host = host;
+        this.port = port;
+
+        try {
+            URL versionUrl = new URL("http", host, port, "/json/version");
+            try (InputStream in = versionUrl.openStream()) {
+                InputStreamReader inr = new InputStreamReader(in);
+                Map version = gson.fromJson(inr, Map.class);
+                URI webSocketUri = new URI((String) version.get("webSocketDebuggerUrl"));
+                String browserVersion = (String) version.get("Browser");
+                this.scheme = webSocketUri.getScheme();
+
+                this.websocketClient = new WebsocketClient(this, webSocketUri);
+                this.tracer = tracer;
+                this.withActiveSpanOnly = withActiveSpanOnly;
+            }
+        } catch (URISyntaxException | IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
-    public Cdp(URI uri, Tracer tracer, boolean withActiveSpanOnly) {
-        this.websocketClient = new WebsocketClient(this, uri);
-        this.tracer = tracer;
-        this.withActiveSpanOnly = withActiveSpanOnly;
+    private Cdp(final String scheme, final String host, final int port, final String path, final Tracer tracer, final boolean withActiveSpanOnly) {
+        this.scheme = scheme;
+        this.host = host;
+        this.port = port;
+
+        try {
+            URI webSocketUri = new URI(scheme, null, host, port, path, null, null);
+
+            this.websocketClient = new WebsocketClient(this, webSocketUri);
+            this.tracer = tracer;
+            this.withActiveSpanOnly = withActiveSpanOnly;
+        } catch (URISyntaxException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public Cdp createSessionClient(final String targetId) {
+        return new Cdp(scheme, host, port, "/devtools/page/" + targetId, tracer, withActiveSpanOnly);
     }
 
     public CompletableFuture<JsonElement> call(String method, Map<String, Object> params) {

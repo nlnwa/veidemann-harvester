@@ -53,7 +53,8 @@ public class CdpTest {
     public void testCall() throws InterruptedException, ExecutionException, URISyntaxException {
         System.out.println("sendMessage");
         String msg = "Hello World";
-        Cdp instance = new Cdp("ws://localhost:9222/devtools/page/cdb3c308-6abe-4159-b09e-4e464b499a92", null, true);
+//        Cdp instance = new Cdp("ws://localhost:9222/devtools/page/cdb3c308-6abe-4159-b09e-4e464b499a92", null, true);
+        Cdp instance = null;
         try {
             System.out.println(">>> " + instance.call("mm", null).get());
         } catch (Exception e) {

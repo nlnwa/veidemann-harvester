@@ -1,16 +1,8 @@
-# Namespace
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: db
----
 # Rethink DB
 apiVersion: v1
 kind: Service
 metadata:
   name: rethink
-  namespace: db
   labels:
     app: rethinkdb
     tier: backend
@@ -37,7 +29,6 @@ apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
   name: rethink
-  namespace: db
 spec:
   replicas: 1
   template:
@@ -49,11 +40,32 @@ spec:
     spec:
       containers:
       - name: rethinkdb
-        image: rethinkdb:2.3
+        image: rethinkdb:2.3.6
         ports:
         - containerPort: 28015
         - containerPort: 29015
         - containerPort: 8080
+        volumeMounts:
+        - mountPath: /data
+          name: datadir
         resources:
             requests:
                 memory: "500Mi"
+      volumes:
+      - name: datadir
+        persistentVolumeClaim:
+          claimName: db-data-claim
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: db-data-claim
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  selector:
+    matchLabels:
+      usage: db

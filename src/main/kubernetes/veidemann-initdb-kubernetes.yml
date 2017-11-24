@@ -1,14 +1,7 @@
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: db
----
 apiVersion: batch/v1
 kind: Job
 metadata:
   name: initdb
-  namespace: db
 spec:
   template:
     metadata:
@@ -19,7 +12,7 @@ spec:
         image: norsknettarkiv/veidemann-db-initializer:1.0.0-SNAPSHOT
         env:
         - name: DB_HOST
-          value: "rethink.db"
+          value: "rethink"
         - name: DB_PORT
           value: "28015"
       restartPolicy: Never

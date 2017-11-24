@@ -1,14 +1,22 @@
 kind: ConfigMap
 apiVersion: v1
 metadata:
+  name: veidemann-config
+data:
+  openid.connect.issuer: "http://${EXTERNAL_HOSTNAME}:32000/dex"
+
+----
+
+kind: ConfigMap
+apiVersion: v1
+metadata:
   name: dex-config
-  namespace: auau
 data:
   config.yaml: |-
     # The base path of dex and the external name of the OpenID Connect service.
     # This is the canonical URL that all clients MUST use to refer to dex. If a
     # path is provided, dex's HTTP service will listen at a non-root URL.
-    issuer: http://${EXTERNAL_HOSTNAME}:32000/dex
+    issuer: https://${EXTERNAL_HOSTNAME}:32000/dex
 
     # The storage configuration determines where dex stores its state. Supported
     # options include SQL flavors and Kubernetes third party resources.
@@ -27,10 +35,6 @@ data:
       http: 0.0.0.0:5556
       allowedOrigins:
       - 'http://${EXTERNAL_HOSTNAME}:30890'
-      # Uncomment for HTTPS options.
-      # https: 0.0.0.0:5554
-      # tlsCert: /etc/dex/tls.crt
-      # tlsKey: /etc/dex/tls.key
 
     # Uncomment this block to enable the gRPC API. This values MUST be different
     # from the HTTP endpoints.
@@ -70,8 +74,6 @@ data:
       name: 'Veidemann CLI'
       secret: cli-app-secret
     - id: veidemann-api
-      redirectURIs:
-      - 'http://${EXTERNAL_HOSTNAME}:30890/activity'
       name: 'Veidemann API'
       secret: VerySecret
       trustedPeers:
@@ -85,7 +87,7 @@ data:
       config:
         issuer: ${PILT_ADDR}
         # Connector config values starting with a "$" will read from the environment.
-        redirectURI: http://${EXTERNAL_HOSTNAME}:32000/dex/callback
+        redirectURI: https://${EXTERNAL_HOSTNAME}:32000/dex/callback
 
     # Let dex keep a list of passwords which can be used to login to dex.
     enablePasswordDB: true

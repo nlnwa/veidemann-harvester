@@ -1,12 +1,5 @@
 #Rethinkdb cluster
 
-# Namespace
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: db
----
 # RethinkDB
 apiVersion: v1
 kind: Service
@@ -16,7 +9,6 @@ metadata:
     tier: backend
     role: admin
   name: rethinkdb-admin
-  namespace: db
 spec:
   type: LoadBalancer
   ports:
@@ -34,7 +26,6 @@ metadata:
     tier: backend
     role: replica
   name: rethinkdb
-  namespace: db
 spec:
   ports:
     - port: 29015
@@ -51,7 +42,6 @@ metadata:
     tier: backend
     role: proxy
   name: rethink
-  namespace: db
 spec:
   type: LoadBalancer
   ports:
@@ -67,7 +57,6 @@ metadata:
   labels:
     app: rethinkdb
   name: rethinkdb-replica
-  namespace: db
 spec:
   template:
     metadata:
@@ -143,7 +132,6 @@ metadata:
   labels:
     app: rethinkdb
   name: rethinkdb-admin
-  namespace: db
 spec:
   template:
     metadata:
@@ -211,7 +199,6 @@ metadata:
   labels:
     app: rethinkdb
   name: rethink
-  namespace: db
 spec:
   template:
     metadata:

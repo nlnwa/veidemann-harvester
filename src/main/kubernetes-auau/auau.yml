@@ -1,14 +1,6 @@
-#Logging - Elasticsearch, fluentd and Kibana
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: auau
----
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
-  namespace: auau
   labels:
       app: dex
   name: dex
@@ -25,14 +17,12 @@ spec:
           command: ["/usr/local/bin/dex", "serve", "/etc/dex/cfg/config.yaml"]
 
           ports:
-          - name: https
+          - name: http
             containerPort: 5556
 
           volumeMounts:
           - name: config
             mountPath: /etc/dex/cfg
-          #- name: tls
-          #  mountPath: /etc/dex/tls
 
       volumes:
       - name: config
@@ -41,23 +31,19 @@ spec:
           items:
           - key: config.yaml
             path: config.yaml
-      #- name: tls
-      #  secret:
-      #    secretName: dex.example.com.tls
 
 ---
 kind: Service
 apiVersion: v1
 metadata:
   name: dex
-  namespace: auau
 spec:
   type: NodePort
   ports:
     - name: dex
       port: 5556
       protocol: TCP
-      targetPort: 5556
+      targetPort: http
       nodePort: 32000
   selector:
     app: dex

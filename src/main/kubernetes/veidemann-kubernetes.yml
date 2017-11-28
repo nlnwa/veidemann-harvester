@@ -650,6 +650,4 @@ spec:
   resources:
     requests:
       storage: 5Gi
-  selector:
-    matchLabels:
-      usage: "warc"
+  storageClassName: gluster-heketi

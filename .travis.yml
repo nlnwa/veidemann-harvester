@@ -1,6 +1,6 @@
 sudo: required
 language: java
-jservices:
+services:
   - docker
 
 jdk:
@@ -14,15 +14,16 @@ env:
   - secure: cE+UBeVZgOU38Rqod3bsDrmCBp4iDFCTMmcv0XRUR5l0KG/Gb18g59bfkI9mHpMauqzL/4wsKzO95ByCUgWkG5mP/5DmUT5YHJd3b/OMwMneBEym0rfri3579uI9J92IghXlX4xuzOnyI1VFDTf7XmJzKso/xj5s4e/Zw4Od4Upr/+usRfDlAL24P7T9EhGNkBfG/U7P7VIIgNjDt7zfMk1AuqNUG7Y+ks3NRYGrequuN5V4J0O0lcl+dli1A86c5x7+PtghYkpUbgPHEy5e5fkB6u6TB3SuyHPeGuTfjG7Nw83iljJaDUyET5ipoEoEj22BUEpwMDeLyf0iBNlgqUISxuyfekWaDEy7V8qTQfW9SkQPosyCDOE9Kf7mtF95AL4dy+THWbbmF35O1o3rOYrR+OXRlH/4FhgJINqADS7bGeUXw3ALUNzB8UjLNFxYt/1j0kTRg4PKp6weki/4IQLJpxWk0Xf4zEP7nwHSsEKWFv6YhoTjlGaq7rZeSwPlVasbLFx8OAEAnBUMc9sULLAB1NPXFSa1Y4yMAUAuyGPF6e8rix/6hvcNjvyzZy7u0CKBLYMQc2ltNugBPvi2Qtewv5x9o4Q8oziPzNdx/SFnIBLpv44brbo7SPve3F1LWxPnqs7ccednvfoLpt3hTFQCl0dCYfiXtMlVi/RygGQ=
   - secure: YyvQeb2zeYafPa4te6asF8XSdJZWxajVDAXzKruRuMJWW4kkPQOEA6VxJpU2S/apN6G8/mLMku7QlAl+0v+JYKBiGmjHY5cdMVqH1J7lXYVbJKW9zWaou/xq/pVSriHU++nWojx/9pXvUxq1jX7A9pxgn9nSuVyCHZnmsUcivrrKyxlflOswjnZhzBpJRt+YvSjMn4K/OqEy904ZRQC0qzG5jo4hzR54SXhRcjHyMmhjH7fmk0KCN0eQyXdJt52Wz+A4+m+NzCGXHq3nlLzCNE7XbH539ihDqLFRkwjouAodkKWlctACnivQzZKiAjkCxTgK1XZ2K1yiOCDwQ/afTocFyAtf/BQAZPDpE248m5Oev8Pqg6nM+QU3HCUws9/2buqUSLYDK7zH5TYju5aMROOWSvMN3IQXJQXnA3+GSGn11rv7e/Mse0CKHUuEPHm3pkh8V+SUUhRqwgJ9WfziyV18ZQwigkKT45c6mfnscdoogsoiE7NoKoMl22prxWGTohfPOpM2hix1ut3ig/YDGpAh4VEd//b/FZ+cuz3A28s2ssKbOM0BkAo+tbOuGZBMQWAN10yvpvuLPBdBfedTaR8NsnvpGgeTzYsVRclsW9CcUBJBONRw0llsuLhNPc9MBfSY2bvGJOB/s3UH72eAx8yhr/Lm+jWTjmm9NEbV0rE=
 
+install: true
+
 script: mvn install -B -Pdocker-build -Pintegration-tests
 
 after_success:
-- if [ -n "$TRAVIS_TAG" -o "$TRAVIS_BRANCH" == "master" ]; then
-    docker login -u "$DOCKER_USERNAME" -p "$DOCKER_PASSWORD";
-  fi
 - if [ -n "$TRAVIS_TAG" ]; then
+  docker login -u "$DOCKER_USERNAME" -p "$DOCKER_PASSWORD";
   mvn -B -Pdocker-build -Ddocker.tag="$TRAVIS_TAG" docker:push;
   fi
-- if [ "$TRAVIS_BRANCH" == "master" ]; then
+- if [ "$TRAVIS_BRANCH" == "master" -a "$TRAVIS_EVENT_TYPE" == "push" ]; then
+  docker login -u "$DOCKER_USERNAME" -p "$DOCKER_PASSWORD";
   mvn -B -Pdocker-build -Ddocker.tag=latest docker:push;
   fi

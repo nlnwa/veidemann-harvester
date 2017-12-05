@@ -48,6 +48,7 @@ import java.net.InetSocketAddress;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  *
@@ -62,7 +63,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
 
     private final AlreadyCrawledCache cache;
 
-    private final CrawlLog.Builder crawlLog;
+    private CrawlLog.Builder crawlLog;
 
     private final ContentCollector requestCollector;
 
@@ -117,7 +118,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                 MDC.put("eid", executionId);
                 MDC.put("uri", uri);
 
-                LOG.debug("Proxy got request");
+                LOG.debug("Proxy sending request");
 
                 initDiscoveryPathAndReferrer(request);
 
@@ -143,17 +144,18 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                     request.headers().remove(EXECUTION_ID);
 
                     crawlLog.setFetchTimeStamp(ProtoUtils.getNowTs())
-                            .setReferrer(request.headers().get("referer", referrer))
+                            .setReferrer(referrer)
                             .setDiscoveryPath(discoveryPath)
                             .setExecutionId(executionId);
 
                     // Store request
                     requestCollector.setRequestHeaders(request, crawlLog);
-                    requestCollector.writeRequest(crawlLog.build());
-
+                    crawlLog = requestCollector.writeRequest(crawlLog.build()).toBuilder();
                     LOG.debug("Proxy is sending request to final destination.");
                 }
                 return null;
+            } else {
+                LOG.debug("Got something else than http request: {}", httpObject);
             }
         } catch (Throwable t) {
             LOG.error("Error handling request", t);
@@ -163,12 +165,12 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
 
     @Override
     public HttpObject serverToProxyResponse(HttpObject httpObject) {
+        MDC.put("eid", executionId);
+        MDC.put("uri", uri);
+
         try {
             responseSpan = buildSpan("serverToProxyResponse", uriRequest);
             GlobalTracer.get().makeActive(requestSpan);
-
-            MDC.put("eid", executionId);
-            MDC.put("uri", uri);
 
             boolean handled = false;
 
@@ -194,15 +196,14 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
 
             if (ProxyUtils.isLastChunk(httpObject)) {
                 responseCollector.writeCache(cache, uri, executionId);
-
                 String warcId = responseCollector.writeResponse(crawlLog.build()).getWarcId();
 
                 responseSpan.log("Last chunk");
                 if (uriRequest != null) {
                     uriRequest.setSize(responseCollector.getSize());
                     responseSpan.finish();
-                    finishSpan(uriRequest);
                     uriRequest.setWarcId(warcId);
+                    finishSpan(uriRequest);
                 }
             }
 
@@ -253,7 +254,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
             db.saveCrawlLog(crawlLog.build());
         }
 
-        LOG.debug("Http connect failed");
+        LOG.info("Http connect failed");
         finishSpan(uriRequest);
     }
 
@@ -270,37 +271,36 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
             db.saveCrawlLog(crawlLog.build());
         }
 
-        LOG.debug("Http connect timed out");
+        LOG.info("Http connect timed out");
         finishSpan(uriRequest);
     }
 
+    @Override
+    public void proxyToServerConnectionSSLHandshakeStarted() {
+        LOG.info("proxyToServerConnectionSSLHandshakeStarted");
+    }
+
     private void initDiscoveryPathAndReferrer(HttpRequest request) {
+        referrer = request.headers().get("Referer", "");
         if (uri.endsWith("robots.txt")) {
             referrer = "";
             discoveryPath = "P";
         } else if (executionId == MANUAL_EXID) {
-            referrer = request.headers().get("Referer", "");
             discoveryPath = "";
         } else {
             session = sessionRegistry.get(executionId);
 
             if (session == null) {
                 LOG.error("Could not find session. Probably a bug");
-                referrer = request.headers().get("Referer", "");
                 discoveryPath = "";
             } else {
-                referrer = session.getReferrer();
-                try {
-                    uriRequest = session.getUriRequests().getByUrl(uri)
-                            .get(session.getProtocolTimeout(), TimeUnit.MILLISECONDS);
-                } catch (InterruptedException | ExecutionException | TimeoutException ex) {
-                    LOG.error("Failed getting page request from session: {}", ex.toString(), ex);
-                } catch (Throwable ex) {
-                    LOG.error(ex.toString(), ex);
-                }
+                uriRequest = session.getUriRequests().getByUrl(uri);
 
                 if (uriRequest != null) {
                     discoveryPath = uriRequest.getDiscoveryPath();
+                    if (referrer.isEmpty()) {
+                        referrer = uriRequest.getReferrer();
+                    }
                 } else {
                     discoveryPath = "";
                     LOG.info("Could not find page request in session. Probably a bug");
@@ -329,7 +329,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
 
     private void finishSpan(UriRequest uriRequest) {
         if (uriRequest != null) {
-            uriRequest.getSpan().finish();
+            uriRequest.finish();
         }
     }
 

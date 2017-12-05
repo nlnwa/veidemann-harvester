@@ -57,7 +57,7 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
     private final Map<String, BrowserScript> scriptCache = new HashMap<>();
 
     public BrowserController(final String chromeHost, final int chromePort, final DbAdapter db,
-            final BrowserSessionRegistry sessionRegistry)
+                             final BrowserSessionRegistry sessionRegistry)
             throws IOException {
 
         this.chrome = new ChromeDebugProtocol(chromeHost, chromePort, GlobalTracer.get());
@@ -127,7 +127,8 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
                 PageLog.Builder pageLog = PageLog.newBuilder()
                         .setUri(queuedUri.getUri())
                         .setExecutionId(queuedUri.getExecutionId())
-                        .setWarcId(session.getUriRequests().getRootRequest().getWarcId());
+                        .setWarcId(session.getUriRequests().getInitialRequest().getWarcId())
+                        .setReferrer(session.getUriRequests().getInitialRequest().getReferrer());
 
                 session.getUriRequests().getPageLogResources().forEach(r -> pageLog.addResource(r));
                 resultBuilder.getOutlinksOrBuilderList().forEach(o -> pageLog.addOutlink(o.getUri()));

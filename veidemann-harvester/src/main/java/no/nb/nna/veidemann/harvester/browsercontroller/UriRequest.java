@@ -21,8 +21,14 @@ import io.opentracing.Tracer;
 import io.opentracing.tag.Tags;
 import io.opentracing.util.GlobalTracer;
 import no.nb.nna.veidemann.chrome.client.NetworkDomain;
+import no.nb.nna.veidemann.chrome.client.NetworkDomain.RequestIntercepted;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  *
@@ -31,9 +37,9 @@ public class UriRequest {
 
     private static final Logger LOG = LoggerFactory.getLogger(UriRequest.class);
 
-    NetworkDomain.RequestWillBeSent request;
+    private String url;
 
-    NetworkDomain.ResponseReceived response;
+    private String interceptionId;
 
     private ResourceType resourceType;
 
@@ -41,7 +47,9 @@ public class UriRequest {
 
     private int statusCode;
 
-    private String discoveryPath = "";
+    private String referrer;
+
+    private String discoveryPath = null;
 
     private UriRequest parent;
 
@@ -49,9 +57,13 @@ public class UriRequest {
 
     private long size = 0L;
 
+    private Double responseSize = null;
+
     private boolean fromCache = false;
 
     private String warcId = "";
+
+    private final BaseSpan parentSpan;
 
     private Span span;
 
@@ -62,43 +74,81 @@ public class UriRequest {
      */
     private boolean rootResource = false;
 
-    private UriRequest(NetworkDomain.RequestWillBeSent request, BaseSpan parentSpan) {
-        this.request = request;
-        this.resourceType = ResourceType.forName(request.type);
-        LOG.debug("RequestId: {}, documentUrl: {}, URL: {}, initiator: {}, redirectResponse: {}, referer: {}",
-                request.requestId, request.documentURL, request.request.url, request.initiator,
-                request.redirectResponse, request.request.headers.get("Referer"));
+    private final Lock lock = new ReentrantLock();
+    private final Condition noReferrer = lock.newCondition();
+    private final Condition noDiscoveryPath = lock.newCondition();
 
-        span = buildSpan(parentSpan, request.request.url);
+    public UriRequest(RequestIntercepted request, String referrer, BaseSpan parentSpan) {
+        this.interceptionId = request.interceptionId;
+        this.url = request.request.url;
+        if (request.isNavigationRequest) {
+            this.referrer = referrer;
+        }
+        this.resourceType = ResourceType.forName(request.resourceType);
+
+        if (request.isNavigationRequest) {
+            this.rootResource = true;
+        }
+
+        this.parentSpan = parentSpan;
     }
 
-    public UriRequest(NetworkDomain.RequestWillBeSent request, String initialDiscoveryPath,
-            BaseSpan parentSpan) {
-
-        this(request, parentSpan);
-        this.discoveryPath = initialDiscoveryPath;
-        this.rootResource = true;
-    }
-
-    public UriRequest(NetworkDomain.RequestWillBeSent request, UriRequest parent,
-            BaseSpan parentSpan) {
-
-        this(request, parentSpan);
+    public UriRequest(UriRequest parent, RequestIntercepted request, BaseSpan parentSpan) {
         this.parent = parent;
-        if (request.redirectResponse != null) {
-            this.rootResource = parent.rootResource;
-            this.statusCode = request.redirectResponse.status.intValue();
-            this.discoveryPath = parent.discoveryPath + "R";
-        } else if ("script".equals(request.initiator.type)) {
-            // Resource is loaded by a script
-            this.discoveryPath = parent.discoveryPath + "X";
-        } else {
-            this.discoveryPath = parent.discoveryPath + "E";
+        this.interceptionId = parent.interceptionId;
+        this.url = request.redirectUrl;
+        this.statusCode = request.redirectStatusCode;
+        this.discoveryPath = parent.discoveryPath + "R";
+        this.referrer = parent.url;
+        this.resourceType = ResourceType.forName(request.resourceType);
+        this.rootResource = parent.rootResource;
+
+        this.parentSpan = parentSpan;
+    }
+
+    public void addRequest(NetworkDomain.RequestWillBeSent request) {
+        if (this.discoveryPath == null && parent != null) {
+            if (request.redirectResponse != null) {
+                setDiscoveryPath(parent.discoveryPath + "R");
+            } else if ("script".equals(request.initiator.type)) {
+                // Resource is loaded by a script
+                setDiscoveryPath(parent.discoveryPath + "X");
+            } else {
+                setDiscoveryPath(parent.discoveryPath + "E");
+            }
         }
     }
 
-    public String getRequestId() {
-        return request.requestId;
+    void addRedirectResponse(NetworkDomain.Response response) {
+        mimeType = response.mimeType;
+        statusCode = response.status.intValue();
+        this.responseSize = response.encodedDataLength;
+    }
+
+    void addResponse(NetworkDomain.ResponseReceived response) {
+        if (this.responseSize != null) {
+            LOG.debug("Already got response, previous length: {}, new length: {}, Referrer: {}, DiscoveryPath: {}",
+                    this.responseSize, response.response.encodedDataLength, referrer, discoveryPath);
+            return;
+        }
+
+        this.responseSize = response.response.encodedDataLength;
+        resourceType = ResourceType.forName(response.type);
+        mimeType = response.response.mimeType;
+        statusCode = response.response.status.intValue();
+
+        renderable = MimeTypes.forType(mimeType)
+                .filter(m -> m.resourceType.category == ResourceType.Category.Document)
+                .isPresent();
+
+//        if (!mimeTypeIsConsistentWithType(this)) {
+//            LOG.error("Resource interpreted as {} but transferred with MIME type {}: \"{}\".", resourceType.title,
+//                    mimeType, getUrl());
+//        }
+    }
+
+    public String getInterceptionId() {
+        return interceptionId;
     }
 
     public ResourceType getResourceType() {
@@ -110,7 +160,7 @@ public class UriRequest {
     }
 
     public String getUrl() {
-        return request.request.url;
+        return url;
     }
 
     public int getStatusCode() {
@@ -118,11 +168,68 @@ public class UriRequest {
     }
 
     public String getDiscoveryPath() {
-        return discoveryPath;
+        lock.lock();
+        try {
+            if (discoveryPath == null) {
+                noDiscoveryPath.await(2, TimeUnit.SECONDS);
+            }
+            if (discoveryPath == null) {
+                LOG.error("Bowser event for updating discovery path was not fired within the time limits");
+                throw new IllegalStateException("Bowser event for updating discovery path was not fired within the time limits");
+            }
+            return discoveryPath;
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public void setDiscoveryPath(String discoveryPath) {
+        lock.lock();
+        try {
+            this.discoveryPath = discoveryPath;
+            noDiscoveryPath.signalAll();
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public String getReferrer() {
+        lock.lock();
+        try {
+            if (referrer == null) {
+                noReferrer.await(2, TimeUnit.SECONDS);
+            }
+            if (referrer == null) {
+                LOG.error("Bowser event for updating referrer was not fired within the time limits");
+                throw new IllegalStateException("Bowser event for updating referrer was not fired within the time limits");
+            }
+            return referrer;
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public void setReferrer(String referrer) {
+        lock.lock();
+        try {
+            this.referrer = referrer;
+            noReferrer.signalAll();
+        } finally {
+            lock.unlock();
+        }
     }
 
     public UriRequest getParent() {
         return parent;
+    }
+
+    public void setParent(UriRequest parent) {
+        setReferrer(parent.url);
+        this.parent = parent;
     }
 
     public boolean isRenderable() {
@@ -157,34 +264,6 @@ public class UriRequest {
         this.warcId = warcId;
     }
 
-    public Span getSpan() {
-        return span;
-    }
-
-    void addResponse(NetworkDomain.ResponseReceived response) {
-        if (this.response != null) {
-            LOG.error("Already got response, previous length: {}, new length: {}", this.response.response.encodedDataLength, response.response.encodedDataLength);
-        }
-
-        this.response = response;
-        if (!request.request.url.equals(response.response.url)) {
-            LOG.warn("URL for request and response mismatched {} - {}", request.request.url, response.response.url);
-        }
-
-        resourceType = ResourceType.forName(response.type);
-        mimeType = response.response.mimeType;
-        statusCode = response.response.status.intValue();
-
-        renderable = MimeTypes.forType(mimeType)
-                .filter(m -> m.resourceType.category == ResourceType.Category.Document)
-                .isPresent();
-
-//        if (!mimeTypeIsConsistentWithType(this)) {
-//            LOG.error("Resource interpreted as {} but transferred with MIME type {}: \"{}\".", resourceType.title,
-//                    mimeType, getUrl());
-//        }
-    }
-
     private static boolean mimeTypeIsConsistentWithType(UriRequest request) {
         // If status is an error, content is likely to be of an inconsistent type,
         // as it's going to be an error message. We do not want to emit a warning
@@ -207,6 +286,18 @@ public class UriRequest {
         }
 
         return MimeTypes.forType(request.getMimeType()).filter(m -> m.resourceType == resourceType).isPresent();
+    }
+
+    public void start() {
+        span = buildSpan(parentSpan, url);
+    }
+
+    public void finish() {
+        span.finish();;
+    }
+
+    public Span getSpan() {
+        return span;
     }
 
     private Span buildSpan(BaseSpan parentSpan, String uri) {

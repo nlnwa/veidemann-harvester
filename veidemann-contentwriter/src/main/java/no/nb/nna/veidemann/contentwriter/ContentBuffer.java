@@ -40,6 +40,8 @@ public class ContentBuffer {
 
     private ByteString payloadBuf;
 
+    private final static String EMPTY_DIGEST_STRING = "sha1:da39a3ee5e6b4b0d3255bfef95601890afd80709";
+
     public ContentBuffer() {
         this.blockDigest = new Sha1Digest();
         this.payloadDigest = new Sha1Digest();
@@ -81,6 +83,9 @@ public class ContentBuffer {
     }
 
     public String getHeaderDigest() {
+        if (headerDigest == null) {
+            return EMPTY_DIGEST_STRING;
+        }
         return headerDigest.getPrefixedDigestString();
     }
 

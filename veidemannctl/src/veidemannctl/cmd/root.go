@@ -21,6 +21,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"io/ioutil"
 	"strings"
 	"veidemannctl/util"
 )
@@ -29,6 +30,7 @@ var (
 	cfgFile           string
 	controllerAddress string
 	Idp               string
+	rootCAs           string
 	debug             bool
 )
 
@@ -38,10 +40,9 @@ var RootCmd = &cobra.Command{
 	Short: "Veidemann command line client",
 	Long:  `A command line client for Veidemann which can manipulate configs and request status of the crawler.`,
 
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
-	//Run: func(cmd *cobra.Command, args []string) {
-	//},
+	Run: func(cmd *cobra.Command, args []string) {
+		cmd.Help()
+	},
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -61,8 +62,10 @@ func init() {
 	RootCmd.PersistentFlags().StringVarP(&controllerAddress, "controllerAddress", "c", "localhost:50051", "Address to the Controller service")
 	viper.BindPFlag("controllerAddress", RootCmd.PersistentFlags().Lookup("controllerAddress"))
 
-	RootCmd.PersistentFlags().StringVarP(&Idp, "idp", "", "", "Address to identity provider")
+	RootCmd.PersistentFlags().StringVar(&Idp, "idp", "", "Address to identity provider")
 	viper.BindPFlag("idp", RootCmd.PersistentFlags().Lookup("idp"))
+
+	RootCmd.PersistentFlags().StringVar(&rootCAs, "issuer-root-ca", "", "Root certificate authorities for the issuer. Defaults to host certs.")
 
 	RootCmd.PersistentFlags().BoolVarP(&debug, "debug", "d", false, "Turn on debugging")
 }
@@ -101,12 +104,23 @@ func initConfig() {
 	if viper.GetString("idp") == "" && viper.GetString("controllerAddress") != "" {
 		ca := strings.SplitN(viper.GetString("controllerAddress"), ":", 2)
 		host := ca[0]
-		Idp = "https://" + host + ":3200/dex"
+		Idp = "https://" + host + ":32000/dex"
 	} else {
 		Idp = viper.GetString("idp")
 	}
 
-	if RootCmd.PersistentFlags().Changed("controllerAddress") || RootCmd.PersistentFlags().Changed("idp") {
+	if rootCAs != "" {
+		rootCABytes, err := ioutil.ReadFile(rootCAs)
+		if err != nil {
+			log.Fatalf("failed to read root-ca: %v", err)
+		}
+		viper.Set("rootCAs", string(rootCABytes))
+	}
+
+	if RootCmd.PersistentFlags().Changed("controllerAddress") ||
+		RootCmd.PersistentFlags().Changed("idp") ||
+		RootCmd.PersistentFlags().Changed("issuer-root-ca") {
+
 		util.WriteConfig()
 	}
 }

@@ -24,7 +24,6 @@ items:
   kind: Deployment
   metadata:
     name: jaeger-deployment
-    namespace: tracing
     labels:
       app: jaeger
       jaeger-infra: jaeger-deployment
@@ -64,7 +63,6 @@ items:
   kind: Service
   metadata:
     name: jaeger-query
-    namespace: tracing
     labels:
       app: jaeger
       jaeger-infra: jaeger-service
@@ -82,7 +80,6 @@ items:
   kind: Service
   metadata:
     name: jaeger-collector
-    namespace: tracing
     labels:
       app: jaeger
       jaeger-infra: collector-service
@@ -107,7 +104,6 @@ items:
   kind: Service
   metadata:
     name: jaeger-agent
-    namespace: tracing
     labels:
       app: jaeger
       jaeger-infra: agent-service
@@ -132,7 +128,6 @@ items:
   kind: Service
   metadata:
     name: zipkin
-    namespace: tracing
     labels:
       app: jaeger
       jaeger-infra: zipkin-service

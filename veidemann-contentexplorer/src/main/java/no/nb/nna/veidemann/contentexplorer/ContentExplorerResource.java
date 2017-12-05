@@ -217,7 +217,7 @@ public class ContentExplorerResource {
         try (Stream<WarcRecord> s = getRecords(fileName);) {
             s.filter(r -> id.equals(r.header.warcRecordIdStr))
                     .forEach(r -> {
-                        html.append("<pre>").append(new String(r.getHttpHeader().getHeader())).append("</pre>");
+                        html.append("<pre>").append(new String(r.getHttpHeader().getHeader()).replaceAll("<", "&lt;")).append("</pre>");
                     });
         } catch (Exception ex) {
             LOG.error(ex.toString(), ex);
@@ -296,6 +296,25 @@ public class ContentExplorerResource {
                     .append("</h3><pre>");
 
             html.append(new String(r.warcRecord.header.headerBytes, StandardCharsets.UTF_8).replaceAll("<", "&lt;"));
+            html.append("</pre>");
+            return html.append(htmlFooter).toString();
+        } catch (Exception ex) {
+            LOG.error(ex.toString(), ex);
+            throw new WebApplicationException(ex, 404);
+        }
+    }
+
+    @GET
+    @Path("storageref/{ref}/httpheader")
+    @Produces(MediaType.TEXT_HTML)
+    public String getHttpHeaderForRef(@PathParam("ref") String storageRef) {
+        try (WarcRecordContainer r = getRecord(storageRef);) {
+            StringBuilder html = new StringBuilder(htmlHeader)
+                    .append("<h3>HTTP headers for ")
+                    .append(storageRef.replaceAll("<", "&lt;"))
+                    .append("</h3><pre>");
+
+            html.append(new String(r.warcRecord.getHttpHeader().getHeader()).replaceAll("<", "&lt;"));
             html.append("</pre>");
             return html.append(htmlFooter).toString();
         } catch (Exception ex) {

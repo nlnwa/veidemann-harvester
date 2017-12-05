@@ -79,7 +79,7 @@
                                     <autoCreateCustomNetworks>true</autoCreateCustomNetworks>
                                     <images>
                                         <image>
-                                            <name>rethinkdb:2.3</name>
+                                            <name>rethinkdb:2.3.6</name>
                                             <alias>db</alias>
                                             <run>
                                                 <network>
@@ -221,8 +221,7 @@
                                         <from>java:8</from>
                                         <maintainer>National Library of Norway</maintainer>
                                         <tags>
-                                            <tag>latest</tag>
-                                            <tag>${project.version}</tag>
+                                            <tag>${docker.tag}</tag>
                                         </tags>
                                         <ports>
                                             <port>50051</port>

@@ -147,8 +147,7 @@
                                         <from>java:8</from>
                                         <maintainer>National Library of Norway</maintainer>
                                         <tags>
-                                            <tag>latest</tag>
-                                            <tag>${project.version}</tag>
+                                            <tag>${docker.tag}</tag>
                                         </tags>
                                         <optimise>true</optimise>
                                         <runCmds>

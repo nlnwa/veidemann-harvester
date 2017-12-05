@@ -122,7 +122,7 @@ public class SimpleCrawlIT implements VeidemannHeaderConstants {
                 .setName("Test entity 1")).build();
         entity = controllerClient.saveEntity(entity);
         ConfigProto.Seed seed = ConfigProto.Seed.newBuilder()
-                .setMeta(ConfigProto.Meta.newBuilder().setName("http://a1.dev"))
+                .setMeta(ConfigProto.Meta.newBuilder().setName("http://a1.com"))
                 .setEntityId(entity.getId())
                 .addJobId(jobId)
                 .build();
@@ -135,12 +135,21 @@ public class SimpleCrawlIT implements VeidemannHeaderConstants {
 
         executeJob(request).get();
 
-        assertThat(WarcInspector.getWarcFiles().getRecordCount()).isEqualTo(15);
+        // TODO: check these values instead of just printing
+        WarcInspector.getWarcFiles().getRecordStream().forEach(r -> System.out.println(r.header.warcTypeStr + " -- "
+                + r.header.warcTargetUriStr));
+
+        assertThat(WarcInspector.getWarcFiles().getRecordCount()).isEqualTo(23L);
 
         CrawlLogListReply crawlLog = db.listCrawlLogs(CrawlLogListRequest.getDefaultInstance());
         PageLogListReply pageLog = db.listPageLogs(PageLogListRequest.getDefaultInstance());
-        assertThat(crawlLog.getCount()).isEqualTo(15);
-        assertThat(pageLog.getCount()).isEqualTo(6);
+
+        // TODO: check these values instead of just printing
+        crawlLog.getValueList().forEach(r -> System.out.println(r.getRequestedUri() + " -- " + r.getStatusCode()
+                + " -- " + r.getContentType() + " -- " + r.getRecordType() + " -- " + r.getReferrer()));
+
+        assertThat(crawlLog.getCount()).isEqualTo(13L);
+        assertThat(pageLog.getCount()).isEqualTo(6L);
 
         try {
             new CrawlExecutionValidator(db).validate();
@@ -150,7 +159,13 @@ public class SimpleCrawlIT implements VeidemannHeaderConstants {
 
         executeJob(request).get();
         crawlLog = db.listCrawlLogs(CrawlLogListRequest.getDefaultInstance());
-        assertThat(crawlLog.getCount()).isEqualTo(27);
+
+        // TODO: check these values instead of just printing
+        System.out.println("---------------");
+        crawlLog.getValueList().forEach(r -> System.out.println(r.getRequestedUri() + " -- " + r.getStatusCode()
+                + " -- " + r.getContentType() + " -- " + r.getRecordType() + " -- " + r.getReferrer()));
+
+        assertThat(crawlLog.getCount()).isEqualTo(22);
     }
 
     JobCompletion executeJob(ControllerProto.RunCrawlRequest crawlRequest) {

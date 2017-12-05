@@ -1,11 +1,4 @@
 # Veidemann app for Kubernetes
----
-# Namespace
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: veidemann
----
 kind: ConfigMap
 apiVersion: v1
 data:
@@ -28,7 +21,6 @@ data:
     </Configuration>
 metadata:
   name: log4j.conf
-  namespace: veidemann
   labels:
     tier: backend
     role: config
@@ -38,7 +30,6 @@ apiVersion: v1
 kind: Service
 metadata:
   name: veidemann-harvester
-  namespace: veidemann
   labels:
     app: harvester
     tier: backend
@@ -64,7 +55,6 @@ apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
   name: veidemann-harvester
-  namespace: veidemann
 spec:
   template:
     metadata:
@@ -75,13 +65,15 @@ spec:
     spec:
       containers:
       - name: browser
-        image: norsknettarkiv/chrome-headless
+        image: norsknettarkiv/chrome-headless:64.0.3269.3
         ports:
         - name: debug
           containerPort: 9222
         env:
         - name: CHROME_OPTS
           value: "--proxy-server=localhost:8080 --ignore-certificate-errors --disable-web-security --allow-running-insecure-content"
+          # --dbus-stub --deterministic-fetch
+          # --disable-background-networking
         volumeMounts:
         - mountPath: /data
           name: workdir
@@ -101,7 +93,7 @@ spec:
         - name: BROWSER_PORT
           value: "9222"
         - name: DB_HOST
-          value: "rethink.db"
+          value: "rethink"
         - name: DB_PORT
           value: "28015"
         - name: CONTENT_WRITER_HOST
@@ -148,7 +140,6 @@ apiVersion: v1
 kind: Service
 metadata:
   name: veidemann-contentwriter
-  namespace: veidemann
   labels:
     app: contentwriter
     tier: backend
@@ -173,7 +164,6 @@ apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
   name: veidemann-contentwriter
-  namespace: veidemann
 spec:
   replicas: 1
   template:
@@ -190,7 +180,7 @@ spec:
         - containerPort: 8080
         env:
         - name: DB_HOST
-          value: "rethink.db"
+          value: "rethink"
         - name: DB_PORT
           value: "28015"
         volumeMounts:
@@ -210,7 +200,7 @@ spec:
         - containerPort: 8081
         env:
         - name: DB_HOST
-          value: "rethink.db"
+          value: "rethink"
         - name: DB_PORT
           value: "28015"
         volumeMounts:
@@ -239,8 +229,9 @@ spec:
       volumes:
       - emptyDir: {}
         name: workdir
-      - emptyDir: {}
-        name: warcs
+      - name: warcs
+        persistentVolumeClaim:
+          claimName: warc-data-claim
       - name: log4j-config
         configMap:
           name: log4j.conf
@@ -251,7 +242,6 @@ apiVersion: v1
 kind: Service
 metadata:
   name: veidemann-frontier
-  namespace: veidemann
   labels:
     app: frontier
     tier: backend
@@ -271,7 +261,6 @@ apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
   name: veidemann-frontier
-  namespace: veidemann
 spec:
   replicas: 1
   template:
@@ -288,7 +277,7 @@ spec:
         - containerPort: 7700
         env:
         - name: DB_HOST
-          value: "rethink.db"
+          value: "rethink"
         - name: DB_PORT
           value: "28015"
         - name: HARVESTER_HOST
@@ -337,7 +326,6 @@ apiVersion: v1
 kind: Service
 metadata:
   name: veidemann-controller
-  namespace: veidemann
   labels:
     app: controller
     tier: backend
@@ -358,7 +346,6 @@ apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
   name: veidemann-controller
-  namespace: veidemann
 spec:
   replicas: 1
   template:
@@ -375,13 +362,18 @@ spec:
         - containerPort: 50051
         env:
         - name: DB_HOST
-          value: "rethink.db"
+          value: "rethink"
         - name: DB_PORT
           value: "28015"
         - name: FRONTIER_HOST
           value: "veidemann-frontier"
         - name: FRONTIER_PORT
           value: "7700"
+        - name: OPENID_CONNECT_ISSUER
+          valueFrom:
+            configMapKeyRef:
+              name: veidemann-config
+              key: openid.connect.issuer
         volumeMounts:
         - name: log4j-config
           mountPath: /veidemann-controller/config/log4j2.xml
@@ -412,7 +404,6 @@ apiVersion: v1
 kind: Service
 metadata:
   name: veidemann-robots
-  namespace: veidemann
   labels:
     app: robots
     tier: backend
@@ -432,7 +423,6 @@ apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
   name: veidemann-robots
-  namespace: veidemann
 spec:
   replicas: 1
   template:
@@ -449,7 +439,7 @@ spec:
         - containerPort: 50052
         env:
         - name: DB_HOST
-          value: "rethink.db"
+          value: "rethink"
         - name: DB_PORT
           value: "28015"
         - name: PROXY_HOST
@@ -486,7 +476,6 @@ apiVersion: v1
 kind: Service
 metadata:
   name: veidemann-dnsresolver
-  namespace: veidemann
   labels:
     app: dnsresolver
     tier: backend
@@ -506,7 +495,6 @@ apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
   name: veidemann-dnsresolver
-  namespace: veidemann
 spec:
   replicas: 1
   template:
@@ -523,11 +511,12 @@ spec:
         - containerPort: 50052
         env:
         - name: DB_HOST
-          value: "rethink.db"
+          value: "rethink"
         - name: DB_PORT
           value: "28015"
         - name: CONTENT_WRITER_HOST
           value: "veidemann-contentwriter"
+
         - name: CONTENT_WRITER_PORT
           value: "8080"
         - name: DNS_SERVER
@@ -562,7 +551,6 @@ apiVersion: v1
 kind: Service
 metadata:
   name: veidemann-api-gateway
-  namespace: veidemann
   labels:
     app: api-gateway
     tier: frontend
@@ -581,7 +569,6 @@ apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
   name: veidemann-api-gateway
-  namespace: veidemann
 spec:
   replicas: 1
   template:
@@ -608,7 +595,6 @@ apiVersion: v1
 kind: Service
 metadata:
   name: veidemann-admin
-  namespace: veidemann
   labels:
     app: admin
     tier: frontend
@@ -629,7 +615,6 @@ apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
   name: veidemann-admin
-  namespace: veidemann
 spec:
   replicas: 1
   template:
@@ -647,64 +632,22 @@ spec:
         env:
         - name: PROXY_ADDR
           value: "veidemann-api-gateway:3010"
-        - name: EXTERNAL_HOSTNAME
-          value: "192.168.99.100"
+        - name: OPENID_CONNECT_ISSUER
+          valueFrom:
+            configMapKeyRef:
+              name: veidemann-config
+              key: openid.connect.issuer
       restartPolicy: Always
       dnsPolicy: ClusterFirst
-
 ---
-# Test web server and dns
+kind: PersistentVolumeClaim
 apiVersion: v1
-kind: Service
 metadata:
-  name: veidemann-testsites
-  namespace: veidemann
-  labels:
-    app: testsites
-    tier: backend
-    role: test
+  name: warc-data-claim
 spec:
-  ports:
-  - name: http
-    port: 80
-    targetPort: http
-    nodePort: 30980
-  - name: dns
-    port: 53
-    targetPort: dns
-    protocol: UDP
-    nodePort: 30953
-  selector:
-    app: testsites
-    tier: backend
-    role: test
-  type: NodePort
----
-apiVersion: apps/v1beta1
-kind: Deployment
-metadata:
-  name: veidemann-testsites
-  namespace: veidemann
-spec:
-  replicas: 1
-  template:
-    metadata:
-      labels:
-        app: testsites
-        tier: backend
-        role: test
-    spec:
-      containers:
-      - name: testsites
-        image: norsknettarkiv/testsites
-        ports:
-        - name: http
-          containerPort: 80
-        - name: dns
-          containerPort: 53
-          protocol: UDP
-        env:
-        - name: HOST
-          value: "veidemann-testsites"
-      restartPolicy: Always
-      dnsPolicy: ClusterFirst
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: gluster-heketi

@@ -41,7 +41,8 @@ public class CrawlExecutionValidator {
     private void checkConsistency() {
         crawlLogs.forEach(cl -> {
             assertThat(warcRecords.keySet())
-                    .as("Missing WARC record for crawllog entry %s", cl.getWarcId())
+                    .as("Missing WARC record for crawllog entry %s with uri: %s",
+                            cl.getWarcId(), cl.getRequestedUri())
                     .contains(cl.getWarcId());
             if (!cl.getWarcRefersTo().isEmpty()) {
                 assertThat(crawlLogs.stream().map(c -> c.getWarcId()))
@@ -53,9 +54,10 @@ public class CrawlExecutionValidator {
             assertThat(warcRecords.keySet())
                     .as("Missing WARC record for pagelog entry %s", pl.getWarcId())
                     .contains(pl.getWarcId());
-            pl.getResourceList().forEach(r -> {
+            pl.getResourceList().stream().filter(r -> !r.getFromCache()).forEach(r -> {
                 assertThat(warcRecords.keySet())
-                        .as("Missing WARC record for crawllog resource entry %s", r.getWarcId())
+                        .as("Missing WARC record for crawllog resource entry %s with uri: %s",
+                                r.getWarcId(), r.getUri())
                         .contains(r.getWarcId());
             });
         });

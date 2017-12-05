@@ -126,10 +126,10 @@ public class EntryPoint {
                 .addStatement("this.$1N = $1N", port)
                 .addStatement("this.$1N = $1N", tracer)
                 .addStatement("this.$1N = $1N", withActiveSpanOnly)
-                .addStatement("$N = new Cdp($L, $N, $N)", protocolClient, createUrl("ws", host, port, "/devtools/browser"), tracer, withActiveSpanOnly);
+                .addStatement("$N = new Cdp($N, $N, $N, $N)", protocolClient, host, port, tracer, withActiveSpanOnly);
 
         for (Domain domain : domains) {
-            if ("Target".equals(domain.domain)) {
+            if ("Target".equals(domain.domain) || "Browser".equals(domain.domain)) {
                 FieldSpec field = FieldSpec
                         .builder(domain.className, uncap(domain.domain), Modifier.FINAL)
                         .build();
@@ -231,10 +231,6 @@ public class EntryPoint {
                 .addStatement("return contextIds")
                 .build();
         classBuilder.addMethod(getOpenContexts);
-    }
-
-    public static CodeBlock createUrl(String protocol, FieldSpec host, FieldSpec port, String path) {
-        return CodeBlock.of("$S + $N + $S + $N + $S", protocol + "://", host, ":", port, path);
     }
 
 }

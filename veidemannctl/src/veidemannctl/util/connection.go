@@ -67,7 +67,9 @@ func AddCredentials(opts []grpc.DialOption) []grpc.DialOption {
 	}
 
 	a.CheckStoredAccessToken()
-	log.Debugf("Raw IdToken: %s", a.oauth2Token.TokenType)
+	if a.oauth2Token != nil {
+		log.Debugf("Raw IdToken: %s", a.oauth2Token.TokenType)
+	}
 	if a.rawIdToken == "" {
 		return opts
 	}

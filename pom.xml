@@ -49,17 +49,17 @@
         <io.opentracing.version>0.30.0</io.opentracing.version>
         <io.opentracing.brave.version>0.20.0</io.opentracing.brave.version>
         <com.uber.jaeger.version>0.21.0</com.uber.jaeger.version>
-        <io.grpc.version>1.6.1</io.grpc.version>
-        <io.grpc.protoc-gen-grpc-java.version>1.6.1</io.grpc.protoc-gen-grpc-java.version>
-        <com.google.protobuf.protoc.version>3.3.0</com.google.protobuf.protoc.version>
+        <io.grpc.version>1.7.1</io.grpc.version>
+        <io.grpc.protoc-gen-grpc-java.version>1.7.0</io.grpc.protoc-gen-grpc-java.version>
+        <com.google.protobuf.protoc.version>3.4.0</com.google.protobuf.protoc.version>
         <io.zipkin.reporter.version>0.10.0</io.zipkin.reporter.version>
         <io.zipkin.brave.version>4.3.4</io.zipkin.brave.version>
         <antlr.version>4.7</antlr.version>
         <antlr4test-maven-plugin.version>1.8</antlr4test-maven-plugin.version>
 
         <!--Properties for golang-->
-        <go.sdk.version>1.8.3</go.sdk.version>
-        <go.wrapper.plugin.version>2.1.5</go.wrapper.plugin.version>
+        <go.sdk.version>1.9.2</go.sdk.version>
+        <go.wrapper.plugin.version>2.1.6</go.wrapper.plugin.version>
     </properties>
 
     <repositories>

@@ -69,23 +69,16 @@
                                 <package>github.com/coreos/go-oidc</package>
                                 <package>github.com/sirupsen/logrus</package>
                                 <package>github.com/jteeuwen/go-bindata/...</package>
-                            </packages>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>default-build</id>
-                        <configuration>
-                            <packages>
-                                <main>veidemannctl/main.go</main>
+                                <package>github.com/inconshreveable/mousetrap</package>
                             </packages>
                         </configuration>
                     </execution>
                     <!-- This execution will block default build process -->
-                    <!--                    <execution>
+                    <execution>
                         <id>default-build</id>
                         <phase>none</phase>
                     </execution>
-                     This execution will build version for linux amd64
+                     <!--Build 64 bit versions for linux, windows and mac-->
                     <execution>
                         <id>build-for-linux64</id>
                         <goals>
@@ -94,39 +87,10 @@
                         <configuration>
                             <targetOs>linux</targetOs>
                             <targetArch>amd64</targetArch>
-                            <resultName>${project.build.finalName}-linux-amd64</resultName>
+                            <resultFolder>${project.build.directory}/linux/amd64</resultFolder>
+                            <resultName>${project.build.finalName}</resultName>
                             <packages>
-                                <app>main.go</app>
-                            </packages>
-                        </configuration>
-                    </execution>
-                     This execution will build version for linux i386
-                    <execution>
-                        <id>build-for-linux386</id>
-                        <goals>
-                            <goal>build</goal>
-                        </goals>
-                        <configuration>
-                            <targetOs>linux</targetOs>
-                            <targetArch>386</targetArch>
-                            <resultName>${project.build.finalName}-linux-386</resultName>
-                            <packages>
-                                <app>main.go</app>
-                            </packages>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>build-for-windows386</id>
-                        <goals>
-                            <goal>build</goal>
-                        </goals>
-                        <configuration>
-                            <strip>true</strip>
-                            <targetOs>windows</targetOs>
-                            <targetArch>386</targetArch>
-                            <resultName>${project.build.finalName}-windows-386.exe</resultName>
-                            <packages>
-                                <app>main.go</app>
+                                <main>veidemannctl/main.go</main>
                             </packages>
                         </configuration>
                     </execution>
@@ -139,24 +103,10 @@
                             <strip>true</strip>
                             <targetOs>windows</targetOs>
                             <targetArch>amd64</targetArch>
-                            <resultName>${project.build.finalName}-windows-amd64.exe</resultName>
+                            <resultFolder>${project.build.directory}/windows/amd64</resultFolder>
+                            <resultName>${project.build.finalName}.exe</resultName>
                             <packages>
-                                <app>main.go</app>
-                            </packages>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>build-for-macos386</id>
-                        <goals>
-                            <goal>build</goal>
-                        </goals>
-                        <configuration>
-                            <strip>true</strip>
-                            <targetOs>darwin</targetOs>
-                            <targetArch>386</targetArch>
-                            <resultName>${project.build.finalName}-macos-386</resultName>
-                            <packages>
-                                <app>main.go</app>
+                                <main>veidemannctl/main.go</main>
                             </packages>
                         </configuration>
                     </execution>
@@ -169,12 +119,61 @@
                             <strip>true</strip>
                             <targetOs>darwin</targetOs>
                             <targetArch>amd64</targetArch>
-                            <resultName>${project.build.finalName}-macos-amd64</resultName>
+                            <resultFolder>${project.build.directory}/darwin/amd64</resultFolder>
+                            <resultName>${project.build.finalName}</resultName>
                             <packages>
-                                <app>main.go</app>
+                                <main>veidemannctl/main.go</main>
                             </packages>
                         </configuration>
-                    </execution>-->
+                    </execution>
+                    <!--Build 32 bit versions for linux, windows and mac-->
+                    <!--<execution>-->
+                        <!--<id>build-for-linux386</id>-->
+                        <!--<goals>-->
+                            <!--<goal>build</goal>-->
+                        <!--</goals>-->
+                        <!--<configuration>-->
+                            <!--<targetOs>linux</targetOs>-->
+                            <!--<targetArch>386</targetArch>-->
+                            <!--<resultFolder>${project.build.directory}/linux/386</resultFolder>-->
+                            <!--<resultName>${project.build.finalName}</resultName>-->
+                            <!--<packages>-->
+                                <!--<main>veidemannctl/main.go</main>-->
+                            <!--</packages>-->
+                        <!--</configuration>-->
+                    <!--</execution>-->
+                    <!--<execution>-->
+                        <!--<id>build-for-windows386</id>-->
+                        <!--<goals>-->
+                            <!--<goal>build</goal>-->
+                        <!--</goals>-->
+                        <!--<configuration>-->
+                            <!--<strip>true</strip>-->
+                            <!--<targetOs>windows</targetOs>-->
+                            <!--<targetArch>386</targetArch>-->
+                            <!--<resultFolder>${project.build.directory}/windows/386</resultFolder>-->
+                            <!--<resultName>${project.build.finalName}.exe</resultName>-->
+                            <!--<packages>-->
+                                <!--<main>veidemannctl/main.go</main>-->
+                            <!--</packages>-->
+                        <!--</configuration>-->
+                    <!--</execution>-->
+                    <!--<execution>-->
+                        <!--<id>build-for-macos386</id>-->
+                        <!--<goals>-->
+                            <!--<goal>build</goal>-->
+                        <!--</goals>-->
+                        <!--<configuration>-->
+                            <!--<strip>true</strip>-->
+                            <!--<targetOs>darwin</targetOs>-->
+                            <!--<targetArch>386</targetArch>-->
+                            <!--<resultFolder>${project.build.directory}/darwin/386</resultFolder>-->
+                            <!--<resultName>${project.build.finalName}</resultName>-->
+                            <!--<packages>-->
+                                <!--<main>veidemannctl/main.go</main>-->
+                            <!--</packages>-->
+                        <!--</configuration>-->
+                    <!--</execution>-->
                 </executions>
             </plugin>
             <plugin>

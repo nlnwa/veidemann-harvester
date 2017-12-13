@@ -142,6 +142,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                     // Fix headers before sending to final destination
                     request.headers().set("Accept-Encoding", "identity");
                     request.headers().remove(EXECUTION_ID);
+                    request.headers().remove(CHROME_INTERCEPTION_ID);
 
                     crawlLog.setFetchTimeStamp(ProtoUtils.getNowTs())
                             .setReferrer(referrer)
@@ -179,6 +180,10 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
 
                 HttpResponse res = (HttpResponse) httpObject;
                 responseCollector.setResponseHeaders(res, crawlLog);
+
+                if (uriRequest != null) {
+                    res.headers().add(CHROME_INTERCEPTION_ID, uriRequest.getInterceptionId());
+                }
 
                 responseSpan.log("Got response headers");
                 handled = true;
@@ -294,7 +299,11 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                 LOG.error("Could not find session. Probably a bug");
                 discoveryPath = "";
             } else {
-                uriRequest = session.getUriRequests().getByUrl(uri);
+                String interceptionId = request.headers().get(CHROME_INTERCEPTION_ID);
+
+                if (interceptionId != null) {
+                    uriRequest = session.getUriRequests().getByInterceptionId(interceptionId);
+                }
 
                 if (uriRequest != null) {
                     discoveryPath = uriRequest.getDiscoveryPath();

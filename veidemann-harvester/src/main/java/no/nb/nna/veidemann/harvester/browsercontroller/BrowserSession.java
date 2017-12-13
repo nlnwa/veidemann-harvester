@@ -119,7 +119,7 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
             ).get(config.getBrowserConfig().getPageLoadTimeoutMs(), MILLISECONDS);
 
             // set up listeners
-            session.network.onRequestIntercepted(nr -> this.onNavigationRequested(nr));
+            session.network.onRequestIntercepted(nr -> this.onRequestIntercepted(nr));
             session.network.onRequestWillBeSent(r -> {
                 uriRequests.onRequestWillBeSent(r);
             });
@@ -215,24 +215,27 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
         }
     }
 
-    void onNavigationRequested(NetworkDomain.RequestIntercepted nr) {
+    void onRequestIntercepted(NetworkDomain.RequestIntercepted intercepted) {
         try {
-            if (nr.authChallenge != null) {
-                uriRequests.onRequestIntercepted(nr, queuedUri, false);
+            Map<String, Object> headers = intercepted.request.headers;
+            headers.put(CHROME_INTERCEPTION_ID, intercepted.interceptionId);
+
+            if (intercepted.authChallenge != null) {
+                uriRequests.onRequestIntercepted(intercepted, queuedUri, false);
 
                 // TODO: Add option for filling in user/passwd
                 AuthChallengeResponse authChallengeResponse = new AuthChallengeResponse();
                 authChallengeResponse.response = "Default";
-                session.network.continueInterceptedRequest(nr.interceptionId, null, null, null, null, null, null, authChallengeResponse);
-            } else if (!followRedirects && nr.isNavigationRequest && nr.redirectUrl != null) {
+                session.network.continueInterceptedRequest(intercepted.interceptionId, null, null, null, null, null, null, authChallengeResponse);
+            } else if (!followRedirects && intercepted.isNavigationRequest && intercepted.redirectUrl != null) {
                 // Request is a redirect and we are configured to not follow it.
                 LOG.debug("Aborting follow redirect");
-                uriRequests.onRequestIntercepted(nr, queuedUri, true);
-                session.network.continueInterceptedRequest(nr.interceptionId, "Aborted", null, null, null, null, null, null);
+                uriRequests.onRequestIntercepted(intercepted, queuedUri, true);
+                session.network.continueInterceptedRequest(intercepted.interceptionId, "Aborted", null, null, null, null, headers, null);
             } else {
-                uriRequests.onRequestIntercepted(nr, queuedUri, false);
-                session.network.continueInterceptedRequest(nr.interceptionId, null, null, null,
-                        null, null, null, null);
+                uriRequests.onRequestIntercepted(intercepted, queuedUri, false);
+                session.network.continueInterceptedRequest(intercepted.interceptionId, null, null, null,
+                        null, null, headers, null);
             }
         } catch (Throwable ex) {
             ex.printStackTrace();

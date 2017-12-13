@@ -19,6 +19,7 @@ import io.opentracing.BaseSpan;
 import no.nb.nna.veidemann.api.MessagesProto.PageLog.Resource;
 import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
 import no.nb.nna.veidemann.chrome.client.NetworkDomain;
+import no.nb.nna.veidemann.commons.VeidemannHeaderConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -32,7 +33,7 @@ import java.util.stream.Stream;
 /**
  *
  */
-public class UriRequestRegistry implements AutoCloseable {
+public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstants {
 
     private static final Logger LOG = LoggerFactory.getLogger(UriRequestRegistry.class);
 
@@ -69,7 +70,7 @@ public class UriRequestRegistry implements AutoCloseable {
         return requestIdToUrl.get(requestId);
     }
 
-    private synchronized UriRequest getByInterceptionId(String interceptionId) {
+    public synchronized UriRequest getByInterceptionId(String interceptionId) {
         return requestsByInterceptionId.get(interceptionId);
     }
 
@@ -192,7 +193,7 @@ public class UriRequestRegistry implements AutoCloseable {
         MDC.put("eid", executionId);
         MDC.put("uri", r.response.url);
 
-
+        System.out.println("XXXX: " + r.response.headers.get(CHROME_INTERCEPTION_ID));
         UriRequest request = getByUrl(r.response.url);
         if (request == null) {
             LOG.error(

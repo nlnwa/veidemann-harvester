@@ -212,7 +212,7 @@
                         </run>
                     </image>
                     <image>
-                        <name>norsknettarkiv/chrome-headless</name>
+                        <name>norsknettarkiv/chrome-headless:${chrome.version}</name>
                         <alias>browser</alias>
                         <run>
                             <user>${uid}</user>

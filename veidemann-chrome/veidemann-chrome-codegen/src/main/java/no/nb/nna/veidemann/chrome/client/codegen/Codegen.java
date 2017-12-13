@@ -30,9 +30,19 @@ public class Codegen {
 
     static ClassName CLIENT_CLASS = ClassName.get(PACKAGE + ".ws", "Cdp");
 
-    static String CHROME_VERSION = "64.0.3269.3";
+    static String CHROME_VERSION;
 
     public static void main(String args[]) throws IOException {
+        if (args.length < 2) {
+            throw new IllegalArgumentException("Missing required arguments. Usage: Codegen <chrome_version> <generated_code_dir>");
+        }
+
+        CHROME_VERSION = args[0];
+        File outdir = new File(args[1]);
+
+        System.out.println("Generating client for Chrome version: " + CHROME_VERSION);
+        System.out.println("Sources generated in: " + outdir);
+
         String browserProtocol = "https://chromium.googlesource.com/chromium/src/+/"
                 + CHROME_VERSION + "/third_party/WebKit/Source/core/inspector/browser_protocol.json?format=text";
 
@@ -42,7 +52,6 @@ public class Codegen {
         Protocol protocol = loadProtocol(browserProtocol);
         protocol.merge(loadProtocol(jsProtocol));
 
-        File outdir = args.length > 0 ? new File(args[0]) : null;
         protocol.gencode(outdir);
     }
 

@@ -28,6 +28,12 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Stream;
 
 /**
@@ -42,11 +48,7 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
     // List of all requests since redirects reuses requestId
     private final List<UriRequest> allRequests = new ArrayList<>();
 
-    private final Map<String, String> requestIdToUrl = new HashMap<>();
-
     private final Map<String, UriRequest> requestsByInterceptionId = new HashMap<>();
-
-    private final Map<String, UriRequest> requestsByUrl = new HashMap<>();
 
     /**
      * The request initializing the page load
@@ -61,55 +63,124 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
 
     private final BaseSpan span;
 
+    private ExecutorService executorService = Executors.newCachedThreadPool();
+
+    private final Lock allRequestsLock = new ReentrantLock();
+    private final Condition allRequestsUpdate = allRequestsLock.newCondition();
+
     public UriRequestRegistry(final String executionId, final BaseSpan span) {
         this.executionId = executionId;
         this.span = span;
-    }
-
-    private synchronized String getUrlForRequestId(String requestId) {
-        return requestIdToUrl.get(requestId);
     }
 
     public synchronized UriRequest getByInterceptionId(String interceptionId) {
         return requestsByInterceptionId.get(interceptionId);
     }
 
-    public synchronized UriRequest getByUrl(String url) {
-        return requestsByUrl.get(url);
+    public UriRequest getByRequestId(String requestId) {
+        allRequestsLock.lock();
+        try {
+            long timeLimit = System.currentTimeMillis() + 5000L;
+            while (System.currentTimeMillis() < timeLimit) {
+                for (UriRequest r : allRequests) {
+                    if (r.getRequestId().contains(requestId) && r.getChildren().isEmpty()) {
+                        return r;
+                    }
+                }
+                allRequestsUpdate.await(1, TimeUnit.SECONDS);
+            }
+
+            LOG.error("Request for id {} not found", requestId);
+            throw new RuntimeException("Request for id " + requestId + " not found");
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        } finally {
+            allRequestsLock.unlock();
+        }
     }
 
-    public synchronized void add(UriRequest pageRequest) {
-        if (!requestsByUrl.containsKey(pageRequest.getUrl())) {
+    public UriRequest getByUrl(String url, boolean onlyLeafNodes) {
+        allRequestsLock.lock();
+        try {
+            long timeLimit = System.currentTimeMillis() + 5000L;
+            while (System.currentTimeMillis() < timeLimit) {
+                for (UriRequest r : allRequests) {
+                    if (r.getUrl().equals(url) && (!onlyLeafNodes || r.getChildren().isEmpty())) {
+                        return r;
+                    }
+                }
+                allRequestsUpdate.await(1, TimeUnit.SECONDS);
+            }
+            LOG.error("Request for url {} not found", url, new RuntimeException());
+            throw new RuntimeException("Request for url " + url + " not found");
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        } finally {
+            allRequestsLock.unlock();
+        }
+    }
+
+    public UriRequest getByUrlWithEqualOrEmptyRequestId(String url, String requestId) {
+        allRequestsLock.lock();
+        try {
+            long timeLimit = System.currentTimeMillis() + 5000L;
+            while (System.currentTimeMillis() < timeLimit) {
+                for (UriRequest r : allRequests) {
+                    if (r.getUrl().equals(url) && r.getChildren().isEmpty()) {
+                        if (r.getRequestId().contains(requestId) || r.getRequestId().isEmpty()) {
+                            return r;
+                        }
+                    }
+                }
+                allRequestsUpdate.await(1, TimeUnit.SECONDS);
+            }
+            LOG.error("Request for url {} not found", url, new RuntimeException());
+            throw new RuntimeException("Request for url " + url + " not found");
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        } finally {
+            allRequestsLock.unlock();
+        }
+    }
+
+    public void add(UriRequest pageRequest) {
+        allRequestsLock.lock();
+        try {
             if (pageRequest.isRootResource()) {
                 rootRequest = pageRequest;
             }
             allRequests.add(pageRequest);
             requestsByInterceptionId.put(pageRequest.getInterceptionId(), pageRequest);
-            requestsByUrl.put(pageRequest.getUrl(), pageRequest);
 
             pageRequest.start();
+            allRequestsUpdate.signalAll();
+        } finally {
+            allRequestsLock.unlock();
         }
     }
 
-    public synchronized UriRequest getRootRequest() {
+    public UriRequest getRootRequest() {
         return rootRequest;
     }
 
-    public synchronized UriRequest getInitialRequest() {
+    public UriRequest getInitialRequest() {
         return initialRequest;
     }
 
-    public synchronized long getBytesDownloaded() {
+    public List<UriRequest> getAllRequests() {
+        return allRequests;
+    }
+
+    public long getBytesDownloaded() {
         return allRequests.stream().mapToLong(r -> r.getSize()).sum();
     }
 
-    public synchronized int getUriDownloadedCount() {
+    public int getUriDownloadedCount() {
         return (int) allRequests.stream().filter(r -> !r.isFromCache()).count();
     }
 
-    public synchronized Stream<Resource> getPageLogResources() {
+    public Stream<Resource> getPageLogResources() {
         return allRequests.stream()
-                .filter(r -> r.getParent() != null)
                 .map(r -> {
                     Resource.Builder b = Resource.newBuilder()
                             .setUri(r.getUrl())
@@ -132,51 +203,94 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
         MDC.put("eid", executionId);
         MDC.put("uri", request.request.url);
 
+        if (request.redirectUrl == null && (request.responseHeaders != null || request.responseStatusCode != null || request.responseErrorReason != null)) {
+            String responseInterceptionId = (String) request.responseHeaders.get(CHROME_INTERCEPTION_ID);
+            if (!request.interceptionId.equals(responseInterceptionId)) {
+                allRequestsLock.lock();
+                try {
+                    UriRequest old = getByInterceptionId(request.interceptionId);
+                    old.getParent().getChildren().remove(old);
+                    old.getParent().getChildren().add(getByInterceptionId(responseInterceptionId));
+                    allRequests.remove(old);
+                    old.finish();
+                    allRequestsUpdate.signalAll();
+                } finally {
+                    allRequestsLock.unlock();
+                }
+            }
+            return;
+        }
+
         UriRequest newRequest;
         UriRequest parent = getByInterceptionId(request.interceptionId);
         if (parent == null) {
-            newRequest = new UriRequest(request, queuedUri.getReferrer(), span);
+            newRequest = new UriRequest(request, aborted, span);
         } else if (request.redirectUrl != null) {
-            newRequest = new UriRequest(parent, request, span);
+            newRequest = new UriRequest(parent, request, aborted, span);
+        } else if (request.authChallenge != null) {
+            newRequest = new UriRequest(parent, request, aborted, span);
+            // TODO: Handle auth challenge
+            LOG.error("TODO: Handle auth challenge");
         } else {
-            throw new RuntimeException("TODO: Handle auth challenge");
+            newRequest = new UriRequest(parent, request, aborted, span);
         }
-        if (allRequests.isEmpty()) {
-            initialRequest = newRequest;
-            newRequest.setDiscoveryPath(queuedUri.getDiscoveryPath());
-        }
-        add(newRequest);
-    }
 
-    synchronized void onRequestWillBeSent(NetworkDomain.RequestWillBeSent request) {
-        MDC.put("eid", executionId);
-        MDC.put("uri", request.request.url);
-
-        if (request.redirectResponse == null) {
-            UriRequest initiator = getByUrl(request.initiator.url);
-            UriRequest req = getByUrl(request.request.url);
-            if (req == null) {
-                LOG.error("Could not find request: {}" + request.request.url);
+        allRequestsLock.lock();
+        try {
+            String referrer;
+            if (allRequests.isEmpty()) {
+                initialRequest = newRequest;
+                newRequest.setDiscoveryPath(queuedUri.getDiscoveryPath());
+                referrer = queuedUri.getReferrer();
             } else {
-                if (initiator != null) {
-                    req.setParent(initiator);
-                }
-                req.addRequest(request);
-                requestIdToUrl.put(request.requestId, request.request.url);
+                referrer = rootRequest.getUrl();
             }
-        } else if (!request.redirectResponse.fromDiskCache) {
-            UriRequest req = getByUrl(request.redirectResponse.url);
-            req.addRedirectResponse(request.redirectResponse);
-            requestIdToUrl.put(request.requestId, request.redirectResponse.url);
+            newRequest.setReferrer((String) request.request.headers.getOrDefault("Referer", referrer));
+            add(newRequest);
+        } finally {
+            allRequestsLock.unlock();
         }
     }
 
-    synchronized void onLoadingFailed(NetworkDomain.LoadingFailed f) {
+    private class RequestWillBeSentHandler implements Runnable {
+        final NetworkDomain.RequestWillBeSent request;
+
+        public RequestWillBeSentHandler(NetworkDomain.RequestWillBeSent request) {
+            this.request = request;
+        }
+
+        @Override
+        public void run() {
+            MDC.put("eid", executionId);
+            MDC.put("uri", request.request.url);
+            if (request.redirectResponse == null) {
+                UriRequest r = getByUrlWithEqualOrEmptyRequestId(request.request.url, request.requestId);
+                r.setRequestId(request.requestId);
+                if (r.getParent() == null) {
+                    r.addRequest(request, rootRequest.getDiscoveryPath());
+                } else {
+                    r.addRequest(request, r.getParent().getDiscoveryPath());
+                }
+            } else if (!request.redirectResponse.fromDiskCache) {
+                UriRequest r = getByUrl(request.redirectResponse.url, false);
+                r.setRequestId(request.requestId);
+                r.addRedirectResponse(request.redirectResponse);
+            }
+        }
+    }
+
+    void onRequestWillBeSent(NetworkDomain.RequestWillBeSent request) {
+        // The order of events from Chrome is a bit random. In case this event is triggered before requestIntercepted,
+        // we have to wait until that event is triggered. This is done in a separate thread.
+        executorService.submit(new RequestWillBeSentHandler(request));
+    }
+
+    void onLoadingFailed(NetworkDomain.LoadingFailed f) {
         // net::ERR_EMPTY_RESPONSE
         // net::ERR_CONNECTION_TIMED_OUT
         // net::ERR_CONTENT_LENGTH_MISMATCH
         // net::ERR_TUNNEL_CONNECTION_FAILED
-        UriRequest request = getByUrl(getUrlForRequestId(f.requestId));
+        UriRequest request = getByRequestId(f.requestId);
         MDC.put("eid", executionId);
         MDC.put("uri", request.getUrl());
         if (!f.canceled) {
@@ -189,19 +303,23 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
         request.finish();
     }
 
-    synchronized void onResponseReceived(NetworkDomain.ResponseReceived r) {
+    void onResponseReceived(NetworkDomain.ResponseReceived r) {
         MDC.put("eid", executionId);
         MDC.put("uri", r.response.url);
 
-        System.out.println("XXXX: " + r.response.headers.get(CHROME_INTERCEPTION_ID));
-        UriRequest request = getByUrl(r.response.url);
-        if (request == null) {
-            LOG.error(
-                    "Response received, but we missed the request: reqId '{}', loaderId '{}', ts '{}', type '{}', resp '{}', frameId '{}'",
-                    r.requestId, r.loaderId, r.timestamp, r.type, r.response, r.frameId);
-        } else {
-            if (!r.response.fromDiskCache) {
-                request.addResponse(r);
+        if (!r.response.fromDiskCache) {
+            allRequestsLock.lock();
+            try {
+                UriRequest request = getByInterceptionId((String) r.response.headers.get(CHROME_INTERCEPTION_ID));
+                if (request == null) {
+                    LOG.error(
+                            "Response received, but we missed the request: reqId '{}', loaderId '{}', ts '{}', type '{}', resp '{}', frameId '{}'",
+                            r.requestId, r.loaderId, r.timestamp, r.type, r.response, r.frameId);
+                } else {
+                    request.addResponse(r);
+                }
+            } finally {
+                allRequestsLock.unlock();
             }
         }
 
@@ -209,8 +327,13 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
 
     @Override
     public synchronized void close() {
-        // Ensure that potensially unfinished spans are finshed
+        // Ensure that potentially unfinished spans are finshed
         allRequests.forEach(r -> r.finish());
     }
 
+    public String printAllRequests() {
+        StringBuilder sb = new StringBuilder();
+        allRequests.forEach(r -> sb.append("- " + r).append('\n'));
+        return sb.toString();
+    }
 }

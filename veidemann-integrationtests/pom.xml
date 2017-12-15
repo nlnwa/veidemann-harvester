@@ -177,7 +177,7 @@
                                             <port>+browser.host:browser.port:9222</port>
                                         </ports>
                                         <env>
-                                            <CHROME_OPTS>--ignore-certificate-errors --disable-web-security --allow-running-insecure-content --proxy-server=harvester:8080 --dbus-stub --deterministic-fetch --disable-background-networking</CHROME_OPTS>
+                                            <CHROME_OPTS>--ignore-certificate-errors --disable-web-security --allow-running-insecure-content --proxy-server=harvester:8080 --dbus-stub</CHROME_OPTS>
                                         </env>
                                         <volumes>
                                             <bind>

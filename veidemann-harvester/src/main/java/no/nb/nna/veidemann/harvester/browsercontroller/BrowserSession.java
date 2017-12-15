@@ -15,39 +15,29 @@
  */
 package no.nb.nna.veidemann.harvester.browsercontroller;
 
-import java.io.IOException;
-import java.time.OffsetDateTime;
-import java.util.ArrayList;
-import java.util.Base64;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeoutException;
-import java.util.stream.Collectors;
-
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.protobuf.ByteString;
 import io.opentracing.BaseSpan;
-import no.nb.nna.veidemann.chrome.client.ChromeDebugProtocol;
-import no.nb.nna.veidemann.chrome.client.DebuggerDomain;
-import no.nb.nna.veidemann.chrome.client.NetworkDomain;
+import no.nb.nna.veidemann.api.ConfigProto;
+import no.nb.nna.veidemann.api.MessagesProto;
+import no.nb.nna.veidemann.chrome.client.*;
 import no.nb.nna.veidemann.chrome.client.NetworkDomain.AuthChallengeResponse;
 import no.nb.nna.veidemann.chrome.client.NetworkDomain.RequestPattern;
-import no.nb.nna.veidemann.chrome.client.PageDomain;
-import no.nb.nna.veidemann.chrome.client.RuntimeDomain;
-import no.nb.nna.veidemann.chrome.client.Session;
 import no.nb.nna.veidemann.commons.VeidemannHeaderConstants;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.util.ApiTools;
 import no.nb.nna.veidemann.db.ProtoUtils;
-import no.nb.nna.veidemann.api.ConfigProto;
-import no.nb.nna.veidemann.api.MessagesProto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.time.OffsetDateTime;
+import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
@@ -79,7 +69,8 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
         uriRequests = new UriRequestRegistry(executionId, span);
         this.executionId = Objects.requireNonNull(executionId);
         protocolTimeout = config.getBrowserConfig().getPageLoadTimeoutMs();
-        sleepAfterPageLoad = config.getBrowserConfig().getSleepAfterPageloadMs();
+        // Ensure that we at least wait half a second even if the configuration says less.
+        sleepAfterPageLoad = Math.max(config.getBrowserConfig().getSleepAfterPageloadMs(), 500);
 
         try {
             session = chrome.newSession(
@@ -106,16 +97,25 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
 
             CompletableFuture.allOf(
                     session.debugger.enable(),
-                    session.debugger.setBreakpointsActive(true),
-                    session.debugger.setAsyncCallStackDepth(32),
+                    session.network.enable(null, null),
                     session.page.enable(),
                     session.runtime.enable(),
-                    session.security.enable(),
+                    session.security.enable()
+            ).get(config.getBrowserConfig().getPageLoadTimeoutMs(), MILLISECONDS);
+
+            // Request patterns for enabling interception on requests and responses
+            RequestPattern rp1 = new RequestPattern();
+            RequestPattern rp2 = new RequestPattern();
+            rp2.interceptionStage = "HeadersReceived";
+            List<RequestPattern> requestPatterns = ImmutableList.of(rp1, rp2);
+
+            CompletableFuture.allOf(
+                    session.debugger.setBreakpointsActive(true),
+                    session.debugger.setAsyncCallStackDepth(32),
                     session.security.setOverrideCertificateErrors(true),
-                    session.network.enable(null, null),
                     session.network.setCacheDisabled(true),
                     setUserAgent,
-                    session.network.setRequestInterception(Collections.singletonList(new RequestPattern()))
+                    session.network.setRequestInterception(requestPatterns)
             ).get(config.getBrowserConfig().getPageLoadTimeoutMs(), MILLISECONDS);
 
             // set up listeners
@@ -209,6 +209,7 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
             loaded.get(protocolTimeout, MILLISECONDS);
 
             // wait a little for any onload javascript to fire
+            LOG.debug("Wait {}ms for javascripts to fire", sleepAfterPageLoad);
             Thread.sleep(sleepAfterPageLoad);
         } catch (InterruptedException | ExecutionException | TimeoutException ex) {
             throw new RuntimeException(ex);

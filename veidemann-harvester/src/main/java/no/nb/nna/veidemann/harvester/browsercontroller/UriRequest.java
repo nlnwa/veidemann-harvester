@@ -25,6 +25,10 @@ import no.nb.nna.veidemann.chrome.client.NetworkDomain.RequestIntercepted;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
@@ -39,7 +43,9 @@ public class UriRequest {
 
     private String url;
 
-    private String interceptionId;
+    private final String interceptionId;
+
+    private Set<String> requestId = new HashSet<>();
 
     private ResourceType resourceType;
 
@@ -53,11 +59,13 @@ public class UriRequest {
 
     private UriRequest parent;
 
+    private List<UriRequest> children = new ArrayList<>();
+
     private boolean renderable = false;
 
     private long size = 0L;
 
-    private Double responseSize = null;
+    private Double responseSize = 0d;
 
     private boolean fromCache = false;
 
@@ -67,6 +75,8 @@ public class UriRequest {
 
     private Span span;
 
+    private final boolean aborted;
+
     /**
      * True if this request is for the top level request.
      * <p>
@@ -74,18 +84,16 @@ public class UriRequest {
      */
     private boolean rootResource = false;
 
-    private final Lock lock = new ReentrantLock();
-    private final Condition noReferrer = lock.newCondition();
-    private final Condition noDiscoveryPath = lock.newCondition();
+    private final Lock referrerLock = new ReentrantLock();
+    private final Lock discoveryPathLock = new ReentrantLock();
+    private final Condition noReferrer = referrerLock.newCondition();
+    private final Condition noDiscoveryPath = discoveryPathLock.newCondition();
 
-    public UriRequest(RequestIntercepted request, String referrer, BaseSpan parentSpan) {
+    public UriRequest(RequestIntercepted request, boolean aborted, BaseSpan parentSpan) {
+        this.aborted = aborted;
         this.interceptionId = request.interceptionId;
         this.url = request.request.url;
-        if (request.isNavigationRequest) {
-            this.referrer = referrer;
-        }
         this.resourceType = ResourceType.forName(request.resourceType);
-
         if (request.isNavigationRequest) {
             this.rootResource = true;
         }
@@ -93,11 +101,12 @@ public class UriRequest {
         this.parentSpan = parentSpan;
     }
 
-    public UriRequest(UriRequest parent, RequestIntercepted request, BaseSpan parentSpan) {
-        this.parent = parent;
-        this.interceptionId = parent.interceptionId;
+    public UriRequest(UriRequest parent, RequestIntercepted request, boolean aborted, BaseSpan parentSpan) {
+        this.aborted = aborted;
+        setParent(parent);
+        this.interceptionId = request.interceptionId;
         this.url = request.redirectUrl;
-        this.statusCode = request.redirectStatusCode;
+        parent.statusCode = request.responseStatusCode;
         this.discoveryPath = parent.discoveryPath + "R";
         this.referrer = parent.url;
         this.resourceType = ResourceType.forName(request.resourceType);
@@ -106,15 +115,15 @@ public class UriRequest {
         this.parentSpan = parentSpan;
     }
 
-    public void addRequest(NetworkDomain.RequestWillBeSent request) {
-        if (this.discoveryPath == null && parent != null) {
+    public void addRequest(NetworkDomain.RequestWillBeSent request, String parentDiscoveryPath) {
+        if (this.discoveryPath == null) {
             if (request.redirectResponse != null) {
-                setDiscoveryPath(parent.discoveryPath + "R");
+                setDiscoveryPath(parentDiscoveryPath + "R");
             } else if ("script".equals(request.initiator.type)) {
                 // Resource is loaded by a script
-                setDiscoveryPath(parent.discoveryPath + "X");
+                setDiscoveryPath(parentDiscoveryPath + "X");
             } else {
-                setDiscoveryPath(parent.discoveryPath + "E");
+                setDiscoveryPath(parentDiscoveryPath + "E");
             }
         }
     }
@@ -127,12 +136,12 @@ public class UriRequest {
 
     void addResponse(NetworkDomain.ResponseReceived response) {
         if (this.responseSize != null) {
-            LOG.debug("Already got response, previous length: {}, new length: {}, Referrer: {}, DiscoveryPath: {}",
+            LOG.trace("Already got response, previous length: {}, new length: {}, Referrer: {}, DiscoveryPath: {}",
                     this.responseSize, response.response.encodedDataLength, referrer, discoveryPath);
-            return;
         }
 
-        this.responseSize = response.response.encodedDataLength;
+        setRequestId(response.requestId);
+        this.responseSize += response.response.encodedDataLength;
         resourceType = ResourceType.forName(response.type);
         mimeType = response.response.mimeType;
         statusCode = response.response.status.intValue();
@@ -149,6 +158,14 @@ public class UriRequest {
 
     public String getInterceptionId() {
         return interceptionId;
+    }
+
+    public Set<String> getRequestId() {
+        return requestId;
+    }
+
+    public void setRequestId(String requestId) {
+        this.requestId.add(requestId);
     }
 
     public ResourceType getResourceType() {
@@ -168,58 +185,58 @@ public class UriRequest {
     }
 
     public String getDiscoveryPath() {
-        lock.lock();
+        discoveryPathLock.lock();
         try {
             if (discoveryPath == null) {
-                noDiscoveryPath.await(2, TimeUnit.SECONDS);
+                noDiscoveryPath.await(20, TimeUnit.SECONDS);
             }
             if (discoveryPath == null) {
-                LOG.error("Bowser event for updating discovery path was not fired within the time limits");
-                throw new IllegalStateException("Bowser event for updating discovery path was not fired within the time limits");
+                LOG.error("Browser event for updating discovery path was not fired within the time limits");
+                throw new IllegalStateException("Browser event for updating discovery path was not fired within the time limits");
             }
             return discoveryPath;
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         } finally {
-            lock.unlock();
+            discoveryPathLock.unlock();
         }
     }
 
     public void setDiscoveryPath(String discoveryPath) {
-        lock.lock();
+        discoveryPathLock.lock();
         try {
             this.discoveryPath = discoveryPath;
             noDiscoveryPath.signalAll();
         } finally {
-            lock.unlock();
+            discoveryPathLock.unlock();
         }
     }
 
     public String getReferrer() {
-        lock.lock();
+        referrerLock.lock();
         try {
             if (referrer == null) {
-                noReferrer.await(2, TimeUnit.SECONDS);
+                noReferrer.await(20, TimeUnit.SECONDS);
             }
             if (referrer == null) {
-                LOG.error("Bowser event for updating referrer was not fired within the time limits");
-                throw new IllegalStateException("Bowser event for updating referrer was not fired within the time limits");
+                LOG.error("Browser event for updating referrer was not fired within the time limits");
+                throw new IllegalStateException("Browser event for updating referrer was not fired within the time limits");
             }
             return referrer;
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         } finally {
-            lock.unlock();
+            referrerLock.unlock();
         }
     }
 
     public void setReferrer(String referrer) {
-        lock.lock();
+        referrerLock.lock();
         try {
             this.referrer = referrer;
             noReferrer.signalAll();
         } finally {
-            lock.unlock();
+            referrerLock.unlock();
         }
     }
 
@@ -227,9 +244,14 @@ public class UriRequest {
         return parent;
     }
 
-    public void setParent(UriRequest parent) {
+    private void setParent(UriRequest parent) {
         setReferrer(parent.url);
         this.parent = parent;
+        parent.children.add(this);
+    }
+
+    public List<UriRequest> getChildren() {
+        return children;
     }
 
     public boolean isRenderable() {
@@ -264,6 +286,10 @@ public class UriRequest {
         this.warcId = warcId;
     }
 
+    public boolean isAborted() {
+        return aborted;
+    }
+
     private static boolean mimeTypeIsConsistentWithType(UriRequest request) {
         // If status is an error, content is likely to be of an inconsistent type,
         // as it's going to be an error message. We do not want to emit a warning
@@ -293,7 +319,7 @@ public class UriRequest {
     }
 
     public void finish() {
-        span.finish();;
+        span.finish();
     }
 
     public Span getSpan() {
@@ -311,4 +337,25 @@ public class UriRequest {
         return newSpan.startManual();
     }
 
+    @Override
+    public String toString() {
+        final StringBuffer sb = new StringBuffer("UriRequest{");
+        sb.append("iId='").append(interceptionId).append('\'');
+        sb.append(", rId='").append(requestId).append('\'');
+        sb.append(", status=").append(statusCode);
+        sb.append(", path='").append(discoveryPath).append('\'');
+        sb.append(", renderable=").append(renderable);
+        sb.append(", url='").append(url).append('\'');
+        sb.append(", referrer=").append(referrer);
+        sb.append(", fromCache=").append(fromCache);
+        sb.append(", aborted=").append(aborted);
+        sb.append(", warcId=").append(warcId);
+        if (!children.isEmpty()) {
+            for (UriRequest c : children) {
+                sb.append("\n  > ").append(c.toString());
+            }
+        }
+        sb.append('}');
+        return sb.toString();
+    }
 }

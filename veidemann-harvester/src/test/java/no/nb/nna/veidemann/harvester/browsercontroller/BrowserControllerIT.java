@@ -94,12 +94,7 @@ public class BrowserControllerIT {
             DbAdapter db = getDbMock();
 
             MessagesProto.QueuedUri queuedUri = MessagesProto.QueuedUri.newBuilder()
-                    //.setUri("https://158.39.129.50/wp-content/uploads/2016/09/Avtale-om-Bokhylla-2012.pdf")
-                    //.setUri("http://nbdcms.nb.no/wp-content/uploads/2016/09/Avtale-om-Bokhylla-2012.pdf")
-                    //.setUri("http://nbdcms.nb.no/index.php/om-nb/hva-og-hvem-er-vi/avtalar-og-samarbeid/")
-                    //.setUri("https://nbdcms.nb.no")
                     .setUri("http://a1.com")
-//                    .setUri("http://redirect.com/apache-icon.gif")
                     .setExecutionId("testId")
                     .setDiscoveryPath("L")
                     .setReferrer("http://example.org/")
@@ -110,6 +105,8 @@ public class BrowserControllerIT {
             File tmpDir = Files.createDirectories(Paths.get("target", "it-workdir")).toFile();
             tmpDir.deleteOnExit();
 
+            Thread.sleep(1000);
+
             try (RecordingProxy proxy = new RecordingProxy(tmpDir, proxyPort, db, contentWriterClient,
                     new TestHostResolver(), sessionRegistry, new InMemoryAlreadyCrawledCache());
 
@@ -118,7 +115,7 @@ public class BrowserControllerIT {
 
                 HarvesterProto.HarvestPageReply result = controller.render(queuedUri, config);
 
-                System.out.println("=========*\n" + result);
+//                System.out.println("=========*\n" + result);
                 // TODO review the generated test code and remove the default call to fail.
 //            fail("The test case is a prototype.");
             }
@@ -134,8 +131,8 @@ public class BrowserControllerIT {
                 .setUserAgent("veidemann/1.0")
                 .setWindowHeight(900)
                 .setWindowWidth(900)
-                .setPageLoadTimeoutMs(10000)
-                .setSleepAfterPageloadMs(1500)
+                .setPageLoadTimeoutMs(20000)
+                .setSleepAfterPageloadMs(500)
                 .setScriptSelector(ConfigProto.Selector.newBuilder().addLabel(ApiTools.buildLabel("scope", "default")))
                 .build();
 
@@ -161,7 +158,8 @@ public class BrowserControllerIT {
         when(db.hasCrawledContent(any())).thenReturn(Optional.empty());
         when(db.saveCrawlLog(any())).thenAnswer((InvocationOnMock i) -> {
             CrawlLog cl = i.getArgument(0);
-            System.out.println("CL: " + cl);
+            cl = cl.toBuilder().setWarcId("WARC_ID").build();
+//            System.out.println("CL: " + cl);
             return cl;
         });
         when(db.savePageLog(any(PageLog.class))).then(a -> {
@@ -198,9 +196,11 @@ public class BrowserControllerIT {
 
         @Override
         public InetSocketAddress resolve(String host, int port) throws UnknownHostException {
+            InetSocketAddress resolvedAddress = new InetSocketAddress(InetAddresses.forString("127.0.0.1"), testSitesHttpPort);
+//            InetSocketAddress resolvedAddress = new InetSocketAddress(InetAddress.getByName(host), port);
             System.out.println("H: " + testSitesHttpHost);
-            System.out.println("H: " + host + ":" + port + " => " + new InetSocketAddress(InetAddresses.forString("127.0.0.1"), testSitesHttpPort));
-            return new InetSocketAddress(InetAddresses.forString("127.0.0.1"), testSitesHttpPort);
+            System.out.println("H: " + host + ":" + port + " => " + resolvedAddress);
+            return resolvedAddress;
         }
 
     }

@@ -16,26 +16,22 @@
 package no.nb.nna.veidemann.harvester.proxy;
 
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.http.FullHttpResponse;
-import io.netty.handler.codec.http.HttpContent;
-import io.netty.handler.codec.http.HttpObject;
-import io.netty.handler.codec.http.HttpRequest;
-import io.netty.handler.codec.http.HttpResponse;
+import io.netty.handler.codec.http.*;
 import io.opentracing.ActiveSpan;
 import io.opentracing.Span;
 import io.opentracing.Tracer;
 import io.opentracing.tag.Tags;
 import io.opentracing.util.GlobalTracer;
+import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
 import no.nb.nna.veidemann.commons.AlreadyCrawledCache;
-import no.nb.nna.veidemann.commons.VeidemannHeaderConstants;
 import no.nb.nna.veidemann.commons.ExtraStatusCodes;
+import no.nb.nna.veidemann.commons.VeidemannHeaderConstants;
 import no.nb.nna.veidemann.commons.client.ContentWriterClient;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.db.ProtoUtils;
 import no.nb.nna.veidemann.harvester.BrowserSessionRegistry;
 import no.nb.nna.veidemann.harvester.browsercontroller.BrowserSession;
 import no.nb.nna.veidemann.harvester.browsercontroller.UriRequest;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
 import org.littleshoot.proxy.HttpFiltersAdapter;
 import org.littleshoot.proxy.impl.ProxyUtils;
 import org.netpreserve.commons.uri.Uri;
@@ -45,10 +41,6 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
 import java.net.InetSocketAddress;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  *
@@ -142,6 +134,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                     // Fix headers before sending to final destination
                     request.headers().set("Accept-Encoding", "identity");
                     request.headers().remove(EXECUTION_ID);
+                    request.headers().remove(CHROME_INTERCEPTION_ID);
 
                     crawlLog.setFetchTimeStamp(ProtoUtils.getNowTs())
                             .setReferrer(referrer)
@@ -154,6 +147,10 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                     LOG.debug("Proxy is sending request to final destination.");
                 }
                 return null;
+            } else if (httpObject instanceof HttpContent) {
+                // TODO: Request body is not handled yet
+                LOG.debug("TODO: Request body is not handled yet");
+                HttpContent request = (HttpContent) httpObject;
             } else {
                 LOG.debug("Got something else than http request: {}", httpObject);
             }
@@ -167,7 +164,6 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
     public HttpObject serverToProxyResponse(HttpObject httpObject) {
         MDC.put("eid", executionId);
         MDC.put("uri", uri);
-
         try {
             responseSpan = buildSpan("serverToProxyResponse", uriRequest);
             GlobalTracer.get().makeActive(requestSpan);
@@ -179,6 +175,10 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
 
                 HttpResponse res = (HttpResponse) httpObject;
                 responseCollector.setResponseHeaders(res, crawlLog);
+
+                if (uriRequest != null) {
+                    res.headers().add(CHROME_INTERCEPTION_ID, uriRequest.getInterceptionId());
+                }
 
                 responseSpan.log("Got response headers");
                 handled = true;
@@ -294,7 +294,13 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                 LOG.error("Could not find session. Probably a bug");
                 discoveryPath = "";
             } else {
-                uriRequest = session.getUriRequests().getByUrl(uri);
+                String interceptionId = request.headers().get(CHROME_INTERCEPTION_ID);
+
+                if (interceptionId != null) {
+                    uriRequest = session.getUriRequests().getByInterceptionId(interceptionId);
+                } else {
+                    uriRequest = session.getUriRequests().getByUrl(uri, true);
+                }
 
                 if (uriRequest != null) {
                     discoveryPath = uriRequest.getDiscoveryPath();

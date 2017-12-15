@@ -54,6 +54,7 @@
                     <mainClass>no.nb.nna.veidemann.chrome.client.codegen.Codegen</mainClass>
                     <includePluginDependencies>true</includePluginDependencies>
                     <arguments>
+                        <argument>${chrome.version}</argument>
                         <argument>${project.build.directory}/generated-sources/cdp</argument>
                     </arguments>
                     <executableDependency>

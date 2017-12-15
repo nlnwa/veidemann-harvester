@@ -75,8 +75,16 @@ public class ContentWriterService extends ContentWriterGrpc.ContentWriterImplBas
                 switch (value.getValueCase()) {
                     case CRAWL_LOG:
                         crawlLog = value.getCrawlLog().toBuilder();
+                        MDC.put("eid", crawlLog.getExecutionId());
+                        MDC.put("uri", crawlLog.getRequestedUri());
                         break;
                     case HEADER:
+                        if (contentBuffer.hasHeader()) {
+                            LOG.error("Header received twice");
+                            Status status = Status.INVALID_ARGUMENT.withDescription("Header received twice");
+                            responseObserver.onError(status.asException());
+                            break;
+                        }
                         contentBuffer.setHeader(value.getHeader());
                         break;
                     case PAYLOAD:

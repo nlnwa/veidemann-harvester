@@ -5,7 +5,7 @@ option go_package = "veidemann_api";
 option java_package = "no.nb.nna.veidemann.api";
 option java_outer_classname = "ContentWriterProto";
 
-import "messages.proto";
+import "google/protobuf/timestamp.proto";
 import "google/protobuf/empty.proto";
 
 // Service for writing archival data to persisten storage.
@@ -15,14 +15,63 @@ service ContentWriter {
     rpc delete (google.protobuf.Empty) returns (google.protobuf.Empty) {}
 }
 
+enum RecordType {
+    WARCINFO = 0;
+    RESPONSE = 1;
+    RESOURCE = 2;
+    REQUEST = 3;
+    METADATA = 4;
+    REVISIT = 5;
+    CONVERSION = 6;
+    CONTINUATION = 7;
+}
+
+message Data {
+    int32 record_num = 1;
+    bytes data = 2;
+}
+
+message WriteRequestMeta {
+    message RecordMeta {
+        int32 record_num = 1;
+        RecordType type = 2;
+        string record_content_type = 3;
+        string payload_content_type = 4;
+        string block_digest = 5;
+        string payload_digest = 6;
+        int64 size = 7;
+        string warc_refers_to = 8;
+    }
+
+    string execution_id = 1;
+    string target_uri = 2;
+    repeated RecordMeta record_meta = 3;
+
+    google.protobuf.Timestamp fetch_time_stamp = 4;
+    string ip_address = 5;
+    // The http status code. Only relevant for response records.
+    int32 status_code = 6;
+}
+
 message WriteRequest {
     oneof value {
-        CrawlLog crawl_log = 1;
-        bytes header = 2;
-        bytes payload = 3;
+        WriteRequestMeta meta = 1;
+        Data header = 2;
+        Data payload = 3;
     }
 }
 
+message WriteResponseMeta {
+    message RecordMeta {
+        int32 record_num = 1;
+        RecordType type = 2;
+        string warc_id = 3;
+        string storage_ref = 4;
+    }
+
+    repeated RecordMeta record_meta = 1;
+}
+
 message WriteReply {
-    string storage_ref = 1;
+    WriteResponseMeta meta = 1;
 }

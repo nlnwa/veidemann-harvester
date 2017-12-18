@@ -27,6 +27,7 @@ import no.nb.nna.veidemann.commons.AlreadyCrawledCache;
 import no.nb.nna.veidemann.commons.ExtraStatusCodes;
 import no.nb.nna.veidemann.commons.VeidemannHeaderConstants;
 import no.nb.nna.veidemann.commons.client.ContentWriterClient;
+import no.nb.nna.veidemann.commons.client.ContentWriterClient.ContentWriterSession;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.db.ProtoUtils;
 import no.nb.nna.veidemann.harvester.BrowserSessionRegistry;
@@ -89,8 +90,9 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
         this.crawlLog = CrawlLog.newBuilder()
                 .setRequestedUri(uri)
                 .setSurt(surtUri.toString());
-        this.requestCollector = new ContentCollector(db, contentWriterClient);
-        this.responseCollector = new ContentCollector(db, contentWriterClient);
+        ContentWriterSession contentWriterSession = contentWriterClient.createSession();
+        this.requestCollector = new ContentCollector(db, contentWriterSession);
+        this.responseCollector = new ContentCollector(db, contentWriterSession);
         this.sessionRegistry = sessionRegistry;
         this.cache = cache;
     }

@@ -56,8 +56,6 @@ public class ContentCollector {
 
     private final DbAdapter db;
 
-    private final ContentWriterClient contentWriterClient;
-
     private ContentWriterClient.ContentWriterSession contentWriterSession;
 
     private long size;
@@ -74,9 +72,8 @@ public class ContentCollector {
 
     private ByteString cacheValue;
 
-    public ContentCollector(final DbAdapter db, final ContentWriterClient contentWriterClient) {
+    public ContentCollector(final DbAdapter db, final ContentWriterClient.ContentWriterSession contentWriterSession) {
         this.db = db;
-        this.contentWriterClient = contentWriterClient;
         this.digest = new Sha1Digest();
     }
 
@@ -96,7 +93,7 @@ public class ContentCollector {
 
         ByteString data = ByteString.copyFromUtf8(headers.toString());
         digest.update(data);
-        getContentWriterSession().sendHeader(data);
+        contentWriterSession.sendRequestHeader(data);
         shouldAddSeparator = true;
         size = data.size();
     }
@@ -119,7 +116,7 @@ public class ContentCollector {
 
         ByteString data = ByteString.copyFromUtf8(headers.toString());
         digest.update(data);
-        getContentWriterSession().sendHeader(data);
+        contentWriterSession.sendResponseHeader(data);
         shouldAddSeparator = true;
         size = data.size();
 
@@ -139,7 +136,7 @@ public class ContentCollector {
         }
     }
 
-    public void addPayload(ByteBuf payload) {
+    public void addResponsePayload(ByteBuf payload) {
         if (shouldAddSeparator) {
             digest.update(CRLF);
             size += 2;
@@ -147,7 +144,7 @@ public class ContentCollector {
         }
         ByteString data = ByteString.copyFrom(payload.nioBuffer());
         digest.update(data);
-        getContentWriterSession().sendPayload(data);
+        contentWriterSession.sendResponsePayload(data);
         size += data.size();
 
         if (shouldCache) {
@@ -157,13 +154,6 @@ public class ContentCollector {
                 cacheValue = cacheValue.concat(data);
             }
         }
-    }
-
-    private synchronized ContentWriterSession getContentWriterSession() {
-        if (contentWriterSession == null) {
-            contentWriterSession = contentWriterClient.createSession();
-        }
-        return contentWriterSession;
     }
 
     public String getDigest() {
@@ -209,15 +199,6 @@ public class ContentCollector {
         if (LOG.isDebugEnabled()) {
             LOG.debug("Writing request {}", logEntryBuilder.getRequestedUri());
         }
-        getContentWriterSession().sendCrawlLog(logEntry);
-        try {
-            getContentWriterSession().finish();
-            return logEntry;
-        } catch (InterruptedException | StatusException ex) {
-            LOG.error("Failed finishing write request", ex);
-            // TODO: Do something reasonable with the exception
-            throw new RuntimeException(ex);
-        }
     }
 
     public CrawlLog writeResponse(CrawlLog logEntry) {
@@ -230,9 +211,9 @@ public class ContentCollector {
         if (LOG.isDebugEnabled()) {
             LOG.debug("Writing response {}", logEntryBuilder.getRequestedUri());
         }
-        getContentWriterSession().sendCrawlLog(logEntry);
+        contentWriterSession.sendCrawlLog(logEntry);
         try {
-            getContentWriterSession().finish();
+            contentWriterSession.finish();
             return logEntry;
         } catch (InterruptedException | StatusException ex) {
             LOG.error("Failed finishing write response", ex);

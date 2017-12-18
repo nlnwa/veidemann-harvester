@@ -125,4 +125,7 @@ public class ContentBuffer {
         return payloadBuf != null;
     }
 
+    public void close() {
+        // Clean up resources
+    }
 }

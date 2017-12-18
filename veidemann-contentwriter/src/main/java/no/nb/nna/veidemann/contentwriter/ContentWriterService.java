@@ -17,6 +17,9 @@ package no.nb.nna.veidemann.contentwriter;
 
 import java.io.IOException;
 import java.net.URI;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ForkJoinPool;
@@ -28,10 +31,13 @@ import io.grpc.Status.Code;
 import io.grpc.StatusException;
 import io.grpc.stub.StreamObserver;
 import no.nb.nna.veidemann.api.ContentWriterGrpc;
+import no.nb.nna.veidemann.api.ContentWriterProto.RecordType;
 import no.nb.nna.veidemann.api.ContentWriterProto.WriteReply;
 import no.nb.nna.veidemann.api.ContentWriterProto.WriteRequest;
+import no.nb.nna.veidemann.api.ContentWriterProto.WriteRequestMeta;
+import no.nb.nna.veidemann.api.ContentWriterProto.WriteResponseMeta;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
-import no.nb.nna.veidemann.contentwriter.text.TextExtracter;
+import no.nb.nna.veidemann.contentwriter.text.TextExtractor;
 import no.nb.nna.veidemann.contentwriter.warc.SingleWarcWriter;
 import no.nb.nna.veidemann.contentwriter.warc.WarcWriterPool;
 import no.nb.nna.veidemann.api.MessagesProto;
@@ -55,40 +61,56 @@ public class ContentWriterService extends ContentWriterGrpc.ContentWriterImplBas
 
     private final WarcWriterPool warcWriterPool;
 
-    private final TextExtracter textExtracter;
+    private final TextExtractor textExtractor;
 
-    public ContentWriterService(DbAdapter db, WarcWriterPool warcWriterPool, TextExtracter textExtracter) {
+    public ContentWriterService(DbAdapter db, WarcWriterPool warcWriterPool, TextExtractor textExtractor) {
         this.db = db;
         this.warcWriterPool = warcWriterPool;
-        this.textExtracter = textExtracter;
+        this.textExtractor = textExtractor;
     }
 
     @Override
     public StreamObserver<WriteRequest> write(StreamObserver<WriteReply> responseObserver) {
         return new StreamObserver<WriteRequest>() {
-            private final ContentBuffer contentBuffer = new ContentBuffer();
+            private final Map<Integer, ContentBuffer> contentBuffers = new HashMap<>();
 
-            private MessagesProto.CrawlLog.Builder crawlLog;
+            private WriteRequestMeta writeRequestMeta;
+
+            private ContentBuffer getContentBuffer(Integer recordNum) {
+                return contentBuffers.computeIfAbsent(recordNum, n -> new ContentBuffer());
+            }
+
+            private WriteRequestMeta.RecordMeta getRecordMeta(int recordNum) throws StatusException {
+                for (WriteRequestMeta.RecordMeta m : writeRequestMeta.getRecordMetaList()) {
+                    if (m.getRecordNum() == recordNum) {
+                        return m;
+                    }
+                }
+                throw Status.INVALID_ARGUMENT.withDescription("Missing metadata").asException();
+            }
 
             @Override
             public void onNext(WriteRequest value) {
+                ContentBuffer contentBuffer;
                 switch (value.getValueCase()) {
-                    case CRAWL_LOG:
-                        crawlLog = value.getCrawlLog().toBuilder();
-                        MDC.put("eid", crawlLog.getExecutionId());
-                        MDC.put("uri", crawlLog.getRequestedUri());
+                    case META:
+                        writeRequestMeta = value.getMeta();
+                        MDC.put("eid", writeRequestMeta.getExecutionId());
+                        MDC.put("uri", writeRequestMeta.getTargetUri());
                         break;
                     case HEADER:
+                        contentBuffer = getContentBuffer(value.getHeader().getRecordNum());
                         if (contentBuffer.hasHeader()) {
                             LOG.error("Header received twice");
                             Status status = Status.INVALID_ARGUMENT.withDescription("Header received twice");
                             responseObserver.onError(status.asException());
                             break;
                         }
-                        contentBuffer.setHeader(value.getHeader());
+                        contentBuffer.setHeader(value.getHeader().getData());
                         break;
                     case PAYLOAD:
-                        contentBuffer.addPayload(value.getPayload());
+                        contentBuffer = getContentBuffer(value.getHeader().getRecordNum());
+                        contentBuffer.addPayload(value.getPayload().getData());
                         break;
                     default:
                         break;
@@ -99,9 +121,9 @@ public class ContentWriterService extends ContentWriterGrpc.ContentWriterImplBas
             public void onError(Throwable t) {
                 Status status = Status.fromThrowable(t);
                 if (status.getCode().equals(Code.CANCELLED)) {
-                    if (crawlLog != null) {
-                        MDC.put("uri", crawlLog.getRequestedUri());
-                        MDC.put("recordType", crawlLog.getRecordType());
+                    if (writeRequestMeta != null) {
+                        MDC.put("uri", writeRequestMeta.getTargetUri());
+                        MDC.put("eid", writeRequestMeta.getExecutionId());
                     }
                     LOG.info("Request cancelled before WARC record written");
                 } else {
@@ -111,38 +133,76 @@ public class ContentWriterService extends ContentWriterGrpc.ContentWriterImplBas
 
             @Override
             public void onCompleted() {
-                if (crawlLog == null) {
-                    LOG.error("Missing CrawlLog object");
-                    Status status = Status.INVALID_ARGUMENT.withDescription("Missing CrawlLog object");
-                    responseObserver.onError(status.asException());
-                    return;
-                }
-                if (contentBuffer.getTotalSize() == 0L) {
-                    MDC.put("uri", crawlLog.getRequestedUri());
-                    LOG.error("Nothing to store");
-                    Status status = Status.INVALID_ARGUMENT.withDescription("Nothing to store");
+                if (writeRequestMeta == null) {
+                    LOG.error("Missing metadata object");
+                    Status status = Status.INVALID_ARGUMENT.withDescription("Missing metadata object");
                     responseObserver.onError(status.asException());
                     return;
                 }
 
-                try {
-                    detectRevisit(contentBuffer, crawlLog);
+                MDC.put("uri", writeRequestMeta.getTargetUri());
+                MDC.put("eid", writeRequestMeta.getExecutionId());
 
-                    URI ref = writeRecord(contentBuffer, crawlLog);
+                WriteReply.Builder reply = WriteReply.newBuilder();
+                // Validate
+                for (Entry<Integer, ContentBuffer> recordEntry : contentBuffers.entrySet()) {
+                    try {
+                        ContentBuffer contentBuffer = recordEntry.getValue();
+                        WriteRequestMeta.RecordMeta recordMeta = getRecordMeta(recordEntry.getKey());
 
-                    db.saveCrawlLog(crawlLog.build());
+                        if (contentBuffer.getTotalSize() == 0L) {
+                            LOG.error("Nothing to store");
+                            throw Status.INVALID_ARGUMENT.withDescription("Nothing to store").asException();
+                        }
 
-                    responseObserver.onNext(WriteReply.newBuilder()
-                            .setStorageRef(ref.toString())
-                            .build());
-                    responseObserver.onCompleted();
-                } catch (StatusException ex) {
-                    LOG.error("Failed write: {}", ex.getMessage(), ex);
-                    responseObserver.onError(ex);
-                } catch (Throwable ex) {
-                    LOG.error("Failed write: {}", ex.getMessage(), ex);
-                    responseObserver.onError(Status.fromThrowable(ex).asException());
+                        if (!contentBuffer.getBlockDigest().equals(recordMeta.getBlockDigest())) {
+                            LOG.error("Block digest mismatch. Expected {}, but was {}",
+                                    recordMeta.getBlockDigest(), contentBuffer.getBlockDigest());
+                            throw Status.INVALID_ARGUMENT.withDescription("Block digest mismatch").asException();
+                        }
+
+                        if (contentBuffer.getTotalSize() != recordMeta.getSize()) {
+                            LOG.error("Size mismatch. Expected {}, but was {}",
+                                    recordMeta.getSize(), contentBuffer.getTotalSize());
+                            throw Status.INVALID_ARGUMENT.withDescription("Size mismatch").asException();
+                        }
+                    } catch (StatusException ex) {
+                        responseObserver.onError(ex);
+                    }
                 }
+
+                // Write
+                for (Entry<Integer, ContentBuffer> recordEntry : contentBuffers.entrySet()) {
+                    ContentBuffer contentBuffer = recordEntry.getValue();
+                    try {
+                        String recordId = Util.createIdentifier();
+                        WriteRequestMeta.RecordMeta recordMeta = getRecordMeta(recordEntry.getKey());
+
+                        if (recordMeta.getType() == RecordType.RESPONSE) {
+                            recordMeta = detectRevisit(recordId, contentBuffer, recordMeta);
+                        }
+
+                        URI ref = writeRecord(recordId, contentBuffer, writeRequestMeta, recordMeta);
+
+                        WriteResponseMeta.RecordMeta.Builder responseMeta = WriteResponseMeta.RecordMeta.newBuilder()
+                                .setRecordNum(recordMeta.getRecordNum())
+                                .setType(recordMeta.getType())
+                                .setWarcId(recordId)
+                                .setStorageRef(ref.toString());
+
+                        reply.getMetaBuilder().addRecordMeta(responseMeta);
+                    } catch (StatusException ex) {
+                        LOG.error("Failed write: {}", ex.getMessage(), ex);
+                        responseObserver.onError(ex);
+                    } catch (Throwable ex) {
+                        LOG.error("Failed write: {}", ex.getMessage(), ex);
+                        responseObserver.onError(Status.fromThrowable(ex).asException());
+                    } finally {
+                        contentBuffer.close();
+                    }
+                }
+                responseObserver.onNext(reply.build());
+                responseObserver.onCompleted();
             }
 
         };
@@ -176,50 +236,32 @@ public class ContentWriterService extends ContentWriterGrpc.ContentWriterImplBas
         }
     }
 
-    private void detectRevisit(final ContentBuffer contentBuffer, final MessagesProto.CrawlLog.Builder crawlLog) {
-        switch (crawlLog.getRecordType()) {
-            case "":
-            case "response":
-                Optional<MessagesProto.CrawledContent> isDuplicate = db
-                        .hasCrawledContent(MessagesProto.CrawledContent.newBuilder()
-                                .setDigest(contentBuffer.getPayloadDigest())
-                                .setWarcId(crawlLog.getWarcId())
-                                .build());
+    private WriteRequestMeta.RecordMeta detectRevisit(String warcId, final ContentBuffer contentBuffer,
+                                                      final WriteRequestMeta.RecordMeta recordMeta) {
+        Optional<MessagesProto.CrawledContent> isDuplicate = db
+                .hasCrawledContent(MessagesProto.CrawledContent.newBuilder()
+                        .setDigest(contentBuffer.getPayloadDigest())
+                        .setWarcId(warcId)
+                        .build());
 
-                if (isDuplicate.isPresent()) {
-                    crawlLog.setRecordType("revisit")
-                            .setRecordContentType("application/http")
-                            .setBlockDigest(contentBuffer.getHeaderDigest())
-                            .setPayloadDigest(isDuplicate.get().getDigest())
-                            .setSize(contentBuffer.getHeaderSize())
-                            .setWarcRefersTo(isDuplicate.get().getWarcId());
+        if (isDuplicate.isPresent()) {
+            WriteRequestMeta.RecordMeta.Builder recordMetaBuilder = recordMeta.toBuilder();
+            recordMetaBuilder.setType(RecordType.REVISIT)
+                    .setRecordContentType("application/http")
+                    .setBlockDigest(contentBuffer.getHeaderDigest())
+                    .setPayloadDigest(isDuplicate.get().getDigest())
+                    .setSize(contentBuffer.getHeaderSize())
+                    .setWarcRefersTo(isDuplicate.get().getWarcId());
 
-                    contentBuffer.removePayload();
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug("Writing {} as a revisit of {}",
-                                crawlLog.getRequestedUri(), crawlLog.getWarcRefersTo());
-                    }
-                } else {
-                    crawlLog.setRecordType("response")
-                            .setBlockDigest(contentBuffer.getBlockDigest())
-                            .setPayloadDigest(contentBuffer.getPayloadDigest())
-                            .setSize(contentBuffer.getTotalSize());
-
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug("Writing {}", crawlLog.getRequestedUri());
-                    }
-                }
-                break;
-
-            default:
-                crawlLog.setBlockDigest(contentBuffer.getBlockDigest())
-                        .setPayloadDigest(contentBuffer.getPayloadDigest())
-                        .setSize(contentBuffer.getTotalSize());
-                break;
+            contentBuffer.removePayload();
+            LOG.debug("Detected {} as a revisit of {}",
+                    MDC.get("uri"), recordMeta.getWarcRefersTo());
+            return recordMetaBuilder.build();
         }
+        return recordMeta;
     }
 
-    private URI writeRecord(final ContentBuffer contentBuffer, final MessagesProto.CrawlLog.Builder crawlLog)
+    private URI writeRecord(final String warcId, final ContentBuffer contentBuffer, final WriteRequestMeta request, final WriteRequestMeta.RecordMeta recordMeta)
             throws StatusException {
 
         try (WarcWriterPool.PooledWarcWriter pooledWarcWriter = warcWriterPool.borrow()) {
@@ -227,8 +269,7 @@ public class ContentWriterService extends ContentWriterGrpc.ContentWriterImplBas
 
             SingleWarcWriter warcWriter = pooledWarcWriter.getWarcWriter();
 
-            URI ref = warcWriter.writeWarcHeader(crawlLog.build());
-            crawlLog.setStorageRef(ref.toString());
+            URI ref = warcWriter.writeWarcHeader(warcId, request, recordMeta);
 
             if (contentBuffer.hasHeader()) {
                 size += warcWriter.addPayload(contentBuffer.getHeader().newInput());
@@ -248,27 +289,33 @@ public class ContentWriterService extends ContentWriterGrpc.ContentWriterImplBas
 
                 });
 
-                ForkJoinTask<Void> extractTextJob = ForkJoinPool.commonPool().submit(new Callable<Void>() {
-                    @Override
-                    public Void call() throws Exception {
-                        textExtracter.analyze(contentBuffer.getPayload().newInput(), crawlLog.build(), db);
-                        return null;
-                    }
+                ForkJoinTask<Void> extractTextJob = null;
+                if (recordMeta.getType() == RecordType.RESPONSE) {
+                    extractTextJob = ForkJoinPool.commonPool().submit(new Callable<Void>() {
+                        @Override
+                        public Void call() throws Exception {
+                            textExtractor.analyze(warcId, request.getTargetUri(), recordMeta.getPayloadContentType(),
+                                    request.getStatusCode(), contentBuffer.getPayload().newInput(), db);
+                            return null;
+                        }
 
-                });
+                    });
+                }
 
                 long payloadSize = writeWarcJob.get();
-                LOG.debug("Payload of size {}b written for {}", payloadSize, crawlLog.getRequestedUri());
+                LOG.debug("Payload of size {}b written for {}", payloadSize, request.getTargetUri());
                 size += payloadSize;
-                extractTextJob.get();
+                if (extractTextJob != null) {
+                    extractTextJob.get();
+                }
             }
 
             try {
                 warcWriter.closeRecord();
             } catch (IOException ex) {
-                if (crawlLog.getSize() != size) {
+                if (recordMeta.getSize() != size) {
                     Status status = Status.OUT_OF_RANGE.withDescription("Size doesn't match metadata. Expected "
-                            + crawlLog.getSize() + ", but was " + size);
+                            + recordMeta.getSize() + ", but was " + size);
                     LOG.error(status.getDescription());
                     throw status.asException();
                 } else {

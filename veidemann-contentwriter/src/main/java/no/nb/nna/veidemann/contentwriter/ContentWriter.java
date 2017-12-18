@@ -24,7 +24,7 @@ import com.typesafe.config.ConfigFactory;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.opentracing.TracerFactory;
 import no.nb.nna.veidemann.contentwriter.settings.Settings;
-import no.nb.nna.veidemann.contentwriter.text.TextExtracter;
+import no.nb.nna.veidemann.contentwriter.text.TextExtractor;
 import no.nb.nna.veidemann.contentwriter.warc.WarcWriterPool;
 import no.nb.nna.veidemann.db.RethinkDbAdapter;
 import org.slf4j.Logger;
@@ -60,10 +60,10 @@ public class ContentWriter {
      */
     public ContentWriter start() {
         try (DbAdapter db = new RethinkDbAdapter(SETTINGS.getDbHost(), SETTINGS.getDbPort(), SETTINGS.getDbName());
-                WarcWriterPool warcWriterPool = new WarcWriterPool(new File(SETTINGS.getWarcDir()),
+             WarcWriterPool warcWriterPool = new WarcWriterPool(new File(SETTINGS.getWarcDir()),
                         SETTINGS.getWarcFileSize(), SETTINGS.isCompressWarc(), SETTINGS.getWarcWriterPoolSize());
-                TextExtracter textExtracter = new TextExtracter();
-                ApiServer apiServer = new ApiServer(SETTINGS.getApiPort(), db, warcWriterPool, textExtracter).start();) {
+             TextExtractor textExtractor = new TextExtractor();
+             ApiServer apiServer = new ApiServer(SETTINGS.getApiPort(), db, warcWriterPool, textExtractor).start();) {
             LOG.info("Veidemann Content Writer (v. {}) started",
                     ContentWriter.class.getPackage().getImplementationVersion());
 

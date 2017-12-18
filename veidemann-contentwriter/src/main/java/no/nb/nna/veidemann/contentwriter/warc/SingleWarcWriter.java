@@ -25,6 +25,8 @@ import java.util.GregorianCalendar;
 import java.util.TimeZone;
 import java.util.UUID;
 
+import no.nb.nna.veidemann.api.ContentWriterProto.WriteRequestMeta;
+import no.nb.nna.veidemann.contentwriter.Util;
 import no.nb.nna.veidemann.db.ProtoUtils;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
 import org.jwat.warc.WarcFileNaming;
@@ -49,7 +51,8 @@ public class SingleWarcWriter implements AutoCloseable {
         warcFileWriter = WarcFileWriter.getWarcWriterInstance(warcFileNaming, writerConfig);
     }
 
-    public URI writeWarcHeader(CrawlLog logEntry) throws UncheckedIOException {
+    public URI writeWarcHeader(String warcId, final WriteRequestMeta request, final WriteRequestMeta.RecordMeta recordMeta)
+            throws UncheckedIOException {
         try {
             boolean newFile = warcFileWriter.nextWriter();
             File currentFile = warcFileWriter.getFile();
@@ -63,26 +66,26 @@ public class SingleWarcWriter implements AutoCloseable {
 
             WarcRecord record = WarcRecord.createRecord(writer);
 
-            record.header.addHeader(FN_WARC_TYPE, logEntry.getRecordType());
-            record.header.addHeader(FN_WARC_TARGET_URI, logEntry.getRequestedUri());
-            Date warcDate = Date.from(ProtoUtils.tsToOdt(logEntry.getFetchTimeStamp()).toInstant());
+            record.header.addHeader(FN_WARC_TYPE, Util.getRecordTypeString(recordMeta.getType()));
+            record.header.addHeader(FN_WARC_TARGET_URI, request.getTargetUri());
+            Date warcDate = Date.from(ProtoUtils.tsToOdt(request.getFetchTimeStamp()).toInstant());
             record.header.addHeader(FN_WARC_DATE, warcDate, null);
-            record.header.addHeader(FN_WARC_RECORD_ID, "<urn:uuid:" + logEntry.getWarcId() + ">");
+            record.header.addHeader(FN_WARC_RECORD_ID, Util.formatIdentifierAsUrn(warcId));
 
-            if (RT_REVISIT.equals(logEntry.getRecordType())) {
+            if (RT_REVISIT.equals(recordMeta.getType())) {
                 record.header.addHeader(FN_WARC_PROFILE, PROFILE_IDENTICAL_PAYLOAD_DIGEST);
-                record.header.addHeader(FN_WARC_REFERS_TO, "<urn:uuid:" + logEntry.getWarcRefersTo() + ">");
+                record.header.addHeader(FN_WARC_REFERS_TO, Util.formatIdentifierAsUrn(recordMeta.getWarcRefersTo()));
             }
 
-            record.header.addHeader(FN_WARC_IP_ADDRESS, logEntry.getIpAddress());
+            record.header.addHeader(FN_WARC_IP_ADDRESS, request.getIpAddress());
             record.header.addHeader(FN_WARC_WARCINFO_ID, "<" + warcFileWriter.warcinfoRecordId + ">");
-            record.header.addHeader(FN_WARC_BLOCK_DIGEST, logEntry.getBlockDigest());
-            record.header.addHeader(FN_WARC_PAYLOAD_DIGEST, logEntry.getPayloadDigest());
+            record.header.addHeader(FN_WARC_BLOCK_DIGEST, recordMeta.getBlockDigest());
+            record.header.addHeader(FN_WARC_PAYLOAD_DIGEST, recordMeta.getPayloadDigest());
 
-            record.header.addHeader(FN_CONTENT_LENGTH, logEntry.getSize(), null);
+            record.header.addHeader(FN_CONTENT_LENGTH, recordMeta.getSize(), null);
 
-            if (logEntry.getSize() > 0) {
-                record.header.addHeader(FN_CONTENT_TYPE, logEntry.getRecordContentType());
+            if (recordMeta.getSize() > 0) {
+                record.header.addHeader(FN_CONTENT_TYPE, recordMeta.getRecordContentType());
             }
 
             writer.writeHeader(record);

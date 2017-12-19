@@ -62,20 +62,27 @@ public class CrawlExecutionValidator {
             });
         });
         warcRecords.values().stream()
-                .filter(w -> ((!"metadata".equals(w.header.warcTypeStr)) && (!"warcinfo".equals(w.header.warcTypeStr))))
+                .filter(w -> (("response".equals(w.header.warcTypeStr)) || ("revisit".equals(w.header.warcTypeStr)) || ("resource".equals(w.header.warcTypeStr))))
                 .forEach(wid -> {
                     assertThat(crawlLogs.stream().map(c -> c.getWarcId()))
-                            .as("Missing crawllog entry for WARC record %s", wid)
+                            .as("Missing crawllog entry for WARC record %s, record type %s, target %s",
+                                    wid.header.warcRecordIdStr, wid.header.warcTypeStr, wid.header.warcTargetUriStr)
                             .contains(wid.header.warcRecordIdStr.substring(10, wid.header.warcRecordIdStr.lastIndexOf(">")));
 
                     String refersTo = stripWarcId(wid.header.warcRefersToStr);
+                    List<String> concurrentTo = wid.header.warcConcurrentToList.stream()
+                            .map(c -> stripWarcId(c.warcConcurrentToStr))
+                            .collect(Collectors.toList());
                     if (!refersTo.isEmpty()) {
                         assertThat(crawlLogs.stream().map(c -> c.getWarcId()))
-                                .as("Missing crawllog entry for WARC record %s's warcRefersTo", wid)
+                                .as("Missing crawllog entry for WARC record %s's warcRefersTo %s", wid, refersTo)
                                 .contains(refersTo);
                         assertThat(warcRecords.keySet().stream())
-                                .as("Missing crawllog entry for WARC record %s", wid)
+                                .as("Missing referred WARC record for WARC record %s's warcRefersTo %s", wid, refersTo)
                                 .contains(refersTo);
+                        assertThat(warcRecords.keySet().stream())
+                                .as("Missing referred WARC record for WARC record %s's concurrentTo %s", wid, concurrentTo)
+                                .containsAll(concurrentTo);
                     }
                 });
     }
@@ -98,29 +105,30 @@ public class CrawlExecutionValidator {
     private void checkChecksum() {
         crawlLogs.forEach(cl -> {
             assertThat(cl.getBlockDigest())
-                    .as("Block digest for crawllog entry %s was empty", cl.getWarcId())
+                    .as("Block digest for crawllog entry %s (uri:%s) was empty",
+                            cl.getWarcId(), cl.getRequestedUri())
                     .isNotEmpty();
             assertThat(cl.getPayloadDigest())
-                    .as("Payload digest for crawllog entry %s was empty", cl.getWarcId())
+                    .as("Payload digest for crawllog entry %s (uri:%s) was empty",
+                            cl.getWarcId(), cl.getRequestedUri())
                     .isNotEmpty();
         });
         warcRecords.values().stream()
                 .filter(w -> ((!"metadata".equals(w.header.warcTypeStr)) && (!"warcinfo".equals(w.header.warcTypeStr))))
                 .forEach(w -> {
                     assertThat(w.header.warcBlockDigestStr)
-                            .as("Block digest for WARC entry %s was empty", w.header.warcRecordIdStr)
+                            .as("Block digest for WARC entry %s (uri:%s) was empty",
+                                    w.header.warcRecordIdStr, w.header.warcTargetUriStr)
                             .isNotEmpty();
                     assertThat(w.header.warcPayloadDigestStr)
-                            .as("Payload digest for WARC entry %s was empty", w.header.warcRecordIdStr)
+                            .as("Payload digest for WARC entry %s (uri:%s) was empty",
+                                    w.header.warcRecordIdStr, w.header.warcTargetUriStr)
                             .isNotEmpty();
                 });
     }
 
     private void checkValidWarc() {
         warcRecords.values().forEach(r -> {
-            assertThat(r.isCompliant())
-                    .as("Record is not compliant. Uri: %s, type: %s", r.header.warcTargetUriStr, r.header.warcTypeStr)
-                    .isTrue();
             if (!r.isCompliant()) {
                 HttpHeader p = r.getHttpHeader();
                 System.out.println("Http Header: " + p);
@@ -143,6 +151,9 @@ public class CrawlExecutionValidator {
                         .collect(Collectors.joining()));
                 r.getHeaderList().forEach(h -> System.out.print(" W: " + new String(h.raw)));
             }
+            assertThat(r.isCompliant())
+                    .as("Record is not compliant. Uri: %s, type: %s", r.header.warcTargetUriStr, r.header.warcTypeStr)
+                    .isTrue();
         });
     }
 
@@ -158,7 +169,10 @@ public class CrawlExecutionValidator {
                     } catch (IOException e) {
                         fail("Failed closing record", e);
                     }
-                    warcRecords.put(r.header.warcRecordIdStr.substring(10, r.header.warcRecordIdStr.lastIndexOf(">")), r);
+                    WarcRecord existing = warcRecords.put(r.header.warcRecordIdStr.substring(10, r.header.warcRecordIdStr.lastIndexOf(">")), r);
+                    assertThat(existing)
+                            .as("Duplicate WARC record id %s", r.header.warcRecordIdStr)
+                            .isNull();
                 });
     }
 

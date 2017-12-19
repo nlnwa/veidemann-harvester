@@ -25,7 +25,7 @@ var logoutCmd = &cobra.Command{
 	Short: "Log out of Veidemann",
 	Long:  `Log out of Veidemann.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		viper.Set("idToken", "")
+		viper.Set("accessToken", "")
 		viper.Set("nonce", "")
 		util.WriteConfig()
 	},

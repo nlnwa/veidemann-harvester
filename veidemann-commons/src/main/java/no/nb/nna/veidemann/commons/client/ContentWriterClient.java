@@ -15,7 +15,6 @@
  */
 package no.nb.nna.veidemann.commons.client;
 
-import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.Status;
@@ -29,7 +28,6 @@ import no.nb.nna.veidemann.api.ContentWriterProto.WriteReply;
 import no.nb.nna.veidemann.api.ContentWriterProto.WriteRequest;
 import no.nb.nna.veidemann.api.ContentWriterProto.WriteRequestMeta;
 import no.nb.nna.veidemann.api.ContentWriterProto.WriteResponseMeta;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -136,6 +134,12 @@ public class ContentWriterClient implements AutoCloseable {
                 throw error;
             }
             return responseMeta;
+        }
+
+        public void cancel(String reason) {
+            LOG.info("Cancelling content writer session");
+            requestObserver.onError(Status.CANCELLED.withDescription(reason).asException());
+            finishLatch.countDown();
         }
 
         private void sendRequest(Supplier<WriteRequest> request) {

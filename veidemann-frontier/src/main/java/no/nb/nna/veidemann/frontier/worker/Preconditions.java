@@ -18,6 +18,7 @@ package no.nb.nna.veidemann.frontier.worker;
 import java.net.UnknownHostException;
 import java.util.List;
 
+import no.nb.nna.veidemann.api.ConfigProto.PolitenessConfig.RobotsPolicy;
 import no.nb.nna.veidemann.api.ControllerProto;
 import no.nb.nna.veidemann.commons.ExtraStatusCodes;
 import no.nb.nna.veidemann.api.ConfigProto.CrawlConfig;
@@ -78,7 +79,8 @@ public class Preconditions {
     private static boolean checkRobots(Frontier frontier, CrawlConfig config, QueuedUriWrapper qUri) {
         LOG.debug("Check robots.txt for URI '{}'", qUri.getUri());
         // Check robots.txt
-        if (!frontier.getRobotsServiceClient().isAllowed(qUri.getQueuedUri(), config)) {
+        if (config.getPoliteness().getRobotsPolicy() != RobotsPolicy.IGNORE_ROBOTS
+                && !frontier.getRobotsServiceClient().isAllowed(qUri.getQueuedUri(), config)) {
             LOG.info("URI '{}' precluded by robots.txt", qUri.getUri());
             qUri = qUri.setError(ExtraStatusCodes.PRECLUDED_BY_ROBOTS.toFetchError());
             frontier.writeLog(frontier, qUri);

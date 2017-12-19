@@ -15,7 +15,6 @@
  */
 package no.nb.nna.veidemann.commons.client;
 
-import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.Status;
@@ -24,9 +23,11 @@ import io.grpc.stub.StreamObserver;
 import io.opentracing.contrib.ClientTracingInterceptor;
 import io.opentracing.util.GlobalTracer;
 import no.nb.nna.veidemann.api.ContentWriterGrpc;
+import no.nb.nna.veidemann.api.ContentWriterProto.Data;
 import no.nb.nna.veidemann.api.ContentWriterProto.WriteReply;
 import no.nb.nna.veidemann.api.ContentWriterProto.WriteRequest;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
+import no.nb.nna.veidemann.api.ContentWriterProto.WriteRequestMeta;
+import no.nb.nna.veidemann.api.ContentWriterProto.WriteResponseMeta;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -80,7 +81,7 @@ public class ContentWriterClient implements AutoCloseable {
 
         private final CountDownLatch finishLatch = new CountDownLatch(1);
 
-        private String storageRef;
+        private WriteResponseMeta responseMeta;
 
         private StatusException error;
 
@@ -89,7 +90,7 @@ public class ContentWriterClient implements AutoCloseable {
             StreamObserver<WriteReply> responseObserver = new StreamObserver<WriteReply>() {
                 @Override
                 public void onNext(WriteReply reply) {
-                    storageRef = reply.getStorageRef();
+                    responseMeta = reply.getMeta();
                 }
 
                 @Override
@@ -110,29 +111,35 @@ public class ContentWriterClient implements AutoCloseable {
             this.requestObserver = asyncStub.write(responseObserver);
         }
 
-        public ContentWriterSession sendCrawlLog(CrawlLog crawlLog) {
-            sendRequest(() -> WriteRequest.newBuilder().setCrawlLog(crawlLog).build());
+        public ContentWriterSession sendMetadata(WriteRequestMeta meta) {
+            sendRequest(() -> WriteRequest.newBuilder().setMeta(meta).build());
             return this;
         }
 
-        public ContentWriterSession sendHeader(ByteString header) {
-            sendRequest(() -> WriteRequest.newBuilder().setHeader(header).build());
+        public ContentWriterSession sendHeader(Data data) {
+            sendRequest(() -> WriteRequest.newBuilder().setHeader(data).build());
             return this;
         }
 
-        public ContentWriterSession sendPayload(ByteString payload) {
-            sendRequest(() -> WriteRequest.newBuilder().setPayload(payload).build());
+        public ContentWriterSession sendPayload(Data data) {
+            sendRequest(() -> WriteRequest.newBuilder().setPayload(data).build());
             return this;
         }
 
-        public String finish() throws InterruptedException, StatusException {
+        public WriteResponseMeta finish() throws InterruptedException, StatusException {
             requestObserver.onCompleted();
             // Receiving happens asynchronously
             finishLatch.await(1, TimeUnit.MINUTES);
             if (error != null) {
                 throw error;
             }
-            return storageRef;
+            return responseMeta;
+        }
+
+        public void cancel(String reason) {
+            LOG.info("Cancelling content writer session");
+            requestObserver.onError(Status.CANCELLED.withDescription(reason).asException());
+            finishLatch.countDown();
         }
 
         private void sendRequest(Supplier<WriteRequest> request) {

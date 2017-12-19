@@ -23,6 +23,7 @@ import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
+import no.nb.nna.veidemann.api.ContentWriterProto;
 import no.nb.nna.veidemann.commons.AlreadyCrawledCache;
 import no.nb.nna.veidemann.commons.client.ContentWriterClient;
 import no.nb.nna.veidemann.commons.client.ContentWriterClient.ContentWriterSession;
@@ -30,6 +31,7 @@ import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.util.Sha1Digest;
 import no.nb.nna.veidemann.db.ProtoUtils;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
+import org.apache.http.HttpStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,9 +58,15 @@ public class ContentCollector {
 
     private final DbAdapter db;
 
-    private final ContentWriterClient contentWriterClient;
+    private final int recordNum;
 
-    private ContentWriterClient.ContentWriterSession contentWriterSession;
+    private final ContentWriterProto.RecordType type;
+
+    private final String targetUri;
+
+    private final ContentWriterClient.ContentWriterSession contentWriterSession;
+
+    private final ContentWriterProto.WriteRequestMeta.RecordMeta.Builder recordMeta;
 
     private long size;
 
@@ -66,69 +74,112 @@ public class ContentCollector {
 
     private boolean shouldCache = false;
 
-    private HttpResponseStatus httpResponseStatus;
-
-    private HttpVersion httpResponseProtocolVersion;
-
     private HttpHeaders cacheHeaders;
 
     private ByteString cacheValue;
 
-    public ContentCollector(final DbAdapter db, final ContentWriterClient contentWriterClient) {
+    public ContentCollector(int recordNum, ContentWriterProto.RecordType type, final String targetUri, final DbAdapter db, final ContentWriterSession contentWriterSession) {
+        this.recordNum = recordNum;
+        this.type = type;
+        this.targetUri = targetUri;
         this.db = db;
-        this.contentWriterClient = contentWriterClient;
+        this.contentWriterSession = contentWriterSession;
         this.digest = new Sha1Digest();
+        this.recordMeta = ContentWriterProto.WriteRequestMeta.RecordMeta.newBuilder()
+                .setRecordNum(recordNum)
+                .setType(type);
+        switch (type) {
+            case REQUEST:
+                this.recordMeta.setRecordContentType(RECORD_CONTENT_TYPE_REQUEST);
+                break;
+            case RESPONSE:
+                this.recordMeta.setRecordContentType(RECORD_CONTENT_TYPE_RESPONSE);
+                break;
+        }
     }
 
-    public void setRequestHeaders(HttpRequest request, CrawlLog.Builder crawlLog) {
-        crawlLog.setContentType(request.headers().get("Content-Type", ""))
-                .setRecordContentType(RECORD_CONTENT_TYPE_REQUEST);
-
-        StringBuilder headers = new StringBuilder(512)
+    public static String createRequestPreamble(HttpRequest request) {
+        return new StringBuilder()
                 .append(request.method().toString())
                 .append(" ")
                 .append(request.uri())
                 .append(" ")
                 .append(request.protocolVersion().text())
-                .append(CRLF);
-
-        addHeaders(request.headers(), headers);
-
-        ByteString data = ByteString.copyFromUtf8(headers.toString());
-        digest.update(data);
-        getContentWriterSession().sendHeader(data);
-        shouldAddSeparator = true;
-        size = data.size();
+                .append(CRLF).toString();
     }
 
-    public void setResponseHeaders(HttpResponse response, CrawlLog.Builder crawlLog) {
-        httpResponseStatus = response.status();
-        httpResponseProtocolVersion = response.protocolVersion();
-
-        crawlLog.setStatusCode(httpResponseStatus.code())
-                .setContentType(response.headers().get("Content-Type", ""))
-                .setRecordContentType(RECORD_CONTENT_TYPE_RESPONSE);
-
-        StringBuilder headers = new StringBuilder(512)
+    public static String createResponsePreamble(HttpResponse response) {
+        return new StringBuilder()
                 .append(response.protocolVersion().text())
                 .append(" ")
                 .append(response.status().toString())
-                .append(CRLF);
+                .append(CRLF).toString();
+    }
 
-        addHeaders(response.headers(), headers);
+    public void setHeaders(String preamble, HttpHeaders headers) {
+        recordMeta.setPayloadContentType(headers.get("Content-Type", ""));
+        ByteString headerData = ByteString.copyFromUtf8(preamble).concat(serializeHeaders(headers));
 
-        ByteString data = ByteString.copyFromUtf8(headers.toString());
-        digest.update(data);
-        getContentWriterSession().sendHeader(data);
+        digest.update(headerData);
+        contentWriterSession.sendHeader(ContentWriterProto.Data.newBuilder().setRecordNum(recordNum).setData(headerData).build());
         shouldAddSeparator = true;
-        size = data.size();
+        size = headerData.size();
 
         if (shouldCache) {
-            cacheHeaders = response.headers();
+            cacheHeaders = headers;
         }
     }
 
-    private void addHeaders(HttpHeaders headers, StringBuilder buf) {
+//    public void setRequestHeaders(HttpRequest request, CrawlLog.Builder crawlLog) {
+//        crawlLog.setContentType(request.headers().get("Content-Type", ""))
+//                .setRecordContentType(RECORD_CONTENT_TYPE_REQUEST);
+//
+//        StringBuilder headers = new StringBuilder(512)
+//                .append(request.method().toString())
+//                .append(" ")
+//                .append(request.uri())
+//                .append(" ")
+//                .append(request.protocolVersion().text())
+//                .append(CRLF);
+//
+//        addHeaders(request.headers(), headers);
+//
+//        ByteString data = ByteString.copyFromUtf8(headers.toString());
+//        digest.update(data);
+//        contentWriterSession.sendRequestHeader(data);
+//        shouldAddSeparator = true;
+//        size = data.size();
+//    }
+//
+//    public void setResponseHeaders(HttpResponse response, CrawlLog.Builder crawlLog) {
+//        httpResponseStatus = response.status();
+//        httpResponseProtocolVersion = response.protocolVersion();
+//
+//        crawlLog.setStatusCode(httpResponseStatus.code())
+//                .setContentType(response.headers().get("Content-Type", ""))
+//                .setRecordContentType(RECORD_CONTENT_TYPE_RESPONSE);
+//
+//        StringBuilder headers = new StringBuilder(512)
+//                .append(response.protocolVersion().text())
+//                .append(" ")
+//                .append(response.status().toString())
+//                .append(CRLF);
+//
+//        addHeaders(response.headers(), headers);
+//
+//        ByteString data = ByteString.copyFromUtf8(headers.toString());
+//        digest.update(data);
+//        contentWriterSession.sendResponseHeader(data);
+//        shouldAddSeparator = true;
+//        size = data.size();
+//
+//        if (shouldCache) {
+//            cacheHeaders = response.headers();
+//        }
+//    }
+
+    private ByteString serializeHeaders(HttpHeaders headers) {
+        StringBuilder buf = new StringBuilder();
         Iterator<Map.Entry<CharSequence, CharSequence>> iter = headers.iteratorCharSequence();
         while (iter.hasNext()) {
             Map.Entry<CharSequence, CharSequence> header = iter.next();
@@ -137,6 +188,7 @@ public class ContentCollector {
                     .append(header.getValue())
                     .append(CRLF);
         }
+        return ByteString.copyFromUtf8(buf.toString());
     }
 
     public void addPayload(ByteBuf payload) {
@@ -147,7 +199,7 @@ public class ContentCollector {
         }
         ByteString data = ByteString.copyFrom(payload.nioBuffer());
         digest.update(data);
-        getContentWriterSession().sendPayload(data);
+        contentWriterSession.sendPayload(ContentWriterProto.Data.newBuilder().setRecordNum(recordNum).setData(data).build());
         size += data.size();
 
         if (shouldCache) {
@@ -159,19 +211,23 @@ public class ContentCollector {
         }
     }
 
-    private synchronized ContentWriterSession getContentWriterSession() {
-        if (contentWriterSession == null) {
-            contentWriterSession = contentWriterClient.createSession();
-        }
-        return contentWriterSession;
-    }
-
     public String getDigest() {
         return digest.getPrefixedDigestString();
     }
 
     public long getSize() {
         return size;
+    }
+
+    public int getRecordNum() {
+        return recordNum;
+    }
+
+    public ContentWriterProto.WriteRequestMeta.RecordMeta getRecordMeta() {
+        return recordMeta
+                .setBlockDigest(digest.getPrefixedDigestString())
+                .setSize(size)
+                .build();
     }
 
     public void setShouldCache(boolean shouldCache) {
@@ -186,7 +242,8 @@ public class ContentCollector {
         return cacheValue;
     }
 
-    public void writeCache(AlreadyCrawledCache cache, String uri, String executionId) {
+    public void writeCache(AlreadyCrawledCache cache, String uri, String executionId,
+                           HttpResponseStatus httpResponseStatus, HttpVersion httpResponseProtocolVersion) {
         if (shouldCache) {
             cacheHeaders.set("Content-Length", getCacheValue().size());
             cacheHeaders.remove("Transfer-Encoding");
@@ -201,43 +258,34 @@ public class ContentCollector {
         }
     }
 
-    public CrawlLog writeRequest(CrawlLog logEntry) {
-        CrawlLog.Builder logEntryBuilder = logEntry.toBuilder();
-        logEntryBuilder.setRecordType("request")
-                .setBlockDigest(getDigest());
-        logEntry = db.saveCrawlLog(logEntryBuilder.build());
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("Writing request {}", logEntryBuilder.getRequestedUri());
-        }
-        getContentWriterSession().sendCrawlLog(logEntry);
-        try {
-            getContentWriterSession().finish();
-            return logEntry;
-        } catch (InterruptedException | StatusException ex) {
-            LOG.error("Failed finishing write request", ex);
-            // TODO: Do something reasonable with the exception
-            throw new RuntimeException(ex);
-        }
-    }
-
-    public CrawlLog writeResponse(CrawlLog logEntry) {
-        CrawlLog.Builder logEntryBuilder = logEntry.toBuilder();
-        logEntryBuilder.setRecordType("response")
-                .setFetchTimeMs(Duration.between(ProtoUtils.tsToOdt(
-                        logEntryBuilder.getFetchTimeStamp()), ProtoUtils.getNowOdt()).toMillis())
-                .setBlockDigest(getDigest());
-        logEntry = db.saveCrawlLog(logEntryBuilder.build());
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("Writing response {}", logEntryBuilder.getRequestedUri());
-        }
-        getContentWriterSession().sendCrawlLog(logEntry);
-        try {
-            getContentWriterSession().finish();
-            return logEntry;
-        } catch (InterruptedException | StatusException ex) {
-            LOG.error("Failed finishing write response", ex);
-            // TODO: Do something reasonable with the exception
-            throw new RuntimeException(ex);
-        }
-    }
+//    public CrawlLog writeRequest(CrawlLog logEntry) {
+//        CrawlLog.Builder logEntryBuilder = logEntry.toBuilder();
+//        logEntryBuilder.setRecordType("request")
+//                .setBlockDigest(getDigest());
+//        logEntry = db.saveCrawlLog(logEntryBuilder.build());
+//        if (LOG.isDebugEnabled()) {
+//            LOG.debug("Writing request {}", logEntryBuilder.getRequestedUri());
+//        }
+//    }
+//
+//    public CrawlLog writeResponse(CrawlLog logEntry) {
+//        CrawlLog.Builder logEntryBuilder = logEntry.toBuilder();
+//        logEntryBuilder.setRecordType("response")
+//                .setFetchTimeMs(Duration.between(ProtoUtils.tsToOdt(
+//                        logEntryBuilder.getFetchTimeStamp()), ProtoUtils.getNowOdt()).toMillis())
+//                .setBlockDigest(getDigest());
+//        logEntry = db.saveCrawlLog(logEntryBuilder.build());
+//        if (LOG.isDebugEnabled()) {
+//            LOG.debug("Writing response {}", logEntryBuilder.getRequestedUri());
+//        }
+//        contentWriterSession.sendCrawlLog(logEntry);
+//        try {
+//            contentWriterSession.finish();
+//            return logEntry;
+//        } catch (InterruptedException | StatusException ex) {
+//            LOG.error("Failed finishing write response", ex);
+//            // TODO: Do something reasonable with the exception
+//            throw new RuntimeException(ex);
+//        }
+//    }
 }

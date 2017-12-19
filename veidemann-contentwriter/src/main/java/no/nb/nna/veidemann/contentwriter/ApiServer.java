@@ -24,7 +24,7 @@ import io.grpc.ServerBuilder;
 import io.opentracing.contrib.ServerTracingInterceptor;
 import io.opentracing.util.GlobalTracer;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
-import no.nb.nna.veidemann.contentwriter.text.TextExtracter;
+import no.nb.nna.veidemann.contentwriter.text.TextExtractor;
 import no.nb.nna.veidemann.contentwriter.warc.WarcWriterPool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,18 +39,18 @@ private static final Logger LOG = LoggerFactory.getLogger(ApiServer.class);
     /**
      * Construct a new REST API server.
      */
-    public ApiServer(int port, DbAdapter db, WarcWriterPool warcWriterPool, TextExtracter textExtracter) {
-        this(ServerBuilder.forPort(port), db, warcWriterPool, textExtracter);
+    public ApiServer(int port, DbAdapter db, WarcWriterPool warcWriterPool, TextExtractor textExtractor) {
+        this(ServerBuilder.forPort(port), db, warcWriterPool, textExtractor);
     }
 
-    public ApiServer(ServerBuilder<?> serverBuilder, DbAdapter db, WarcWriterPool warcWriterPool, TextExtracter textExtracter) {
+    public ApiServer(ServerBuilder<?> serverBuilder, DbAdapter db, WarcWriterPool warcWriterPool, TextExtractor textExtractor) {
 
         ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor.Builder(GlobalTracer.get())
                 .withTracedAttributes(ServerTracingInterceptor.ServerRequestAttribute.CALL_ATTRIBUTES,
                         ServerTracingInterceptor.ServerRequestAttribute.METHOD_TYPE)
                 .build();
 
-        server = serverBuilder.addService(tracingInterceptor.intercept(new ContentWriterService(db, warcWriterPool, textExtracter))).build();
+        server = serverBuilder.addService(tracingInterceptor.intercept(new ContentWriterService(db, warcWriterPool, textExtractor))).build();
     }
 
     public ApiServer start() {

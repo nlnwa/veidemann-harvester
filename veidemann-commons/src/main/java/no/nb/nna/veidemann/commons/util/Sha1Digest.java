@@ -25,28 +25,32 @@ public class Sha1Digest {
         this.digest = digest;
     }
 
-    public void update(ByteString data) {
+    public Sha1Digest update(ByteString data) {
         dirty = true;
         for (ByteBuffer b : data.asReadOnlyByteBufferList()) {
             digest.update(b);
         }
+        return this;
     }
 
-    public void update(ByteBuffer data) {
+    public Sha1Digest update(ByteBuffer data) {
         dirty = true;
         digest.update(data);
+        return this;
     }
 
-    public void update(char... data) {
+    public Sha1Digest update(char... data) {
         dirty = true;
         for (char b : data) {
             digest.update((byte) b);
         }
+        return this;
     }
 
-    public void update(byte... data) {
+    public Sha1Digest update(byte... data) {
         dirty = true;
         digest.update(data);
+        return this;
     }
 
     @Override

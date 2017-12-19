@@ -45,7 +45,7 @@ message WriteRequestMeta {
 
     string execution_id = 1;
     string target_uri = 2;
-    repeated RecordMeta record_meta = 3;
+    map<int32, RecordMeta> record_meta = 3;
 
     google.protobuf.Timestamp fetch_time_stamp = 4;
     string ip_address = 5;
@@ -67,9 +67,11 @@ message WriteResponseMeta {
         RecordType type = 2;
         string warc_id = 3;
         string storage_ref = 4;
+        string block_digest = 5;
+        string payload_digest = 6;
     }
 
-    repeated RecordMeta record_meta = 1;
+    map<int32, RecordMeta> record_meta = 1;
 }
 
 message WriteReply {

@@ -23,10 +23,14 @@ import io.netty.buffer.Unpooled;
 import io.opentracing.ActiveSpan;
 import io.opentracing.tag.Tags;
 import io.opentracing.util.GlobalTracer;
+import no.nb.nna.veidemann.api.ContentWriterProto;
+import no.nb.nna.veidemann.api.ContentWriterProto.WriteResponseMeta;
+import no.nb.nna.veidemann.api.ContentWriterProto.WriteResponseMeta.RecordMeta;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
 import no.nb.nna.veidemann.commons.ExtraStatusCodes;
 import no.nb.nna.veidemann.commons.client.ContentWriterClient;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
+import no.nb.nna.veidemann.commons.util.Sha1Digest;
 import no.nb.nna.veidemann.db.ProtoUtils;
 import org.netpreserve.commons.util.datetime.DateFormat;
 import org.netpreserve.commons.util.datetime.Granularity;
@@ -52,12 +56,10 @@ import org.xbill.DNS.Type;
 
 import java.io.IOException;
 import java.io.InterruptedIOException;
-import java.math.BigInteger;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -85,10 +87,6 @@ public class DnsLookup {
     private static final short TYPE = Type.A;
 
     final Cache cache;
-
-    String digestAlgorithm = "SHA-1";
-
-    boolean digestContent = true;
 
     private final DbAdapter db;
 
@@ -173,29 +171,6 @@ public class DnsLookup {
         this.acceptNonDnsResolves = acceptNonDnsResolves;
     }
 
-    /**
-     * Whether or not to perform an on-the-fly digest hash of retrieved content-bodies.
-     */
-    public boolean getDigestContent() {
-        return digestContent;
-    }
-
-    public void setDigestContent(boolean digest) {
-        digestContent = digest;
-    }
-
-    /**
-     * Which algorithm (for example MD5 or SHA-1) to use to perform an on-the-fly digest hash of retrieved
-     * content-bodies.
-     */
-    public String getDigestAlgorithm() {
-        return digestAlgorithm;
-    }
-
-    public void setDigestAlgorithm(String digestAlgorithm) {
-        this.digestAlgorithm = digestAlgorithm;
-    }
-
     protected void storeDnsRecord(final String host, final State state) throws IOException, NoSuchAlgorithmException,
             InterruptedException, StatusException {
 
@@ -222,27 +197,39 @@ public class DnsLookup {
                 .setFetchTimeStamp(ProtoUtils.odtToTs(state.fetchStart))
                 .setIpAddress(state.dnsIp)
                 .setContentType("text/dns")
-                .setRecordContentType("text/dns")
                 .setSize(payload.readableBytes());
 
-        // Shall we get a digest on the content downloaded?
-        if (digestContent) {
-            MessageDigest digest = MessageDigest.getInstance(getDigestAlgorithm());
-
-            String digestString = "sha1:" + new BigInteger(1, digest.digest(buf)).toString(16);
-            crawlLogBuilder.setBlockDigest(digestString);
-        }
-
-        CrawlLog crawlLog = crawlLogBuilder.build();
-        if (db != null) {
-            crawlLog = db.saveCrawlLog(crawlLog);
-        }
-
         if (contentWriterClient != null) {
-            String uri = contentWriterClient.createSession()
-                    .sendCrawlLog(crawlLog)
-                    .sendPayload(ByteString.copyFrom(buf))
+            ByteString data = ByteString.copyFrom(buf);
+            ContentWriterProto.WriteRequestMeta.RecordMeta record = ContentWriterProto.WriteRequestMeta.RecordMeta.newBuilder()
+                    .setRecordNum(0)
+                    .setType(ContentWriterProto.RecordType.RESOURCE)
+                    .setRecordContentType("text/dns")
+                    .setSize(data.size())
+                    .setBlockDigest(new Sha1Digest().update(data).getPrefixedDigestString())
+                    .build();
+            ContentWriterProto.WriteRequestMeta meta = ContentWriterProto.WriteRequestMeta.newBuilder()
+                    .setTargetUri("dns:" + host)
+                    .setStatusCode(ExtraStatusCodes.SUCCESSFUL_DNS.getCode())
+                    .setFetchTimeStamp(ProtoUtils.odtToTs(state.fetchStart))
+                    .setIpAddress(state.dnsIp)
+                    .putRecordMeta(record.getRecordNum(), record)
+                    .build();
+
+            WriteResponseMeta response = contentWriterClient.createSession()
+                    .sendMetadata(meta)
+                    .sendPayload(ContentWriterProto.Data.newBuilder().setRecordNum(record.getRecordNum()).setData(data).build())
                     .finish();
+            RecordMeta responseRecordMeta = response.getRecordMetaOrThrow(record.getRecordNum());
+
+            CrawlLog crawlLog = crawlLogBuilder
+                    .setWarcId(responseRecordMeta.getWarcId())
+                    .setBlockDigest(responseRecordMeta.getBlockDigest())
+                    .setPayloadDigest(responseRecordMeta.getPayloadDigest())
+                    .build();
+            if (db != null) {
+                crawlLog = db.saveCrawlLog(crawlLog);
+            }
         }
 
         LOG.debug("DNS record for {} written", host);

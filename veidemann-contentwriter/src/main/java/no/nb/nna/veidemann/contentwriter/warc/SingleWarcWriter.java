@@ -15,6 +15,16 @@
  */
 package no.nb.nna.veidemann.contentwriter.warc;
 
+import no.nb.nna.veidemann.api.ContentWriterProto.WriteRequestMeta;
+import no.nb.nna.veidemann.contentwriter.Util;
+import no.nb.nna.veidemann.db.ProtoUtils;
+import org.jwat.warc.WarcFileNaming;
+import org.jwat.warc.WarcFileNamingDefault;
+import org.jwat.warc.WarcFileWriter;
+import org.jwat.warc.WarcFileWriterConfig;
+import org.jwat.warc.WarcRecord;
+import org.jwat.warc.WarcWriter;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -22,19 +32,9 @@ import java.io.UncheckedIOException;
 import java.net.URI;
 import java.util.Date;
 import java.util.GregorianCalendar;
+import java.util.List;
 import java.util.TimeZone;
 import java.util.UUID;
-
-import no.nb.nna.veidemann.api.ContentWriterProto.WriteRequestMeta;
-import no.nb.nna.veidemann.contentwriter.Util;
-import no.nb.nna.veidemann.db.ProtoUtils;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
-import org.jwat.warc.WarcFileNaming;
-import org.jwat.warc.WarcFileNamingDefault;
-import org.jwat.warc.WarcFileWriter;
-import org.jwat.warc.WarcFileWriterConfig;
-import org.jwat.warc.WarcRecord;
-import org.jwat.warc.WarcWriter;
 
 import static org.jwat.warc.WarcConstants.*;
 
@@ -51,8 +51,10 @@ public class SingleWarcWriter implements AutoCloseable {
         warcFileWriter = WarcFileWriter.getWarcWriterInstance(warcFileNaming, writerConfig);
     }
 
-    public URI writeWarcHeader(String warcId, final WriteRequestMeta request, final WriteRequestMeta.RecordMeta recordMeta)
+    public URI writeWarcHeader(String warcId, final WriteRequestMeta request,
+                               final WriteRequestMeta.RecordMeta recordMeta, final List<String> allRecordIds)
             throws UncheckedIOException {
+
         try {
             boolean newFile = warcFileWriter.nextWriter();
             File currentFile = warcFileWriter.getFile();
@@ -66,13 +68,15 @@ public class SingleWarcWriter implements AutoCloseable {
 
             WarcRecord record = WarcRecord.createRecord(writer);
 
-            record.header.addHeader(FN_WARC_TYPE, Util.getRecordTypeString(recordMeta.getType()));
+            String recordType = Util.getRecordTypeString(recordMeta.getType());
+
+            record.header.addHeader(FN_WARC_TYPE, recordType);
             record.header.addHeader(FN_WARC_TARGET_URI, request.getTargetUri());
             Date warcDate = Date.from(ProtoUtils.tsToOdt(request.getFetchTimeStamp()).toInstant());
             record.header.addHeader(FN_WARC_DATE, warcDate, null);
             record.header.addHeader(FN_WARC_RECORD_ID, Util.formatIdentifierAsUrn(warcId));
 
-            if (RT_REVISIT.equals(recordMeta.getType())) {
+            if (RT_REVISIT.equals(recordType)) {
                 record.header.addHeader(FN_WARC_PROFILE, PROFILE_IDENTICAL_PAYLOAD_DIGEST);
                 record.header.addHeader(FN_WARC_REFERS_TO, Util.formatIdentifierAsUrn(recordMeta.getWarcRefersTo()));
             }
@@ -86,6 +90,12 @@ public class SingleWarcWriter implements AutoCloseable {
 
             if (recordMeta.getSize() > 0) {
                 record.header.addHeader(FN_CONTENT_TYPE, recordMeta.getRecordContentType());
+            }
+
+            for (String otherId : allRecordIds) {
+                if (!otherId.equals(warcId)) {
+                    record.header.addHeader(FN_WARC_CONCURRENT_TO, otherId);
+                }
             }
 
             writer.writeHeader(record);

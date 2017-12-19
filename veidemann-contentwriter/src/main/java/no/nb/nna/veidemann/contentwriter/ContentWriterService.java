@@ -15,16 +15,6 @@
  */
 package no.nb.nna.veidemann.contentwriter;
 
-import java.io.IOException;
-import java.net.URI;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Optional;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.ForkJoinTask;
-
 import com.google.protobuf.Empty;
 import io.grpc.Status;
 import io.grpc.Status.Code;
@@ -36,14 +26,27 @@ import no.nb.nna.veidemann.api.ContentWriterProto.WriteReply;
 import no.nb.nna.veidemann.api.ContentWriterProto.WriteRequest;
 import no.nb.nna.veidemann.api.ContentWriterProto.WriteRequestMeta;
 import no.nb.nna.veidemann.api.ContentWriterProto.WriteResponseMeta;
+import no.nb.nna.veidemann.api.MessagesProto;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.contentwriter.text.TextExtractor;
 import no.nb.nna.veidemann.contentwriter.warc.SingleWarcWriter;
 import no.nb.nna.veidemann.contentwriter.warc.WarcWriterPool;
-import no.nb.nna.veidemann.api.MessagesProto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+
+import java.io.IOException;
+import java.net.URI;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Optional;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinTask;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import static io.netty.handler.codec.http.HttpConstants.CR;
 import static io.netty.handler.codec.http.HttpConstants.LF;
@@ -81,22 +84,24 @@ public class ContentWriterService extends ContentWriterGrpc.ContentWriterImplBas
             }
 
             private WriteRequestMeta.RecordMeta getRecordMeta(int recordNum) throws StatusException {
-                for (WriteRequestMeta.RecordMeta m : writeRequestMeta.getRecordMetaList()) {
-                    if (m.getRecordNum() == recordNum) {
-                        return m;
-                    }
+                WriteRequestMeta.RecordMeta m = writeRequestMeta.getRecordMetaOrDefault(recordNum, null);
+                if (m == null) {
+                    throw Status.INVALID_ARGUMENT.withDescription("Missing metadata").asException();
                 }
-                throw Status.INVALID_ARGUMENT.withDescription("Missing metadata").asException();
+                return m;
             }
 
             @Override
             public void onNext(WriteRequest value) {
+                if (writeRequestMeta != null) {
+                    MDC.put("eid", writeRequestMeta.getExecutionId());
+                    MDC.put("uri", writeRequestMeta.getTargetUri());
+                }
+
                 ContentBuffer contentBuffer;
                 switch (value.getValueCase()) {
                     case META:
                         writeRequestMeta = value.getMeta();
-                        MDC.put("eid", writeRequestMeta.getExecutionId());
-                        MDC.put("uri", writeRequestMeta.getTargetUri());
                         break;
                     case HEADER:
                         contentBuffer = getContentBuffer(value.getHeader().getRecordNum());
@@ -109,7 +114,7 @@ public class ContentWriterService extends ContentWriterGrpc.ContentWriterImplBas
                         contentBuffer.setHeader(value.getHeader().getData());
                         break;
                     case PAYLOAD:
-                        contentBuffer = getContentBuffer(value.getHeader().getRecordNum());
+                        contentBuffer = getContentBuffer(value.getPayload().getRecordNum());
                         contentBuffer.addPayload(value.getPayload().getData());
                         break;
                     default:
@@ -125,9 +130,12 @@ public class ContentWriterService extends ContentWriterGrpc.ContentWriterImplBas
                         MDC.put("uri", writeRequestMeta.getTargetUri());
                         MDC.put("eid", writeRequestMeta.getExecutionId());
                     }
-                    LOG.info("Request cancelled before WARC record written");
+                    LOG.info("Request cancelled before WARC record written. Reason {}", status.getDescription());
                 } else {
                     LOG.error("Error caught: {}", t.getMessage(), t);
+                }
+                for (ContentBuffer contentBuffer : contentBuffers.values()) {
+                    contentBuffer.close();
                 }
             }
 
@@ -155,42 +163,50 @@ public class ContentWriterService extends ContentWriterGrpc.ContentWriterImplBas
                             throw Status.INVALID_ARGUMENT.withDescription("Nothing to store").asException();
                         }
 
-                        if (!contentBuffer.getBlockDigest().equals(recordMeta.getBlockDigest())) {
-                            LOG.error("Block digest mismatch. Expected {}, but was {}",
-                                    recordMeta.getBlockDigest(), contentBuffer.getBlockDigest());
-                            throw Status.INVALID_ARGUMENT.withDescription("Block digest mismatch").asException();
-                        }
-
                         if (contentBuffer.getTotalSize() != recordMeta.getSize()) {
                             LOG.error("Size mismatch. Expected {}, but was {}",
                                     recordMeta.getSize(), contentBuffer.getTotalSize());
                             throw Status.INVALID_ARGUMENT.withDescription("Size mismatch").asException();
                         }
+
+                        if (!contentBuffer.getBlockDigest().equals(recordMeta.getBlockDigest())) {
+                            LOG.error("Block digest mismatch. Expected {}, but was {}",
+                                    recordMeta.getBlockDigest(), contentBuffer.getBlockDigest());
+                            throw Status.INVALID_ARGUMENT.withDescription("Block digest mismatch").asException();
+                        }
                     } catch (StatusException ex) {
                         responseObserver.onError(ex);
+                        return;
                     }
                 }
 
                 // Write
+                List<String> allRecordIds = contentBuffers.values().stream()
+                        .map(cb -> Util.formatIdentifierAsUrn(cb.getWarcId()))
+                        .collect(Collectors.toList());
+
                 for (Entry<Integer, ContentBuffer> recordEntry : contentBuffers.entrySet()) {
                     ContentBuffer contentBuffer = recordEntry.getValue();
                     try {
-                        String recordId = Util.createIdentifier();
                         WriteRequestMeta.RecordMeta recordMeta = getRecordMeta(recordEntry.getKey());
 
+                        recordMeta = recordMeta.toBuilder().setPayloadDigest(contentBuffer.getPayloadDigest()).build();
+
                         if (recordMeta.getType() == RecordType.RESPONSE) {
-                            recordMeta = detectRevisit(recordId, contentBuffer, recordMeta);
+                            recordMeta = detectRevisit(contentBuffer, recordMeta);
                         }
 
-                        URI ref = writeRecord(recordId, contentBuffer, writeRequestMeta, recordMeta);
+                        URI ref = writeRecord(contentBuffer, writeRequestMeta, recordMeta, allRecordIds);
 
                         WriteResponseMeta.RecordMeta.Builder responseMeta = WriteResponseMeta.RecordMeta.newBuilder()
                                 .setRecordNum(recordMeta.getRecordNum())
                                 .setType(recordMeta.getType())
-                                .setWarcId(recordId)
-                                .setStorageRef(ref.toString());
+                                .setWarcId(contentBuffer.getWarcId())
+                                .setStorageRef(ref.toString())
+                                .setBlockDigest(contentBuffer.getBlockDigest())
+                                .setPayloadDigest(contentBuffer.getPayloadDigest());
 
-                        reply.getMetaBuilder().addRecordMeta(responseMeta);
+                        reply.getMetaBuilder().putRecordMeta(responseMeta.getRecordNum(), responseMeta.build());
                     } catch (StatusException ex) {
                         LOG.error("Failed write: {}", ex.getMessage(), ex);
                         responseObserver.onError(ex);
@@ -236,12 +252,12 @@ public class ContentWriterService extends ContentWriterGrpc.ContentWriterImplBas
         }
     }
 
-    private WriteRequestMeta.RecordMeta detectRevisit(String warcId, final ContentBuffer contentBuffer,
+    private WriteRequestMeta.RecordMeta detectRevisit(final ContentBuffer contentBuffer,
                                                       final WriteRequestMeta.RecordMeta recordMeta) {
         Optional<MessagesProto.CrawledContent> isDuplicate = db
                 .hasCrawledContent(MessagesProto.CrawledContent.newBuilder()
                         .setDigest(contentBuffer.getPayloadDigest())
-                        .setWarcId(warcId)
+                        .setWarcId(contentBuffer.getWarcId())
                         .build());
 
         if (isDuplicate.isPresent()) {
@@ -261,7 +277,8 @@ public class ContentWriterService extends ContentWriterGrpc.ContentWriterImplBas
         return recordMeta;
     }
 
-    private URI writeRecord(final String warcId, final ContentBuffer contentBuffer, final WriteRequestMeta request, final WriteRequestMeta.RecordMeta recordMeta)
+    private URI writeRecord(final ContentBuffer contentBuffer, final WriteRequestMeta request,
+                            final WriteRequestMeta.RecordMeta recordMeta, final List<String> allRecordIds)
             throws StatusException {
 
         try (WarcWriterPool.PooledWarcWriter pooledWarcWriter = warcWriterPool.borrow()) {
@@ -269,7 +286,7 @@ public class ContentWriterService extends ContentWriterGrpc.ContentWriterImplBas
 
             SingleWarcWriter warcWriter = pooledWarcWriter.getWarcWriter();
 
-            URI ref = warcWriter.writeWarcHeader(warcId, request, recordMeta);
+            URI ref = warcWriter.writeWarcHeader(contentBuffer.getWarcId(), request, recordMeta, allRecordIds);
 
             if (contentBuffer.hasHeader()) {
                 size += warcWriter.addPayload(contentBuffer.getHeader().newInput());
@@ -284,6 +301,8 @@ public class ContentWriterService extends ContentWriterGrpc.ContentWriterImplBas
                 ForkJoinTask<Long> writeWarcJob = ForkJoinPool.commonPool().submit(new Callable<Long>() {
                     @Override
                     public Long call() throws Exception {
+                        MDC.put("eid", request.getExecutionId());
+                        MDC.put("uri", request.getTargetUri());
                         return warcWriter.addPayload(contentBuffer.getPayload().newInput());
                     }
 
@@ -294,7 +313,9 @@ public class ContentWriterService extends ContentWriterGrpc.ContentWriterImplBas
                     extractTextJob = ForkJoinPool.commonPool().submit(new Callable<Void>() {
                         @Override
                         public Void call() throws Exception {
-                            textExtractor.analyze(warcId, request.getTargetUri(), recordMeta.getPayloadContentType(),
+                            MDC.put("eid", request.getExecutionId());
+                            MDC.put("uri", request.getTargetUri());
+                            textExtractor.analyze(contentBuffer.getWarcId(), request.getTargetUri(), recordMeta.getPayloadContentType(),
                                     request.getStatusCode(), contentBuffer.getPayload().newInput(), db);
                             return null;
                         }
@@ -302,11 +323,15 @@ public class ContentWriterService extends ContentWriterGrpc.ContentWriterImplBas
                     });
                 }
 
-                long payloadSize = writeWarcJob.get();
+                long payloadSize = writeWarcJob.get(1, TimeUnit.MINUTES);
                 LOG.debug("Payload of size {}b written for {}", payloadSize, request.getTargetUri());
                 size += payloadSize;
                 if (extractTextJob != null) {
-                    extractTextJob.get();
+                    try {
+                        extractTextJob.get(10, TimeUnit.SECONDS);
+                    } catch (Exception ex) {
+                        LOG.error("Failed extracting text");
+                    }
                 }
             }
 

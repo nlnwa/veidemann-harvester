@@ -15,38 +15,37 @@
  */
 package no.nb.nna.veidemann.harvester.browsercontroller;
 
+import com.google.common.net.InetAddresses;
+import no.nb.nna.veidemann.api.ConfigProto;
+import no.nb.nna.veidemann.api.ContentWriterProto;
+import no.nb.nna.veidemann.api.ContentWriterProto.WriteResponseMeta;
+import no.nb.nna.veidemann.api.ControllerProto;
+import no.nb.nna.veidemann.api.HarvesterProto;
+import no.nb.nna.veidemann.api.MessagesProto;
+import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
+import no.nb.nna.veidemann.api.MessagesProto.PageLog;
+import no.nb.nna.veidemann.commons.client.ContentWriterClient;
+import no.nb.nna.veidemann.commons.db.DbAdapter;
+import no.nb.nna.veidemann.commons.util.ApiTools;
+import no.nb.nna.veidemann.harvester.BrowserSessionRegistry;
+import no.nb.nna.veidemann.harvester.proxy.InMemoryAlreadyCrawledCache;
+import no.nb.nna.veidemann.harvester.proxy.RecordingProxy;
+import org.junit.BeforeClass;
+import org.junit.Test;
+import org.littleshoot.proxy.HostResolver;
+import org.mockito.invocation.InvocationOnMock;
+
 import java.io.File;
-import java.net.Inet4Address;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.URL;
 import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Optional;
 
-import com.google.common.net.InetAddresses;
-import no.nb.nna.veidemann.api.ControllerProto;
-import no.nb.nna.veidemann.api.HarvesterProto;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
-import no.nb.nna.veidemann.commons.db.DbAdapter;
-import no.nb.nna.veidemann.commons.client.ContentWriterClient;
-import no.nb.nna.veidemann.commons.util.ApiTools;
-import no.nb.nna.veidemann.harvester.BrowserSessionRegistry;
-import no.nb.nna.veidemann.harvester.proxy.InMemoryAlreadyCrawledCache;
-import no.nb.nna.veidemann.harvester.proxy.RecordingProxy;
-import no.nb.nna.veidemann.api.ConfigProto;
-import no.nb.nna.veidemann.api.MessagesProto;
-import no.nb.nna.veidemann.api.MessagesProto.PageLog;
-import org.junit.BeforeClass;
-import org.junit.Ignore;
-import org.junit.Test;
-import org.littleshoot.proxy.HostResolver;
-import org.mockito.invocation.InvocationOnMock;
-
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  *
@@ -89,7 +88,15 @@ public class BrowserControllerIT {
             ContentWriterClient contentWriterClient = mock(ContentWriterClient.class);
             ContentWriterClient.ContentWriterSession contentWriterSession = mock(ContentWriterClient.ContentWriterSession.class);
             when(contentWriterClient.createSession()).thenReturn(contentWriterSession);
-            when(contentWriterSession.finish()).thenReturn("WARC_ID");
+            ContentWriterProto.WriteResponseMeta.Builder response = ContentWriterProto.WriteResponseMeta.newBuilder()
+                    .putRecordMeta(0, WriteResponseMeta.RecordMeta.newBuilder()
+                            .setRecordNum(0)
+                            .setWarcId("WARC_ID_REQUEST").build())
+                    .putRecordMeta(1, WriteResponseMeta.RecordMeta.newBuilder()
+                            .setRecordNum(0)
+                            .setWarcId("WARC_ID_RESPONSE").build());
+
+            when(contentWriterSession.finish()).thenReturn(response.build());
 
             DbAdapter db = getDbMock();
 

@@ -32,19 +32,21 @@ public class ContentBuffer {
 
     static final byte[] CRLF = {CR, LF};
 
+    private final static String EMPTY_DIGEST_STRING = "sha1:da39a3ee5e6b4b0d3255bfef95601890afd80709";
+
     private final Sha1Digest blockDigest;
     private final Sha1Digest payloadDigest;
     private Sha1Digest headerDigest;
 
     private ByteString headerBuf;
-
     private ByteString payloadBuf;
 
-    private final static String EMPTY_DIGEST_STRING = "sha1:da39a3ee5e6b4b0d3255bfef95601890afd80709";
+    private final String warcId;
 
     public ContentBuffer() {
         this.blockDigest = new Sha1Digest();
         this.payloadDigest = new Sha1Digest();
+        this.warcId = Util.createIdentifier();
     }
 
     public void setHeader(ByteString header) {
@@ -123,6 +125,10 @@ public class ContentBuffer {
 
     public boolean hasPayload() {
         return payloadBuf != null;
+    }
+
+    public String getWarcId() {
+        return warcId;
     }
 
     public void close() {

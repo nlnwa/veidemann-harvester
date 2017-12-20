@@ -110,6 +110,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
         this.responseCollector = new ContentCollector(1, ContentWriterProto.RecordType.RESPONSE, uri, db, contentWriterSession);
         this.sessionRegistry = sessionRegistry;
         this.cache = cache;
+        this.fetchTimeStamp = ProtoUtils.getNowTs();
     }
 
     @Override
@@ -152,8 +153,6 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                     request.headers().set("Accept-Encoding", "identity");
                     request.headers().remove(EXECUTION_ID);
                     request.headers().remove(CHROME_INTERCEPTION_ID);
-
-                    fetchTimeStamp = ProtoUtils.getNowTs();
 
                     // Store request
                     requestCollector.setHeaders(ContentCollector.createRequestPreamble(request), request.headers());

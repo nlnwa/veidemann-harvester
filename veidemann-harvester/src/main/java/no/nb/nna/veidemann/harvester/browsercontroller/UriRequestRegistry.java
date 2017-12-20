@@ -124,15 +124,22 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
         allRequestsLock.lock();
         try {
             long timeLimit = System.currentTimeMillis() + 5000L;
+            UriRequest fallbackCandidate = null;
             while (System.currentTimeMillis() < timeLimit) {
                 for (UriRequest r : allRequests) {
                     if (r.getUrl().equals(url) && r.getChildren().isEmpty()) {
                         if (r.getRequestId().contains(requestId) || r.getRequestId().isEmpty()) {
                             return r;
                         }
+                    } else if (r.getUrl().equals(url) && (r.getRequestId().contains(requestId) || r.getRequestId().isEmpty())) {
+                        fallbackCandidate = r;
                     }
                 }
                 allRequestsUpdate.await(1, TimeUnit.SECONDS);
+            }
+            // TODO: experimental
+            if (fallbackCandidate != null) {
+                return fallbackCandidate;
             }
             LOG.error("Request for url {} not found", url, new RuntimeException());
             throw new RuntimeException("Request for url " + url + " not found");

@@ -131,7 +131,7 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
                         if (r.getRequestId().contains(requestId) || r.getRequestId().isEmpty()) {
                             return r;
                         }
-                    } else if (r.getUrl().equals(url) && (r.getRequestId().contains(requestId) || r.getRequestId().isEmpty())) {
+                    } else if (r.getRequestId().contains(requestId) || r.getRequestId().isEmpty()) {
                         fallbackCandidate = r;
                     }
                 }
@@ -139,6 +139,7 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
             }
             // TODO: experimental
             if (fallbackCandidate != null) {
+                LOG.error("Search for {} returned {}", url, fallbackCandidate.getUrl());
                 return fallbackCandidate;
             }
             LOG.error("Request for url {} not found", url, new RuntimeException());

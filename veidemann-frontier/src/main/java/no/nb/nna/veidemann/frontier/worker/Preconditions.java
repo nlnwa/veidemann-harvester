@@ -106,7 +106,8 @@ public class Preconditions {
             LOG.info("Failed ip resolution for URI '{}' by extracting host '{}' and port '{}'",
                     qUri.getUri(),
                     qUri.getHost(),
-                    qUri.getPort());
+                    qUri.getPort(),
+                    ex);
 
             qUri.setError(ExtraStatusCodes.FAILED_DNS.toFetchError(ex.toString()))
                 .setEarliestFetchDelaySeconds(config.getPoliteness().getRetryDelaySeconds())

@@ -81,9 +81,9 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
 
     private Timestamp fetchTimeStamp;
 
-    private String discoveryPath;
+    private String discoveryPath = "";
 
-    private String referrer;
+    private String referrer = "";
 
     private InetSocketAddress resolvedRemoteAddress;
 
@@ -372,9 +372,14 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                 }
 
                 if (uriRequest != null) {
-                    discoveryPath = uriRequest.getDiscoveryPath();
-                    if (referrer.isEmpty()) {
-                        referrer = uriRequest.getReferrer();
+                    try {
+                        discoveryPath = uriRequest.getDiscoveryPath();
+                        if (referrer.isEmpty()) {
+                            referrer = uriRequest.getReferrer();
+                        }
+                    } catch (Exception ex) {
+                        LOG.error("Failed getting discovery path from uriRequest", ex);
+                        responseSpan.log("Failed getting discovery path from uriRequest: " + ex.toString());
                     }
                 } else {
                     discoveryPath = "";

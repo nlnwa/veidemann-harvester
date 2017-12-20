@@ -224,12 +224,17 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                 try {
                     responseCollector.writeCache(cache, uri, executionId, httpResponseStatus, httpResponseProtocolVersion);
 
+                    String ipAddress = "";
+                    if (resolvedRemoteAddress != null) {
+                        ipAddress = resolvedRemoteAddress.getAddress().getHostAddress();
+                    }
+
                     ContentWriterProto.WriteRequestMeta meta = ContentWriterProto.WriteRequestMeta.newBuilder()
                             .setExecutionId(executionId)
                             .setFetchTimeStamp(fetchTimeStamp)
                             .setTargetUri(uri)
                             .setStatusCode(httpResponseStatus.code())
-                            .setIpAddress(resolvedRemoteAddress.getAddress().getHostAddress())
+                            .setIpAddress(ipAddress)
                             .putRecordMeta(requestCollector.getRecordNum(), requestCollector.getRecordMeta())
                             .putRecordMeta(responseCollector.getRecordNum(), responseCollector.getRecordMeta())
                             .build();
@@ -242,7 +247,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                     responseRecordMeta = writeResponse.getRecordMetaOrDefault(1, null);
                     CrawlLog.Builder crawlLog = buildCrawlLog()
                             .setStatusCode(httpResponseStatus.code())
-                            .setIpAddress(resolvedRemoteAddress.getAddress().getHostAddress())
+                            .setIpAddress(ipAddress)
                             .setWarcId(responseRecordMeta.getWarcId())
                             .setStorageRef(responseRecordMeta.getStorageRef())
                             .setRecordType(responseRecordMeta.getType().name().toLowerCase())

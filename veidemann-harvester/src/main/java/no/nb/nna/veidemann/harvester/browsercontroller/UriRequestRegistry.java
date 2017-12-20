@@ -131,7 +131,7 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
                         if (r.getRequestId().contains(requestId) || r.getRequestId().isEmpty()) {
                             return r;
                         }
-                    } else if (r.getRequestId().contains(requestId) || r.getRequestId().isEmpty()) {
+                    } else if (r.getRequestId().contains(requestId)) {
                         fallbackCandidate = r;
                     }
                 }

@@ -33,6 +33,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
 /**
@@ -48,6 +49,10 @@ public class ContentWriterClient implements AutoCloseable {
 
     private final ContentWriterGrpc.ContentWriterStub asyncStub;
 
+    private final AtomicInteger requestCount = new AtomicInteger(0);
+    private final AtomicInteger responseCount = new AtomicInteger(0);
+    private final AtomicInteger sessionCount = new AtomicInteger(0);
+
     public ContentWriterClient(final String host, final int port) {
         this(ManagedChannelBuilder.forAddress(host, port).usePlaintext(true));
         LOG.info("ContentWriter client pointing to " + host + ":" + port);
@@ -62,11 +67,13 @@ public class ContentWriterClient implements AutoCloseable {
     }
 
     public ContentWriterSession createSession() {
+        sessionCount.incrementAndGet();
         return new ContentWriterSession();
     }
 
     @Override
     public void close() {
+        LOG.trace("Session count: {}, Request count: {}, Response count: {}", sessionCount.get(), requestCount.get(), responseCount.get());
         try {
             channel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
         } catch (InterruptedException ex) {
@@ -113,6 +120,7 @@ public class ContentWriterClient implements AutoCloseable {
 
         public ContentWriterSession sendMetadata(WriteRequestMeta meta) {
             sendRequest(() -> WriteRequest.newBuilder().setMeta(meta).build());
+            requestCount.incrementAndGet();
             return this;
         }
 
@@ -133,6 +141,8 @@ public class ContentWriterClient implements AutoCloseable {
             if (error != null) {
                 throw error;
             }
+            responseCount.incrementAndGet();
+            LOG.trace("Session count: {}, Request count: {}, Response count: {}", sessionCount.get(), requestCount.get(), responseCount.get());
             return responseMeta;
         }
 

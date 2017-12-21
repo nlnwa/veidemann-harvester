@@ -95,7 +95,9 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
 
     private Span responseSpan;
 
-    private final ContentWriterSession contentWriterSession;
+    private final ContentWriterClient contentWriterClient;
+
+    private ContentWriterSession contentWriterSession;
 
     public RecorderFilter(final String uri, final HttpRequest originalRequest, final ChannelHandlerContext ctx,
                           final DbAdapter db, final ContentWriterClient contentWriterClient,
@@ -105,9 +107,9 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
         this.db = db;
         this.uri = uri;
 
-        this.contentWriterSession = contentWriterClient.createSession();
-        this.requestCollector = new ContentCollector(0, ContentWriterProto.RecordType.REQUEST, uri, db, contentWriterSession);
-        this.responseCollector = new ContentCollector(1, ContentWriterProto.RecordType.RESPONSE, uri, db, contentWriterSession);
+        this.contentWriterClient = contentWriterClient;
+        this.requestCollector = new ContentCollector(0, ContentWriterProto.RecordType.REQUEST, uri, db);
+        this.responseCollector = new ContentCollector(1, ContentWriterProto.RecordType.RESPONSE, uri, db);
         this.sessionRegistry = sessionRegistry;
         this.cache = cache;
         this.fetchTimeStamp = ProtoUtils.getNowTs();
@@ -155,14 +157,14 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                     request.headers().remove(CHROME_INTERCEPTION_ID);
 
                     // Store request
-                    requestCollector.setHeaders(ContentCollector.createRequestPreamble(request), request.headers());
+                    contentWriterSession = contentWriterClient.createSession();
+                    requestCollector.setHeaders(ContentCollector.createRequestPreamble(request), request.headers(), contentWriterSession);
                     LOG.debug("Proxy is sending request to final destination.");
                 }
                 return null;
             } else if (httpObject instanceof HttpContent) {
-                // TODO: Request body is not handled yet
-                LOG.debug("TODO: Request body is not handled yet");
                 HttpContent request = (HttpContent) httpObject;
+                requestCollector.addPayload(request.content(), contentWriterSession);
             } else {
                 LOG.debug("Got something else than http request: {}", httpObject);
             }
@@ -188,7 +190,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                     HttpResponse res = (HttpResponse) httpObject;
                     httpResponseStatus = res.status();
                     httpResponseProtocolVersion = res.protocolVersion();
-                    responseCollector.setHeaders(ContentCollector.createResponsePreamble(res), res.headers());
+                    responseCollector.setHeaders(ContentCollector.createResponsePreamble(res), res.headers(), contentWriterSession);
 
                     if (uriRequest != null) {
                         res.headers().add(CHROME_INTERCEPTION_ID, uriRequest.getInterceptionId());
@@ -208,7 +210,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                 try {
                     HttpContent res = (HttpContent) httpObject;
                     responseSpan.log("Got response content. Size: " + res.content().readableBytes());
-                    responseCollector.addPayload(res.content());
+                    responseCollector.addPayload(res.content(), contentWriterSession);
 
                     handled = true;
                     LOG.trace("Handled response content");
@@ -242,6 +244,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                     // Finish ContentWriter session
                     contentWriterSession.sendMetadata(meta);
                     ContentWriterProto.WriteResponseMeta writeResponse = contentWriterSession.finish();
+                    contentWriterSession = null;
 
                     // Write CrawlLog
                     responseRecordMeta = writeResponse.getRecordMetaOrDefault(1, null);
@@ -304,7 +307,6 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
             db.saveCrawlLog(crawlLog.build());
         }
 
-        contentWriterSession.cancel("DNS lookup failed for " + hostAndPort);
         LOG.debug("DNS lookup failed for {}", hostAndPort);
     }
 
@@ -321,7 +323,6 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
             db.saveCrawlLog(crawlLog.build());
         }
 
-        contentWriterSession.cancel("Http connect failed for " + uri);
         LOG.info("Http connect failed");
         finishSpan(uriRequest);
     }
@@ -339,7 +340,6 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
             db.saveCrawlLog(crawlLog.build());
         }
 
-        contentWriterSession.cancel("Http connect timed out for " + uri);
         LOG.info("Http connect timed out");
         finishSpan(uriRequest);
     }
@@ -430,4 +430,10 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
         }
     }
 
+    @Override
+    protected void finalize() throws Throwable {
+        if (contentWriterSession != null) {
+            contentWriterSession.cancel("Session was not completed");
+        }
+    }
 }

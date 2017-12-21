@@ -16,7 +16,6 @@
 package no.nb.nna.veidemann.harvester.proxy;
 
 import com.google.protobuf.ByteString;
-import io.grpc.StatusException;
 import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpRequest;
@@ -25,17 +24,12 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import no.nb.nna.veidemann.api.ContentWriterProto;
 import no.nb.nna.veidemann.commons.AlreadyCrawledCache;
-import no.nb.nna.veidemann.commons.client.ContentWriterClient;
 import no.nb.nna.veidemann.commons.client.ContentWriterClient.ContentWriterSession;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.util.Sha1Digest;
-import no.nb.nna.veidemann.db.ProtoUtils;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
-import org.apache.http.HttpStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.time.Duration;
 import java.util.Iterator;
 import java.util.Map;
 
@@ -64,8 +58,6 @@ public class ContentCollector {
 
     private final String targetUri;
 
-    private final ContentWriterClient.ContentWriterSession contentWriterSession;
-
     private final ContentWriterProto.WriteRequestMeta.RecordMeta.Builder recordMeta;
 
     private long size;
@@ -78,12 +70,11 @@ public class ContentCollector {
 
     private ByteString cacheValue;
 
-    public ContentCollector(int recordNum, ContentWriterProto.RecordType type, final String targetUri, final DbAdapter db, final ContentWriterSession contentWriterSession) {
+    public ContentCollector(int recordNum, ContentWriterProto.RecordType type, final String targetUri, final DbAdapter db) {
         this.recordNum = recordNum;
         this.type = type;
         this.targetUri = targetUri;
         this.db = db;
-        this.contentWriterSession = contentWriterSession;
         this.digest = new Sha1Digest();
         this.recordMeta = ContentWriterProto.WriteRequestMeta.RecordMeta.newBuilder()
                 .setRecordNum(recordNum)
@@ -116,7 +107,7 @@ public class ContentCollector {
                 .append(CRLF).toString();
     }
 
-    public void setHeaders(String preamble, HttpHeaders headers) {
+    public void setHeaders(String preamble, HttpHeaders headers, ContentWriterSession contentWriterSession) {
         recordMeta.setPayloadContentType(headers.get("Content-Type", ""));
         ByteString headerData = ByteString.copyFromUtf8(preamble).concat(serializeHeaders(headers));
 
@@ -129,54 +120,6 @@ public class ContentCollector {
             cacheHeaders = headers;
         }
     }
-
-//    public void setRequestHeaders(HttpRequest request, CrawlLog.Builder crawlLog) {
-//        crawlLog.setContentType(request.headers().get("Content-Type", ""))
-//                .setRecordContentType(RECORD_CONTENT_TYPE_REQUEST);
-//
-//        StringBuilder headers = new StringBuilder(512)
-//                .append(request.method().toString())
-//                .append(" ")
-//                .append(request.uri())
-//                .append(" ")
-//                .append(request.protocolVersion().text())
-//                .append(CRLF);
-//
-//        addHeaders(request.headers(), headers);
-//
-//        ByteString data = ByteString.copyFromUtf8(headers.toString());
-//        digest.update(data);
-//        contentWriterSession.sendRequestHeader(data);
-//        shouldAddSeparator = true;
-//        size = data.size();
-//    }
-//
-//    public void setResponseHeaders(HttpResponse response, CrawlLog.Builder crawlLog) {
-//        httpResponseStatus = response.status();
-//        httpResponseProtocolVersion = response.protocolVersion();
-//
-//        crawlLog.setStatusCode(httpResponseStatus.code())
-//                .setContentType(response.headers().get("Content-Type", ""))
-//                .setRecordContentType(RECORD_CONTENT_TYPE_RESPONSE);
-//
-//        StringBuilder headers = new StringBuilder(512)
-//                .append(response.protocolVersion().text())
-//                .append(" ")
-//                .append(response.status().toString())
-//                .append(CRLF);
-//
-//        addHeaders(response.headers(), headers);
-//
-//        ByteString data = ByteString.copyFromUtf8(headers.toString());
-//        digest.update(data);
-//        contentWriterSession.sendResponseHeader(data);
-//        shouldAddSeparator = true;
-//        size = data.size();
-//
-//        if (shouldCache) {
-//            cacheHeaders = response.headers();
-//        }
-//    }
 
     private ByteString serializeHeaders(HttpHeaders headers) {
         StringBuilder buf = new StringBuilder();
@@ -191,7 +134,7 @@ public class ContentCollector {
         return ByteString.copyFromUtf8(buf.toString());
     }
 
-    public void addPayload(ByteBuf payload) {
+    public void addPayload(ByteBuf payload, ContentWriterSession contentWriterSession) {
         if (shouldAddSeparator) {
             digest.update(CRLF);
             size += 2;
@@ -258,34 +201,4 @@ public class ContentCollector {
         }
     }
 
-//    public CrawlLog writeRequest(CrawlLog logEntry) {
-//        CrawlLog.Builder logEntryBuilder = logEntry.toBuilder();
-//        logEntryBuilder.setRecordType("request")
-//                .setBlockDigest(getDigest());
-//        logEntry = db.saveCrawlLog(logEntryBuilder.build());
-//        if (LOG.isDebugEnabled()) {
-//            LOG.debug("Writing request {}", logEntryBuilder.getRequestedUri());
-//        }
-//    }
-//
-//    public CrawlLog writeResponse(CrawlLog logEntry) {
-//        CrawlLog.Builder logEntryBuilder = logEntry.toBuilder();
-//        logEntryBuilder.setRecordType("response")
-//                .setFetchTimeMs(Duration.between(ProtoUtils.tsToOdt(
-//                        logEntryBuilder.getFetchTimeStamp()), ProtoUtils.getNowOdt()).toMillis())
-//                .setBlockDigest(getDigest());
-//        logEntry = db.saveCrawlLog(logEntryBuilder.build());
-//        if (LOG.isDebugEnabled()) {
-//            LOG.debug("Writing response {}", logEntryBuilder.getRequestedUri());
-//        }
-//        contentWriterSession.sendCrawlLog(logEntry);
-//        try {
-//            contentWriterSession.finish();
-//            return logEntry;
-//        } catch (InterruptedException | StatusException ex) {
-//            LOG.error("Failed finishing write response", ex);
-//            // TODO: Do something reasonable with the exception
-//            throw new RuntimeException(ex);
-//        }
-//    }
 }

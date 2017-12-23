@@ -30,6 +30,7 @@ import no.nb.nna.veidemann.commons.util.Sha1Digest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.Map;
 
@@ -140,16 +141,28 @@ public class ContentCollector {
             size += 2;
             shouldAddSeparator = false;
         }
-        ByteString data = ByteString.copyFrom(payload.nioBuffer());
-        digest.update(data);
-        contentWriterSession.sendPayload(ContentWriterProto.Data.newBuilder().setRecordNum(recordNum).setData(data).build());
-        size += data.size();
 
-        if (shouldCache) {
-            if (cacheValue == null) {
-                cacheValue = data;
-            } else {
-                cacheValue = cacheValue.concat(data);
+        if (payload.readableBytes() == 0) {
+            ByteString data = ByteString.copyFrom(payload.nioBuffer());
+            digest.update(data);
+            contentWriterSession.sendPayload(ContentWriterProto.Data.newBuilder().setRecordNum(recordNum).setData(data).build());
+            size += data.size();
+        } else {
+            ByteBuffer payloadBuf = payload.nioBuffer();
+            while (payloadBuf.hasRemaining()) {
+                int length = Math.min(32 * 1024, payloadBuf.remaining());
+                ByteString data = ByteString.copyFrom(payloadBuf, length);
+                digest.update(data);
+                contentWriterSession.sendPayload(ContentWriterProto.Data.newBuilder().setRecordNum(recordNum).setData(data).build());
+                size += data.size();
+
+                if (shouldCache) {
+                    if (cacheValue == null) {
+                        cacheValue = data;
+                    } else {
+                        cacheValue = cacheValue.concat(data);
+                    }
+                }
             }
         }
     }

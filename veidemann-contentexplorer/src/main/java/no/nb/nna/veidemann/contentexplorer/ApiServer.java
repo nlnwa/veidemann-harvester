@@ -16,17 +16,17 @@
 
 package no.nb.nna.veidemann.contentexplorer;
 
-import java.io.File;
-import java.net.URI;
-
-import io.netty.channel.Channel;
-import javax.ws.rs.core.UriBuilder;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
+import org.glassfish.grizzly.http.server.HttpServer;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
-import org.glassfish.jersey.netty.httpserver.NettyHttpContainerProvider;
+import org.glassfish.jersey.grizzly2.httpserver.GrizzlyHttpServerFactory;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.ws.rs.core.UriBuilder;
+import java.io.File;
+import java.net.URI;
 
 /**
  *
@@ -59,11 +59,11 @@ private static final Logger LOG = LoggerFactory.getLogger(ApiServer.class);
 
                 });
 
-        final Channel server = NettyHttpContainerProvider.createHttp2Server(baseUri, resourceConfig, null);
+        final HttpServer server = GrizzlyHttpServerFactory.createHttpServer(baseUri, resourceConfig, true);
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             LOG.info("Shutting down server.");
-            server.close();
+            server.shutdownNow();
         }));
     }
 }

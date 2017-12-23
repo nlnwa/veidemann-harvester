@@ -173,6 +173,8 @@
                                             <name>integration-test-net</name>
                                             <alias>browser</alias>
                                         </network>
+                                        <!-- 1GB -->
+                                        <memory>1073741824</memory>
                                         <ports>
                                             <port>+browser.host:browser.port:9222</port>
                                         </ports>

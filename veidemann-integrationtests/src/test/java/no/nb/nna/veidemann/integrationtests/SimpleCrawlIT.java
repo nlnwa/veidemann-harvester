@@ -139,16 +139,17 @@ public class SimpleCrawlIT implements VeidemannHeaderConstants {
         WarcInspector.getWarcFiles().getRecordStream().forEach(r -> System.out.println(r.header.warcTypeStr + " -- "
                 + r.header.warcTargetUriStr));
 
-        assertThat(WarcInspector.getWarcFiles().getRecordCount()).isEqualTo(23L);
+        assertThat(WarcInspector.getWarcFiles().getRecordCount()).isEqualTo(35L);
 
-        CrawlLogListReply crawlLog = db.listCrawlLogs(CrawlLogListRequest.getDefaultInstance());
+        CrawlLogListReply crawlLog = db.listCrawlLogs(CrawlLogListRequest.newBuilder().setPageSize(100).build());
         PageLogListReply pageLog = db.listPageLogs(PageLogListRequest.getDefaultInstance());
 
         // TODO: check these values instead of just printing
+        System.out.println();
         crawlLog.getValueList().forEach(r -> System.out.println(r.getRequestedUri() + " -- " + r.getStatusCode()
                 + " -- " + r.getContentType() + " -- " + r.getRecordType() + " -- " + r.getReferrer()));
 
-        assertThat(crawlLog.getCount()).isEqualTo(13L);
+        assertThat(crawlLog.getCount()).isEqualTo(19L);
         assertThat(pageLog.getCount()).isEqualTo(6L);
 
         try {
@@ -158,14 +159,14 @@ public class SimpleCrawlIT implements VeidemannHeaderConstants {
         }
 
         executeJob(request).get();
-        crawlLog = db.listCrawlLogs(CrawlLogListRequest.getDefaultInstance());
+        crawlLog = db.listCrawlLogs(CrawlLogListRequest.newBuilder().setPageSize(100).build());
 
         // TODO: check these values instead of just printing
         System.out.println("---------------");
         crawlLog.getValueList().forEach(r -> System.out.println(r.getRequestedUri() + " -- " + r.getStatusCode()
                 + " -- " + r.getContentType() + " -- " + r.getRecordType() + " -- " + r.getReferrer()));
 
-        assertThat(crawlLog.getCount()).isEqualTo(22);
+        assertThat(crawlLog.getCount()).isEqualTo(34);
     }
 
     JobCompletion executeJob(ControllerProto.RunCrawlRequest crawlRequest) {

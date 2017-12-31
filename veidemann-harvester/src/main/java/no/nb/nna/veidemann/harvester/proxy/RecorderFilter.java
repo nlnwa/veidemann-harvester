@@ -115,6 +115,13 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
         this.fetchTimeStamp = ProtoUtils.getNowTs();
     }
 
+    private synchronized ContentWriterSession getContentWriterSession() {
+        if (contentWriterSession == null) {
+            contentWriterSession = contentWriterClient.createSession();
+        }
+        return contentWriterSession;
+    }
+
     @Override
     public HttpResponse proxyToServerRequest(HttpObject httpObject) {
         try {
@@ -145,6 +152,11 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                             if (uriRequest != null) {
                                 uriRequest.setFromCache(true);
                             }
+
+                            if (uriRequest != null) {
+                                cachedResponse.headers().add(CHROME_INTERCEPTION_ID, uriRequest.getInterceptionId());
+                            }
+
                             return cachedResponse;
                         } else {
                             responseCollector.setShouldCache(true);
@@ -157,14 +169,13 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                     request.headers().remove(CHROME_INTERCEPTION_ID);
 
                     // Store request
-                    contentWriterSession = contentWriterClient.createSession();
-                    requestCollector.setHeaders(ContentCollector.createRequestPreamble(request), request.headers(), contentWriterSession);
+                    requestCollector.setHeaders(ContentCollector.createRequestPreamble(request), request.headers(), getContentWriterSession());
                     LOG.debug("Proxy is sending request to final destination.");
                 }
                 return null;
             } else if (httpObject instanceof HttpContent) {
                 HttpContent request = (HttpContent) httpObject;
-                requestCollector.addPayload(request.content(), contentWriterSession);
+                requestCollector.addPayload(request.content(), getContentWriterSession());
             } else {
                 LOG.debug("Got something else than http request: {}", httpObject);
             }
@@ -190,7 +201,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                     HttpResponse res = (HttpResponse) httpObject;
                     httpResponseStatus = res.status();
                     httpResponseProtocolVersion = res.protocolVersion();
-                    responseCollector.setHeaders(ContentCollector.createResponsePreamble(res), res.headers(), contentWriterSession);
+                    responseCollector.setHeaders(ContentCollector.createResponsePreamble(res), res.headers(), getContentWriterSession());
 
                     if (uriRequest != null) {
                         res.headers().add(CHROME_INTERCEPTION_ID, uriRequest.getInterceptionId());
@@ -210,7 +221,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                 try {
                     HttpContent res = (HttpContent) httpObject;
                     responseSpan.log("Got response content. Size: " + res.content().readableBytes());
-                    responseCollector.addPayload(res.content(), contentWriterSession);
+                    responseCollector.addPayload(res.content(), getContentWriterSession());
 
                     handled = true;
                     LOG.trace("Handled response content");
@@ -242,8 +253,8 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                             .build();
 
                     // Finish ContentWriter session
-                    contentWriterSession.sendMetadata(meta);
-                    ContentWriterProto.WriteResponseMeta writeResponse = contentWriterSession.finish();
+                    getContentWriterSession().sendMetadata(meta);
+                    ContentWriterProto.WriteResponseMeta writeResponse = getContentWriterSession().finish();
                     contentWriterSession = null;
 
                     // Write CrawlLog

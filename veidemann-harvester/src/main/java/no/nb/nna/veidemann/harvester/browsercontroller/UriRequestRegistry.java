@@ -91,7 +91,8 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
             }
 
             LOG.error("Request for id {} not found", requestId);
-            throw new RuntimeException("Request for id " + requestId + " not found");
+            LOG.trace("Registry state:\n" + printAllRequests());
+            return null;
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         } finally {
@@ -111,8 +112,10 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
                 }
                 allRequestsUpdate.await(1, TimeUnit.SECONDS);
             }
-            LOG.error("Request for url {} not found", url, new RuntimeException());
-            throw new RuntimeException("Request for url " + url + " not found");
+//            LOG.error("Request for url {} not found", url, new RuntimeException());
+            LOG.error("Request for url {} not found", url);
+            LOG.trace("Registry state:\n" + printAllRequests());
+            return null;
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         } finally {
@@ -134,8 +137,10 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
                 }
                 allRequestsUpdate.await(1, TimeUnit.SECONDS);
             }
-            LOG.error("Request for url {} not found", url, new RuntimeException());
-            throw new RuntimeException("Request for url " + url + " not found");
+//            LOG.error("Request for url {} not found", url, new RuntimeException());
+            LOG.error("Request for url {} not found", url);
+            LOG.trace("Registry state:\n" + printAllRequests());
+            return null;
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         } finally {
@@ -265,16 +270,20 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
             MDC.put("uri", request.request.url);
             if (request.redirectResponse == null) {
                 UriRequest r = getByUrlWithEqualOrEmptyRequestId(request.request.url, request.requestId);
-                r.setRequestId(request.requestId);
-                if (r.getParent() == null) {
-                    r.addRequest(request, rootRequest.getDiscoveryPath());
-                } else {
-                    r.addRequest(request, r.getParent().getDiscoveryPath());
+                if (r != null) {
+                    r.setRequestId(request.requestId);
+                    if (r.getParent() == null) {
+                        r.addRequest(request, rootRequest.getDiscoveryPath());
+                    } else {
+                        r.addRequest(request, r.getParent().getDiscoveryPath());
+                    }
                 }
             } else if (!request.redirectResponse.fromDiskCache) {
                 UriRequest r = getByUrl(request.redirectResponse.url, false);
-                r.setRequestId(request.requestId);
-                r.addRedirectResponse(request.redirectResponse);
+                if (r != null) {
+                    r.setRequestId(request.requestId);
+                    r.addRedirectResponse(request.redirectResponse);
+                }
             }
         }
     }
@@ -286,21 +295,29 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
     }
 
     void onLoadingFailed(NetworkDomain.LoadingFailed f) {
+        MDC.put("eid", executionId);
+
         // net::ERR_EMPTY_RESPONSE
         // net::ERR_CONNECTION_TIMED_OUT
         // net::ERR_CONTENT_LENGTH_MISMATCH
         // net::ERR_TUNNEL_CONNECTION_FAILED
         UriRequest request = getByRequestId(f.requestId);
-        MDC.put("eid", executionId);
-        MDC.put("uri", request.getUrl());
-        if (!f.canceled) {
-            LOG.error(
-                    "Failed fetching page: Error '{}', Blocked reason '{}', Resource type: '{}', Canceled: {}, Req: {}",
-                    f.errorText, f.blockedReason, f.type, f.canceled, request.getUrl());
-        }
-        MDC.clear();
+        if (request == null) {
+            LOG.error("Could not find request for id {}", f.requestId);
+        } else {
+            MDC.put("uri", request.getUrl());
+            if (!f.canceled) {
+                LOG.error(
+                        "Failed fetching page: Error '{}', Blocked reason '{}', Resource type: '{}', Canceled: {}, Req: {}",
+                        f.errorText, f.blockedReason, f.type, f.canceled, request.getUrl());
+            }
 
-        request.finish();
+            // TODO: Add information to pagelog
+
+            MDC.clear();
+
+            request.finish();
+        }
     }
 
     void onResponseReceived(NetworkDomain.ResponseReceived r) {
@@ -312,9 +329,13 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
             try {
                 UriRequest request = getByInterceptionId((String) r.response.headers.get(CHROME_INTERCEPTION_ID));
                 if (request == null) {
+                    request = getByRequestId(r.requestId);
+                }
+                if (request == null) {
                     LOG.error(
-                            "Response received, but we missed the request: reqId '{}', loaderId '{}', ts '{}', type '{}', resp '{}', frameId '{}'",
-                            r.requestId, r.loaderId, r.timestamp, r.type, r.response, r.frameId);
+                            "Response received, but we missed the request: interceptId '{}', reqId '{}', loaderId '{}', ts '{}', type '{}', resp '{}', frameId '{}'",
+                            r.response.headers.get(CHROME_INTERCEPTION_ID), r.requestId, r.loaderId, r.timestamp, r.type, r.response, r.frameId);
+                    LOG.trace("Registry state:\n" + printAllRequests());
                 } else {
                     request.addResponse(r);
                 }

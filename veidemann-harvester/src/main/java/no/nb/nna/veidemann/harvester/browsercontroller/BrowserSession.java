@@ -21,9 +21,14 @@ import com.google.protobuf.ByteString;
 import io.opentracing.BaseSpan;
 import no.nb.nna.veidemann.api.ConfigProto;
 import no.nb.nna.veidemann.api.MessagesProto;
-import no.nb.nna.veidemann.chrome.client.*;
+import no.nb.nna.veidemann.chrome.client.ChromeDebugProtocol;
+import no.nb.nna.veidemann.chrome.client.DebuggerDomain;
+import no.nb.nna.veidemann.chrome.client.NetworkDomain;
 import no.nb.nna.veidemann.chrome.client.NetworkDomain.AuthChallengeResponse;
 import no.nb.nna.veidemann.chrome.client.NetworkDomain.RequestPattern;
+import no.nb.nna.veidemann.chrome.client.PageDomain;
+import no.nb.nna.veidemann.chrome.client.RuntimeDomain;
+import no.nb.nna.veidemann.chrome.client.Session;
 import no.nb.nna.veidemann.commons.VeidemannHeaderConstants;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.util.ApiTools;
@@ -33,7 +38,12 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.time.OffsetDateTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
@@ -219,6 +229,7 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
     void onRequestIntercepted(NetworkDomain.RequestIntercepted intercepted) {
         try {
             Map<String, Object> headers = intercepted.request.headers;
+            headers.put(EXECUTION_ID, queuedUri.getExecutionId());
             headers.put(CHROME_INTERCEPTION_ID, intercepted.interceptionId);
 
             if (intercepted.authChallenge != null) {

@@ -160,7 +160,15 @@ public class ContentCollector {
                     if (cacheValue == null) {
                         cacheValue = data;
                     } else {
-                        cacheValue = cacheValue.concat(data);
+                        int dataSize = cacheValue.size() + data.size();
+                        int maxCacheSize = 10 * 1024 * 1024;
+                        if (dataSize > maxCacheSize) {
+                            LOG.info("Won't cache {} content too big. Size: {}, Max cache size: {}", targetUri, dataSize, maxCacheSize);
+                            shouldCache = false;
+                            cacheValue = null;
+                        } else {
+                            cacheValue = cacheValue.concat(data);
+                        }
                     }
                 }
             }

@@ -138,7 +138,7 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
                 allRequestsUpdate.await(1, TimeUnit.SECONDS);
             }
 //            LOG.error("Request for url {} not found", url, new RuntimeException());
-            LOG.error("Request for url {} not found", url);
+            LOG.error("Request for url {} and request id {} not found", url, requestId);
             LOG.trace("Registry state:\n" + printAllRequests());
             return null;
         } catch (InterruptedException e) {
@@ -303,7 +303,7 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
         // net::ERR_TUNNEL_CONNECTION_FAILED
         UriRequest request = getByRequestId(f.requestId);
         if (request == null) {
-            LOG.error("Could not find request for id {}", f.requestId);
+            LOG.error("Could not find request for failed id {}. Error '{}', Blocked reason '{}', Resource type: '{}', Canceled: {}", f.requestId, f.errorText, f.blockedReason, f.type, f.canceled);
         } else {
             MDC.put("uri", request.getUrl());
             if (!f.canceled) {

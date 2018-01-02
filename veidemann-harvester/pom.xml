@@ -112,7 +112,6 @@
                     </execution>
                 </executions>
             <configuration>
-                <autoCreateCustomNetworks>true</autoCreateCustomNetworks>
                 <images>
                     <image>
                         <name>norsknettarkiv/${project.artifactId}</name>
@@ -187,11 +186,6 @@
                         <name>norsknettarkiv/testsites</name>
                         <alias>testsites</alias>
                         <run>
-                            <network>
-                                <mode>custom</mode>
-                                <name>harvester-test-net</name>
-                                <alias>testsites</alias>
-                            </network>
                             <ports>
                                 <port>+test.http.host:test.http.port:80</port>
                                 <port>+test.dns.host:test.dns.port:53</port>
@@ -216,11 +210,6 @@
                         <alias>browser</alias>
                         <run>
                             <user>${uid}</user>
-                            <network>
-                                <mode>custom</mode>
-                                <name>harvester-test-net</name>
-                                <alias>browser</alias>
-                            </network>
                             <ports>
                                 <port>+browser.host:browser.port:9222</port>
                             </ports>

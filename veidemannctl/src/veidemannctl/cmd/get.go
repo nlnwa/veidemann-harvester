@@ -64,6 +64,9 @@ var getCmd = &cobra.Command{
 				if selector != nil {
 					request.Qry = &api.ListRequest_Selector{selector}
 				}
+				request.Page = page
+				request.PageSize = pageSize
+
 				r, err := client.ListCrawlEntities(context.Background(), &request)
 				if err != nil {
 					log.Fatalf("could not get entity: %v", err)
@@ -77,6 +80,9 @@ var getCmd = &cobra.Command{
 				if selector != nil {
 					request.Qry = &api.SeedListRequest_Selector{selector}
 				}
+				request.Page = page
+				request.PageSize = pageSize
+
 				r, err := client.ListSeeds(context.Background(), &request)
 				if err != nil {
 					log.Fatalf("could not get seed: %v", err)
@@ -90,6 +96,9 @@ var getCmd = &cobra.Command{
 				if selector != nil {
 					request.Qry = &api.CrawlJobListRequest_Selector{selector}
 				}
+				request.Page = page
+				request.PageSize = pageSize
+
 				r, err := client.ListCrawlJobs(context.Background(), &request)
 				if err != nil {
 					log.Fatalf("could not get job: %v", err)
@@ -103,6 +112,9 @@ var getCmd = &cobra.Command{
 				if selector != nil {
 					request.Qry = &api.ListRequest_Selector{selector}
 				}
+				request.Page = page
+				request.PageSize = pageSize
+
 				r, err := client.ListCrawlConfigs(context.Background(), &request)
 				if err != nil {
 					log.Fatalf("could not get crawl config: %v", err)
@@ -116,6 +128,9 @@ var getCmd = &cobra.Command{
 				if selector != nil {
 					request.Qry = &api.ListRequest_Selector{selector}
 				}
+				request.Page = page
+				request.PageSize = pageSize
+
 				r, err := client.ListCrawlScheduleConfigs(context.Background(), &request)
 				if err != nil {
 					log.Fatalf("could not get schedule config: %v", err)
@@ -129,6 +144,9 @@ var getCmd = &cobra.Command{
 				if selector != nil {
 					request.Qry = &api.ListRequest_Selector{selector}
 				}
+				request.Page = page
+				request.PageSize = pageSize
+
 				r, err := client.ListBrowserConfigs(context.Background(), &request)
 				if err != nil {
 					log.Fatalf("could not get browser config: %v", err)
@@ -142,6 +160,9 @@ var getCmd = &cobra.Command{
 				if selector != nil {
 					request.Qry = &api.ListRequest_Selector{selector}
 				}
+				request.Page = page
+				request.PageSize = pageSize
+
 				r, err := client.ListPolitenessConfigs(context.Background(), &request)
 				if err != nil {
 					log.Fatalf("could not get politeness config: %v", err)
@@ -155,6 +176,9 @@ var getCmd = &cobra.Command{
 				if selector != nil {
 					request.Qry = &api.BrowserScriptListRequest_Selector{selector}
 				}
+				request.Page = page
+				request.PageSize = pageSize
+
 				r, err := client.ListBrowserScripts(context.Background(), &request)
 				if err != nil {
 					log.Fatalf("could not get browser script: %v", err)
@@ -168,6 +192,9 @@ var getCmd = &cobra.Command{
 				if selector != nil {
 					request.Qry = &api.ListRequest_Selector{selector}
 				}
+				request.Page = page
+				request.PageSize = pageSize
+
 				r, err := client.ListCrawlHostGroupConfigs(context.Background(), &request)
 				if err != nil {
 					log.Fatalf("could not get crawl host group config: %v", err)
@@ -196,6 +223,9 @@ var getCmd = &cobra.Command{
 				}
 			case "role":
 				request := api.RoleMappingsListRequest{}
+				request.Page = page
+				request.PageSize = pageSize
+
 				r, err := client.ListRoleMappings(context.Background(), &request)
 				if err != nil {
 					log.Fatalf("could not get active role: %v", err)
@@ -234,6 +264,8 @@ func init() {
 	getCmd.PersistentFlags().StringVarP(&label, "label", "l", "", "List objects by label")
 	getCmd.PersistentFlags().StringVarP(&format, "format", "f", "table", "Output format (table|json|yaml)")
 	getCmd.PersistentFlags().StringVarP(&file, "output", "o", "", "File name to write to")
+	getCmd.PersistentFlags().Int32VarP(&pageSize, "pagesize", "s", 10, "Number of objects to get")
+	getCmd.PersistentFlags().Int32VarP(&page, "page", "p", 0, "The page number")
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:

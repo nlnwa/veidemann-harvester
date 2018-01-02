@@ -61,8 +61,7 @@ func MarshalTable(w io.Writer, msg proto.Message) error {
 		}
 	}
 
-	tm.Println(table)
-	tm.Flush()
+	fmt.Fprintln(w, table)
 
 	return nil
 }

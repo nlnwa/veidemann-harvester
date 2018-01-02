@@ -119,7 +119,7 @@
                         <alias>harvester</alias>
                         <run><skip>true</skip></run>
                         <build>
-                            <from>java:8</from>
+                            <from>java:8-alpine</from>
                             <maintainer>National Library of Norway</maintainer>
                             <tags>
                                 <tag>${docker.tag}</tag>
@@ -243,6 +243,7 @@
                                     </ports>
                                 </tcp>
                                 <time>20000</time>
+                                <log>Certificate /data/certificates/VeidemannCA.pem imported</log>
                             </wait>
                             <dependsOn>
                                 <container>testsites</container>
@@ -278,7 +279,7 @@
                             <configurationDirectory>config</configurationDirectory>
                             <endorsedDir>plugins</endorsedDir>
                             <preAssembleDirectory>src/main/distfiles</preAssembleDirectory>
-                            <extraJvmArguments>-Dconfig.file=@BASEDIR@/config/application.conf</extraJvmArguments>
+                            <extraJvmArguments>-Dconfig.file=@BASEDIR@/config/application.conf -XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap</extraJvmArguments>
                         </configuration>
                         <executions>
                             <execution>
@@ -405,6 +406,7 @@
                             <systemPropertyVariables>
                                 <browser.host>${browser.host}</browser.host>
                                 <browser.port>${browser.port}</browser.port>
+                                <proxy.host>${proxy.ip}</proxy.host>
                                 <proxy.port>${proxy.port}</proxy.port>
                                 <testsites.http.host>${test.http.host}</testsites.http.host>
                                 <testsites.http.port>${test.http.port}</testsites.http.port>

@@ -15,7 +15,6 @@
  */
 package no.nb.nna.veidemann.harvester.browsercontroller;
 
-import com.google.common.net.InetAddresses;
 import no.nb.nna.veidemann.api.ConfigProto;
 import no.nb.nna.veidemann.api.ContentWriterProto;
 import no.nb.nna.veidemann.api.ContentWriterProto.WriteResponseMeta;
@@ -24,6 +23,7 @@ import no.nb.nna.veidemann.api.HarvesterProto;
 import no.nb.nna.veidemann.api.MessagesProto;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
 import no.nb.nna.veidemann.api.MessagesProto.PageLog;
+import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
 import no.nb.nna.veidemann.commons.client.ContentWriterClient;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.util.ApiTools;
@@ -34,8 +34,10 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.littleshoot.proxy.HostResolver;
 import org.mockito.invocation.InvocationOnMock;
+import org.netpreserve.commons.uri.UriConfigs;
 
 import java.io.File;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.file.Files;
@@ -43,9 +45,7 @@ import java.nio.file.Paths;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.fail;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 /**
  *
@@ -55,6 +55,8 @@ public class BrowserControllerIT {
     static String browserHost;
 
     static int browserPort;
+
+    static String proxyIp;
 
     static int proxyPort;
 
@@ -70,7 +72,9 @@ public class BrowserControllerIT {
     public static void init() {
         browserHost = System.getProperty("browser.host");
         browserPort = Integer.parseInt(System.getProperty("browser.port"));
+        proxyIp = System.getProperty("proxy.host");
         proxyPort = Integer.parseInt(System.getProperty("proxy.port"));
+//        proxyPort = 41355;
         testSitesHttpHost = System.getProperty("testsites.http.host");
         testSitesHttpPort = Integer.parseInt(System.getProperty("testsites.http.port"));
         testSitesDnsHost = System.getProperty("testsites.dns.host");
@@ -101,10 +105,13 @@ public class BrowserControllerIT {
             DbAdapter db = getDbMock();
 
             MessagesProto.QueuedUri queuedUri = MessagesProto.QueuedUri.newBuilder()
-                    .setUri("http://a1.com")
+//                    .setUri("http://a1.com")
+                    .setUri("https://www.nb.no")
+//                    .setUri("https://www.nb.no/besok-oss/utstillinger")
+//                    .setUri("https://www.nb.no/statsmaktene/")
                     .setExecutionId("testId")
-                    .setDiscoveryPath("L")
-                    .setReferrer("http://example.org/")
+//                    .setDiscoveryPath("L")
+//                    .setReferrer("http://example.org/")
                     .build();
 
             ConfigProto.CrawlConfig config = getDefaultConfig();
@@ -112,7 +119,7 @@ public class BrowserControllerIT {
             File tmpDir = Files.createDirectories(Paths.get("target", "it-workdir")).toFile();
             tmpDir.deleteOnExit();
 
-            Thread.sleep(1000);
+//            Thread.sleep(1000);
 
             try (RecordingProxy proxy = new RecordingProxy(tmpDir, proxyPort, db, contentWriterClient,
                     new TestHostResolver(), sessionRegistry, new InMemoryAlreadyCrawledCache());
@@ -121,10 +128,29 @@ public class BrowserControllerIT {
                          sessionRegistry);) {
 
                 HarvesterProto.HarvestPageReply result = controller.render(queuedUri, config);
+                int pagesHarvested = 0;
+                for (QueuedUri qu : result.getOutlinksList()) {
+                    String surt = UriConfigs.SURT_KEY.buildUri(qu.getUri()).toString();
+                    if (!surt.startsWith("(no,nb,")) {
+                        System.out.println("OOS: " + surt + " --- " + qu.getUri());
+                        continue;
+                    }
+
+                    System.out.println("URI: " + qu.getUri());
+                    Thread.sleep(1000);
+                    HarvesterProto.HarvestPageReply result2 = controller.render(qu, config);
+                    pagesHarvested++;
+//                    if (pagesHarvested > 10) {
+//                        break;
+//                    }
+                }
 
 //                System.out.println("=========*\n" + result);
                 // TODO review the generated test code and remove the default call to fail.
 //            fail("The test case is a prototype.");
+        } catch (Exception ex) {
+                System.out.println("¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤");
+                ex.printStackTrace();
             }
         } catch (Exception ex) {
             ex.printStackTrace();
@@ -139,7 +165,7 @@ public class BrowserControllerIT {
                 .setWindowHeight(900)
                 .setWindowWidth(900)
                 .setPageLoadTimeoutMs(20000)
-                .setSleepAfterPageloadMs(500)
+                .setSleepAfterPageloadMs(4000)
                 .setScriptSelector(ConfigProto.Selector.newBuilder().addLabel(ApiTools.buildLabel("scope", "default")))
                 .build();
 
@@ -171,9 +197,12 @@ public class BrowserControllerIT {
         });
         when(db.savePageLog(any(PageLog.class))).then(a -> {
             PageLog o = a.getArgument(0);
-            System.out.println("PageLOG::::");
-            System.out.println(o);
-            System.out.println("::::PageLOG");
+//            System.out.println("PageLOG::::");
+            System.out.println("Uri: " + o.getUri());
+//            System.out.println("Referrer: " + o.getReferrer());
+            System.out.println("resource count: " + o.getResourceCount());
+            System.out.println("outlinks count: " + o.getOutlinkCount());
+//            System.out.println("::::PageLOG");
             return o;
         });
         when(db.listBrowserScripts(any())).thenReturn(ControllerProto.BrowserScriptListReply.newBuilder()
@@ -203,10 +232,9 @@ public class BrowserControllerIT {
 
         @Override
         public InetSocketAddress resolve(String host, int port) throws UnknownHostException {
-            InetSocketAddress resolvedAddress = new InetSocketAddress(InetAddresses.forString("127.0.0.1"), testSitesHttpPort);
-//            InetSocketAddress resolvedAddress = new InetSocketAddress(InetAddress.getByName(host), port);
-            System.out.println("H: " + testSitesHttpHost);
-            System.out.println("H: " + host + ":" + port + " => " + resolvedAddress);
+//            InetSocketAddress resolvedAddress = new InetSocketAddress(InetAddresses.forString("127.0.0.1"), testSitesHttpPort);
+            InetSocketAddress resolvedAddress = new InetSocketAddress(InetAddress.getByName(host), port);
+//            System.out.println("H: " + host + ":" + port + " => " + resolvedAddress);
             return resolvedAddress;
         }
 

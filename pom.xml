@@ -42,6 +42,8 @@
         <docker.tag>latest</docker.tag>
 
         <chrome.version>64.0.3282.24</chrome.version>
+        <docker.java.image>openjdk:8u151-jdk-alpine</docker.java.image>
+
         <log4j.version>2.7</log4j.version>
         <org.jwat.version>1.0.4</org.jwat.version>
         <org.glassfish.jersey.version>2.25.1</org.glassfish.jersey.version>

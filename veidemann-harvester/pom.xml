@@ -118,7 +118,7 @@
                         <alias>harvester</alias>
                         <run><skip>true</skip></run>
                         <build>
-                            <from>java:8-alpine</from>
+                            <from>${docker.java.image}</from>
                             <maintainer>National Library of Norway</maintainer>
                             <tags>
                                 <tag>${docker.tag}</tag>
@@ -138,11 +138,11 @@
                             </ports>
                             <cmd>
                                 <exec>
-                                    <arg>/${project.artifactId}/bin/${project.artifactId}</arg>
+                                    <arg>/application/bin/${project.artifactId}</arg>
                                 </exec>
                             </cmd>
                             <assembly>
-                                <targetDir>/${project.artifactId}</targetDir>
+                                <targetDir>/application</targetDir>
 
                                 <inline>
                                     <includeBaseDirectory>true</includeBaseDirectory>
@@ -216,6 +216,9 @@
                             <env>
                                 <CHROME_OPTS>--ignore-certificate-errors --disable-web-security --allow-running-insecure-content --proxy-server=${proxy.ip}:${proxy.port}</CHROME_OPTS>
                             </env>
+                            <!-- 1GB -->
+                            <memory>1073741824</memory>
+                            <shmSize>1073741824</shmSize>
                             <volumes>
                                 <bind>
                                     <volume>${project.build.directory}/it-workdir:/data</volume>

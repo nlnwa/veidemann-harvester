@@ -32,6 +32,7 @@ import org.cache2k.expiry.ExpiryPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.ByteBuffer;
 import java.util.Objects;
 
 /**
@@ -47,20 +48,16 @@ public class InMemoryAlreadyCrawledCache implements AlreadyCrawledCache {
         cache = new Cache2kBuilder<CacheKey, FullHttpResponse>() {
         }
                 .name("embedsCache")
-                .entryCapacity(10000)
+                .entryCapacity(100)
                 .expiryPolicy(new ExpiryPolicy<CacheKey, FullHttpResponse>() {
                     @Override
                     public long calculateExpiryTime(CacheKey key, FullHttpResponse value,
                             long loadTime, CacheEntry<CacheKey, FullHttpResponse> oldEntry) {
-                        if (value == null || value.content().readableBytes() > (1024 * 1024 * 1024)) {
-                            if (LOG.isDebugEnabled()) {
-                                LOG.debug("Won't cache {} content too big", key);
-                            }
+                        if (value == null || value.content().readableBytes() > (1024 * 1024)) {
+                            LOG.debug("Won't cache {} content too big", key);
                             return NO_CACHE;
                         }
-                        if (LOG.isTraceEnabled()) {
-                            LOG.trace("Caching {}", key);
-                        }
+                        LOG.trace("Caching {}", key);
                         return ETERNAL;
                     }
 

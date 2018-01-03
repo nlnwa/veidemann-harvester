@@ -42,8 +42,6 @@ import no.nb.nna.veidemann.commons.client.ContentWriterClient.ContentWriterSessi
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.db.ProtoUtils;
 import no.nb.nna.veidemann.harvester.BrowserSessionRegistry;
-import no.nb.nna.veidemann.harvester.browsercontroller.BrowserSession;
-import no.nb.nna.veidemann.harvester.browsercontroller.UriRequest;
 import org.littleshoot.proxy.HttpFiltersAdapter;
 import org.littleshoot.proxy.impl.ProxyUtils;
 import org.netpreserve.commons.uri.Uri;
@@ -75,15 +73,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
 
     private String executionId;
 
-    private UriRequest uriRequest;
-
-    private BrowserSession session;
-
     private Timestamp fetchTimeStamp;
-
-    private String discoveryPath = "";
-
-    private String referrer = "";
 
     private InetSocketAddress resolvedRemoteAddress;
 
@@ -130,8 +120,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
 
                 executionId = request.headers().get(EXECUTION_ID);
                 if (executionId == null) {
-                    executionId = MANUAL_EXID;
-                    LOG.info("Manual download of {}", uri);
+                    LOG.error("Missing executionId for {}", uri);
                 }
 
                 MDC.put("eid", executionId);
@@ -139,34 +128,25 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
 
                 LOG.debug("Proxy sending request");
 
-                initDiscoveryPathAndReferrer(request);
-
-                requestSpan = buildSpan("clientToProxyRequest", uriRequest);
+                requestSpan = buildSpan("clientToProxyRequest");
                 try (ActiveSpan span = GlobalTracer.get().makeActive(requestSpan)) {
 
-                    if (discoveryPath.endsWith("E")) {
-                        FullHttpResponse cachedResponse = cache.get(uri, executionId);
-                        if (cachedResponse != null) {
-                            LOG.debug("Found in cache");
-                            requestSpan.log("Loaded from cache");
-                            if (uriRequest != null) {
-                                uriRequest.setFromCache(true);
-                            }
+                    FullHttpResponse cachedResponse = cache.get(uri, executionId);
+                    if (cachedResponse != null) {
+                        LOG.debug("Found in cache");
+                        requestSpan.log("Loaded from cache");
+                        CrawlLog.Builder crawlLog = buildCrawlLog()
+                                .setStatusCode(cachedResponse.status().code());
 
-                            if (uriRequest != null) {
-                                cachedResponse.headers().add(CHROME_INTERCEPTION_ID, uriRequest.getInterceptionId());
-                            }
-
-                            return cachedResponse;
-                        } else {
-                            responseCollector.setShouldCache(true);
-                        }
+                        sessionRegistry.get(executionId).addCrawlLog(crawlLog);
+                        return cachedResponse;
+                    } else {
+                        responseCollector.setShouldCache(true);
                     }
 
                     // Fix headers before sending to final destination
                     request.headers().set("Accept-Encoding", "identity");
                     request.headers().remove(EXECUTION_ID);
-                    request.headers().remove(CHROME_INTERCEPTION_ID);
 
                     // Store request
                     requestCollector.setHeaders(ContentCollector.createRequestPreamble(request), request.headers(), getContentWriterSession());
@@ -190,7 +170,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
         MDC.put("eid", executionId);
         MDC.put("uri", uri);
         try {
-            responseSpan = buildSpan("serverToProxyResponse", uriRequest);
+            responseSpan = buildSpan("serverToProxyResponse");
             GlobalTracer.get().makeActive(requestSpan);
 
             boolean handled = false;
@@ -202,11 +182,6 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                     httpResponseStatus = res.status();
                     httpResponseProtocolVersion = res.protocolVersion();
                     responseCollector.setHeaders(ContentCollector.createResponsePreamble(res), res.headers(), getContentWriterSession());
-
-                    if (uriRequest != null) {
-                        res.headers().add(CHROME_INTERCEPTION_ID, uriRequest.getInterceptionId());
-                    }
-
                     responseSpan.log("Got response headers");
                     handled = true;
                     LOG.trace("Handled response headers");
@@ -268,7 +243,12 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                             .setBlockDigest(responseRecordMeta.getBlockDigest())
                             .setPayloadDigest(responseRecordMeta.getPayloadDigest());
 
-                    db.saveCrawlLog(crawlLog.build());
+                    if (uri.endsWith("robots.txt")) {
+                        crawlLog.setDiscoveryPath("P");
+                        db.saveCrawlLog(crawlLog.build());
+                    } else {
+                        sessionRegistry.get(executionId).addCrawlLog(crawlLog);
+                    }
 
                 } catch (Exception ex) {
                     LOG.error("Error writing response", ex);
@@ -276,14 +256,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                 }
 
                 responseSpan.log("Last response chunk");
-                if (uriRequest != null) {
-                    uriRequest.setSize(responseCollector.getSize());
-                    responseSpan.finish();
-                    if (responseRecordMeta != null) {
-                        uriRequest.setWarcId(responseRecordMeta.getWarcId());
-                    }
-                    finishSpan(uriRequest);
-                }
+                responseSpan.finish();
                 LOG.debug("Handled last response chunk");
             }
 
@@ -313,10 +286,11 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
         CrawlLog.Builder crawlLog = buildCrawlLog()
                 .setRecordType("response")
                 .setStatusCode(ExtraStatusCodes.FAILED_DNS.getCode());
+        sessionRegistry.get(executionId).addCrawlLog(crawlLog);
 
-        if (db != null) {
-            db.saveCrawlLog(crawlLog.build());
-        }
+//        if (db != null) {
+//            db.saveCrawlLog(crawlLog.build());
+//        }
 
         LOG.debug("DNS lookup failed for {}", hostAndPort);
     }
@@ -329,13 +303,14 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
         CrawlLog.Builder crawlLog = buildCrawlLog()
                 .setRecordType("response")
                 .setStatusCode(ExtraStatusCodes.CONNECT_FAILED.getCode());
+        sessionRegistry.get(executionId).addCrawlLog(crawlLog);
 
-        if (db != null) {
-            db.saveCrawlLog(crawlLog.build());
-        }
+//        if (db != null) {
+//            db.saveCrawlLog(crawlLog.build());
+//        }
 
         LOG.info("Http connect failed");
-        finishSpan(uriRequest);
+//        finishSpan(uriRequest);
     }
 
     @Override
@@ -346,58 +321,19 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
         CrawlLog.Builder crawlLog = buildCrawlLog()
                 .setRecordType("response")
                 .setStatusCode(ExtraStatusCodes.HTTP_TIMEOUT.getCode());
+        sessionRegistry.get(executionId).addCrawlLog(crawlLog);
 
-        if (db != null) {
-            db.saveCrawlLog(crawlLog.build());
-        }
+//        if (db != null) {
+//            db.saveCrawlLog(crawlLog.build());
+//        }
 
         LOG.info("Http connect timed out");
-        finishSpan(uriRequest);
+//        finishSpan(uriRequest);
     }
 
     @Override
     public void proxyToServerConnectionSSLHandshakeStarted() {
         LOG.info("proxyToServerConnectionSSLHandshakeStarted");
-    }
-
-    private void initDiscoveryPathAndReferrer(HttpRequest request) {
-        referrer = request.headers().get("Referer", "");
-        if (uri.endsWith("robots.txt")) {
-            referrer = "";
-            discoveryPath = "P";
-        } else if (executionId == MANUAL_EXID) {
-            discoveryPath = "";
-        } else {
-            session = sessionRegistry.get(executionId);
-
-            if (session == null) {
-                LOG.error("Could not find session. Probably a bug");
-                discoveryPath = "";
-            } else {
-                String interceptionId = request.headers().get(CHROME_INTERCEPTION_ID);
-
-                if (interceptionId != null) {
-                    uriRequest = session.getUriRequests().getByInterceptionId(interceptionId);
-                } else {
-                    uriRequest = session.getUriRequests().getByUrl(uri, true);
-                }
-
-                if (uriRequest != null) {
-                    try {
-                        discoveryPath = uriRequest.getDiscoveryPath();
-                        if (referrer.isEmpty()) {
-                            referrer = uriRequest.getReferrer();
-                        }
-                    } catch (Exception ex) {
-                        LOG.error("Failed getting discovery path from uriRequest", ex);
-                        responseSpan.log("Failed getting discovery path from uriRequest: " + ex.toString());
-                    }
-                } else {
-                    discoveryPath = "";
-                    LOG.info("Could not find page request in session. Probably a bug");
-                }
-            }
-        }
     }
 
     private CrawlLog.Builder buildCrawlLog() {
@@ -411,34 +347,19 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                 .setRequestedUri(uri)
                 .setSurt(surtUri.toString())
                 .setFetchTimeStamp(fetchTimeStamp)
-                .setFetchTimeMs(Durations.toMillis(fetchDuration))
-                .setReferrer(referrer)
-                .setDiscoveryPath(discoveryPath);
+                .setFetchTimeMs(Durations.toMillis(fetchDuration));
         return crawlLog;
     }
 
-    private Span buildSpan(String operationName, UriRequest uriRequest) {
+    //    private Span buildSpan(String operationName, UriRequest uriRequest) {
+    private Span buildSpan(String operationName) {
         Tracer.SpanBuilder newSpan = GlobalTracer.get()
                 .buildSpan(operationName)
                 .withTag(Tags.COMPONENT.getKey(), "RecorderFilter")
                 .withTag("executionId", executionId)
                 .withTag("uri", uri);
 
-        if (uriRequest != null && uriRequest.getSpan() == null) {
-            LOG.error("Span is not initilized", new IllegalStateException());
-        }
-
-        if (uriRequest != null) {
-            newSpan = newSpan.asChildOf(uriRequest.getSpan());
-        }
-
         return newSpan.startManual();
-    }
-
-    private void finishSpan(UriRequest uriRequest) {
-        if (uriRequest != null) {
-            uriRequest.finish();
-        }
     }
 
     @Override

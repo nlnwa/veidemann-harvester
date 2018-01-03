@@ -15,8 +15,10 @@
  */
 package no.nb.nna.veidemann.harvester.browsercontroller;
 
+import com.google.common.net.InetAddresses;
 import no.nb.nna.veidemann.api.ConfigProto;
 import no.nb.nna.veidemann.api.ContentWriterProto;
+import no.nb.nna.veidemann.api.ContentWriterProto.RecordType;
 import no.nb.nna.veidemann.api.ContentWriterProto.WriteResponseMeta;
 import no.nb.nna.veidemann.api.ControllerProto;
 import no.nb.nna.veidemann.api.HarvesterProto;
@@ -95,18 +97,25 @@ public class BrowserControllerIT {
             ContentWriterProto.WriteResponseMeta.Builder response = ContentWriterProto.WriteResponseMeta.newBuilder()
                     .putRecordMeta(0, WriteResponseMeta.RecordMeta.newBuilder()
                             .setRecordNum(0)
-                            .setWarcId("WARC_ID_REQUEST").build())
+                            .setWarcId("WARC_ID_REQUEST")
+                            .setType(RecordType.REQUEST)
+                            .build())
                     .putRecordMeta(1, WriteResponseMeta.RecordMeta.newBuilder()
                             .setRecordNum(0)
-                            .setWarcId("WARC_ID_RESPONSE").build());
+                            .setWarcId("WARC_ID_RESPONSE")
+                            .setType(RecordType.RESPONSE)
+                            .build());
 
             when(contentWriterSession.finish()).thenReturn(response.build());
+            when(contentWriterSession.sendHeader(any())).thenReturn(contentWriterSession);
+            when(contentWriterSession.sendMetadata(any())).thenReturn(contentWriterSession);
+            when(contentWriterSession.sendPayload(any())).thenReturn(contentWriterSession);
 
             DbAdapter db = getDbMock();
 
             MessagesProto.QueuedUri queuedUri = MessagesProto.QueuedUri.newBuilder()
-//                    .setUri("http://a1.com")
-                    .setUri("https://www.nb.no")
+                    .setUri("http://a1.com")
+//                    .setUri("https://www.nb.no")
 //                    .setUri("https://www.nb.no/besok-oss/utstillinger")
 //                    .setUri("https://www.nb.no/statsmaktene/")
                     .setExecutionId("testId")
@@ -119,7 +128,7 @@ public class BrowserControllerIT {
             File tmpDir = Files.createDirectories(Paths.get("target", "it-workdir")).toFile();
             tmpDir.deleteOnExit();
 
-//            Thread.sleep(1000);
+            Thread.sleep(1000);
 
             try (RecordingProxy proxy = new RecordingProxy(tmpDir, proxyPort, db, contentWriterClient,
                     new TestHostResolver(), sessionRegistry, new InMemoryAlreadyCrawledCache());
@@ -128,18 +137,20 @@ public class BrowserControllerIT {
                          sessionRegistry);) {
 
                 HarvesterProto.HarvestPageReply result = controller.render(queuedUri, config);
-                int pagesHarvested = 0;
+                int pagesHarvested = 1;
+                int totalPages = result.getOutlinksCount() + 1;
                 for (QueuedUri qu : result.getOutlinksList()) {
                     String surt = UriConfigs.SURT_KEY.buildUri(qu.getUri()).toString();
-                    if (!surt.startsWith("(no,nb,")) {
-                        System.out.println("OOS: " + surt + " --- " + qu.getUri());
-                        continue;
-                    }
+//                    if (!surt.startsWith("(no,nb,")) {
+//                        System.out.println("OOS: " + surt + " --- " + qu.getUri());
+//                        totalPages--;
+//                        continue;
+//                    }
 
-                    System.out.println("URI: " + qu.getUri());
+                    pagesHarvested++;
+                    System.out.println("URI " + pagesHarvested + " of " + totalPages + ": " + qu.getUri());
                     Thread.sleep(1000);
                     HarvesterProto.HarvestPageReply result2 = controller.render(qu, config);
-                    pagesHarvested++;
 //                    if (pagesHarvested > 10) {
 //                        break;
 //                    }
@@ -148,7 +159,7 @@ public class BrowserControllerIT {
 //                System.out.println("=========*\n" + result);
                 // TODO review the generated test code and remove the default call to fail.
 //            fail("The test case is a prototype.");
-        } catch (Exception ex) {
+            } catch (Exception ex) {
                 System.out.println("¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤");
                 ex.printStackTrace();
             }
@@ -162,10 +173,10 @@ public class BrowserControllerIT {
         ConfigProto.BrowserConfig browserConfig = ConfigProto.BrowserConfig.newBuilder()
                 .setMeta(ApiTools.buildMeta("Default", "Default browser configuration"))
                 .setUserAgent("veidemann/1.0")
-                .setWindowHeight(900)
-                .setWindowWidth(900)
+                .setWindowHeight(1280)
+                .setWindowWidth(1024)
                 .setPageLoadTimeoutMs(20000)
-                .setSleepAfterPageloadMs(4000)
+                .setSleepAfterPageloadMs(10000)
                 .setScriptSelector(ConfigProto.Selector.newBuilder().addLabel(ApiTools.buildLabel("scope", "default")))
                 .build();
 
@@ -197,12 +208,13 @@ public class BrowserControllerIT {
         });
         when(db.savePageLog(any(PageLog.class))).then(a -> {
             PageLog o = a.getArgument(0);
-//            System.out.println("PageLOG::::");
-            System.out.println("Uri: " + o.getUri());
+            System.out.println("PageLOG::::");
+            System.out.println(o);
+//            System.out.println("Uri: " + o.getUri());
 //            System.out.println("Referrer: " + o.getReferrer());
-            System.out.println("resource count: " + o.getResourceCount());
-            System.out.println("outlinks count: " + o.getOutlinkCount());
-//            System.out.println("::::PageLOG");
+//            System.out.println("resource count: " + o.getResourceCount());
+//            System.out.println("outlinks count: " + o.getOutlinkCount());
+            System.out.println("::::PageLOG");
             return o;
         });
         when(db.listBrowserScripts(any())).thenReturn(ControllerProto.BrowserScriptListReply.newBuilder()
@@ -232,8 +244,8 @@ public class BrowserControllerIT {
 
         @Override
         public InetSocketAddress resolve(String host, int port) throws UnknownHostException {
-//            InetSocketAddress resolvedAddress = new InetSocketAddress(InetAddresses.forString("127.0.0.1"), testSitesHttpPort);
-            InetSocketAddress resolvedAddress = new InetSocketAddress(InetAddress.getByName(host), port);
+            InetSocketAddress resolvedAddress = new InetSocketAddress(InetAddresses.forString("127.0.0.1"), testSitesHttpPort);
+//            InetSocketAddress resolvedAddress = new InetSocketAddress(InetAddress.getByName(host), port);
 //            System.out.println("H: " + host + ":" + port + " => " + resolvedAddress);
             return resolvedAddress;
         }

@@ -6,10 +6,12 @@
         </Console>
     </Appenders>
     <Loggers>
-        <Logger name="no.nb.nna.veidemann" level="error" />
+        <Logger name="no.nb.nna.veidemann" level="info" />
         <Logger name="no.nb.nna.veidemann.harvester.proxy" level="info" />
         <Logger name="no.nb.nna.veidemann.harvester.browsercontroller.BrowserSession" level="info" />
-        <Logger name="no.nb.nna.veidemann.harvester.BrowserSessionRegistry" level="all" />
+        <Logger name="no.nb.nna.veidemann.harvester.browsercontroller.UriRequest" level="info" />
+        <Logger name="no.nb.nna.veidemann.harvester.browsercontroller.CrawlLogRegistry" level="info" />
+        <Logger name="no.nb.nna.veidemann.harvester.BrowserSessionRegistry" level="info" />
         <Logger name="no.nb.nna.veidemann.chrome" level="info" />
         <Root level="error">
             <AppenderRef ref="Console"/>

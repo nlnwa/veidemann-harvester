@@ -1,9 +1,9 @@
-#!/bin/bash
+#!/bin/sh
 
 # Eventually import extra CA certificate
-if [ -e /veidemann-controller/tls/tls.crt ]; then
-    openssl x509 -in /veidemann-controller/tls/tls.crt -inform pem -out /veidemann-controller/config/ca.der -outform der
-    keytool -importcert -trustcacerts -noprompt -alias startssl -keystore $JAVA_HOME/jre/lib/security/cacerts -storepass changeit -file /veidemann-controller/config/ca.der
+if [ -e /veidemann/tls/tls.crt ]; then
+    openssl x509 -in /veidemann/tls/tls.crt -inform pem -out /veidemann/config/ca.der -outform der
+    keytool -importcert -trustcacerts -noprompt -alias startssl -keystore $JAVA_HOME/jre/lib/security/cacerts -storepass changeit -file /veidemann/config/ca.der
 fi
 
-exec /veidemann-controller/bin/veidemann-controller
+exec /veidemann/bin/veidemann-controller

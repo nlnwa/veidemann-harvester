@@ -22,5 +22,4 @@ package no.nb.nna.veidemann.commons;
 public interface VeidemannHeaderConstants {
     static final String EXECUTION_ID = "veidemann_eid";
     static final String MANUAL_EXID = "manual";
-    static final String CHROME_INTERCEPTION_ID = "veidemann_ciid";
 }

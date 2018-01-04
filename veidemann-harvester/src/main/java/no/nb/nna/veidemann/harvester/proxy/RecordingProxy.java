@@ -99,6 +99,8 @@ public class RecordingProxy implements AutoCloseable {
                 .withMaxHeaderSize(1024 * 32)
                 .withFiltersSource(new RecorderFilterSourceAdapter(db, contentWriterClient, sessionRegistry, cache))
                 .start();
+
+        LOG.info("Recording proxy started.");
     }
 
     @Override

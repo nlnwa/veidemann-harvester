@@ -18,12 +18,14 @@ package no.nb.nna.veidemann.harvester.browsercontroller;
 import com.google.common.net.InetAddresses;
 import no.nb.nna.veidemann.api.ConfigProto;
 import no.nb.nna.veidemann.api.ContentWriterProto;
+import no.nb.nna.veidemann.api.ContentWriterProto.RecordType;
 import no.nb.nna.veidemann.api.ContentWriterProto.WriteResponseMeta;
 import no.nb.nna.veidemann.api.ControllerProto;
 import no.nb.nna.veidemann.api.HarvesterProto;
 import no.nb.nna.veidemann.api.MessagesProto;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
 import no.nb.nna.veidemann.api.MessagesProto.PageLog;
+import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
 import no.nb.nna.veidemann.commons.client.ContentWriterClient;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.util.ApiTools;
@@ -34,8 +36,10 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.littleshoot.proxy.HostResolver;
 import org.mockito.invocation.InvocationOnMock;
+import org.netpreserve.commons.uri.UriConfigs;
 
 import java.io.File;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.file.Files;
@@ -43,9 +47,7 @@ import java.nio.file.Paths;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.fail;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 /**
  *
@@ -55,6 +57,8 @@ public class BrowserControllerIT {
     static String browserHost;
 
     static int browserPort;
+
+    static String proxyIp;
 
     static int proxyPort;
 
@@ -70,7 +74,9 @@ public class BrowserControllerIT {
     public static void init() {
         browserHost = System.getProperty("browser.host");
         browserPort = Integer.parseInt(System.getProperty("browser.port"));
+        proxyIp = System.getProperty("proxy.host");
         proxyPort = Integer.parseInt(System.getProperty("proxy.port"));
+//        proxyPort = 41355;
         testSitesHttpHost = System.getProperty("testsites.http.host");
         testSitesHttpPort = Integer.parseInt(System.getProperty("testsites.http.port"));
         testSitesDnsHost = System.getProperty("testsites.dns.host");
@@ -91,20 +97,30 @@ public class BrowserControllerIT {
             ContentWriterProto.WriteResponseMeta.Builder response = ContentWriterProto.WriteResponseMeta.newBuilder()
                     .putRecordMeta(0, WriteResponseMeta.RecordMeta.newBuilder()
                             .setRecordNum(0)
-                            .setWarcId("WARC_ID_REQUEST").build())
+                            .setWarcId("WARC_ID_REQUEST")
+                            .setType(RecordType.REQUEST)
+                            .build())
                     .putRecordMeta(1, WriteResponseMeta.RecordMeta.newBuilder()
                             .setRecordNum(0)
-                            .setWarcId("WARC_ID_RESPONSE").build());
+                            .setWarcId("WARC_ID_RESPONSE")
+                            .setType(RecordType.RESPONSE)
+                            .build());
 
             when(contentWriterSession.finish()).thenReturn(response.build());
+            when(contentWriterSession.sendHeader(any())).thenReturn(contentWriterSession);
+            when(contentWriterSession.sendMetadata(any())).thenReturn(contentWriterSession);
+            when(contentWriterSession.sendPayload(any())).thenReturn(contentWriterSession);
 
             DbAdapter db = getDbMock();
 
             MessagesProto.QueuedUri queuedUri = MessagesProto.QueuedUri.newBuilder()
                     .setUri("http://a1.com")
+//                    .setUri("https://www.nb.no")
+//                    .setUri("https://www.nb.no/besok-oss/utstillinger")
+//                    .setUri("https://www.nb.no/statsmaktene/")
                     .setExecutionId("testId")
-                    .setDiscoveryPath("L")
-                    .setReferrer("http://example.org/")
+//                    .setDiscoveryPath("L")
+//                    .setReferrer("http://example.org/")
                     .build();
 
             ConfigProto.CrawlConfig config = getDefaultConfig();
@@ -121,10 +137,31 @@ public class BrowserControllerIT {
                          sessionRegistry);) {
 
                 HarvesterProto.HarvestPageReply result = controller.render(queuedUri, config);
+                int pagesHarvested = 1;
+                int totalPages = result.getOutlinksCount() + 1;
+                for (QueuedUri qu : result.getOutlinksList()) {
+                    String surt = UriConfigs.SURT_KEY.buildUri(qu.getUri()).toString();
+//                    if (!surt.startsWith("(no,nb,")) {
+//                        System.out.println("OOS: " + surt + " --- " + qu.getUri());
+//                        totalPages--;
+//                        continue;
+//                    }
+
+                    pagesHarvested++;
+                    System.out.println("URI " + pagesHarvested + " of " + totalPages + ": " + qu.getUri());
+                    Thread.sleep(1000);
+                    HarvesterProto.HarvestPageReply result2 = controller.render(qu, config);
+//                    if (pagesHarvested > 10) {
+//                        break;
+//                    }
+                }
 
 //                System.out.println("=========*\n" + result);
                 // TODO review the generated test code and remove the default call to fail.
 //            fail("The test case is a prototype.");
+            } catch (Exception ex) {
+                System.out.println("¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤");
+                ex.printStackTrace();
             }
         } catch (Exception ex) {
             ex.printStackTrace();
@@ -136,10 +173,10 @@ public class BrowserControllerIT {
         ConfigProto.BrowserConfig browserConfig = ConfigProto.BrowserConfig.newBuilder()
                 .setMeta(ApiTools.buildMeta("Default", "Default browser configuration"))
                 .setUserAgent("veidemann/1.0")
-                .setWindowHeight(900)
-                .setWindowWidth(900)
+                .setWindowHeight(1280)
+                .setWindowWidth(1024)
                 .setPageLoadTimeoutMs(20000)
-                .setSleepAfterPageloadMs(500)
+                .setSleepAfterPageloadMs(10000)
                 .setScriptSelector(ConfigProto.Selector.newBuilder().addLabel(ApiTools.buildLabel("scope", "default")))
                 .build();
 
@@ -173,6 +210,10 @@ public class BrowserControllerIT {
             PageLog o = a.getArgument(0);
             System.out.println("PageLOG::::");
             System.out.println(o);
+//            System.out.println("Uri: " + o.getUri());
+//            System.out.println("Referrer: " + o.getReferrer());
+//            System.out.println("resource count: " + o.getResourceCount());
+//            System.out.println("outlinks count: " + o.getOutlinkCount());
             System.out.println("::::PageLOG");
             return o;
         });
@@ -205,8 +246,7 @@ public class BrowserControllerIT {
         public InetSocketAddress resolve(String host, int port) throws UnknownHostException {
             InetSocketAddress resolvedAddress = new InetSocketAddress(InetAddresses.forString("127.0.0.1"), testSitesHttpPort);
 //            InetSocketAddress resolvedAddress = new InetSocketAddress(InetAddress.getByName(host), port);
-            System.out.println("H: " + testSitesHttpHost);
-            System.out.println("H: " + host + ":" + port + " => " + resolvedAddress);
+//            System.out.println("H: " + host + ":" + port + " => " + resolvedAddress);
             return resolvedAddress;
         }
 

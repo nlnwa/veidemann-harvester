@@ -112,14 +112,13 @@
                     </execution>
                 </executions>
             <configuration>
-                <autoCreateCustomNetworks>true</autoCreateCustomNetworks>
                 <images>
                     <image>
                         <name>norsknettarkiv/${project.artifactId}</name>
                         <alias>harvester</alias>
                         <run><skip>true</skip></run>
                         <build>
-                            <from>java:8</from>
+                            <from>${docker.java.image}</from>
                             <maintainer>National Library of Norway</maintainer>
                             <tags>
                                 <tag>${docker.tag}</tag>
@@ -139,11 +138,11 @@
                             </ports>
                             <cmd>
                                 <exec>
-                                    <arg>/${project.artifactId}/bin/${project.artifactId}</arg>
+                                    <arg>/veidemann/bin/${project.artifactId}</arg>
                                 </exec>
                             </cmd>
                             <assembly>
-                                <targetDir>/${project.artifactId}</targetDir>
+                                <targetDir>/veidemann</targetDir>
 
                                 <inline>
                                     <includeBaseDirectory>true</includeBaseDirectory>
@@ -187,11 +186,6 @@
                         <name>norsknettarkiv/testsites</name>
                         <alias>testsites</alias>
                         <run>
-                            <network>
-                                <mode>custom</mode>
-                                <name>harvester-test-net</name>
-                                <alias>testsites</alias>
-                            </network>
                             <ports>
                                 <port>+test.http.host:test.http.port:80</port>
                                 <port>+test.dns.host:test.dns.port:53</port>
@@ -216,17 +210,15 @@
                         <alias>browser</alias>
                         <run>
                             <user>${uid}</user>
-                            <network>
-                                <mode>custom</mode>
-                                <name>harvester-test-net</name>
-                                <alias>browser</alias>
-                            </network>
                             <ports>
                                 <port>+browser.host:browser.port:9222</port>
                             </ports>
                             <env>
                                 <CHROME_OPTS>--ignore-certificate-errors --disable-web-security --allow-running-insecure-content --proxy-server=${proxy.ip}:${proxy.port}</CHROME_OPTS>
                             </env>
+                            <!-- 1GB -->
+                            <memory>1073741824</memory>
+                            <shmSize>1073741824</shmSize>
                             <volumes>
                                 <bind>
                                     <volume>${project.build.directory}/it-workdir:/data</volume>
@@ -243,6 +235,7 @@
                                     </ports>
                                 </tcp>
                                 <time>20000</time>
+                                <log>Certificate /data/certificates/VeidemannCA.pem imported</log>
                             </wait>
                             <dependsOn>
                                 <container>testsites</container>
@@ -278,7 +271,7 @@
                             <configurationDirectory>config</configurationDirectory>
                             <endorsedDir>plugins</endorsedDir>
                             <preAssembleDirectory>src/main/distfiles</preAssembleDirectory>
-                            <extraJvmArguments>-Dconfig.file=@BASEDIR@/config/application.conf</extraJvmArguments>
+                            <extraJvmArguments>-Dconfig.file=@BASEDIR@/config/application.conf -XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap</extraJvmArguments>
                         </configuration>
                         <executions>
                             <execution>
@@ -405,6 +398,7 @@
                             <systemPropertyVariables>
                                 <browser.host>${browser.host}</browser.host>
                                 <browser.port>${browser.port}</browser.port>
+                                <proxy.host>${proxy.ip}</proxy.host>
                                 <proxy.port>${proxy.port}</proxy.port>
                                 <testsites.http.host>${test.http.host}</testsites.http.host>
                                 <testsites.http.port>${test.http.port}</testsites.http.port>

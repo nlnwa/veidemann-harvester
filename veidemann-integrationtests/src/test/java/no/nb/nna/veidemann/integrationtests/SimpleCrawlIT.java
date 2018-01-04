@@ -136,6 +136,7 @@ public class SimpleCrawlIT implements VeidemannHeaderConstants {
         executeJob(request).get();
 
         // TODO: check these values instead of just printing
+        System.out.println("WARC RECORDS");
         WarcInspector.getWarcFiles().getRecordStream().forEach(r -> System.out.println(r.header.warcTypeStr + " -- "
                 + r.header.warcTargetUriStr));
 
@@ -145,7 +146,7 @@ public class SimpleCrawlIT implements VeidemannHeaderConstants {
         PageLogListReply pageLog = db.listPageLogs(PageLogListRequest.getDefaultInstance());
 
         // TODO: check these values instead of just printing
-        System.out.println();
+        System.out.println("\nCRAWL LOG");
         crawlLog.getValueList().forEach(r -> System.out.println(r.getRequestedUri() + " -- " + r.getStatusCode()
                 + " -- " + r.getContentType() + " -- " + r.getRecordType() + " -- " + r.getReferrer()));
 

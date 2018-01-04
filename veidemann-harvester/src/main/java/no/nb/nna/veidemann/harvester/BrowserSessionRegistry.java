@@ -15,14 +15,14 @@
  */
 package no.nb.nna.veidemann.harvester;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
-
 import no.nb.nna.veidemann.commons.VeidemannHeaderConstants;
 import no.nb.nna.veidemann.harvester.browsercontroller.BrowserSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
 
 /**
  * Registry which allows both BrowserController and Proxy to access information about a request.
@@ -38,10 +38,11 @@ public class BrowserSessionRegistry implements VeidemannHeaderConstants {
     }
 
     public synchronized BrowserSession get(String executionId) {
-        if (MANUAL_EXID.equals(executionId)) {
-            return null;
+        BrowserSession session = executionIdToSession.get(executionId);
+        if (session == null) {
+            LOG.error("Missing session for executionId {}", executionId);
         }
-        return executionIdToSession.get(executionId);
+        return session;
     }
 
     public synchronized BrowserSession remove(String executionId) {

@@ -15,10 +15,6 @@
  */
 package no.nb.nna.veidemann.harvester.proxy;
 
-import no.nb.nna.veidemann.commons.AlreadyCrawledCache;
-
-import java.util.Objects;
-
 import com.google.protobuf.ByteString;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -27,6 +23,7 @@ import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
+import no.nb.nna.veidemann.commons.AlreadyCrawledCache;
 import no.nb.nna.veidemann.commons.VeidemannHeaderConstants;
 import org.cache2k.Cache;
 import org.cache2k.Cache2kBuilder;
@@ -34,6 +31,9 @@ import org.cache2k.CacheEntry;
 import org.cache2k.expiry.ExpiryPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.nio.ByteBuffer;
+import java.util.Objects;
 
 /**
  *
@@ -48,20 +48,16 @@ public class InMemoryAlreadyCrawledCache implements AlreadyCrawledCache {
         cache = new Cache2kBuilder<CacheKey, FullHttpResponse>() {
         }
                 .name("embedsCache")
-                .entryCapacity(10000)
+                .entryCapacity(100)
                 .expiryPolicy(new ExpiryPolicy<CacheKey, FullHttpResponse>() {
                     @Override
                     public long calculateExpiryTime(CacheKey key, FullHttpResponse value,
                             long loadTime, CacheEntry<CacheKey, FullHttpResponse> oldEntry) {
-                        if (value == null || value.content().readableBytes() > 256 * 1024) {
-                            if (LOG.isDebugEnabled()) {
-                                LOG.debug("Won't cache {} content too big", key);
-                            }
+                        if (value == null || value.content().readableBytes() > (1024 * 1024)) {
+                            LOG.debug("Won't cache {} content too big", key);
                             return NO_CACHE;
                         }
-                        if (LOG.isTraceEnabled()) {
-                            LOG.trace("Caching {}", key);
-                        }
+                        LOG.trace("Caching {}", key);
                         return ETERNAL;
                     }
 

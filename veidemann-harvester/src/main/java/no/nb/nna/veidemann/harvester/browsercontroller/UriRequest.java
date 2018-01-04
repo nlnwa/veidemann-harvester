@@ -20,15 +20,13 @@ import io.opentracing.Span;
 import io.opentracing.Tracer;
 import io.opentracing.tag.Tags;
 import io.opentracing.util.GlobalTracer;
+import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
 import no.nb.nna.veidemann.chrome.client.NetworkDomain;
-import no.nb.nna.veidemann.chrome.client.NetworkDomain.RequestIntercepted;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
@@ -43,9 +41,7 @@ public class UriRequest {
 
     private String url;
 
-    private final String interceptionId;
-
-    private Set<String> requestId = new HashSet<>();
+    private String requestId;
 
     private ResourceType resourceType;
 
@@ -75,7 +71,11 @@ public class UriRequest {
 
     private Span span;
 
-    private final boolean aborted;
+    //    private final boolean aborted;
+
+    private boolean finished = false;
+
+    private CrawlLog crawlLog;
 
     /**
      * True if this request is for the top level request.
@@ -89,49 +89,38 @@ public class UriRequest {
     private final Condition noReferrer = referrerLock.newCondition();
     private final Condition noDiscoveryPath = discoveryPathLock.newCondition();
 
-    public UriRequest(RequestIntercepted request, boolean aborted, BaseSpan parentSpan) {
-        this.aborted = aborted;
-        this.interceptionId = request.interceptionId;
+    private UriRequest(NetworkDomain.RequestWillBeSent request, BaseSpan parentSpan) {
+        this.requestId = request.requestId;
         this.url = request.request.url;
-        this.resourceType = ResourceType.forName(request.resourceType);
-        if (request.isNavigationRequest) {
-            this.rootResource = true;
-        }
+        this.referrer = (String) request.request.headers.getOrDefault("referer", "");
+        this.resourceType = ResourceType.forName(request.type);
+        LOG.debug("RequestId: {}, documentUrl: {}, URL: {}, initiator: {}, redirectResponse: {}, referer: {}",
+                request.requestId, request.documentURL, request.request.url, request.initiator,
+                request.redirectResponse, request.request.headers.get("Referer"));
 
         this.parentSpan = parentSpan;
     }
 
-    public UriRequest(UriRequest parent, RequestIntercepted request, boolean aborted, BaseSpan parentSpan) {
-        this.aborted = aborted;
+    public UriRequest(NetworkDomain.RequestWillBeSent request, String initialDiscoveryPath, BaseSpan parentSpan) {
+        this(request, parentSpan);
+        this.discoveryPath = initialDiscoveryPath;
+        this.rootResource = true;
+    }
+
+    public UriRequest(NetworkDomain.RequestWillBeSent request, UriRequest parent, BaseSpan parentSpan) {
+        this(request, parentSpan);
         setParent(parent);
-        this.interceptionId = request.interceptionId;
-        this.url = request.redirectUrl;
-        parent.statusCode = request.responseStatusCode;
-        this.discoveryPath = parent.discoveryPath + "R";
-        this.referrer = parent.url;
-        this.resourceType = ResourceType.forName(request.resourceType);
-        this.rootResource = parent.rootResource;
-
-        this.parentSpan = parentSpan;
-    }
-
-    public void addRequest(NetworkDomain.RequestWillBeSent request, String parentDiscoveryPath) {
-        if (this.discoveryPath == null) {
-            if (request.redirectResponse != null) {
-                setDiscoveryPath(parentDiscoveryPath + "R");
-            } else if ("script".equals(request.initiator.type)) {
-                // Resource is loaded by a script
-                setDiscoveryPath(parentDiscoveryPath + "X");
-            } else {
-                setDiscoveryPath(parentDiscoveryPath + "E");
-            }
+        if (request.redirectResponse != null) {
+            this.rootResource = parent.rootResource;
+            parent.statusCode = request.redirectResponse.status.intValue();
+            parent.fromCache = request.redirectResponse.fromDiskCache;
+            this.discoveryPath = parent.discoveryPath + "R";
+        } else if ("script".equals(request.initiator.type)) {
+            // Resource is loaded by a script
+            this.discoveryPath = parent.discoveryPath + "X";
+        } else {
+            this.discoveryPath = parent.discoveryPath + "E";
         }
-    }
-
-    void addRedirectResponse(NetworkDomain.Response response) {
-        mimeType = response.mimeType;
-        statusCode = response.status.intValue();
-        this.responseSize = response.encodedDataLength;
     }
 
     void addResponse(NetworkDomain.ResponseReceived response) {
@@ -140,11 +129,11 @@ public class UriRequest {
                     this.responseSize, response.response.encodedDataLength, referrer, discoveryPath);
         }
 
-        setRequestId(response.requestId);
         this.responseSize += response.response.encodedDataLength;
         resourceType = ResourceType.forName(response.type);
         mimeType = response.response.mimeType;
         statusCode = response.response.status.intValue();
+        fromCache = response.response.fromDiskCache;
 
         renderable = MimeTypes.forType(mimeType)
                 .filter(m -> m.resourceType.category == ResourceType.Category.Document)
@@ -156,16 +145,8 @@ public class UriRequest {
 //        }
     }
 
-    public String getInterceptionId() {
-        return interceptionId;
-    }
-
-    public Set<String> getRequestId() {
+    public String getRequestId() {
         return requestId;
-    }
-
-    public void setRequestId(String requestId) {
-        this.requestId.add(requestId);
     }
 
     public ResourceType getResourceType() {
@@ -286,8 +267,25 @@ public class UriRequest {
         this.warcId = warcId;
     }
 
-    public boolean isAborted() {
-        return aborted;
+    public void setStatusCode(int statusCode) {
+        this.statusCode = statusCode;
+    }
+
+    //    public boolean isAborted() {
+    //        return aborted;
+    //    }
+
+    public CrawlLog setCrawlLog(CrawlLog.Builder crawlLogBuilder) {
+        this.crawlLog = crawlLogBuilder
+                .setReferrer(referrer)
+                .setDiscoveryPath(discoveryPath)
+                .build();
+        this.warcId = crawlLog.getWarcId();
+        return this.crawlLog;
+    }
+
+    public CrawlLog getCrawlLog() {
+        return crawlLog;
     }
 
     private static boolean mimeTypeIsConsistentWithType(UriRequest request) {
@@ -316,10 +314,16 @@ public class UriRequest {
 
     public void start() {
         span = buildSpan(parentSpan, url);
-    }
+        LOG.debug("Request {} started", requestId);
+   }
 
-    public void finish() {
-        span.finish();
+    public void finish(CrawlLogRegistry crawlLogRegistry) {
+        if (!finished) {
+            span.finish();
+            crawlLogRegistry.signalRequestsUpdated();
+            LOG.debug("Request {} finished", requestId);
+            finished = true;
+        }
     }
 
     public Span getSpan() {
@@ -339,20 +343,26 @@ public class UriRequest {
 
     @Override
     public String toString() {
-        final StringBuffer sb = new StringBuffer("UriRequest{");
-        sb.append("iId='").append(interceptionId).append('\'');
-        sb.append(", rId='").append(requestId).append('\'');
+        return toString("");
+    }
+
+    public String toString(String indent) {
+        final StringBuffer sb = new StringBuffer(indent + "- UriRequest{");
+        sb.append("rId='").append(requestId).append('\'');
         sb.append(", status=").append(statusCode);
         sb.append(", path='").append(discoveryPath).append('\'');
         sb.append(", renderable=").append(renderable);
         sb.append(", url='").append(url).append('\'');
         sb.append(", referrer=").append(referrer);
         sb.append(", fromCache=").append(fromCache);
-        sb.append(", aborted=").append(aborted);
+//        sb.append(", aborted=").append(aborted);
         sb.append(", warcId=").append(warcId);
+        if (crawlLog != null) {
+            sb.append(", log=").append(crawlLog.getStatusCode() + "::" + crawlLog.getRequestedUri());
+        }
         if (!children.isEmpty()) {
             for (UriRequest c : children) {
-                sb.append("\n  > ").append(c.toString());
+                sb.append("\n  ").append(indent).append(c.toString(indent + "  "));
             }
         }
         sb.append('}');

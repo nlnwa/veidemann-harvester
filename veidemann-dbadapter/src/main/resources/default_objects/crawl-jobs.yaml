@@ -28,10 +28,10 @@ crawlConfig:
             name: "Default"
             description: "Default browser configuration"
         userAgent: "veidemann/1.0"
-        windowWidth: 900
-        windowHeight: 900
+        windowWidth: 1280
+        windowHeight: 1024
         pageLoadTimeoutMs: 180000
-        sleepAfterPageLoadMs: 2000
+        sleepAfterPageloadMs: 2000
         scriptSelector:
             label:
             - key: "scope"

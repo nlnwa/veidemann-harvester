@@ -15,6 +15,24 @@
  */
 package no.nb.nna.veidemann.harvester.browsercontroller;
 
+import io.opentracing.Span;
+import io.opentracing.contrib.OpenTracingContextKey;
+import io.opentracing.tag.Tags;
+import io.opentracing.util.GlobalTracer;
+import no.nb.nna.veidemann.api.ConfigProto.BrowserScript;
+import no.nb.nna.veidemann.api.ConfigProto.CrawlConfig;
+import no.nb.nna.veidemann.api.ControllerProto;
+import no.nb.nna.veidemann.api.HarvesterProto.HarvestPageReply;
+import no.nb.nna.veidemann.api.MessagesProto.PageLog;
+import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
+import no.nb.nna.veidemann.chrome.client.ChromeDebugProtocol;
+import no.nb.nna.veidemann.commons.VeidemannHeaderConstants;
+import no.nb.nna.veidemann.commons.db.DbAdapter;
+import no.nb.nna.veidemann.harvester.BrowserSessionRegistry;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -22,24 +40,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
-
-import io.opentracing.Span;
-import io.opentracing.contrib.OpenTracingContextKey;
-import io.opentracing.tag.Tags;
-import io.opentracing.util.GlobalTracer;
-import no.nb.nna.veidemann.api.ControllerProto;
-import no.nb.nna.veidemann.api.HarvesterProto.HarvestPageReply;
-import no.nb.nna.veidemann.chrome.client.ChromeDebugProtocol;
-import no.nb.nna.veidemann.commons.VeidemannHeaderConstants;
-import no.nb.nna.veidemann.commons.db.DbAdapter;
-import no.nb.nna.veidemann.harvester.BrowserSessionRegistry;
-import no.nb.nna.veidemann.api.ConfigProto.BrowserScript;
-import no.nb.nna.veidemann.api.ConfigProto.CrawlConfig;
-import no.nb.nna.veidemann.api.MessagesProto.PageLog;
-import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.slf4j.MDC;
 
 /**
  *
@@ -81,13 +81,15 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
         MDC.put("eid", queuedUri.getExecutionId());
         MDC.put("uri", queuedUri.getUri());
 
-        BrowserSession session = new BrowserSession(chrome, config, queuedUri.getExecutionId(), span);
+        BrowserSession session = new BrowserSession(db, chrome, config, queuedUri, span);
         try {
             sessionRegistry.put(session);
 
             session.setBreakpoints();
-            session.setCookies(queuedUri);
-            session.loadPage(queuedUri);
+            session.setCookies();
+            session.loadPage();
+            session.getCrawlLogs().waitForMatcherToFinish();
+
             if (session.isPageRenderable()) {
 //                // disable scrollbars
 //                session.runtime.evaluate("document.getElementsByTagName('body')[0].style.overflow='hidden'",
@@ -124,6 +126,9 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
                 LOG.info("Page is not renderable");
             }
             try {
+
+                LOG.debug("======== PAGELOG ========\n{}", session.getUriRequests());
+
                 PageLog.Builder pageLog = PageLog.newBuilder()
                         .setUri(queuedUri.getUri())
                         .setExecutionId(queuedUri.getExecutionId())

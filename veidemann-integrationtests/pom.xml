@@ -175,6 +175,7 @@
                                         </network>
                                         <!-- 1GB -->
                                         <memory>1073741824</memory>
+                                        <shmSize>1073741824</shmSize>
                                         <ports>
                                             <port>+browser.host:browser.port:9222</port>
                                         </ports>
@@ -272,6 +273,7 @@
                                         <env>
                                             <DB_HOST>db</DB_HOST>
                                             <UNSAFE>true</UNSAFE>
+                                            <WARC_WRITER_POOL_SIZE>4</WARC_WRITER_POOL_SIZE>
                                         </env>
                                         <log>
                                             <enabled>true</enabled>

@@ -119,7 +119,7 @@
                             <configurationDirectory>config</configurationDirectory>
                             <endorsedDir>plugins</endorsedDir>
                             <preAssembleDirectory>src/main/distfiles</preAssembleDirectory>
-                            <extraJvmArguments>-Dconfig.file=@BASEDIR@/config/application.conf</extraJvmArguments>
+                            <extraJvmArguments>-Dconfig.file=@BASEDIR@/config/application.conf -XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap</extraJvmArguments>
                         </configuration>
                         <executions>
                             <execution>
@@ -150,7 +150,7 @@
                                     <name>norsknettarkiv/${project.artifactId}</name>
                                     <alias>${project.artifactId}</alias>
                                     <build>
-                                        <from>java:8</from>
+                                        <from>${docker.java.image}</from>
                                         <maintainer>National Library of Norway</maintainer>
                                         <tags>
                                             <tag>${docker.tag}</tag>
@@ -173,11 +173,11 @@
                                         </ports>
                                         <cmd>
                                             <exec>
-                                                <arg>/${project.artifactId}/bin/${project.artifactId}</arg>
+                                                <arg>/veidemann/bin/${project.artifactId}</arg>
                                             </exec>
                                         </cmd>
                                         <assembly>
-                                            <targetDir>/${project.artifactId}</targetDir>
+                                            <targetDir>/veidemann</targetDir>
 
                                             <inline>
                                                 <includeBaseDirectory>true</includeBaseDirectory>

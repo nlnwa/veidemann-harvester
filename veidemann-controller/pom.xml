@@ -99,7 +99,7 @@
                             <configurationDirectory>config</configurationDirectory>
                             <endorsedDir>plugins</endorsedDir>
                             <preAssembleDirectory>src/main/distfiles</preAssembleDirectory>
-                            <extraJvmArguments>-Dconfig.file=@BASEDIR@/config/application.conf</extraJvmArguments>
+                            <extraJvmArguments>-Dconfig.file=@BASEDIR@/config/application.conf -XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap</extraJvmArguments>
                         </configuration>
                     </plugin>
 
@@ -122,22 +122,23 @@
                                     <name>norsknettarkiv/${project.artifactId}</name>
                                     <alias>controller</alias>
                                     <build>
-                                        <from>java:8</from>
+                                        <from>${docker.java.image}</from>
                                         <maintainer>National Library of Norway</maintainer>
                                         <tags>
                                             <tag>${docker.tag}</tag>
                                         </tags>
+                                        <runCmds>apk add --update openssl &amp;&amp; rm -rf /var/cache/apk/*</runCmds>
+
                                         <ports>
                                             <port>50051</port>
                                         </ports>
                                         <cmd>
                                             <exec>
-                                                <!--<arg>/${project.artifactId}/bin/${project.artifactId}</arg>-->
-                                                <arg>/${project.artifactId}/bin/start.sh</arg>
+                                                <arg>/veidemann/bin/start.sh</arg>
                                             </exec>
                                         </cmd>
                                         <assembly>
-                                            <targetDir>/${project.artifactId}</targetDir>
+                                            <targetDir>/veidemann</targetDir>
 
                                             <inline>
                                                 <includeBaseDirectory>true</includeBaseDirectory>

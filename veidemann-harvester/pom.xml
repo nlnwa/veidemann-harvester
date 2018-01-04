@@ -138,11 +138,11 @@
                             </ports>
                             <cmd>
                                 <exec>
-                                    <arg>/application/bin/${project.artifactId}</arg>
+                                    <arg>/veidemann/bin/${project.artifactId}</arg>
                                 </exec>
                             </cmd>
                             <assembly>
-                                <targetDir>/application</targetDir>
+                                <targetDir>/veidemann</targetDir>
 
                                 <inline>
                                     <includeBaseDirectory>true</includeBaseDirectory>

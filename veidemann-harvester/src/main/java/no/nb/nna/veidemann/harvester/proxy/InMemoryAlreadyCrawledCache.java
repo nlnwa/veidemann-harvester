@@ -53,7 +53,7 @@ public class InMemoryAlreadyCrawledCache implements AlreadyCrawledCache {
                     @Override
                     public long calculateExpiryTime(CacheKey key, FullHttpResponse value,
                             long loadTime, CacheEntry<CacheKey, FullHttpResponse> oldEntry) {
-                        if (value == null || value.content().readableBytes() > (1024 * 1024)) {
+                        if (value == null || value.content().readableBytes() > (1024 * 1024 * 10)) {
                             LOG.debug("Won't cache {} content too big", key);
                             return NO_CACHE;
                         }

@@ -89,6 +89,8 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
 
     private ContentWriterSession contentWriterSession;
 
+    private ChunkedCacheContentWriter chunkedCacheResponse;
+
     public RecorderFilter(final String uri, final HttpRequest originalRequest, final ChannelHandlerContext ctx,
                           final DbAdapter db, final ContentWriterClient contentWriterClient,
                           final BrowserSessionRegistry sessionRegistry, final AlreadyCrawledCache cache) {
@@ -139,7 +141,14 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                                 .setStatusCode(cachedResponse.status().code());
 
                         sessionRegistry.get(executionId).addCrawlLog(crawlLog);
-                        return cachedResponse;
+
+                        if (cachedResponse.content().readableBytes() < (1024 * 32)) {
+                            return cachedResponse;
+                        }
+
+                        chunkedCacheResponse = new ChunkedCacheContentWriter(executionId, uri, ctx, cachedResponse);
+
+                        return chunkedCacheResponse.sendResponse().get();
                     } else {
                         responseCollector.setShouldCache(true);
                     }
@@ -163,6 +172,15 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
             LOG.error("Error handling request", t);
         }
         return null;
+    }
+
+    @Override
+    public HttpObject proxyToClientResponse(HttpObject httpObject) {
+        if (chunkedCacheResponse != null) {
+            return null;
+        } else {
+            return httpObject;
+        }
     }
 
     @Override

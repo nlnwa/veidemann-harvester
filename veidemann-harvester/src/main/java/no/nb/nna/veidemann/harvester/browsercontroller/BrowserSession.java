@@ -137,7 +137,7 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
             session.network.onLoadingFinished(f -> uriRequests.onLoadingFinished(f));
             session.network.onLoadingFailed(f -> uriRequests.onLoadingFailed(f));
             session.network.onResponseReceived(l -> uriRequests.onResponseReceived(l));
-            session.network.onDataReceived(l -> crawlLogs.signalActivity());
+            session.network.onDataReceived(d -> uriRequests.onDataReceived(d));
             session.security.onCertificateError(se -> {
                 LOG.info("Certificate error: " + se);
                 session.security.handleCertificateError(se.eventId, "continue");

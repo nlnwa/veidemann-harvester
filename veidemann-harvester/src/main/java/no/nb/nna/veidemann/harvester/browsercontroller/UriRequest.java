@@ -61,7 +61,7 @@ public class UriRequest {
 
     private long size = 0L;
 
-    private Double responseSize = 0d;
+    private long responseSize = 0L;
 
     private boolean fromCache = false;
 
@@ -114,6 +114,7 @@ public class UriRequest {
             this.rootResource = parent.rootResource;
             parent.statusCode = request.redirectResponse.status.intValue();
             parent.fromCache = request.redirectResponse.fromDiskCache;
+            parent.mimeType = request.redirectResponse.mimeType;
             this.discoveryPath = parent.discoveryPath + "R";
         } else if ("script".equals(request.initiator.type)) {
             // Resource is loaded by a script
@@ -124,12 +125,11 @@ public class UriRequest {
     }
 
     void addResponse(NetworkDomain.ResponseReceived response) {
-        if (this.responseSize != null) {
+        if (this.mimeType != null) {
             LOG.trace("Already got response, previous length: {}, new length: {}, Referrer: {}, DiscoveryPath: {}",
                     this.responseSize, response.response.encodedDataLength, referrer, discoveryPath);
         }
 
-        this.responseSize += response.response.encodedDataLength;
         resourceType = ResourceType.forName(response.type);
         mimeType = response.response.mimeType;
         statusCode = response.response.status.intValue();
@@ -247,8 +247,8 @@ public class UriRequest {
         return size;
     }
 
-    public void setSize(long size) {
-        this.size = size;
+    public void incrementSize(long size) {
+        this.size += size;
     }
 
     public boolean isFromCache() {

@@ -175,8 +175,8 @@ public class BrowserControllerIT {
                 .setUserAgent("veidemann/1.0")
                 .setWindowHeight(1280)
                 .setWindowWidth(1024)
-                .setPageLoadTimeoutMs(20000)
-                .setSleepAfterPageloadMs(10000)
+                .setPageLoadTimeoutMs(300000)
+                .setSleepAfterPageloadMs(5000)
                 .setScriptSelector(ConfigProto.Selector.newBuilder().addLabel(ApiTools.buildLabel("scope", "default")))
                 .build();
 

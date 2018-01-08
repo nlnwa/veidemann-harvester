@@ -75,8 +75,13 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
         this.span = span;
     }
 
-    public synchronized UriRequest getByRequestId(String requestId) {
-        return requestsByRequestId.get(requestId);
+    public UriRequest getByRequestId(String requestId) {
+        allRequestsLock.lock();
+        try {
+            return requestsByRequestId.get(requestId);
+        } finally {
+            allRequestsLock.unlock();
+        }
     }
 
     public void add(UriRequest pageRequest) {
@@ -89,7 +94,7 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
                 rootRequest = pageRequest;
             }
             if (allRequests.contains(pageRequest)) {
-                LOG.error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n{}", pageRequest);
+                LOG.error("Request {} already added to allRequests", pageRequest.getRequestId());
             }
             allRequests.add(pageRequest);
             requestsByRequestId.put(pageRequest.getRequestId(), pageRequest);
@@ -142,6 +147,7 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
     }
 
     void onRequestWillBeSent(NetworkDomain.RequestWillBeSent request, String rootDiscoveryPath) {
+        MDC.put("eid", executionId);
         UriRequest uriRequest = getByRequestId(request.requestId);
 
         if (uriRequest != null) {
@@ -167,7 +173,13 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
 
     void onLoadingFinished(NetworkDomain.LoadingFinished f) {
         MDC.put("eid", executionId);
+
         UriRequest request = getByRequestId(f.requestId);
+        if (request != null) {
+            MDC.put("uri", request.getUrl());
+        }
+        LOG.debug("Loading finished. rId{}, size: {}", f.requestId, f.encodedDataLength);
+
         if (request == null) {
             LOG.error("Could not find request for finished id {}.", f.requestId);
         } else {
@@ -184,6 +196,11 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
         // net::ERR_CONTENT_LENGTH_MISMATCH
         // net::ERR_TUNNEL_CONNECTION_FAILED
         UriRequest request = getByRequestId(f.requestId);
+        if (request != null) {
+            MDC.put("uri", request.getUrl());
+        }
+
+        LOG.debug("Loading failed. rId{}, blockedReason: {}, canceled: {}, error: {}", f.requestId, f.blockedReason, f.canceled, f.errorText);
         if (request == null) {
             LOG.error("Could not find request for failed id {}. Error '{}', Blocked reason '{}', Resource type: '{}', Canceled: {}", f.requestId, f.errorText, f.blockedReason, f.type, f.canceled);
         } else {
@@ -198,8 +215,6 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
 
             // TODO: Add information to pagelog
 
-            MDC.clear();
-
             request.finish(crawlLogRegistry);
         }
     }
@@ -208,6 +223,7 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
         MDC.put("eid", executionId);
         MDC.put("uri", r.response.url);
 
+        LOG.debug("Response received. rId{}, size: {}, status: {}", r.requestId, r.response.encodedDataLength, r.response.status);
         allRequestsLock.lock();
         try {
             UriRequest request = getByRequestId(r.requestId);
@@ -224,6 +240,19 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
         } finally {
             allRequestsLock.unlock();
         }
+    }
+
+    void onDataReceived(NetworkDomain.DataReceived d) {
+        MDC.put("eid", executionId);
+        UriRequest request = getByRequestId(d.requestId);
+        if (request != null) {
+            MDC.put("uri", request.getUrl());
+            request.incrementSize(d.dataLength);
+        } else {
+            MDC.remove("uri");
+        }
+        LOG.trace("Data received. rId{}, encodedDataLength: {}, dataLength: {}", d.requestId, d.encodedDataLength, d.dataLength);
+        crawlLogRegistry.signalActivity();
     }
 
     @Override

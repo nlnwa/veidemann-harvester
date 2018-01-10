@@ -27,6 +27,7 @@ import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
+import io.netty.handler.stream.ChunkedWriteHandler;
 import io.opentracing.ActiveSpan;
 import io.opentracing.Span;
 import io.opentracing.Tracer;
@@ -89,8 +90,6 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
 
     private ContentWriterSession contentWriterSession;
 
-    private ChunkedCacheContentWriter chunkedCacheResponse;
-
     public RecorderFilter(final String uri, final HttpRequest originalRequest, final ChannelHandlerContext ctx,
                           final DbAdapter db, final ContentWriterClient contentWriterClient,
                           final BrowserSessionRegistry sessionRegistry, final AlreadyCrawledCache cache) {
@@ -105,6 +104,9 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
         this.sessionRegistry = sessionRegistry;
         this.cache = cache;
         this.fetchTimeStamp = ProtoUtils.getNowTs();
+        if (ctx.pipeline().get("streamer") == null) {
+            ctx.pipeline().addBefore("handler", "streamer", new ChunkedWriteHandler());
+        }
     }
 
     private synchronized ContentWriterSession getContentWriterSession() {
@@ -115,7 +117,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
     }
 
     @Override
-    public HttpResponse proxyToServerRequest(HttpObject httpObject) {
+    public HttpResponse clientToProxyRequest(HttpObject httpObject) {
         try {
             if (httpObject instanceof HttpRequest) {
                 HttpRequest request = (HttpRequest) httpObject;
@@ -142,17 +144,39 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
 
                         sessionRegistry.get(executionId).addCrawlLog(crawlLog);
 
-                        if (cachedResponse.content().readableBytes() < (1024 * 32)) {
+                        if (cachedResponse.content().readableBytes() < (1024 * 1)) {
                             return cachedResponse;
                         }
 
-                        chunkedCacheResponse = new ChunkedCacheContentWriter(executionId, uri, ctx, cachedResponse);
-
-                        return chunkedCacheResponse.sendResponse().get();
+                        return new ChunkedHttpResponse(executionId, uri, cachedResponse);
                     } else {
                         responseCollector.setShouldCache(true);
                     }
+                }
+            }
+        } catch (Throwable t) {
+            LOG.error("Error handling request", t);
+        }
+        return null;
+    }
 
+    @Override
+    public HttpResponse proxyToServerRequest(HttpObject httpObject) {
+        try {
+            if (httpObject instanceof HttpRequest) {
+                HttpRequest request = (HttpRequest) httpObject;
+
+                executionId = request.headers().get(EXECUTION_ID);
+                if (executionId == null) {
+                    LOG.error("Missing executionId for {}", uri);
+                }
+
+                MDC.put("eid", executionId);
+                MDC.put("uri", uri);
+
+                LOG.debug("Proxy sending request");
+
+                try (ActiveSpan span = GlobalTracer.get().makeActive(requestSpan)) {
                     // Fix headers before sending to final destination
                     request.headers().set("Accept-Encoding", "identity");
                     request.headers().remove(EXECUTION_ID);
@@ -172,15 +196,6 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
             LOG.error("Error handling request", t);
         }
         return null;
-    }
-
-    @Override
-    public HttpObject proxyToClientResponse(HttpObject httpObject) {
-        if (chunkedCacheResponse != null) {
-            return null;
-        } else {
-            return httpObject;
-        }
     }
 
     @Override
@@ -349,11 +364,6 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
 //        finishSpan(uriRequest);
     }
 
-    @Override
-    public void proxyToServerConnectionSSLHandshakeStarted() {
-        LOG.info("proxyToServerConnectionSSLHandshakeStarted");
-    }
-
     private CrawlLog.Builder buildCrawlLog() {
         Uri surtUri = UriConfigs.SURT_KEY.buildUri(uri);
         Timestamp now = ProtoUtils.getNowTs();
@@ -369,7 +379,6 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
         return crawlLog;
     }
 
-    //    private Span buildSpan(String operationName, UriRequest uriRequest) {
     private Span buildSpan(String operationName) {
         Tracer.SpanBuilder newSpan = GlobalTracer.get()
                 .buildSpan(operationName)
@@ -381,7 +390,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
     }
 
     @Override
-    protected void finalize() throws Throwable {
+    protected void finalize() {
         if (contentWriterSession != null) {
             contentWriterSession.cancel("Session was not completed");
         }

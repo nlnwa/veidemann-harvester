@@ -41,8 +41,9 @@ public class ChunkedHttpResponse implements ChunkedInput<HttpObject>, HttpRespon
 
     private final String executionId;
     private final String uri;
-    private final HttpResponse head;
+    final FullHttpResponse cachedResponse;
     private final ByteBuf content;
+    private final HttpResponse head;
     private final long length;
     private final int maxChunkSize = 1024 * 64;
     private int offset;
@@ -54,6 +55,7 @@ public class ChunkedHttpResponse implements ChunkedInput<HttpObject>, HttpRespon
     public ChunkedHttpResponse(final String executionId, final String uri, final FullHttpResponse cachedResponse) {
         this.executionId = executionId;
         this.uri = uri;
+        this.cachedResponse = cachedResponse;
         this.content = cachedResponse.content();
         this.length = content.readableBytes();
         this.offset = content.readerIndex();
@@ -66,13 +68,13 @@ public class ChunkedHttpResponse implements ChunkedInput<HttpObject>, HttpRespon
     }
 
     @Override
-    public boolean isEndOfInput() throws Exception {
+    public boolean isEndOfInput() {
         return sentLastChunk;
     }
 
     @Override
-    public void close() throws Exception {
-        ReferenceCountUtil.release(content);
+    public void close() {
+        ReferenceCountUtil.release(cachedResponse);
     }
 
     @Override

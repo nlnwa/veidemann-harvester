@@ -144,7 +144,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
 
                         sessionRegistry.get(executionId).addCrawlLog(crawlLog);
 
-                        if (cachedResponse.content().readableBytes() < (1024 * 1)) {
+                        if (cachedResponse.content().readableBytes() < (1024 * 32)) {
                             return cachedResponse;
                         }
 

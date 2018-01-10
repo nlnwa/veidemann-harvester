@@ -140,7 +140,7 @@ public class SimpleCrawlIT implements VeidemannHeaderConstants {
         WarcInspector.getWarcFiles().getRecordStream().forEach(r -> System.out.println(r.header.warcTypeStr + " -- "
                 + r.header.warcTargetUriStr));
 
-        assertThat(WarcInspector.getWarcFiles().getRecordCount()).isEqualTo(35L);
+        assertThat(WarcInspector.getWarcFiles().getRecordCount()).isEqualTo(25L);
 
         CrawlLogListReply crawlLog = db.listCrawlLogs(CrawlLogListRequest.newBuilder().setPageSize(100).build());
         PageLogListReply pageLog = db.listPageLogs(PageLogListRequest.getDefaultInstance());
@@ -150,7 +150,7 @@ public class SimpleCrawlIT implements VeidemannHeaderConstants {
         crawlLog.getValueList().forEach(r -> System.out.println(r.getRequestedUri() + " -- " + r.getStatusCode()
                 + " -- " + r.getContentType() + " -- " + r.getRecordType() + " -- " + r.getReferrer()));
 
-        assertThat(crawlLog.getCount()).isEqualTo(19L);
+        assertThat(crawlLog.getCount()).isEqualTo(14L);
         assertThat(pageLog.getCount()).isEqualTo(6L);
 
         try {
@@ -167,7 +167,7 @@ public class SimpleCrawlIT implements VeidemannHeaderConstants {
         crawlLog.getValueList().forEach(r -> System.out.println(r.getRequestedUri() + " -- " + r.getStatusCode()
                 + " -- " + r.getContentType() + " -- " + r.getRecordType() + " -- " + r.getReferrer()));
 
-        assertThat(crawlLog.getCount()).isEqualTo(34);
+        assertThat(crawlLog.getCount()).isEqualTo(24);
     }
 
     JobCompletion executeJob(ControllerProto.RunCrawlRequest crawlRequest) {

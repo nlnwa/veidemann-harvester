@@ -100,11 +100,6 @@ public class RethinkDbAlreadyCrawledCache implements AlreadyCrawledCache {
             return;
         }
 
-        // Refuse to cache objects larger than 1MB
-        if (cacheValue == null || cacheValue.size() > 1024 * 1024) {
-            return;
-        }
-
         try {
             List headerList = r.array();
             headers.iteratorCharSequence().forEachRemaining(

@@ -33,6 +33,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 /**
@@ -147,7 +148,7 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
     }
 
     void onRequestWillBeSent(NetworkDomain.RequestWillBeSent request, String rootDiscoveryPath) {
-        MDC.put("eid", executionId);
+        resolveCurrentUriRequest(request.requestId);
         UriRequest uriRequest = getByRequestId(request.requestId);
 
         if (uriRequest != null) {
@@ -172,56 +173,39 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
     }
 
     void onLoadingFinished(NetworkDomain.LoadingFinished f) {
-        MDC.put("eid", executionId);
-
-        UriRequest request = getByRequestId(f.requestId);
-        if (request != null) {
-            MDC.put("uri", request.getUrl());
-        }
-        LOG.debug("Loading finished. rId{}, size: {}", f.requestId, f.encodedDataLength);
-
-        if (request == null) {
-            LOG.error("Could not find request for finished id {}.", f.requestId);
-        } else {
-            MDC.put("uri", request.getUrl());
-            request.finish(crawlLogRegistry);
-        }
+        resolveCurrentUriRequest(f.requestId)
+                .ifPresent(request -> {
+                    LOG.debug("Loading finished. rId{}, size: {}, chunksSize: {}", f.requestId, f.encodedDataLength, request.getSize());
+                    request.finish(crawlLogRegistry);
+                })
+                .otherwise(() -> LOG.error("Could not find request for finished id {}.", f.requestId));
     }
 
     void onLoadingFailed(NetworkDomain.LoadingFailed f) {
-        MDC.put("eid", executionId);
-
         // net::ERR_EMPTY_RESPONSE
         // net::ERR_CONNECTION_TIMED_OUT
         // net::ERR_CONTENT_LENGTH_MISMATCH
         // net::ERR_TUNNEL_CONNECTION_FAILED
-        UriRequest request = getByRequestId(f.requestId);
-        if (request != null) {
-            MDC.put("uri", request.getUrl());
-        }
+        resolveCurrentUriRequest(f.requestId)
+                .ifPresent(request -> {
+                    if (!f.canceled) {
+                        LOG.error(
+                                "Failed fetching page: Error '{}', Blocked reason '{}', Resource type: '{}', Canceled: {}, Req: {}",
+                                f.errorText, f.blockedReason, f.type, f.canceled, request.getUrl());
+                    }
 
+                    request.setStatusCode(ExtraStatusCodes.BLOCKEC_BY_CUSTOM_PROCESSOR.getCode());
+
+                    // TODO: Add information to pagelog
+
+                    request.finish(crawlLogRegistry);
+                })
+                .otherwise(() -> LOG.error("Could not find request for failed id {}. Error '{}', Blocked reason '{}', Resource type: '{}', Canceled: {}", f.requestId, f.errorText, f.blockedReason, f.type, f.canceled));
         LOG.debug("Loading failed. rId{}, blockedReason: {}, canceled: {}, error: {}", f.requestId, f.blockedReason, f.canceled, f.errorText);
-        if (request == null) {
-            LOG.error("Could not find request for failed id {}. Error '{}', Blocked reason '{}', Resource type: '{}', Canceled: {}", f.requestId, f.errorText, f.blockedReason, f.type, f.canceled);
-        } else {
-            MDC.put("uri", request.getUrl());
-            if (!f.canceled) {
-                LOG.error(
-                        "Failed fetching page: Error '{}', Blocked reason '{}', Resource type: '{}', Canceled: {}, Req: {}",
-                        f.errorText, f.blockedReason, f.type, f.canceled, request.getUrl());
-            }
-
-            request.setStatusCode(ExtraStatusCodes.BLOCKEC_BY_CUSTOM_PROCESSOR.getCode());
-
-            // TODO: Add information to pagelog
-
-            request.finish(crawlLogRegistry);
-        }
     }
 
     void onResponseReceived(NetworkDomain.ResponseReceived r) {
-        MDC.put("eid", executionId);
-        MDC.put("uri", r.response.url);
+        resolveCurrentUriRequest(r.requestId);
 
         LOG.debug("Response received. rId{}, size: {}, status: {}", r.requestId, r.response.encodedDataLength, r.response.status);
         allRequestsLock.lock();
@@ -243,14 +227,7 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
     }
 
     void onDataReceived(NetworkDomain.DataReceived d) {
-        MDC.put("eid", executionId);
-        UriRequest request = getByRequestId(d.requestId);
-        if (request != null) {
-            MDC.put("uri", request.getUrl());
-            request.incrementSize(d.dataLength);
-        } else {
-            MDC.remove("uri");
-        }
+        resolveCurrentUriRequest(d.requestId).ifPresent(r -> r.incrementSize(d.dataLength));
         LOG.trace("Data received. rId{}, encodedDataLength: {}, dataLength: {}", d.requestId, d.encodedDataLength, d.dataLength);
         crawlLogRegistry.signalActivity();
     }
@@ -272,4 +249,35 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
     public String toString(String indent) {
         return initialRequest.toString(indent);
     }
+
+    private Optional<UriRequest> resolveCurrentUriRequest(String requestId) {
+        MDC.put("eid", executionId);
+        UriRequest request = getByRequestId(requestId);
+        if (request == null) {
+            MDC.remove("uri");
+            return optional(null);
+        } else {
+            MDC.put("uri", request.getUrl());
+            return optional(request);
+        }
+    }
+
+    public static <T> Optional<T> optional(T optional) {
+        return ifPresent -> otherwise -> {
+            if (optional != null) {
+                ifPresent.accept(optional);
+            } else {
+                otherwise.run();
+            }
+        };
+    }
+
+    public interface Otherwise {
+        void otherwise(Runnable action);
+    }
+
+    public interface Optional<T> {
+        Otherwise ifPresent(Consumer<T> consumer);
+    }
+
 }

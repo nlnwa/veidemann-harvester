@@ -80,7 +80,7 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
         // Ensure that we at least wait a second even if the configuration says less.
         long maxIdleTime = Math.max(config.getBrowserConfig().getSleepAfterPageloadMs(), 1000);
         crawlLogs = new CrawlLogRegistry(db, this, config.getBrowserConfig().getPageLoadTimeoutMs(), maxIdleTime);
-        uriRequests = new UriRequestRegistry(crawlLogs, queuedUri.getExecutionId(), span);
+        uriRequests = new UriRequestRegistry(crawlLogs, queuedUri, span);
         protocolTimeout = config.getBrowserConfig().getPageLoadTimeoutMs();
 
         try {
@@ -132,7 +132,7 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
             // set up listeners
             session.network.onRequestIntercepted(nr -> this.onRequestIntercepted(nr));
             session.network.onRequestWillBeSent(r -> {
-                uriRequests.onRequestWillBeSent(r, this.queuedUri.getDiscoveryPath());
+                uriRequests.onRequestWillBeSent(r);
             });
             session.network.onLoadingFinished(f -> uriRequests.onLoadingFinished(f));
             session.network.onLoadingFailed(f -> uriRequests.onLoadingFailed(f));
@@ -142,6 +142,8 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
                 LOG.info("Certificate error: " + se);
                 session.security.handleCertificateError(se.eventId, "continue");
             });
+
+            session.page.setDownloadBehavior("allow", "/dev/null");
 
             LOG.debug("Browser session configured");
         } catch (IOException ex) {
@@ -189,6 +191,7 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
     }
 
     public void setCookies() throws TimeoutException, ExecutionException, InterruptedException {
+        LOG.debug("Restoring browser cookies");
         CompletableFuture.allOf(queuedUri.getCookiesList().stream()
                 .map(c -> session.network
                         .setCookie(queuedUri.getUri(), c.getName(), c.getValue(), c.getDomain(),
@@ -196,13 +199,11 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
                 .collect(Collectors.toList()).toArray(new CompletableFuture[]{}))
                 .get(protocolTimeout, MILLISECONDS);
 
-        LOG.debug("Browser cookies initialized");
+        LOG.debug("Browser cookies restored");
     }
 
     public void loadPage() {
         try {
-            CompletableFuture<PageDomain.FrameStoppedLoading> loaded = session.page.onFrameStoppedLoading();
-
             // TODO: Handling of dialogs should be configurable
             session.page.onJavascriptDialogOpening(js -> {
                 LOG.debug("JS dialog: {} :: {}", js.type, js.message);
@@ -216,8 +217,6 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
             session.network.setExtraHTTPHeaders(ImmutableMap.of(EXECUTION_ID, queuedUri.getExecutionId()))
                     .get(protocolTimeout, MILLISECONDS);
             session.page.navigate(queuedUri.getUri(), queuedUri.getReferrer(), "link").get(protocolTimeout, MILLISECONDS);
-
-            loaded.get(protocolTimeout, MILLISECONDS);
         } catch (InterruptedException | ExecutionException | TimeoutException ex) {
             throw new RuntimeException(ex);
         }
@@ -232,6 +231,7 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
     }
 
     void onRequestIntercepted(NetworkDomain.RequestIntercepted intercepted) {
+        LOG.trace("Request intercepted: {}", intercepted);
         try {
             crawlLogs.signalActivity();
             Map<String, Object> headers = intercepted.request.headers;
@@ -278,6 +278,9 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
     }
 
     public boolean isPageRenderable() {
+        if (uriRequests.getRootRequest() == null) {
+            return false;
+        }
         return uriRequests.getRootRequest().isRenderable();
     }
 

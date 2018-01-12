@@ -49,11 +49,12 @@ public class IdTokenValidator {
 
     private OIDCProviderMetadata providerDiscovery(String issuerUrl) {
         try {
+            LOG.info("Resolving IDP at '{}'", issuerUrl);
             Issuer issuer = new Issuer(issuerUrl);
             return OIDCProviderMetadata.resolve(issuer);
         } catch (IOException | GeneralException ex) {
-            LOG.error(ex.getMessage(), ex);
-            throw new RuntimeException("Could not connect to IDP", ex);
+            LOG.error("Could not connect to IDP '{}'", issuerUrl, ex);
+            throw new RuntimeException("Could not connect to IDP '" + issuerUrl + "'", ex);
         }
     }
 

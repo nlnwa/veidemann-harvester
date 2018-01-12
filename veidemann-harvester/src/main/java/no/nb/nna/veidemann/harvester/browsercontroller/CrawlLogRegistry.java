@@ -25,6 +25,7 @@ import org.slf4j.MDC;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
@@ -39,12 +40,12 @@ public class CrawlLogRegistry {
     private final List<Builder> crawlLogs = new ArrayList<>();
     private final Lock crawlLogsLock = new ReentrantLock();
     private final Condition crawlLogsUpdate = crawlLogsLock.newCondition();
-    private final Condition matchingFinished = crawlLogsLock.newCondition();
 
     private final long pageLoadTimeout;
     private final long maxIdleTime;
     private final Matcher matcherThread;
-    private boolean running;
+    private final CountDownLatch finishLatch = new CountDownLatch(1);
+    private final MatchStatus status = new MatchStatus();
     private long startTime = System.currentTimeMillis();
     private long lastActivityTime = System.currentTimeMillis();
 
@@ -54,7 +55,6 @@ public class CrawlLogRegistry {
         this.pageLoadTimeout = pageLoadTimeout;
         this.maxIdleTime = maxIdleTime;
         matcherThread = new Matcher();
-        running = true;
         matcherThread.start();
     }
 
@@ -107,16 +107,35 @@ public class CrawlLogRegistry {
     }
 
     private class Matcher extends Thread {
-
         @Override
         public void run() {
             MDC.put("eid", browserSession.queuedUri.getExecutionId());
             MDC.put("uri", browserSession.queuedUri.getUri());
             LOG.debug("Page load timeout: {}", pageLoadTimeout);
             LOG.debug("Max idle time: {}", maxIdleTime);
+
+            while (finishLatch.getCount() > 0) {
+                waitForIdle();
+                innerMatchCrawlLogAndRequest(status);
+
+                if (!status.allHandled()) {
+                    checkForFileDownload();
+                }
+
+                if (status.allHandled()) {
+                    finishLatch.countDown();
+                } else {
+                    LOG.warn("Not resolved. Status: {}", status);
+                }
+            }
+
+            LOG.debug("Finished matching. Status {}", status);
+        }
+
+        private void waitForIdle() {
             crawlLogsLock.lock();
-            MatchStatus status = new MatchStatus();
             try {
+                boolean running = true;
                 while (running) {
                     boolean gotSignal = crawlLogsUpdate.await(maxIdleTime, TimeUnit.MILLISECONDS);
                     if (gotSignal) {
@@ -125,38 +144,67 @@ public class CrawlLogRegistry {
                     if ((System.currentTimeMillis() - lastActivityTime) >= maxIdleTime) {
                         LOG.debug("Timed out waiting for network activity");
                         running = false;
-                    } else if ((System.currentTimeMillis() - startTime) >= pageLoadTimeout) {
-                        LOG.info("Pageload timed out");
-                        running = false;
                     }
                 }
-                innerMatchCrawlLogAndRequest(status);
-                if (!status.allHandled()) {
-                    LOG.warn("Not resolved. Status: {}", status);
-                }
-
-                matchingFinished.signalAll();
             } catch (InterruptedException e) {
                 e.printStackTrace();
             } finally {
                 crawlLogsLock.unlock();
             }
-            LOG.debug("Finished matching. Status {}", status);
         }
     }
 
-    public void waitForMatcherToFinish() {
-        crawlLogsLock.lock();
+    private void checkForFileDownload() {
+        // TODO: When there are crawllogs, but no request events have been received, then this is probably
+        // a file download. At the moment we are creating UriRequests to simulate events. This should be
+        // refactored into real events as soon as Chrome supports it.
+        // https://bugs.chromium.org/p/chromium/issues/detail?id=696481
+        if (browserSession.getUriRequests().getInitialRequest() == null) {
+            LOG.info("Guessing that we are downloading a file. Status: {}", status);
+            crawlLogs.forEach(c -> {
+                browserSession.getUriRequests().resolveCurrentUriRequest("1").ifPresent(parent -> {
+                    UriRequest r = UriRequest.create("1",
+                            c.getRequestedUri(), browserSession.queuedUri.getReferrer(), ResourceType.Other,
+                            'R', parent, browserSession.getUriRequests().getPageSpan());
+                    r.setStatusCode(c.getStatusCode());
+                    browserSession.getUriRequests().add(r);
+                }).otherwise(() -> {
+                    // No parent, this is a root request;
+                    UriRequest r = UriRequest.createRoot("1",
+                            c.getRequestedUri(), browserSession.queuedUri.getReferrer(), ResourceType.Other,
+                            browserSession.queuedUri.getDiscoveryPath(), browserSession.getUriRequests().getPageSpan());
+                    r.setStatusCode(c.getStatusCode());
+                    browserSession.getUriRequests().add(r);
+                });
+            });
+
+            innerMatchCrawlLogAndRequest(status);
+        }
+    }
+
+    public boolean waitForMatcherToFinish() {
         try {
-            while (running) {
-                matchingFinished.awaitUninterruptibly();
+            long timeout = pageLoadTimeout - (System.currentTimeMillis() - startTime);
+            boolean success = finishLatch.await(timeout, TimeUnit.MILLISECONDS);
+            if (!success) {
+                LOG.info("Pageload timed out");
+                finishLatch.countDown();
             }
-        } finally {
-            crawlLogsLock.unlock();
+            innerMatchCrawlLogAndRequest(status);
+            return success;
+        } catch (InterruptedException e) {
+            LOG.info("Pageload interrupted", e);
+            finishLatch.countDown();
+            innerMatchCrawlLogAndRequest(status);
+            return false;
         }
     }
 
     private boolean findRequestForCrawlLog(CrawlLog.Builder crawlLog, UriRequest r) {
+        if (r == null) {
+            return false;
+        }
+
         if (innerFindRequestForCrawlLog(crawlLog, r)) {
             return true;
         }
@@ -168,19 +216,18 @@ public class CrawlLogRegistry {
 
     private boolean innerFindRequestForCrawlLog(CrawlLog.Builder crawlLog, UriRequest r) {
         if (!r.isFromCache() && Objects.equals(r.getUrl(), crawlLog.getRequestedUri()) && crawlLog.getStatusCode() == r.getStatusCode()) {
-            if (crawlLog.getWarcId().isEmpty()) {
-                r.setFromCache(true);
-            } else {
-                db.saveCrawlLog(r.setCrawlLog(crawlLog));
+            CrawlLog enrichedCrawlLog = r.setCrawlLog(crawlLog);
+            if (!r.isFromCache()) {
+                db.saveCrawlLog(enrichedCrawlLog);
             }
             deleteCrawlLog(crawlLog);
             return true;
         }
-        LOG.debug("Did not find request for {}", crawlLog.getRequestedUri());
+        LOG.trace("Did not find request for {}", crawlLog.getRequestedUri());
         return false;
     }
 
-    private void innerMatchCrawlLogAndRequest(MatchStatus status) throws InterruptedException {
+    private void innerMatchCrawlLogAndRequest(MatchStatus status) {
         status.reset();
         List<CrawlLog.Builder> crawlLogList = getCrawlLogs();
         if (!crawlLogList.isEmpty()) {
@@ -217,10 +264,20 @@ public class CrawlLogRegistry {
         @Override
         public String toString() {
             final StringBuilder sb = new StringBuilder();
+
             sb.append("unhandledCrawlLogs={");
-            unhandledCrawlLogs.forEach(c -> sb.append(c.getRequestedUri()).append(", "));
-            sb.append("}, unhandledRequests=");
-            unhandledRequests.forEach(r -> sb.append(r.getUrl()).append(", "));
+            unhandledCrawlLogs.forEach(c -> sb.append('[').append(c.getStatusCode()).append(", ")
+                    .append(c.getRequestedUri()).append("], "));
+
+            sb.append("}, unhandledRequests={");
+            unhandledRequests.forEach(r -> {
+                sb.append('[').append(r.getStatusCode()).append(", ");
+                if (r.isFromCache()) {
+                    sb.append("From Cache, ");
+                }
+                sb.append(r.getUrl()).append("], ");
+            });
+
             sb.append("}");
             return sb.toString();
         }

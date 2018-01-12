@@ -91,11 +91,6 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
             session.getCrawlLogs().waitForMatcherToFinish();
 
             if (session.isPageRenderable()) {
-//                // disable scrollbars
-//                session.runtime.evaluate("document.getElementsByTagName('body')[0].style.overflow='hidden'",
-//                        null, null, null, null, null, null, null, null)
-//                        .get(protocolTimeout, MILLISECONDS);
-
                 if (config.getExtra().getCreateSnapshot()) {
                     LOG.debug("Save screenshot");
                     session.saveScreenshot(db);
@@ -114,8 +109,6 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
                 try {
                     List<BrowserScript> scripts = getScripts(config);
                     resultBuilder.addAllOutlinks(session.extractOutlinks(scripts));
-                    resultBuilder.setBytesDownloaded(session.getUriRequests().getBytesDownloaded());
-                    resultBuilder.setUriCount(session.getUriRequests().getUriDownloadedCount());
                 } catch (Throwable t) {
                     LOG.error("Failed extracting outlinks", t);
                 }
@@ -149,6 +142,10 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
             span.finish();
         }
 
+        resultBuilder.setBytesDownloaded(session.getUriRequests().getBytesDownloaded());
+        resultBuilder.setUriCount(session.getUriRequests().getUriDownloadedCount());
+
+        LOG.debug("======== PAGELOAD RESULT ========\n{}", resultBuilder.build());
         MDC.clear();
         return resultBuilder.build();
     }

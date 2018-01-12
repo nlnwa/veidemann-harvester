@@ -17,6 +17,7 @@ package no.nb.nna.veidemann.harvester.browsercontroller;
 
 import io.opentracing.BaseSpan;
 import no.nb.nna.veidemann.api.MessagesProto.PageLog.Resource;
+import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
 import no.nb.nna.veidemann.chrome.client.NetworkDomain;
 import no.nb.nna.veidemann.commons.ExtraStatusCodes;
 import no.nb.nna.veidemann.commons.VeidemannHeaderConstants;
@@ -45,6 +46,8 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
 
     private final CrawlLogRegistry crawlLogRegistry;
 
+    private final QueuedUri rootRequestUri;
+
     private final String executionId;
 
     // List of all requests since redirects reuses requestId
@@ -70,9 +73,10 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
     private final Lock allRequestsLock = new ReentrantLock();
     private final Condition allRequestsUpdate = allRequestsLock.newCondition();
 
-    public UriRequestRegistry(final CrawlLogRegistry crawlLogRegistry, final String executionId, final BaseSpan span) {
+    public UriRequestRegistry(final CrawlLogRegistry crawlLogRegistry, QueuedUri rootRequestUri, final BaseSpan span) {
         this.crawlLogRegistry = crawlLogRegistry;
-        this.executionId = executionId;
+        this.rootRequestUri = rootRequestUri;
+        this.executionId = rootRequestUri.getExecutionId();
         this.span = span;
     }
 
@@ -147,29 +151,34 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
                 });
     }
 
-    void onRequestWillBeSent(NetworkDomain.RequestWillBeSent request, String rootDiscoveryPath) {
-        resolveCurrentUriRequest(request.requestId);
-        UriRequest uriRequest = getByRequestId(request.requestId);
+    public BaseSpan getPageSpan() {
+        return span;
+    }
 
-        if (uriRequest != null) {
+    void onRequestWillBeSent(NetworkDomain.RequestWillBeSent request) {
+        LOG.debug("Request will be sent: {}", request.requestId);
+        resolveCurrentUriRequest(request.requestId).ifPresent(parent -> {
             // Already got request for this id
             if (request.redirectResponse == null) {
                 LOG.error("Already got request, but no redirect");
                 return;
             } else {
-                LOG.debug("Redirect response: {}, url: {}, cache: {}, redirUrl: {}", request.requestId, request.request.url, request.redirectResponse.fromDiskCache, request.redirectResponse.url);
-                uriRequest = new UriRequest(request, uriRequest, span);
+                LOG.debug("Redirect response: {}, url: {}, cache: {}, redirUrl: {}",
+                        request.requestId, request.request.url, request.redirectResponse.fromDiskCache, request.redirectResponse.url);
+                UriRequest uriRequest = UriRequest.create(request, parent, span);
+                add(uriRequest);
             }
-        } else {
-            if (getRootRequest() != null) {
-                UriRequest parent = getRootRequest();
-                uriRequest = new UriRequest(request, parent, span);
-            } else {
+        }).otherwise(() -> {
+            UriRequest uriRequest;
+            if (getRootRequest() == null) {
                 // New request
-                uriRequest = new UriRequest(request, rootDiscoveryPath, span);
+                uriRequest = UriRequest.createRoot(request, rootRequestUri.getDiscoveryPath(), span);
+            } else {
+                UriRequest parent = getRootRequest();
+                uriRequest = UriRequest.create(request, parent, span);
             }
-        }
-        add(uriRequest);
+            add(uriRequest);
+        });
     }
 
     void onLoadingFinished(NetworkDomain.LoadingFinished f) {
@@ -250,7 +259,7 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
         return initialRequest.toString(indent);
     }
 
-    private Optional<UriRequest> resolveCurrentUriRequest(String requestId) {
+    public Optional<UriRequest> resolveCurrentUriRequest(String requestId) {
         MDC.put("eid", executionId);
         UriRequest request = getByRequestId(requestId);
         if (request == null) {

@@ -27,47 +27,79 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class UserRoleMapper {
     private static final Logger LOG = LoggerFactory.getLogger(UserRoleMapper.class);
+
+    private static final ScheduledExecutorService updaterService = Executors.newSingleThreadScheduledExecutor();
 
     Map<String, Set<Role>> rolesByEmail = new HashMap<>();
     Map<String, Set<Role>> rolesByGroup = new HashMap<>();
 
     private final DbAdapter db;
 
+    Lock roleUpdateLock = new ReentrantLock();
+
     public UserRoleMapper(DbAdapter db) {
         this.db = db;
-        updateRoleMappings();
-    }
 
-    private void updateRoleMappings() {
-        db.listRoleMappings(RoleMappingsListRequest.getDefaultInstance())
-                .getValueList().forEach(rm -> addRoleMapping(rm));
+        updaterService.scheduleAtFixedRate(() -> {
+            updateRoleMappings();
+        }, 0, 60, TimeUnit.SECONDS);
     }
 
     public Collection<Role> getRolesForUser(String email, Collection<String> groups) {
-        Set<Role> roles = new HashSet<>();
-        if (email != null && rolesByEmail.containsKey(email)) {
-            roles.addAll(rolesByEmail.get(email));
-        }
-        if (groups != null) {
-            for (String group : groups) {
-                if (rolesByGroup.containsKey(group)) {
-                    roles.addAll(rolesByGroup.get(group));
+        roleUpdateLock.lock();
+        try {
+            Set<Role> roles = new HashSet<>();
+            if (email != null && rolesByEmail.containsKey(email)) {
+                roles.addAll(rolesByEmail.get(email));
+            }
+            if (groups != null) {
+                for (String group : groups) {
+                    if (rolesByGroup.containsKey(group)) {
+                        roles.addAll(rolesByGroup.get(group));
+                    }
                 }
             }
+            LOG.debug("Get roles for user. Email: {}, Groups: {}, reolved to roles: {}", email, groups, roles);
+            return roles;
+        } finally {
+            roleUpdateLock.unlock();
         }
-        return roles;
     }
 
-    private void addRoleMapping(RoleMapping rm) {
+    private void updateRoleMappings() {
+        LOG.trace("Update role mappings");
+        Map<String, Set<Role>> rolesByEmailTmp = new HashMap<>();
+        Map<String, Set<Role>> rolesByGroupTmp = new HashMap<>();
+
+        db.listRoleMappings(RoleMappingsListRequest.getDefaultInstance())
+                .getValueList().forEach(rm -> addRoleMapping(rm, rolesByEmailTmp, rolesByGroupTmp));
+
+        roleUpdateLock.lock();
+        try {
+            rolesByEmail = rolesByEmailTmp;
+            rolesByGroup = rolesByGroupTmp;
+        } finally {
+            roleUpdateLock.unlock();
+        }
+    }
+
+    private void addRoleMapping(RoleMapping rm, Map<String, Set<Role>> emailRoles, Map<String, Set<Role>> groupRoles) {
         switch (rm.getEmailOrGroupCase()) {
             case EMAIL:
-                rm.getRoleList().forEach(role -> addRoleToList(rolesByEmail, rm.getEmail(), role));
+                LOG.trace("Adding role for email: {}, roles: {}", rm.getEmail(), rm.getRoleList());
+                rm.getRoleList().forEach(role -> addRoleToList(emailRoles, rm.getEmail(), role));
                 break;
             case GROUP:
-                rm.getRoleList().forEach(role -> addRoleToList(rolesByGroup, rm.getEmail(), role));
+                LOG.trace("Adding role for group: {}, roles: {}", rm.getGroup(), rm.getRoleList());
+                rm.getRoleList().forEach(role -> addRoleToList(groupRoles, rm.getGroup(), role));
                 break;
         }
     }

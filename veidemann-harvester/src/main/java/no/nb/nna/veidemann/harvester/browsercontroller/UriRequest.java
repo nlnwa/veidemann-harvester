@@ -65,6 +65,11 @@ public class UriRequest {
 
     private boolean fromCache = false;
 
+    /**
+     * Is this request's response from the proxy.
+     */
+    private boolean fromProxy = true;
+
     private String warcId = "";
 
     private final BaseSpan parentSpan;
@@ -164,6 +169,10 @@ public class UriRequest {
         setMimeType(response.response.mimeType);
         statusCode = response.response.status.intValue();
         fromCache = response.response.fromDiskCache;
+
+        if (response.response.fromDiskCache || response.response.protocol.equals("data")) {
+            setFromProxy(false);
+        }
 
 //        if (!mimeTypeIsConsistentWithType(this)) {
 //            LOG.error("Resource interpreted as {} but transferred with MIME type {}: \"{}\".", resourceType.title,
@@ -295,6 +304,14 @@ public class UriRequest {
 
     public void setFromCache(boolean fromCache) {
         this.fromCache = fromCache;
+    }
+
+    public boolean isFromProxy() {
+        return fromProxy;
+    }
+
+    public void setFromProxy(boolean fromProxy) {
+        this.fromProxy = fromProxy;
     }
 
     public String getWarcId() {

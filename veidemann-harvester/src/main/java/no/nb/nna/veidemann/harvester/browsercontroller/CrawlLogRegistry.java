@@ -124,12 +124,14 @@ public class CrawlLogRegistry {
 
                 if (status.allHandled()) {
                     finishLatch.countDown();
-                } else {
-                    LOG.warn("Not resolved. Status: {}", status);
                 }
             }
 
-            LOG.debug("Finished matching. Status {}", status);
+            if (status.allHandled()) {
+                LOG.debug("Finished matching crawl logs and uri requests");
+            } else {
+                LOG.warn("Not resolved. Status: {}", status);
+            }
         }
 
         private void waitForIdle() {
@@ -241,7 +243,7 @@ public class CrawlLogRegistry {
             }
         }
         for (UriRequest re : browserSession.getUriRequests().getAllRequests()) {
-            if (!re.isFromCache() && re.getStatusCode() >= 0 && re.getCrawlLog() == null) {
+            if (!re.isFromCache() && re.isFromProxy() && re.getStatusCode() >= 0 && re.getCrawlLog() == null) {
                 LOG.trace("Missing CrawlLog for {}", re.getRequestId());
                 status.unhandledRequests.add(re);
             }
@@ -266,12 +268,12 @@ public class CrawlLogRegistry {
             final StringBuilder sb = new StringBuilder();
 
             sb.append("unhandledCrawlLogs={");
-            unhandledCrawlLogs.forEach(c -> sb.append('[').append(c.getStatusCode()).append(", ")
+            unhandledCrawlLogs.forEach(c -> sb.append("\n    [").append(c.getStatusCode()).append(", ")
                     .append(c.getRequestedUri()).append("], "));
 
             sb.append("}, unhandledRequests={");
             unhandledRequests.forEach(r -> {
-                sb.append('[').append(r.getStatusCode()).append(", ");
+                sb.append("\n    [").append(r.getStatusCode()).append(", ");
                 if (r.isFromCache()) {
                     sb.append("From Cache, ");
                 }

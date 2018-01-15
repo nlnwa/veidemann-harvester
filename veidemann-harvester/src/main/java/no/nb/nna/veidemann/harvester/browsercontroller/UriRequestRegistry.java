@@ -195,6 +195,7 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
         // net::ERR_CONNECTION_TIMED_OUT
         // net::ERR_CONTENT_LENGTH_MISMATCH
         // net::ERR_TUNNEL_CONNECTION_FAILED
+        // net::ERR_ABORTED
         resolveCurrentUriRequest(f.requestId)
                 .ifPresent(request -> {
                     if (!f.canceled) {
@@ -203,14 +204,20 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
                                 f.errorText, f.blockedReason, f.type, f.canceled, request.getUrl());
                     }
 
-                    request.setStatusCode(ExtraStatusCodes.BLOCKEC_BY_CUSTOM_PROCESSOR.getCode());
+                    // Only set status code if not set from proxy already
+                    if (request.getStatusCode() == 0) {
+                        request.setStatusCode(ExtraStatusCodes.BLOCKEC_BY_CUSTOM_PROCESSOR.getCode());
+                    }
 
                     // TODO: Add information to pagelog
 
                     request.finish(crawlLogRegistry);
                 })
-                .otherwise(() -> LOG.error("Could not find request for failed id {}. Error '{}', Blocked reason '{}', Resource type: '{}', Canceled: {}", f.requestId, f.errorText, f.blockedReason, f.type, f.canceled));
-        LOG.debug("Loading failed. rId{}, blockedReason: {}, canceled: {}, error: {}", f.requestId, f.blockedReason, f.canceled, f.errorText);
+                .otherwise(() ->
+                        LOG.error("Could not find request for failed id {}. Error '{}', Blocked reason '{}', Resource type: '{}', Canceled: {}",
+                                f.requestId, f.errorText, f.blockedReason, f.type, f.canceled));
+
+        LOG.debug("Loading failed. rId{}, blockedReason: {}, canceled: {}, error: {}", f.requestId, f.blockedReason, f.canceled, f);
     }
 
     void onResponseReceived(NetworkDomain.ResponseReceived r) {

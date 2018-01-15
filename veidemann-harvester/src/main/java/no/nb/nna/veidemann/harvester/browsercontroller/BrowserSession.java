@@ -302,7 +302,8 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
 
     List<MessagesProto.Cookie> extractCookies() {
         try {
-            return session.network.getAllCookies().get(protocolTimeout, MILLISECONDS).cookies.stream()
+            List<MessagesProto.Cookie> cookies = session.network.getAllCookies().get(protocolTimeout, MILLISECONDS)
+                    .cookies.stream()
                     .map(c -> {
                         MessagesProto.Cookie.Builder cb = MessagesProto.Cookie.newBuilder();
                         if (c.name != null) {
@@ -338,6 +339,8 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
                         return cb.build();
                     })
                     .collect(Collectors.toList());
+            LOG.debug("Extracted cookies: {}", cookies);
+            return cookies;
         } catch (InterruptedException | ExecutionException | TimeoutException ex) {
             throw new RuntimeException(ex);
         }

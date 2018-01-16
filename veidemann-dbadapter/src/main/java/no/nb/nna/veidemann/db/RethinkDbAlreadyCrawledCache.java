@@ -45,6 +45,10 @@ public class RethinkDbAlreadyCrawledCache implements AlreadyCrawledCache {
 
     private static final Logger LOG = LoggerFactory.getLogger(RethinkDbAlreadyCrawledCache.class);
 
+    private static final long DEFAULT_MAX_OBJECT_SIZE = 1024 * 1024 * 5;
+
+    long maxObjectSize;
+
     static final RethinkDB r = RethinkDB.r;
 
     final Connection conn;
@@ -53,8 +57,31 @@ public class RethinkDbAlreadyCrawledCache implements AlreadyCrawledCache {
         this(r.connection().hostname(dbHost).port(dbPort).db(dbName).connect());
     }
 
+    public RethinkDbAlreadyCrawledCache(String dbHost, int dbPort, String dbName, long maxObjectSize) {
+        this(r.connection().hostname(dbHost).port(dbPort).db(dbName).connect(), maxObjectSize);
+    }
+
     public RethinkDbAlreadyCrawledCache(Connection conn) {
+        this(conn, 0);
+    }
+
+    public RethinkDbAlreadyCrawledCache(Connection conn, long maxObjectSize) {
         this.conn = conn;
+        if (maxObjectSize <= 0) {
+            this.maxObjectSize = DEFAULT_MAX_OBJECT_SIZE;
+        } else {
+            this.maxObjectSize = maxObjectSize;
+        }
+        LOG.info("Max cache object size: {}", maxObjectSize);
+    }
+
+    @Override
+    public long getMaxObjectSize() {
+        return maxObjectSize;
+    }
+
+    public void setMaxObjectSize(long maxObjectSize) {
+        this.maxObjectSize = maxObjectSize;
     }
 
     @Override
@@ -97,6 +124,11 @@ public class RethinkDbAlreadyCrawledCache implements AlreadyCrawledCache {
             HttpHeaders headers, ByteString cacheValue) {
 
         if (executionId == null) {
+            return;
+        }
+
+        // Refuse to cache objects larger than 1MB
+        if (cacheValue == null || cacheValue.size() > maxObjectSize) {
             return;
         }
 

@@ -103,8 +103,8 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
         this.uri = uri;
 
         this.contentWriterClient = contentWriterClient;
-        this.requestCollector = new ContentCollector(0, ContentWriterProto.RecordType.REQUEST, uri, db);
-        this.responseCollector = new ContentCollector(1, ContentWriterProto.RecordType.RESPONSE, uri, db);
+        this.requestCollector = new ContentCollector(0, ContentWriterProto.RecordType.REQUEST, uri, cache, db);
+        this.responseCollector = new ContentCollector(1, ContentWriterProto.RecordType.RESPONSE, uri, cache, db);
         this.sessionRegistry = sessionRegistry;
         this.cache = cache;
         this.fetchTimeStamp = ProtoUtils.getNowTs();
@@ -244,7 +244,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                 LOG.debug("Got last response chunk");
                 ContentWriterProto.WriteResponseMeta.RecordMeta responseRecordMeta = null;
                 try {
-                    responseCollector.writeCache(cache, uri, executionId, httpResponseStatus, httpResponseProtocolVersion);
+                    responseCollector.writeCache(executionId, httpResponseStatus, httpResponseProtocolVersion);
 
                     String ipAddress = "";
                     if (resolvedRemoteAddress != null) {

@@ -36,4 +36,10 @@ public interface AlreadyCrawledCache extends AutoCloseable {
     @Override
     public void close();
 
+    /**
+     * Get the largest allowed object size to cache.
+     * @return the largest allowed object size to cache
+     */
+    long getMaxObjectSize();
+
 }

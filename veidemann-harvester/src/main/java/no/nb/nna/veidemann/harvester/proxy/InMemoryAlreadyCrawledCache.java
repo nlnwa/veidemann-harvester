@@ -41,9 +41,14 @@ public class InMemoryAlreadyCrawledCache implements AlreadyCrawledCache {
 
     private static final Logger LOG = LoggerFactory.getLogger(InMemoryAlreadyCrawledCache.class);
 
+    private static final long DEFAULT_MAX_OBJECT_SIZE = 1024 * 1024 * 5;
+
+    long maxObjectSize;
+
     private final Cache<CacheKey, FullHttpResponse> cache;
 
     public InMemoryAlreadyCrawledCache() {
+        maxObjectSize = DEFAULT_MAX_OBJECT_SIZE;
         cache = new Cache2kBuilder<CacheKey, FullHttpResponse>() {
         }
                 .name("embedsCache")
@@ -52,12 +57,25 @@ public class InMemoryAlreadyCrawledCache implements AlreadyCrawledCache {
                     @Override
                     public long calculateExpiryTime(CacheKey key, FullHttpResponse value,
                             long loadTime, CacheEntry<CacheKey, FullHttpResponse> oldEntry) {
+                        if (value == null || value.content().readableBytes() > maxObjectSize) {
+                            LOG.debug("Won't cache {} content too big", key);
+                            return NO_CACHE;
+                        }
                         LOG.trace("Caching {}", key);
                         return ETERNAL;
                     }
 
                 })
                 .build();
+    }
+
+    @Override
+    public long getMaxObjectSize() {
+        return maxObjectSize;
+    }
+
+    public void setMaxObjectSize(long maxObjectSize) {
+        this.maxObjectSize = maxObjectSize;
     }
 
     @Override

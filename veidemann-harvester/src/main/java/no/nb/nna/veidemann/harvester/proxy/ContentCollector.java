@@ -65,16 +65,20 @@ public class ContentCollector {
 
     private boolean shouldAddSeparator = false;
 
+    private final AlreadyCrawledCache cache;
+
     private boolean shouldCache = false;
 
     private HttpHeaders cacheHeaders;
 
     private ByteString cacheValue;
 
-    public ContentCollector(int recordNum, ContentWriterProto.RecordType type, final String targetUri, final DbAdapter db) {
+    public ContentCollector(int recordNum, ContentWriterProto.RecordType type,
+                            final String targetUri, AlreadyCrawledCache cache, final DbAdapter db) {
         this.recordNum = recordNum;
         this.type = type;
         this.targetUri = targetUri;
+        this.cache = cache;
         this.db = db;
         this.digest = new Sha1Digest();
         this.recordMeta = ContentWriterProto.WriteRequestMeta.RecordMeta.newBuilder()
@@ -161,9 +165,8 @@ public class ContentCollector {
                         cacheValue = data;
                     } else {
                         int dataSize = cacheValue.size() + data.size();
-                        int maxCacheSize = 10 * 1024 * 1024;
-                        if (dataSize > maxCacheSize) {
-                            LOG.info("Won't cache {} content too big. Size: {}, Max cache size: {}", targetUri, dataSize, maxCacheSize);
+                        if (dataSize > cache.getMaxObjectSize()) {
+                            LOG.info("Won't cache {} content exceeds max cache size: {}", targetUri, cache.getMaxObjectSize());
                             shouldCache = false;
                             cacheValue = null;
                         } else {
@@ -206,8 +209,7 @@ public class ContentCollector {
         return cacheValue;
     }
 
-    public void writeCache(AlreadyCrawledCache cache, String uri, String executionId,
-                           HttpResponseStatus httpResponseStatus, HttpVersion httpResponseProtocolVersion) {
+    public void writeCache(String executionId, HttpResponseStatus httpResponseStatus, HttpVersion httpResponseProtocolVersion) {
 
         if (shouldCache && getCacheValue() != null) {
             cacheHeaders.set("Content-Length", getCacheValue().size());
@@ -216,7 +218,7 @@ public class ContentCollector {
 
             cache.put(httpResponseProtocolVersion,
                     httpResponseStatus,
-                    uri,
+                    targetUri,
                     executionId,
                     cacheHeaders,
                     getCacheValue());

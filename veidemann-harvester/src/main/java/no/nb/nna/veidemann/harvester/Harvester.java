@@ -80,7 +80,7 @@ public class Harvester {
                      SETTINGS.getContentWriterHost(), SETTINGS.getContentWriterPort());
 
              AlreadyCrawledCache cache = new RethinkDbAlreadyCrawledCache(
-                     SETTINGS.getDbHost(), SETTINGS.getDbPort(), SETTINGS.getDbName());
+                     SETTINGS.getDbHost(), SETTINGS.getDbPort(), SETTINGS.getDbName(), SETTINGS.getMaxCacheObjectSize().toBytes());
 
              RecordingProxy proxy = new RecordingProxy(
                      new File(SETTINGS.getWorkDir()),

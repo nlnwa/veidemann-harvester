@@ -15,6 +15,7 @@
  */
 package no.nb.nna.veidemann.harvester.settings;
 
+import com.typesafe.config.ConfigMemorySize;
 import no.nb.nna.veidemann.commons.settings.CommonSettings;
 
 /**
@@ -39,6 +40,8 @@ public class Settings extends CommonSettings {
     private String dnsResolverHost;
 
     private int dnsResolverPort;
+
+    private ConfigMemorySize maxCacheObjectSize;
 
     public int getProxyPort() {
         return proxyPort;
@@ -112,4 +115,11 @@ public class Settings extends CommonSettings {
         this.dnsResolverPort = dnsResolverPort;
     }
 
+    public ConfigMemorySize getMaxCacheObjectSize() {
+        return maxCacheObjectSize;
+    }
+
+    public void setMaxCacheObjectSize(ConfigMemorySize maxCacheObjectSize) {
+        this.maxCacheObjectSize = maxCacheObjectSize;
+    }
 }

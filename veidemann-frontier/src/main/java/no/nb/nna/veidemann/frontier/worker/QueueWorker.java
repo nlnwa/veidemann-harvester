@@ -23,6 +23,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import no.nb.nna.veidemann.commons.db.FutureOptional;
 import no.nb.nna.veidemann.api.MessagesProto;
+import no.nb.nna.veidemann.db.DbException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -106,8 +107,6 @@ public class QueueWorker extends ThreadPoolExecutor {
                     CrawlExecution exe = getNextToFetch();
 
                     processExecution(exe);
-                } catch (InterruptedException ex) {
-                    throw new RuntimeException(ex);
                 } catch (Throwable t) {
                     LOG.error(t.toString(), t);
                     throw new RuntimeException(t);
@@ -146,36 +145,43 @@ public class QueueWorker extends ThreadPoolExecutor {
             long sleep = 0L;
 
             while (true) {
-                FutureOptional<MessagesProto.CrawlHostGroup> crawlHostGroup = frontier.getDb()
-                        .borrowFirstReadyCrawlHostGroup();
-                LOG.trace("Borrow Crawl Host Group: {}", crawlHostGroup);
+                try {
+                    FutureOptional<MessagesProto.CrawlHostGroup> crawlHostGroup = frontier.getDb()
+                            .borrowFirstReadyCrawlHostGroup();
+                    LOG.trace("Borrow Crawl Host Group: {}", crawlHostGroup);
 
-                if (crawlHostGroup.isMaybeInFuture()) {
-                    // A CrawlHostGroup suitable for execution in the future was found, wait until it is ready.
-                    LOG.trace("Crawl Host Group not ready yet, delaying: {}", crawlHostGroup.getDelayMs());
-                    sleep = crawlHostGroup.getDelayMs();
-                } else if (crawlHostGroup.isPresent()) {
-                    FutureOptional<MessagesProto.QueuedUri> foqu = frontier.getDb()
-                            .getNextQueuedUriToFetch(crawlHostGroup.get());
+                    if (crawlHostGroup.isMaybeInFuture()) {
+                        // A CrawlHostGroup suitable for execution in the future was found, wait until it is ready.
+                        LOG.trace("Crawl Host Group not ready yet, delaying: {}", crawlHostGroup.getDelayMs());
+                        sleep = crawlHostGroup.getDelayMs();
+                    } else if (crawlHostGroup.isPresent()) {
+                        FutureOptional<MessagesProto.QueuedUri> foqu = frontier.getDb()
+                                .getNextQueuedUriToFetch(crawlHostGroup.get());
 
-                    if (foqu.isPresent()) {
-                        // A fetchabel URI was found, return it
-                        LOG.debug("Found Queued URI: >>{}<<", foqu.get());
-                        return new CrawlExecution(foqu.get(), crawlHostGroup.get(), frontier);
-                    } else if (foqu.isMaybeInFuture()) {
-                        // A URI was found, but isn't fetchable yet. Wait for it
-                        LOG.debug("Queued URI might be available at: {}", foqu.getWhen());
-                        sleep = (foqu.getDelayMs());
+                        if (foqu.isPresent()) {
+                            // A fetchabel URI was found, return it
+                            LOG.debug("Found Queued URI: >>{}<<", foqu.get());
+                            return new CrawlExecution(foqu.get(), crawlHostGroup.get(), frontier);
+                        } else if (foqu.isMaybeInFuture()) {
+                            // A URI was found, but isn't fetchable yet. Wait for it
+                            LOG.debug("Queued URI might be available at: {}", foqu.getWhen());
+                            sleep = (foqu.getDelayMs());
+                        } else {
+                            // No URI found for this CrawlHostGroup. Wait for RESCHEDULE_DELAY and try again.
+                            LOG.trace("No Queued URI found waiting {}ms before retry", RESCHEDULE_DELAY);
+                            sleep = RESCHEDULE_DELAY;
+                        }
+                        frontier.getDb().releaseCrawlHostGroup(crawlHostGroup.get(), sleep);
                     } else {
-                        // No URI found for this CrawlHostGroup. Wait for RESCHEDULE_DELAY and try again.
-                        LOG.trace("No Queued URI found waiting {}ms before retry", RESCHEDULE_DELAY);
+                        // No CrawlHostGroup ready. Wait a moment and try again
                         sleep = RESCHEDULE_DELAY;
                     }
-                    frontier.getDb().releaseCrawlHostGroup(crawlHostGroup.get(), sleep);
-                } else {
-                    // No CrawlHostGroup ready. Wait a moment and try again
+                } catch (DbException e) {
+                    LOG.error("Caught an DB exception. Might be a temporary condition try again after {}ms",
+                            RESCHEDULE_DELAY, e);
                     sleep = RESCHEDULE_DELAY;
                 }
+
                 Thread.sleep(sleep);
             }
         }

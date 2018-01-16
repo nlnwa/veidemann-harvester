@@ -80,10 +80,7 @@ public class QueuedUriWrapper {
     }
 
     public String getHost() {
-        if (surt == null) {
-            surt = UriConfigs.SURT_KEY.buildUri(qUri.getUri());
-        }
-        return surt.getHost();
+        return UriConfigs.WHATWG.buildUri(qUri.getUri()).getHost();
     }
 
     public int getPort() {

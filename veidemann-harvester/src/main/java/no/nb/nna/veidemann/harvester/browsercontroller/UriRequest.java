@@ -65,6 +65,11 @@ public class UriRequest {
 
     private boolean fromCache = false;
 
+    /**
+     * Is this request's response from the proxy.
+     */
+    private boolean fromProxy = true;
+
     private String warcId = "";
 
     private final BaseSpan parentSpan;
@@ -89,55 +94,85 @@ public class UriRequest {
     private final Condition noReferrer = referrerLock.newCondition();
     private final Condition noDiscoveryPath = discoveryPathLock.newCondition();
 
-    private UriRequest(NetworkDomain.RequestWillBeSent request, BaseSpan parentSpan) {
-        this.requestId = request.requestId;
-        this.url = request.request.url;
-        this.referrer = (String) request.request.headers.getOrDefault("referer", "");
-        this.resourceType = ResourceType.forName(request.type);
-        LOG.debug("RequestId: {}, documentUrl: {}, URL: {}, initiator: {}, redirectResponse: {}, referer: {}",
-                request.requestId, request.documentURL, request.request.url, request.initiator,
-                request.redirectResponse, request.request.headers.get("Referer"));
+    private UriRequest(String requestId, String url, String referrer, ResourceType type, BaseSpan parentSpan) {
+        this.requestId = requestId;
+        this.url = url;
+        this.referrer = referrer;
+        this.resourceType = type;
 
         this.parentSpan = parentSpan;
     }
 
-    public UriRequest(NetworkDomain.RequestWillBeSent request, String initialDiscoveryPath, BaseSpan parentSpan) {
-        this(request, parentSpan);
-        this.discoveryPath = initialDiscoveryPath;
-        this.rootResource = true;
+    private UriRequest(NetworkDomain.RequestWillBeSent request, BaseSpan parentSpan) {
+        this(request.requestId,
+                request.request.url,
+                (String) request.request.headers.getOrDefault("referer", ""),
+                ResourceType.forName(request.type),
+                parentSpan);
+
+        LOG.debug("RequestId: {}, documentUrl: {}, URL: {}, initiator: {} {}, redirectResponse: {}, referer: {}",
+                request.requestId, request.documentURL, request.request.url, request.initiator.type, request.initiator.url,
+                request.redirectResponse, request.request.headers.get("Referer"));
     }
 
-    public UriRequest(NetworkDomain.RequestWillBeSent request, UriRequest parent, BaseSpan parentSpan) {
-        this(request, parentSpan);
-        setParent(parent);
+    public static UriRequest createRoot(NetworkDomain.RequestWillBeSent request, String initialDiscoveryPath, BaseSpan parentSpan) {
+        UriRequest result = new UriRequest(request, parentSpan);
+        result.discoveryPath = initialDiscoveryPath;
+        result.rootResource = true;
+        return result;
+    }
+
+    public static UriRequest createRoot(String requestId, String url, String referrer, ResourceType type, String initialDiscoveryPath, BaseSpan parentSpan) {
+        UriRequest result = new UriRequest(requestId, url, referrer, type, parentSpan);
+        result.discoveryPath = initialDiscoveryPath;
+        result.rootResource = true;
+        return result;
+    }
+
+    public static UriRequest create(String requestId, String url, String referrer, ResourceType type, char discoveryType, UriRequest parent, BaseSpan parentSpan) {
+        UriRequest result = new UriRequest(requestId, url, referrer, type, parentSpan);
+        result.setParent(parent);
+        result.discoveryPath = parent.discoveryPath + discoveryType;
+        return result;
+    }
+
+    public static UriRequest create(NetworkDomain.RequestWillBeSent request, UriRequest parent, BaseSpan parentSpan) {
+        UriRequest result;
+        char discoveryType;
+
         if (request.redirectResponse != null) {
-            this.rootResource = parent.rootResource;
+            discoveryType = 'R';
             parent.statusCode = request.redirectResponse.status.intValue();
             parent.fromCache = request.redirectResponse.fromDiskCache;
-            parent.mimeType = request.redirectResponse.mimeType;
-            this.discoveryPath = parent.discoveryPath + "R";
-        } else if ("script".equals(request.initiator.type)) {
-            // Resource is loaded by a script
-            this.discoveryPath = parent.discoveryPath + "X";
+            parent.setMimeType(request.redirectResponse.mimeType);
         } else {
-            this.discoveryPath = parent.discoveryPath + "E";
+            if ("script".equals(request.initiator.type)) {
+                // Resource is loaded by a script
+                discoveryType = 'X';
+            } else {
+                discoveryType = 'E';
+            }
         }
+
+        result = create(request.requestId, request.request.url, parent.getUrl(), ResourceType.forName(request.type), discoveryType, parent, parentSpan);
+
+        return result;
     }
 
     void addResponse(NetworkDomain.ResponseReceived response) {
-        if (this.mimeType != null) {
+        if (getMimeType() != null) {
             LOG.trace("Already got response, previous length: {}, new length: {}, Referrer: {}, DiscoveryPath: {}",
                     this.responseSize, response.response.encodedDataLength, referrer, discoveryPath);
         }
 
         resourceType = ResourceType.forName(response.type);
-        mimeType = response.response.mimeType;
+        setMimeType(response.response.mimeType);
         statusCode = response.response.status.intValue();
         fromCache = response.response.fromDiskCache;
 
-        renderable = MimeTypes.forType(mimeType)
-                .filter(m -> m.resourceType.category == ResourceType.Category.Document)
-                .isPresent();
+        if (response.response.fromDiskCache || response.response.protocol.equals("data")) {
+            setFromProxy(false);
+        }
 
 //        if (!mimeTypeIsConsistentWithType(this)) {
 //            LOG.error("Resource interpreted as {} but transferred with MIME type {}: \"{}\".", resourceType.title,
@@ -155,6 +190,13 @@ public class UriRequest {
 
     public String getMimeType() {
         return mimeType;
+    }
+
+    public void setMimeType(String mimeType) {
+        this.mimeType = mimeType;
+        renderable = MimeTypes.forType(mimeType)
+                .filter(m -> m.resourceType.category == ResourceType.Category.Document)
+                .isPresent();
     }
 
     public String getUrl() {
@@ -225,7 +267,12 @@ public class UriRequest {
         return parent;
     }
 
-    private void setParent(UriRequest parent) {
+    public void setParent(UriRequest parent) {
+        if (parent.getRequestId().equals(getRequestId())) {
+            rootResource = parent.rootResource;
+        } else {
+            rootResource = false;
+        }
         setReferrer(parent.url);
         this.parent = parent;
         parent.children.add(this);
@@ -259,6 +306,14 @@ public class UriRequest {
         this.fromCache = fromCache;
     }
 
+    public boolean isFromProxy() {
+        return fromProxy;
+    }
+
+    public void setFromProxy(boolean fromProxy) {
+        this.fromProxy = fromProxy;
+    }
+
     public String getWarcId() {
         return warcId;
     }
@@ -281,6 +336,10 @@ public class UriRequest {
                 .setDiscoveryPath(discoveryPath)
                 .build();
         this.warcId = crawlLog.getWarcId();
+        this.size = crawlLog.getSize();
+        if (crawlLog.getWarcId().isEmpty()) {
+            this.fromCache = true;
+        }
         return this.crawlLog;
     }
 
@@ -315,7 +374,7 @@ public class UriRequest {
     public void start() {
         span = buildSpan(parentSpan, url);
         LOG.debug("Request {} started", requestId);
-   }
+    }
 
     public void finish(CrawlLogRegistry crawlLogRegistry) {
         if (!finished) {

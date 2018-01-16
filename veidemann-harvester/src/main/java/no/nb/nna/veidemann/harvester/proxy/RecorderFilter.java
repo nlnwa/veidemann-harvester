@@ -20,6 +20,7 @@ import com.google.protobuf.Timestamp;
 import com.google.protobuf.util.Durations;
 import com.google.protobuf.util.Timestamps;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpObject;
@@ -43,6 +44,7 @@ import no.nb.nna.veidemann.commons.client.ContentWriterClient.ContentWriterSessi
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.db.ProtoUtils;
 import no.nb.nna.veidemann.harvester.BrowserSessionRegistry;
+import no.nb.nna.veidemann.harvester.browsercontroller.BrowserSession;
 import org.littleshoot.proxy.HttpFiltersAdapter;
 import org.littleshoot.proxy.impl.ProxyUtils;
 import org.netpreserve.commons.uri.Uri;
@@ -63,6 +65,8 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
     private final String uri;
 
     private final BrowserSessionRegistry sessionRegistry;
+
+    private BrowserSession browserSession;
 
     private final AlreadyCrawledCache cache;
 
@@ -99,8 +103,8 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
         this.uri = uri;
 
         this.contentWriterClient = contentWriterClient;
-        this.requestCollector = new ContentCollector(0, ContentWriterProto.RecordType.REQUEST, uri, db);
-        this.responseCollector = new ContentCollector(1, ContentWriterProto.RecordType.RESPONSE, uri, db);
+        this.requestCollector = new ContentCollector(0, ContentWriterProto.RecordType.REQUEST, uri, cache, db);
+        this.responseCollector = new ContentCollector(1, ContentWriterProto.RecordType.RESPONSE, uri, cache, db);
         this.sessionRegistry = sessionRegistry;
         this.cache = cache;
         this.fetchTimeStamp = ProtoUtils.getNowTs();
@@ -125,12 +129,14 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                 executionId = request.headers().get(EXECUTION_ID);
                 if (executionId == null) {
                     LOG.error("Missing executionId for {}", uri);
+                    return new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_GATEWAY);
                 }
+                browserSession = sessionRegistry.get(executionId);
 
                 MDC.put("eid", executionId);
                 MDC.put("uri", uri);
 
-                LOG.debug("Proxy sending request");
+                LOG.debug("Proxy got request");
 
                 requestSpan = buildSpan("clientToProxyRequest");
                 try (ActiveSpan span = GlobalTracer.get().makeActive(requestSpan)) {
@@ -142,9 +148,9 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                         CrawlLog.Builder crawlLog = buildCrawlLog()
                                 .setStatusCode(cachedResponse.status().code());
 
-                        sessionRegistry.get(executionId).addCrawlLog(crawlLog);
+                        browserSession.addCrawlLog(crawlLog);
 
-                        if (cachedResponse.content().readableBytes() < (1024 * 32)) {
+                        if (cachedResponse.content().readableBytes() < (1024 * 1)) {
                             return cachedResponse;
                         }
 
@@ -165,11 +171,6 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
         try {
             if (httpObject instanceof HttpRequest) {
                 HttpRequest request = (HttpRequest) httpObject;
-
-                executionId = request.headers().get(EXECUTION_ID);
-                if (executionId == null) {
-                    LOG.error("Missing executionId for {}", uri);
-                }
 
                 MDC.put("eid", executionId);
                 MDC.put("uri", uri);
@@ -243,7 +244,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                 LOG.debug("Got last response chunk");
                 ContentWriterProto.WriteResponseMeta.RecordMeta responseRecordMeta = null;
                 try {
-                    responseCollector.writeCache(cache, uri, executionId, httpResponseStatus, httpResponseProtocolVersion);
+                    responseCollector.writeCache(executionId, httpResponseStatus, httpResponseProtocolVersion);
 
                     String ipAddress = "";
                     if (resolvedRemoteAddress != null) {
@@ -274,13 +275,14 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                             .setStorageRef(responseRecordMeta.getStorageRef())
                             .setRecordType(responseRecordMeta.getType().name().toLowerCase())
                             .setBlockDigest(responseRecordMeta.getBlockDigest())
-                            .setPayloadDigest(responseRecordMeta.getPayloadDigest());
+                            .setPayloadDigest(responseRecordMeta.getPayloadDigest())
+                            .setSize(responseCollector.getSize());
 
                     if (uri.endsWith("robots.txt")) {
                         crawlLog.setDiscoveryPath("P");
                         db.saveCrawlLog(crawlLog.build());
                     } else {
-                        sessionRegistry.get(executionId).addCrawlLog(crawlLog);
+                        browserSession.addCrawlLog(crawlLog);
                     }
 
                 } catch (Exception ex) {
@@ -319,7 +321,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
         CrawlLog.Builder crawlLog = buildCrawlLog()
                 .setRecordType("response")
                 .setStatusCode(ExtraStatusCodes.FAILED_DNS.getCode());
-        sessionRegistry.get(executionId).addCrawlLog(crawlLog);
+        browserSession.addCrawlLog(crawlLog);
 
 //        if (db != null) {
 //            db.saveCrawlLog(crawlLog.build());
@@ -336,7 +338,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
         CrawlLog.Builder crawlLog = buildCrawlLog()
                 .setRecordType("response")
                 .setStatusCode(ExtraStatusCodes.CONNECT_FAILED.getCode());
-        sessionRegistry.get(executionId).addCrawlLog(crawlLog);
+        browserSession.addCrawlLog(crawlLog);
 
 //        if (db != null) {
 //            db.saveCrawlLog(crawlLog.build());
@@ -354,7 +356,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
         CrawlLog.Builder crawlLog = buildCrawlLog()
                 .setRecordType("response")
                 .setStatusCode(ExtraStatusCodes.HTTP_TIMEOUT.getCode());
-        sessionRegistry.get(executionId).addCrawlLog(crawlLog);
+        browserSession.addCrawlLog(crawlLog);
 
 //        if (db != null) {
 //            db.saveCrawlLog(crawlLog.build());

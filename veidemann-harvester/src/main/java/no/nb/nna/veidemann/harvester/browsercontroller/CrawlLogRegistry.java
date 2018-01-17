@@ -253,10 +253,14 @@ public class CrawlLogRegistry {
             }
         }
         for (UriRequest re : browserSession.getUriRequests().getAllRequests()) {
-            if (!re.isFromCache() && re.isFromProxy() && re.getStatusCode() >= 0 && re.getCrawlLog() == null) {
+            if (re.getCrawlLog() == null) {
                 LOG.trace("Missing CrawlLog for {} {} {} {}", re.getRequestId(), re.getStatusCode(), re.getUrl(),
                         re.getDiscoveryPath());
-                status.unhandledRequests.add(re);
+
+                // Only requests that comes from the origin server should be added to the unhandled requests list
+                if (!re.isFromCache() && re.isFromProxy() && re.getStatusCode() >= 0) {
+                    status.unhandledRequests.add(re);
+                }
             }
         }
     }

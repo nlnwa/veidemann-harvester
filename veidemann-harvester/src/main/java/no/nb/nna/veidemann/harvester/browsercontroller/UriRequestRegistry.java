@@ -206,7 +206,11 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
 
                     // Only set status code if not set from proxy already
                     if (request.getStatusCode() == 0) {
-                        request.setStatusCode(ExtraStatusCodes.BLOCKEC_BY_CUSTOM_PROCESSOR.getCode());
+                        if ("mixed-content".equals(f.blockedReason)) {
+                            request.setStatusCode(ExtraStatusCodes.BLOCKED_MIXED_CONTENT.getCode());
+                        } else {
+                            request.setStatusCode(ExtraStatusCodes.BLOCKED_BY_CUSTOM_PROCESSOR.getCode());
+                        }
                     }
 
                     // TODO: Add information to pagelog

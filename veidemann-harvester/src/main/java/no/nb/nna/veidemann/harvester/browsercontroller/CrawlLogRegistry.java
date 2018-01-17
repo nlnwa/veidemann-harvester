@@ -143,7 +143,7 @@ public class CrawlLogRegistry {
                     if (gotSignal) {
                         LOG.trace("Got activity signal");
                     }
-                    if ((System.currentTimeMillis() - lastActivityTime) >= maxIdleTime) {
+                    if (finishLatch.getCount() == 0 || (System.currentTimeMillis() - lastActivityTime) >= maxIdleTime) {
                         LOG.debug("Timed out waiting for network activity");
                         running = false;
                     }
@@ -191,12 +191,16 @@ public class CrawlLogRegistry {
             if (!success) {
                 LOG.info("Pageload timed out");
                 finishLatch.countDown();
+                // Send signal to stop waitForIdle loop
+                signalRequestsUpdated();
             }
             innerMatchCrawlLogAndRequest(status);
             return success;
         } catch (InterruptedException e) {
             LOG.info("Pageload interrupted", e);
             finishLatch.countDown();
+            // Send signal to stop waitForIdle loop
+            signalRequestsUpdated();
             innerMatchCrawlLogAndRequest(status);
             return false;
         }
@@ -211,13 +215,19 @@ public class CrawlLogRegistry {
             return true;
         }
         for (UriRequest c : r.getChildren()) {
-            findRequestForCrawlLog(crawlLog, c);
+            if (findRequestForCrawlLog(crawlLog, c)) {
+                return true;
+            }
         }
         return false;
     }
 
     private boolean innerFindRequestForCrawlLog(CrawlLog.Builder crawlLog, UriRequest r) {
-        if (!r.isFromCache() && Objects.equals(r.getUrl(), crawlLog.getRequestedUri()) && crawlLog.getStatusCode() == r.getStatusCode()) {
+        if (r.getCrawlLog() == null
+                && !r.isFromCache()
+                && Objects.equals(r.getUrl(), crawlLog.getRequestedUri())
+                && crawlLog.getStatusCode() == r.getStatusCode()) {
+
             CrawlLog enrichedCrawlLog = r.setCrawlLog(crawlLog);
             if (!r.isFromCache()) {
                 db.saveCrawlLog(enrichedCrawlLog);
@@ -244,7 +254,8 @@ public class CrawlLogRegistry {
         }
         for (UriRequest re : browserSession.getUriRequests().getAllRequests()) {
             if (!re.isFromCache() && re.isFromProxy() && re.getStatusCode() >= 0 && re.getCrawlLog() == null) {
-                LOG.trace("Missing CrawlLog for {}", re.getRequestId());
+                LOG.trace("Missing CrawlLog for {} {} {} {}", re.getRequestId(), re.getStatusCode(), re.getUrl(),
+                        re.getDiscoveryPath());
                 status.unhandledRequests.add(re);
             }
         }

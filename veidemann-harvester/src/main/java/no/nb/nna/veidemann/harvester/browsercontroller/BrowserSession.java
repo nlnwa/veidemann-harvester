@@ -27,6 +27,7 @@ import no.nb.nna.veidemann.chrome.client.ChromeDebugProtocol;
 import no.nb.nna.veidemann.chrome.client.DebuggerDomain;
 import no.nb.nna.veidemann.chrome.client.NetworkDomain;
 import no.nb.nna.veidemann.chrome.client.NetworkDomain.AuthChallengeResponse;
+import no.nb.nna.veidemann.chrome.client.NetworkDomain.CookieParam;
 import no.nb.nna.veidemann.chrome.client.NetworkDomain.RequestPattern;
 import no.nb.nna.veidemann.chrome.client.PageDomain;
 import no.nb.nna.veidemann.chrome.client.RuntimeDomain;
@@ -191,13 +192,27 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
     }
 
     public void setCookies() throws TimeoutException, ExecutionException, InterruptedException {
-        LOG.debug("Restoring browser cookies");
-        CompletableFuture.allOf(queuedUri.getCookiesList().stream()
-                .map(c -> session.network
-                        .setCookie(queuedUri.getUri(), c.getName(), c.getValue(), c.getDomain(),
-                                c.getPath(), c.getSecure(), c.getHttpOnly(), c.getSameSite(), c.getExpires()))
-                .collect(Collectors.toList()).toArray(new CompletableFuture[]{}))
-                .get(protocolTimeout, MILLISECONDS);
+        LOG.debug("Restoring {} browser cookies", queuedUri.getCookiesCount());
+        if (queuedUri.getCookiesCount() > 0) {
+            List l = queuedUri.getCookiesList().stream()
+                    .map(c -> {
+                                CookieParam nc = new CookieParam();
+                                nc.url = queuedUri.getUri();
+                                nc.name = c.getName();
+                                nc.value = c.getValue();
+                                nc.domain = c.getDomain();
+                                nc.path = c.getPath();
+                                nc.secure = c.getSecure();
+                                nc.httpOnly = c.getHttpOnly();
+                                nc.sameSite = c.getSameSite();
+                                nc.expires = c.getExpires();
+                                return nc;
+                            }
+                    )
+                    .collect(Collectors.toList());
+
+            session.network.setCookies(l).get(protocolTimeout, MILLISECONDS);
+        }
 
         LOG.debug("Browser cookies restored");
     }

@@ -23,6 +23,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpContent;
+import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
@@ -213,6 +214,12 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                 LOG.trace("Got response headers");
                 try {
                     HttpResponse res = (HttpResponse) httpObject;
+
+                    if (res.headers().contains(HttpHeaderNames.SET_COOKIE)
+                            || res.headers().contains(HttpHeaderNames.SET_COOKIE2)) {
+                        responseCollector.setShouldCache(false);
+                    }
+
                     httpResponseStatus = res.status();
                     httpResponseProtocolVersion = res.protocolVersion();
                     responseCollector.setHeaders(ContentCollector.createResponsePreamble(res), res.headers(), getContentWriterSession());

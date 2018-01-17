@@ -93,9 +93,7 @@ public class RobotsCache {
                                 LOG.debug("No '{}' found", url);
                             }
                         } catch (Exception e) {
-                            System.out.println("---------------");
-                            e.printStackTrace();
-                            LOG.debug("No '{}' found", url);
+                            LOG.debug("No '{}' found", url, e);
                         }
                         return EMPTY_ROBOTS;
                     }

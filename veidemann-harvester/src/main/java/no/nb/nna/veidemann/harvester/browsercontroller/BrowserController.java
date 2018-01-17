@@ -145,7 +145,7 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
         resultBuilder.setBytesDownloaded(session.getUriRequests().getBytesDownloaded());
         resultBuilder.setUriCount(session.getUriRequests().getUriDownloadedCount());
 
-        LOG.debug("======== PAGELOAD RESULT ========\n{}", resultBuilder.build());
+        LOG.trace("======== PAGELOAD RESULT ========\n{}", resultBuilder.build());
         MDC.clear();
         return resultBuilder.build();
     }

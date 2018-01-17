@@ -198,19 +198,23 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
         // net::ERR_ABORTED
         resolveCurrentUriRequest(f.requestId)
                 .ifPresent(request -> {
-                    if (!f.canceled) {
-                        LOG.error(
-                                "Failed fetching page: Error '{}', Blocked reason '{}', Resource type: '{}', Canceled: {}, Req: {}",
-                                f.errorText, f.blockedReason, f.type, f.canceled, request.getUrl());
-                    }
-
                     // Only set status code if not set from proxy already
                     if (request.getStatusCode() == 0) {
                         if ("mixed-content".equals(f.blockedReason)) {
+                            LOG.debug(
+                                    "Failed fetching page: Error '{}', Blocked reason '{}', Resource type: '{}', Canceled: {}, Req: {}",
+                                    f.errorText, f.blockedReason, f.type, f.canceled, request.getUrl());
                             request.setStatusCode(ExtraStatusCodes.BLOCKED_MIXED_CONTENT.getCode());
                         } else {
                             request.setStatusCode(ExtraStatusCodes.BLOCKED_BY_CUSTOM_PROCESSOR.getCode());
+                            LOG.error(
+                                    "Failed fetching page: Error '{}', Blocked reason '{}', Resource type: '{}', Canceled: {}, Req: {}",
+                                    f.errorText, f.blockedReason, f.type, f.canceled, request.getUrl());
                         }
+                    } else {
+                        LOG.error(
+                                "Failed fetching page: Error '{}', Blocked reason '{}', Resource type: '{}', Canceled: {}, Req: {}",
+                                f.errorText, f.blockedReason, f.type, f.canceled, request.getUrl());
                     }
 
                     // TODO: Add information to pagelog

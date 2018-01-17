@@ -64,6 +64,7 @@ public class ChunkedHttpResponse implements ChunkedInput<HttpObject>, HttpRespon
         head = ProxyUtils.duplicateHttpResponse(cachedResponse);
         head.headers()
                 .set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED)
+                .set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE)
                 .remove(HttpHeaderNames.CONTENT_LENGTH);
     }
 

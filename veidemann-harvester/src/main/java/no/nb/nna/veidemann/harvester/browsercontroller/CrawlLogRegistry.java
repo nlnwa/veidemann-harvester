@@ -217,7 +217,11 @@ public class CrawlLogRegistry {
     }
 
     private boolean innerFindRequestForCrawlLog(CrawlLog.Builder crawlLog, UriRequest r) {
-        if (!r.isFromCache() && Objects.equals(r.getUrl(), crawlLog.getRequestedUri()) && crawlLog.getStatusCode() == r.getStatusCode()) {
+        if (r.getCrawlLog() == null
+                && !r.isFromCache()
+                && Objects.equals(r.getUrl(), crawlLog.getRequestedUri())
+                && crawlLog.getStatusCode() == r.getStatusCode()) {
+
             CrawlLog enrichedCrawlLog = r.setCrawlLog(crawlLog);
             if (!r.isFromCache()) {
                 db.saveCrawlLog(enrichedCrawlLog);
@@ -244,7 +248,8 @@ public class CrawlLogRegistry {
         }
         for (UriRequest re : browserSession.getUriRequests().getAllRequests()) {
             if (!re.isFromCache() && re.isFromProxy() && re.getStatusCode() >= 0 && re.getCrawlLog() == null) {
-                LOG.trace("Missing CrawlLog for {}", re.getRequestId());
+                LOG.trace("Missing CrawlLog for {} {} {} {}", re.getRequestId(), re.getStatusCode(), re.getUrl(),
+                        re.getDiscoveryPath());
                 status.unhandledRequests.add(re);
             }
         }

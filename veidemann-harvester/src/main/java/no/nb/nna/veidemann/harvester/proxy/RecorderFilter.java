@@ -46,6 +46,7 @@ import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.db.ProtoUtils;
 import no.nb.nna.veidemann.harvester.BrowserSessionRegistry;
 import no.nb.nna.veidemann.harvester.browsercontroller.BrowserSession;
+import no.nb.nna.veidemann.harvester.browsercontroller.CrawlLogRegistry;
 import org.littleshoot.proxy.HttpFiltersAdapter;
 import org.littleshoot.proxy.impl.ProxyUtils;
 import org.netpreserve.commons.uri.Uri;
@@ -55,6 +56,7 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
 import java.net.InetSocketAddress;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  *
@@ -63,7 +65,11 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
 
     private static final Logger LOG = LoggerFactory.getLogger(RecorderFilter.class);
 
+    private static final AtomicLong nextProxyRequestId = new AtomicLong();
+
     private final String uri;
+
+    private CrawlLogRegistry.Entry crawlLogEntry;
 
     private final BrowserSessionRegistry sessionRegistry;
 
@@ -132,7 +138,12 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                     LOG.error("Missing executionId for {}", uri);
                     return new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_GATEWAY);
                 }
-                browserSession = sessionRegistry.get(executionId);
+
+                // Lookup browser session, but skip if it is a robots.txt request since that is not coming from browser.
+                if (!uri.endsWith("robots.txt")) {
+                    browserSession = sessionRegistry.get(executionId);
+                    crawlLogEntry = browserSession.getCrawlLogs().registerProxyRequest(nextProxyRequestId.getAndIncrement(), uri);
+                }
 
                 MDC.put("eid", executionId);
                 MDC.put("uri", uri);
@@ -149,9 +160,9 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                         CrawlLog.Builder crawlLog = buildCrawlLog()
                                 .setStatusCode(cachedResponse.status().code());
 
-                        browserSession.addCrawlLog(crawlLog);
+                        writeCrawlLog(crawlLog);
 
-                        if (cachedResponse.content().readableBytes() < (1024 * 1)) {
+                        if (cachedResponse.content().readableBytes() < (1024 * 64)) {
                             return cachedResponse;
                         }
 
@@ -204,6 +215,15 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
     public HttpObject serverToProxyResponse(HttpObject httpObject) {
         MDC.put("eid", executionId);
         MDC.put("uri", uri);
+
+        if (browserSession != null && browserSession.isClosed()) {
+            LOG.warn("Browser session was closed, aborting request");
+            if (contentWriterSession != null) {
+                contentWriterSession.cancel("Session was aborted");
+            }
+            return ProxyUtils.createFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_GATEWAY);
+        }
+
         try {
             responseSpan = buildSpan("serverToProxyResponse");
             GlobalTracer.get().makeActive(requestSpan);
@@ -229,6 +249,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                 } catch (Exception ex) {
                     LOG.error("Error handling response headers", ex);
                     responseSpan.log("Error handling response headers: " + ex.toString());
+                    return ProxyUtils.createFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_GATEWAY);
                 }
             }
 
@@ -244,6 +265,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                 } catch (Exception ex) {
                     LOG.error("Error handling response content", ex);
                     responseSpan.log("Error handling response content: " + ex.toString());
+                    return ProxyUtils.createFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_GATEWAY);
                 }
             }
 
@@ -285,16 +307,12 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                             .setPayloadDigest(responseRecordMeta.getPayloadDigest())
                             .setSize(responseCollector.getSize());
 
-                    if (uri.endsWith("robots.txt")) {
-                        crawlLog.setDiscoveryPath("P");
-                        db.saveCrawlLog(crawlLog.build());
-                    } else {
-                        browserSession.addCrawlLog(crawlLog);
-                    }
+                    writeCrawlLog(crawlLog);
 
                 } catch (Exception ex) {
                     LOG.error("Error writing response", ex);
                     responseSpan.log("Error writing response: " + ex.toString());
+                    return ProxyUtils.createFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_GATEWAY);
                 }
 
                 responseSpan.log("Last response chunk");
@@ -328,7 +346,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
         CrawlLog.Builder crawlLog = buildCrawlLog()
                 .setRecordType("response")
                 .setStatusCode(ExtraStatusCodes.FAILED_DNS.getCode());
-        browserSession.addCrawlLog(crawlLog);
+        writeCrawlLog(crawlLog);
 
 //        if (db != null) {
 //            db.saveCrawlLog(crawlLog.build());
@@ -345,7 +363,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
         CrawlLog.Builder crawlLog = buildCrawlLog()
                 .setRecordType("response")
                 .setStatusCode(ExtraStatusCodes.CONNECT_FAILED.getCode());
-        browserSession.addCrawlLog(crawlLog);
+        writeCrawlLog(crawlLog);
 
 //        if (db != null) {
 //            db.saveCrawlLog(crawlLog.build());
@@ -363,7 +381,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
         CrawlLog.Builder crawlLog = buildCrawlLog()
                 .setRecordType("response")
                 .setStatusCode(ExtraStatusCodes.HTTP_TIMEOUT.getCode());
-        browserSession.addCrawlLog(crawlLog);
+        writeCrawlLog(crawlLog);
 
 //        if (db != null) {
 //            db.saveCrawlLog(crawlLog.build());
@@ -371,6 +389,17 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
 
         LOG.info("Http connect timed out");
 //        finishSpan(uriRequest);
+    }
+
+    private void writeCrawlLog(CrawlLog.Builder crawlLog) {
+        if (uri.endsWith("robots.txt")) {
+            crawlLog.setDiscoveryPath("P");
+            db.saveCrawlLog(crawlLog.build());
+        } else if (browserSession != null) {
+            crawlLogEntry.setCrawlLog(crawlLog);
+        } else {
+            LOG.error("Browser session missing");
+        }
     }
 
     private CrawlLog.Builder buildCrawlLog() {

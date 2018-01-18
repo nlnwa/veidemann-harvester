@@ -37,7 +37,7 @@ public class CrawlLogRegistry {
     private final DbAdapter db;
     private final BrowserSession browserSession;
 
-    private final List<Builder> crawlLogs = new ArrayList<>();
+    private final List<Entry> crawlLogs = new ArrayList<>();
     private final Lock crawlLogsLock = new ReentrantLock();
     private final Condition crawlLogsUpdate = crawlLogsLock.newCondition();
 
@@ -49,6 +49,37 @@ public class CrawlLogRegistry {
     private long startTime = System.currentTimeMillis();
     private long lastActivityTime = System.currentTimeMillis();
 
+    public class Entry {
+        long proxyRequestId;
+        String uri;
+        CrawlLog.Builder crawlLog;
+        boolean resolved = false;
+
+        public Entry(long proxyRequestId, String uri) {
+            this.proxyRequestId = proxyRequestId;
+            this.uri = uri;
+        }
+
+        public void setCrawlLog(Builder crawlLog) {
+            crawlLogsLock.lock();
+            try {
+                this.crawlLog = crawlLog;
+                lastActivityTime = System.currentTimeMillis();
+                crawlLogsUpdate.signalAll();
+            } finally {
+                crawlLogsLock.unlock();
+            }
+        }
+
+        boolean isResponseReceived() {
+            return crawlLog != null;
+        }
+
+        boolean isResolved() {
+            return resolved;
+        }
+    }
+
     public CrawlLogRegistry(final DbAdapter db, final BrowserSession session, final long pageLoadTimeout, final long maxIdleTime) {
         this.db = db;
         this.browserSession = session;
@@ -58,12 +89,14 @@ public class CrawlLogRegistry {
         matcherThread.start();
     }
 
-    public void addCrawlLog(CrawlLog.Builder crawlLog) {
+    public Entry registerProxyRequest(long proxyRequestId, String uri) {
         crawlLogsLock.lock();
         try {
-            crawlLogs.add(crawlLog);
+            Entry crawlLogEntry = new Entry(proxyRequestId, uri);
+            crawlLogs.add(crawlLogEntry);
             lastActivityTime = System.currentTimeMillis();
             crawlLogsUpdate.signalAll();
+            return crawlLogEntry;
         } finally {
             crawlLogsLock.unlock();
         }
@@ -88,19 +121,10 @@ public class CrawlLogRegistry {
         }
     }
 
-    public void deleteCrawlLog(CrawlLog.Builder crawlLog) {
+    private boolean isCrawlLogsResolved() {
         crawlLogsLock.lock();
         try {
-            crawlLogs.remove(crawlLog);
-        } finally {
-            crawlLogsLock.unlock();
-        }
-    }
-
-    public List<CrawlLog.Builder> getCrawlLogs() {
-        crawlLogsLock.lock();
-        try {
-            return new ArrayList<>(crawlLogs);
+            return crawlLogs.stream().allMatch(e -> e.resolved);
         } finally {
             crawlLogsLock.unlock();
         }
@@ -120,6 +144,10 @@ public class CrawlLogRegistry {
 
                 if (!status.allHandled()) {
                     checkForFileDownload();
+                }
+
+                if (!status.unhandledRequests.isEmpty()) {
+                    checkForCachedRequests();
                 }
 
                 if (status.allHandled()) {
@@ -156,26 +184,49 @@ public class CrawlLogRegistry {
         }
     }
 
+    private void checkForCachedRequests() {
+        for (UriRequest r : status.unhandledRequests) {
+            boolean isWaitingForResponse = crawlLogs.stream()
+                    .filter(e -> e.uri.equals(r.getUrl()))
+                    .anyMatch(e -> !e.isResponseReceived());
+
+            if (!isWaitingForResponse) {
+                crawlLogs.stream()
+                        .filter(e -> (e.uri.equals(r.getUrl()) && e.crawlLog.getStatusCode() == r.getStatusCode()))
+                        .findFirst().ifPresent(e -> {
+                            LOG.info("Found already resolved CrawlLog for {}. Setting fromCache for request {} to true",
+                                    r.getUrl(), r.getRequestId());
+                            r.setFromProxy(true);
+                            r.setFromCache(true);
+                        });
+            }
+        }
+
+        innerMatchCrawlLogAndRequest(status);
+    }
+
+    /**
+     * TODO: When there are crawllogs, but no request events have been received, then this is probably
+     * a file download. At the moment we are creating UriRequests to simulate events. This should be
+     * refactored into real events as soon as Chrome supports it.
+     * https://bugs.chromium.org/p/chromium/issues/detail?id=696481
+     */
     private void checkForFileDownload() {
-        // TODO: When there are crawllogs, but no request events have been received, then this is probably
-        // a file download. At the moment we are creating UriRequests to simulate events. This should be
-        // refactored into real events as soon as Chrome supports it.
-        // https://bugs.chromium.org/p/chromium/issues/detail?id=696481
         if (browserSession.getUriRequests().getInitialRequest() == null) {
             LOG.info("Guessing that we are downloading a file. Status: {}", status);
             crawlLogs.forEach(c -> {
                 browserSession.getUriRequests().resolveCurrentUriRequest("1").ifPresent(parent -> {
                     UriRequest r = UriRequest.create("1",
-                            c.getRequestedUri(), browserSession.queuedUri.getReferrer(), ResourceType.Other,
+                            c.crawlLog.getRequestedUri(), browserSession.queuedUri.getReferrer(), ResourceType.Other,
                             'R', parent, browserSession.getUriRequests().getPageSpan());
-                    r.setStatusCode(c.getStatusCode());
+                    r.setStatusCode(c.crawlLog.getStatusCode());
                     browserSession.getUriRequests().add(r);
                 }).otherwise(() -> {
                     // No parent, this is a root request;
                     UriRequest r = UriRequest.createRoot("1",
-                            c.getRequestedUri(), browserSession.queuedUri.getReferrer(), ResourceType.Other,
+                            c.crawlLog.getRequestedUri(), browserSession.queuedUri.getReferrer(), ResourceType.Other,
                             browserSession.queuedUri.getDiscoveryPath(), browserSession.getUriRequests().getPageSpan());
-                    r.setStatusCode(c.getStatusCode());
+                    r.setStatusCode(c.crawlLog.getStatusCode());
                     browserSession.getUriRequests().add(r);
                 });
             });
@@ -206,53 +257,50 @@ public class CrawlLogRegistry {
         }
     }
 
-    private boolean findRequestForCrawlLog(CrawlLog.Builder crawlLog, UriRequest r) {
+    private boolean findRequestForCrawlLog(Entry crawlLogEntry, UriRequest r) {
         if (r == null) {
             return false;
         }
 
-        if (innerFindRequestForCrawlLog(crawlLog, r)) {
+        if (innerFindRequestForCrawlLog(crawlLogEntry, r)) {
             return true;
         }
         for (UriRequest c : r.getChildren()) {
-            if (findRequestForCrawlLog(crawlLog, c)) {
+            if (findRequestForCrawlLog(crawlLogEntry, c)) {
                 return true;
             }
         }
         return false;
     }
 
-    private boolean innerFindRequestForCrawlLog(CrawlLog.Builder crawlLog, UriRequest r) {
+    private boolean innerFindRequestForCrawlLog(Entry crawlLogEntry, UriRequest r) {
         if (r.getCrawlLog() == null
                 && !r.isFromCache()
-                && Objects.equals(r.getUrl(), crawlLog.getRequestedUri())
-                && crawlLog.getStatusCode() == r.getStatusCode()) {
+                && Objects.equals(r.getUrl(), crawlLogEntry.crawlLog.getRequestedUri())
+                && crawlLogEntry.crawlLog.getStatusCode() == r.getStatusCode()) {
 
-            CrawlLog enrichedCrawlLog = r.setCrawlLog(crawlLog);
+            CrawlLog enrichedCrawlLog = r.setCrawlLog(crawlLogEntry.crawlLog);
             if (!r.isFromCache()) {
                 db.saveCrawlLog(enrichedCrawlLog);
             }
-            deleteCrawlLog(crawlLog);
+            crawlLogEntry.resolved = true;
             return true;
         }
-        LOG.trace("Did not find request for {}", crawlLog.getRequestedUri());
+        LOG.trace("Did not find request for {}", crawlLogEntry.crawlLog.getRequestedUri());
         return false;
     }
 
     private void innerMatchCrawlLogAndRequest(MatchStatus status) {
         status.reset();
-        List<CrawlLog.Builder> crawlLogList = getCrawlLogs();
-        if (!crawlLogList.isEmpty()) {
-            for (CrawlLog.Builder c : crawlLogList) {
-                findRequestForCrawlLog(c, browserSession.getUriRequests().getInitialRequest());
-            }
-            crawlLogList = getCrawlLogs();
-            if (!crawlLogList.isEmpty()) {
-                LOG.trace("There are still {} unhandled crawl logs", crawlLogList.size());
-                status.unhandledCrawlLogs.addAll(crawlLogList);
+        if (!isCrawlLogsResolved()) {
+            crawlLogs.stream().filter(e -> (e.isResponseReceived() && !e.isResolved()))
+                    .forEach(e -> findRequestForCrawlLog(e, browserSession.getUriRequests().getInitialRequest()));
+            if (!isCrawlLogsResolved()) {
+                LOG.trace("There are still unhandled crawl logs");
             }
         }
-        for (UriRequest re : browserSession.getUriRequests().getAllRequests()) {
+
+        browserSession.getUriRequests().getRequestStream().forEach(re -> {
             if (re.getCrawlLog() == null) {
                 LOG.trace("Missing CrawlLog for {} {} {} {}", re.getRequestId(), re.getStatusCode(), re.getUrl(),
                         re.getDiscoveryPath());
@@ -262,20 +310,18 @@ public class CrawlLogRegistry {
                     status.unhandledRequests.add(re);
                 }
             }
-        }
+        });
     }
 
     private class MatchStatus {
-        List<CrawlLog.Builder> unhandledCrawlLogs = new ArrayList<>();
         List<UriRequest> unhandledRequests = new ArrayList<>();
 
         void reset() {
-            unhandledCrawlLogs.clear();
             unhandledRequests.clear();
         }
 
         boolean allHandled() {
-            return unhandledCrawlLogs.isEmpty() && unhandledRequests.isEmpty();
+            return isCrawlLogsResolved() && unhandledRequests.isEmpty();
         }
 
         @Override
@@ -283,8 +329,9 @@ public class CrawlLogRegistry {
             final StringBuilder sb = new StringBuilder();
 
             sb.append("unhandledCrawlLogs={");
-            unhandledCrawlLogs.forEach(c -> sb.append("\n    [").append(c.getStatusCode()).append(", ")
-                    .append(c.getRequestedUri()).append("], "));
+            crawlLogs.stream().filter(e -> !e.isResolved()).forEach(e -> sb.append("\n    [")
+                    .append(e.isResponseReceived() ? e.crawlLog.getStatusCode() : -8888).append(", ")
+                    .append(e.uri).append("], "));
 
             sb.append("}, unhandledRequests={");
             unhandledRequests.forEach(r -> {

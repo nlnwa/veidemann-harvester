@@ -21,7 +21,6 @@ import com.google.protobuf.ByteString;
 import io.opentracing.BaseSpan;
 import no.nb.nna.veidemann.api.ConfigProto;
 import no.nb.nna.veidemann.api.MessagesProto;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
 import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
 import no.nb.nna.veidemann.chrome.client.ChromeDebugProtocol;
 import no.nb.nna.veidemann.chrome.client.DebuggerDomain;
@@ -76,6 +75,8 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
     // TODO: Should be configurable
     boolean followRedirects = true;
 
+    volatile boolean closed = false;
+
     public BrowserSession(DbAdapter db, ChromeDebugProtocol chrome, ConfigProto.CrawlConfig config, QueuedUri queuedUri, BaseSpan span) {
         this.queuedUri = Objects.requireNonNull(queuedUri);
         // Ensure that we at least wait a second even if the configuration says less.
@@ -109,7 +110,7 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
 
             CompletableFuture.allOf(
                     session.debugger.enable(),
-                    session.network.enable(null, null),
+                    session.network.enable(null, null, null),
                     session.page.enable(),
                     session.runtime.enable(),
                     session.security.enable()
@@ -235,10 +236,6 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
         } catch (InterruptedException | ExecutionException | TimeoutException ex) {
             throw new RuntimeException(ex);
         }
-    }
-
-    public void addCrawlLog(CrawlLog.Builder crawlLog) {
-        crawlLogs.addCrawlLog(crawlLog);
     }
 
     public CrawlLogRegistry getCrawlLogs() {
@@ -501,8 +498,15 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
 //        self._wait_for(
 //                lambda: self.websock_thread.got_page_load_event,
 //                timeout=timeout)
+
+
+    public boolean isClosed() {
+        return closed;
+    }
+
     @Override
     public void close() {
+        closed = true;
         if (session != null) {
             session.close();
         }

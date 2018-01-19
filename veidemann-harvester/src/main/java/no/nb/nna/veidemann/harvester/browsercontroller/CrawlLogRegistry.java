@@ -15,9 +15,12 @@
  */
 package no.nb.nna.veidemann.harvester.browsercontroller;
 
+import com.google.protobuf.Timestamp;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlLog.Builder;
+import no.nb.nna.veidemann.commons.ExtraStatusCodes;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
+import no.nb.nna.veidemann.db.ProtoUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -140,18 +143,25 @@ public class CrawlLogRegistry {
 
             while (finishLatch.getCount() > 0) {
                 waitForIdle();
-                innerMatchCrawlLogAndRequest(status);
+                crawlLogsLock.lock();
+                try {
+                    innerMatchCrawlLogAndRequest(status);
 
-                if (!status.allHandled()) {
-                    checkForFileDownload();
-                }
+                    if (!status.allHandled()) {
+                        checkForFileDownload();
+                    }
 
-                if (!status.unhandledRequests.isEmpty()) {
-                    checkForCachedRequests();
-                }
+                    if (!status.unhandledRequests.isEmpty()) {
+                        checkForCachedRequests();
+                    }
 
-                if (status.allHandled()) {
-                    finishLatch.countDown();
+                    if (status.allHandled()) {
+                        finishLatch.countDown();
+                    }
+                } catch (Exception e) {
+                    LOG.error(e.toString(), e);
+                } finally {
+                    crawlLogsLock.unlock();
                 }
             }
 
@@ -177,7 +187,7 @@ public class CrawlLogRegistry {
                     }
                 }
             } catch (InterruptedException e) {
-                e.printStackTrace();
+                LOG.error(e.toString(), e);
             } finally {
                 crawlLogsLock.unlock();
             }
@@ -194,11 +204,11 @@ public class CrawlLogRegistry {
                 crawlLogs.stream()
                         .filter(e -> (e.uri.equals(r.getUrl()) && e.crawlLog.getStatusCode() == r.getStatusCode()))
                         .findFirst().ifPresent(e -> {
-                            LOG.info("Found already resolved CrawlLog for {}. Setting fromCache for request {} to true",
-                                    r.getUrl(), r.getRequestId());
-                            r.setFromProxy(true);
-                            r.setFromCache(true);
-                        });
+                    LOG.info("Found already resolved CrawlLog for {}. Setting fromCache for request {} to true",
+                            r.getUrl(), r.getRequestId());
+                    r.setFromProxy(true);
+                    r.setFromCache(true);
+                });
             }
         }
 
@@ -274,26 +284,43 @@ public class CrawlLogRegistry {
     }
 
     private boolean innerFindRequestForCrawlLog(Entry crawlLogEntry, UriRequest r) {
+        boolean requestFound = false;
+        Timestamp now = ProtoUtils.getNowTs();
         if (r.getCrawlLog() == null
                 && !r.isFromCache()
-                && Objects.equals(r.getUrl(), crawlLogEntry.crawlLog.getRequestedUri())
-                && crawlLogEntry.crawlLog.getStatusCode() == r.getStatusCode()) {
+                && Objects.equals(r.getUrl(), crawlLogEntry.uri)) {
 
-            CrawlLog enrichedCrawlLog = r.setCrawlLog(crawlLogEntry.crawlLog);
-            if (!r.isFromCache()) {
-                db.saveCrawlLog(enrichedCrawlLog);
+            if (crawlLogEntry.isResponseReceived() && crawlLogEntry.crawlLog.getStatusCode() == r.getStatusCode()) {
+                requestFound = true;
+            } else if (r.getStatusCode() == ExtraStatusCodes.CANCELED_BY_BROWSER.getCode()) {
+                if (crawlLogEntry.isResponseReceived()) {
+                    r.setStatusCode(crawlLogEntry.crawlLog.getStatusCode());
+                    requestFound = true;
+                } else {
+                    requestFound = true;
+                }
+            }
+        }
+
+        if (requestFound) {
+            if (crawlLogEntry.isResponseReceived()) {
+                crawlLogEntry.crawlLog.setTimeStamp(now);
+                CrawlLog enrichedCrawlLog = r.setCrawlLog(crawlLogEntry.crawlLog);
+                if (!r.isFromCache()) {
+                    db.saveCrawlLog(enrichedCrawlLog);
+                }
             }
             crawlLogEntry.resolved = true;
-            return true;
+        } else {
+            LOG.trace("Did not find request for {}", crawlLogEntry.uri);
         }
-        LOG.trace("Did not find request for {}", crawlLogEntry.crawlLog.getRequestedUri());
-        return false;
+        return requestFound;
     }
 
     private void innerMatchCrawlLogAndRequest(MatchStatus status) {
         status.reset();
         if (!isCrawlLogsResolved()) {
-            crawlLogs.stream().filter(e -> (e.isResponseReceived() && !e.isResolved()))
+            crawlLogs.stream().filter(e -> (!e.isResolved()))
                     .forEach(e -> findRequestForCrawlLog(e, browserSession.getUriRequests().getInitialRequest()));
             if (!isCrawlLogsResolved()) {
                 LOG.trace("There are still unhandled crawl logs");
@@ -329,9 +356,14 @@ public class CrawlLogRegistry {
             final StringBuilder sb = new StringBuilder();
 
             sb.append("unhandledCrawlLogs={");
-            crawlLogs.stream().filter(e -> !e.isResolved()).forEach(e -> sb.append("\n    [")
-                    .append(e.isResponseReceived() ? e.crawlLog.getStatusCode() : -8888).append(", ")
-                    .append(e.uri).append("], "));
+            crawlLogsLock.lock();
+            try {
+                crawlLogs.stream().filter(e -> !e.isResolved()).forEach(e -> sb.append("\n    [")
+                        .append(e.isResponseReceived() ? e.crawlLog.getStatusCode() : "abort").append(", ")
+                        .append(e.uri).append("], "));
+            } finally {
+                crawlLogsLock.unlock();
+            }
 
             sb.append("}, unhandledRequests={");
             unhandledRequests.forEach(r -> {

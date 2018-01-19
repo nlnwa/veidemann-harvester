@@ -195,7 +195,7 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
     public void setCookies() throws TimeoutException, ExecutionException, InterruptedException {
         LOG.debug("Restoring {} browser cookies", queuedUri.getCookiesCount());
         if (queuedUri.getCookiesCount() > 0) {
-            List l = queuedUri.getCookiesList().stream()
+            List<CookieParam> l = queuedUri.getCookiesList().stream()
                     .map(c -> {
                                 CookieParam nc = new CookieParam();
                                 nc.url = queuedUri.getUri();
@@ -263,7 +263,7 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
                         null, null, headers, null);
             }
         } catch (Throwable ex) {
-            ex.printStackTrace();
+            LOG.error(ex.toString(), ex);
         }
     }
 

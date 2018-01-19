@@ -219,6 +219,11 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
                                     "Failed fetching page: Error '{}', Blocked reason '{}', Resource type: '{}', Canceled: {}, Req: {}",
                                     f.errorText, f.blockedReason, f.type, f.canceled, request.getUrl());
                             request.setStatusCode(ExtraStatusCodes.BLOCKED_MIXED_CONTENT.getCode());
+                        } else if (f.canceled) {
+                            LOG.debug(
+                                    "Failed fetching page: Error '{}', Blocked reason '{}', Resource type: '{}', Canceled: {}, Req: {}",
+                                    f.errorText, f.blockedReason, f.type, f.canceled, request.getUrl());
+                            request.setStatusCode(ExtraStatusCodes.CANCELED_BY_BROWSER.getCode());
                         } else {
                             request.setStatusCode(ExtraStatusCodes.BLOCKED_BY_CUSTOM_PROCESSOR.getCode());
                             LOG.error(

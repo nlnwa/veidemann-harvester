@@ -61,7 +61,7 @@ public class ContentWriter {
     public ContentWriter start() {
         try (DbAdapter db = new RethinkDbAdapter(SETTINGS.getDbHost(), SETTINGS.getDbPort(), SETTINGS.getDbName());
              WarcWriterPool warcWriterPool = new WarcWriterPool(new File(SETTINGS.getWarcDir()),
-                        SETTINGS.getWarcFileSize(), SETTINGS.isCompressWarc(), SETTINGS.getWarcWriterPoolSize());
+                        SETTINGS.getWarcFileSize().toBytes(), SETTINGS.isCompressWarc(), SETTINGS.getWarcWriterPoolSize());
              TextExtractor textExtractor = new TextExtractor();
              ApiServer apiServer = new ApiServer(SETTINGS.getApiPort(), db, warcWriterPool, textExtractor).start();) {
             LOG.info("Veidemann Content Writer (v. {}) started",

@@ -15,6 +15,7 @@
  */
 package no.nb.nna.veidemann.contentwriter.settings;
 
+import com.typesafe.config.ConfigMemorySize;
 import no.nb.nna.veidemann.commons.settings.CommonSettings;
 
 /**
@@ -28,7 +29,7 @@ public class Settings extends CommonSettings {
 
     private int warcWriterPoolSize;
 
-    private long warcFileSize;
+    private ConfigMemorySize warcFileSize;
 
     private boolean compressWarc;
 
@@ -60,11 +61,11 @@ public class Settings extends CommonSettings {
         this.warcWriterPoolSize = warcWriterPoolSize;
     }
 
-    public long getWarcFileSize() {
+    public ConfigMemorySize getWarcFileSize() {
         return warcFileSize;
     }
 
-    public void setWarcFileSize(long warcFileSize) {
+    public void setWarcFileSize(ConfigMemorySize warcFileSize) {
         this.warcFileSize = warcFileSize;
     }
 

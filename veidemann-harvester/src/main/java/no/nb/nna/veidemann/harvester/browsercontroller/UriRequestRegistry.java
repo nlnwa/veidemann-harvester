@@ -215,14 +215,10 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
                     // Only set status code if not set from proxy already
                     if (request.getStatusCode() == 0) {
                         if ("mixed-content".equals(f.blockedReason)) {
-                            LOG.debug(
-                                    "Failed fetching page: Error '{}', Blocked reason '{}', Resource type: '{}', Canceled: {}, Req: {}",
-                                    f.errorText, f.blockedReason, f.type, f.canceled, request.getUrl());
+                            LOG.debug("Resource blocked due to mixed-content");
                             request.setStatusCode(ExtraStatusCodes.BLOCKED_MIXED_CONTENT.getCode());
                         } else if (f.canceled) {
-                            LOG.debug(
-                                    "Failed fetching page: Error '{}', Blocked reason '{}', Resource type: '{}', Canceled: {}, Req: {}",
-                                    f.errorText, f.blockedReason, f.type, f.canceled, request.getUrl());
+                            LOG.debug("Resource canceled by browser: Error '{}', Blocked reason '{}'", f.errorText, f.blockedReason);
                             request.setStatusCode(ExtraStatusCodes.CANCELED_BY_BROWSER.getCode());
                         } else {
                             request.setStatusCode(ExtraStatusCodes.BLOCKED_BY_CUSTOM_PROCESSOR.getCode());
@@ -232,8 +228,8 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
                         }
                     } else {
                         LOG.error(
-                                "Failed fetching page: Error '{}', Blocked reason '{}', Resource type: '{}', Canceled: {}, Req: {}",
-                                f.errorText, f.blockedReason, f.type, f.canceled, request.getUrl());
+                                "Failed fetching page: Error '{}', Blocked reason '{}', Resource type: '{}', Canceled: {}, Status from proxy: {}",
+                                f.errorText, f.blockedReason, f.type, f.canceled, request.getStatusCode());
                     }
 
                     // TODO: Add information to pagelog

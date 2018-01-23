@@ -29,6 +29,7 @@ public final class Main {
     /**
      * Start the server.
      * <p>
+     *
      * @param args the command line arguments
      */
     public static void main(String[] args) {
@@ -36,6 +37,7 @@ public final class Main {
         // This is necessary to be able to replace the LogManager. The system property must be set before any other
         // logging is even loaded.
         System.setProperty("java.util.logging.manager", "org.apache.logging.log4j.jul.LogManager");
+        System.setProperty("log4j2.disable.jmx", "true");
 
         new RobotsServer().start();
     }

@@ -43,7 +43,7 @@ public class SingleWarcWriterTest {
             file.delete();
         }
 
-        try (SingleWarcWriter instance = new SingleWarcWriter(targetDir, maxFileSize, compress, 1);) {
+        try (SingleWarcWriter instance = new SingleWarcWriter("f", targetDir, maxFileSize, compress, "Host");) {
             for (int i = 0; i < 10; i++) {
 //                DbObjectFactory.of(CrawlLog.class, "{\n"
 //                        + "\"contentType\":  \"image/gif\" ,\n"

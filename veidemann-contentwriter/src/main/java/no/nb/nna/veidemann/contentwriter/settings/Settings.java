@@ -25,7 +25,11 @@ public class Settings extends CommonSettings {
 
     private int apiPort;
 
+    private String hostName;
+
     private String warcDir;
+
+    private String filePrefix;
 
     private int warcWriterPoolSize;
 
@@ -45,12 +49,28 @@ public class Settings extends CommonSettings {
         this.apiPort = apiPort;
     }
 
+    public String getHostName() {
+        return hostName;
+    }
+
+    public void setHostName(String hostName) {
+        this.hostName = hostName;
+    }
+
     public String getWarcDir() {
         return warcDir;
     }
 
     public void setWarcDir(String warcDir) {
         this.warcDir = warcDir;
+    }
+
+    public String getFilePrefix() {
+        return filePrefix;
+    }
+
+    public void setFilePrefix(String filePrefix) {
+        this.filePrefix = filePrefix;
     }
 
     public int getWarcWriterPoolSize() {

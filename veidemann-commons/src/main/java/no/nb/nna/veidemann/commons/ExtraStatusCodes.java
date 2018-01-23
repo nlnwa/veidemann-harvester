@@ -43,6 +43,7 @@ public enum ExtraStatusCodes {
     BLOCKED(-5001, "Blocked from fetch by user setting."),
     BLOCKED_BY_CUSTOM_PROCESSOR(-5002, "Blocked by a custom processor."),
     BLOCKED_MIXED_CONTENT(-5010, "Blocked because insecure content was loaded from secure context."),
+    CANCELED_BY_BROWSER(-5011, "The browser driving the fetch canceled the request."),
     QUOTA_EXCEEDED(-5003, "Blocked due to exceeding an established quota."),
     RUNTIME_EXCEEDED(-5004, "Blocked due to exceeding an established runtime"),
     DELETED_FROM_FRONTIER(-6000, "Deleted from Frontier by user."),

@@ -45,8 +45,8 @@ public class SingleWarcWriter implements AutoCloseable {
 
     WarcFileWriter warcFileWriter;
 
-    public SingleWarcWriter(File targetDir, long maxFileSize, boolean compress, int seq) {
-        WarcFileNaming warcFileNaming = new WarcFileNamingDefault("test", null, "host-" + seq, null);
+    public SingleWarcWriter(String filePrefix, File targetDir, long maxFileSize, boolean compress, String hostName) {
+        WarcFileNaming warcFileNaming = new VeidemannWarcFileNaming(filePrefix, hostName);
         WarcFileWriterConfig writerConfig = new WarcFileWriterConfig(targetDir, compress, maxFileSize, false);
         warcFileWriter = WarcFileWriter.getWarcWriterInstance(warcFileNaming, writerConfig);
     }

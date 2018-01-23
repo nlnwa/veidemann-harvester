@@ -25,9 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -49,9 +47,6 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
     private final QueuedUri rootRequestUri;
 
     private final String executionId;
-
-    // List of all requests since redirects reuses requestId
-    private final List<UriRequest> allRequests = new ArrayList<>();
 
     private final Map<String, UriRequest> requestsByRequestId = new HashMap<>();
 
@@ -98,10 +93,6 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
             if (pageRequest.isRootResource()) {
                 rootRequest = pageRequest;
             }
-            if (allRequests.contains(pageRequest)) {
-                LOG.error("Request {} already added to allRequests", pageRequest.getRequestId());
-            }
-            allRequests.add(pageRequest);
             requestsByRequestId.put(pageRequest.getRequestId(), pageRequest);
 
             pageRequest.start();
@@ -119,20 +110,33 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
         return initialRequest;
     }
 
-    public List<UriRequest> getAllRequests() {
-        return allRequests;
+    public Stream<UriRequest> getRequestStream() {
+        Stream.Builder<UriRequest> streamBuilder = Stream.builder();
+        buildStream(initialRequest, streamBuilder);
+        return streamBuilder.build();
+    }
+
+    private void buildStream(UriRequest r, Stream.Builder<UriRequest> streamBuilder) {
+        if (r == null) {
+            return;
+        }
+
+        streamBuilder.add(r);
+        for (UriRequest c : r.getChildren()) {
+            buildStream(c, streamBuilder);
+        }
     }
 
     public long getBytesDownloaded() {
-        return allRequests.stream().mapToLong(r -> r.getSize()).sum();
+        return getRequestStream().filter(r -> (!r.isFromCache() && r.isFromProxy())).mapToLong(r -> r.getSize()).sum();
     }
 
     public int getUriDownloadedCount() {
-        return (int) allRequests.stream().filter(r -> !r.isFromCache()).count();
+        return (int) getRequestStream().filter(r -> (!r.isFromCache() && r.isFromProxy())).count();
     }
 
     public Stream<Resource> getPageLogResources() {
-        return allRequests.stream()
+        return getRequestStream()
                 .map(r -> {
                     Resource.Builder b = Resource.newBuilder()
                             .setUri(r.getUrl())
@@ -156,8 +160,9 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
     }
 
     void onRequestWillBeSent(NetworkDomain.RequestWillBeSent request) {
-        LOG.debug("Request will be sent: {}", request.requestId);
         resolveCurrentUriRequest(request.requestId).ifPresent(parent -> {
+            LOG.debug("Request will be sent: {}", request.requestId);
+
             // Already got request for this id
             if (request.redirectResponse == null) {
                 LOG.error("Already got request, but no redirect");
@@ -169,6 +174,9 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
                 add(uriRequest);
             }
         }).otherwise(() -> {
+            MDC.put("uri", request.request.url);
+            LOG.debug("Request will be sent: {}", request.requestId);
+
             UriRequest uriRequest;
             if (getRootRequest() == null) {
                 // New request
@@ -207,10 +215,21 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
                     // Only set status code if not set from proxy already
                     if (request.getStatusCode() == 0) {
                         if ("mixed-content".equals(f.blockedReason)) {
+                            LOG.debug("Resource blocked due to mixed-content");
                             request.setStatusCode(ExtraStatusCodes.BLOCKED_MIXED_CONTENT.getCode());
+                        } else if (f.canceled) {
+                            LOG.debug("Resource canceled by browser: Error '{}', Blocked reason '{}'", f.errorText, f.blockedReason);
+                            request.setStatusCode(ExtraStatusCodes.CANCELED_BY_BROWSER.getCode());
                         } else {
                             request.setStatusCode(ExtraStatusCodes.BLOCKED_BY_CUSTOM_PROCESSOR.getCode());
+                            LOG.error(
+                                    "Failed fetching page: Error '{}', Blocked reason '{}', Resource type: '{}', Canceled: {}, Req: {}",
+                                    f.errorText, f.blockedReason, f.type, f.canceled, request.getUrl());
                         }
+                    } else {
+                        LOG.error(
+                                "Failed fetching page: Error '{}', Blocked reason '{}', Resource type: '{}', Canceled: {}, Status from proxy: {}",
+                                f.errorText, f.blockedReason, f.type, f.canceled, request.getStatusCode());
                     }
 
                     // TODO: Add information to pagelog
@@ -227,7 +246,7 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
     void onResponseReceived(NetworkDomain.ResponseReceived r) {
         resolveCurrentUriRequest(r.requestId);
 
-        LOG.debug("Response received. rId{}, size: {}, status: {}", r.requestId, r.response.encodedDataLength, r.response.status);
+        LOG.debug("Response received. rId{}, size: {}, status: {}, cache: {}", r.requestId, r.response.encodedDataLength, r.response.status, r.response.fromDiskCache);
         allRequestsLock.lock();
         try {
             UriRequest request = getByRequestId(r.requestId);
@@ -235,7 +254,7 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
                 LOG.error(
                         "Response received, but we missed the request: reqId '{}', loaderId '{}', ts '{}', type '{}', resp '{}', frameId '{}'",
                         r.requestId, r.loaderId, r.timestamp, r.type, r.response, r.frameId);
-                LOG.trace("Registry state:\n" + toString("  "));
+                LOG.trace("Registry state:\n{}", toString("  "));
                 crawlLogRegistry.signalActivity();
             } else {
                 request.addResponse(r);
@@ -255,7 +274,7 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
     @Override
     public synchronized void close() {
         // Ensure that potentially unfinished spans are finshed
-        allRequests.forEach(r -> r.finish(crawlLogRegistry));
+        getRequestStream().forEach(r -> r.finish(crawlLogRegistry));
     }
 
     public void printAllRequests() {

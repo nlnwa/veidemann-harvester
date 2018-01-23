@@ -70,7 +70,7 @@ public class Frontier implements AutoCloseable {
             QueuedUriWrapper qUri = QueuedUriWrapper.getQueuedUriWrapper(this, uri);
             Preconditions
                     .checkPreconditions(this, job.getCrawlConfig(), status, qUri, 1L);
-            LOG.debug("Seed '{}' added to queue" + qUri.getUri());
+            LOG.debug("Seed '{}' added to queue", qUri.getUri());
         } catch (URISyntaxException ex) {
             status.incrementDocumentsFailed()
                     .setEndState(CrawlExecutionStatus.State.FAILED)

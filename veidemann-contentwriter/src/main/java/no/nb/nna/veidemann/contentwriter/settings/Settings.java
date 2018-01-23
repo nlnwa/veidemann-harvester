@@ -15,6 +15,7 @@
  */
 package no.nb.nna.veidemann.contentwriter.settings;
 
+import com.typesafe.config.ConfigMemorySize;
 import no.nb.nna.veidemann.commons.settings.CommonSettings;
 
 /**
@@ -24,11 +25,15 @@ public class Settings extends CommonSettings {
 
     private int apiPort;
 
+    private String hostName;
+
     private String warcDir;
+
+    private String filePrefix;
 
     private int warcWriterPoolSize;
 
-    private long warcFileSize;
+    private ConfigMemorySize warcFileSize;
 
     private boolean compressWarc;
 
@@ -44,12 +49,28 @@ public class Settings extends CommonSettings {
         this.apiPort = apiPort;
     }
 
+    public String getHostName() {
+        return hostName;
+    }
+
+    public void setHostName(String hostName) {
+        this.hostName = hostName;
+    }
+
     public String getWarcDir() {
         return warcDir;
     }
 
     public void setWarcDir(String warcDir) {
         this.warcDir = warcDir;
+    }
+
+    public String getFilePrefix() {
+        return filePrefix;
+    }
+
+    public void setFilePrefix(String filePrefix) {
+        this.filePrefix = filePrefix;
     }
 
     public int getWarcWriterPoolSize() {
@@ -60,11 +81,11 @@ public class Settings extends CommonSettings {
         this.warcWriterPoolSize = warcWriterPoolSize;
     }
 
-    public long getWarcFileSize() {
+    public ConfigMemorySize getWarcFileSize() {
         return warcFileSize;
     }
 
-    public void setWarcFileSize(long warcFileSize) {
+    public void setWarcFileSize(ConfigMemorySize warcFileSize) {
         this.warcFileSize = warcFileSize;
     }
 

@@ -41,7 +41,7 @@
         <maven.compiler.target>1.8</maven.compiler.target>
         <docker.tag>latest</docker.tag>
 
-        <chrome.version>64.0.3282.24</chrome.version>
+        <chrome.version>65.0.3322.3</chrome.version>
         <docker.java.image>openjdk:8u151-jdk-alpine</docker.java.image>
 
         <log4j.version>2.7</log4j.version>
@@ -52,9 +52,9 @@
         <io.opentracing.version>0.30.0</io.opentracing.version>
         <io.opentracing.brave.version>0.20.0</io.opentracing.brave.version>
         <com.uber.jaeger.version>0.21.0</com.uber.jaeger.version>
-        <io.grpc.version>1.7.1</io.grpc.version>
-        <io.grpc.protoc-gen-grpc-java.version>1.7.0</io.grpc.protoc-gen-grpc-java.version>
-        <com.google.protobuf.protoc.version>3.4.0</com.google.protobuf.protoc.version>
+        <io.grpc.version>1.9.0</io.grpc.version>
+        <io.grpc.protoc-gen-grpc-java.version>1.9.0</io.grpc.protoc-gen-grpc-java.version>
+        <com.google.protobuf.protoc.version>3.5.1</com.google.protobuf.protoc.version>
         <io.zipkin.reporter.version>0.10.0</io.zipkin.reporter.version>
         <io.zipkin.brave.version>4.3.4</io.zipkin.brave.version>
         <antlr.version>4.7</antlr.version>
@@ -172,7 +172,7 @@
             </dependency>
             <dependency>
                 <groupId>io.grpc</groupId>
-                <artifactId>grpc-netty</artifactId>
+                <artifactId>grpc-netty-shaded</artifactId>
                 <version>${io.grpc.version}</version>
             </dependency>
             <dependency>

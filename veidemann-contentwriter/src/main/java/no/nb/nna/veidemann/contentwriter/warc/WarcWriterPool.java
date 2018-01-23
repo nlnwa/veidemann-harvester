@@ -27,6 +27,10 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class WarcWriterPool implements AutoCloseable {
 
+    private final String filePrefix;
+
+    private final String hostName;
+
     private final File targetDir;
 
     private final long maxFileSize;
@@ -44,7 +48,10 @@ public class WarcWriterPool implements AutoCloseable {
      * <p>
      * @param poolSize maximum number of writers residing in the pool
      */
-    public WarcWriterPool(final File targetDir, final long maxFileSize, final boolean compress, final int poolSize) {
+    public WarcWriterPool(final String filePrefix, final File targetDir, final long maxFileSize, final boolean compress,
+                          final int poolSize, final String hostName) {
+        this.hostName = hostName;
+        this.filePrefix = filePrefix;
         this.targetDir = targetDir;
         this.maxFileSize = maxFileSize;
         this.compress = compress;
@@ -95,7 +102,7 @@ public class WarcWriterPool implements AutoCloseable {
                 pool = new LinkedBlockingDeque<>();
 
                 for (int i = 0; i < poolSize.get(); i++) {
-                    pool.add(new PooledWarcWriter(new SingleWarcWriter(targetDir, maxFileSize, compress, i)));
+                    pool.add(new PooledWarcWriter(new SingleWarcWriter(filePrefix, targetDir, maxFileSize, compress, hostName)));
                 }
                 closed.set(false);
             } else {

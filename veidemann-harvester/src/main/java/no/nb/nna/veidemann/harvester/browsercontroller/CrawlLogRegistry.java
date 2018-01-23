@@ -15,9 +15,12 @@
  */
 package no.nb.nna.veidemann.harvester.browsercontroller;
 
+import com.google.protobuf.Timestamp;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlLog.Builder;
+import no.nb.nna.veidemann.commons.ExtraStatusCodes;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
+import no.nb.nna.veidemann.db.ProtoUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -37,7 +40,7 @@ public class CrawlLogRegistry {
     private final DbAdapter db;
     private final BrowserSession browserSession;
 
-    private final List<Builder> crawlLogs = new ArrayList<>();
+    private final List<Entry> crawlLogs = new ArrayList<>();
     private final Lock crawlLogsLock = new ReentrantLock();
     private final Condition crawlLogsUpdate = crawlLogsLock.newCondition();
 
@@ -49,6 +52,37 @@ public class CrawlLogRegistry {
     private long startTime = System.currentTimeMillis();
     private long lastActivityTime = System.currentTimeMillis();
 
+    public class Entry {
+        long proxyRequestId;
+        String uri;
+        CrawlLog.Builder crawlLog;
+        boolean resolved = false;
+
+        public Entry(long proxyRequestId, String uri) {
+            this.proxyRequestId = proxyRequestId;
+            this.uri = uri;
+        }
+
+        public void setCrawlLog(Builder crawlLog) {
+            crawlLogsLock.lock();
+            try {
+                this.crawlLog = crawlLog;
+                lastActivityTime = System.currentTimeMillis();
+                crawlLogsUpdate.signalAll();
+            } finally {
+                crawlLogsLock.unlock();
+            }
+        }
+
+        boolean isResponseReceived() {
+            return crawlLog != null;
+        }
+
+        boolean isResolved() {
+            return resolved;
+        }
+    }
+
     public CrawlLogRegistry(final DbAdapter db, final BrowserSession session, final long pageLoadTimeout, final long maxIdleTime) {
         this.db = db;
         this.browserSession = session;
@@ -58,12 +92,14 @@ public class CrawlLogRegistry {
         matcherThread.start();
     }
 
-    public void addCrawlLog(CrawlLog.Builder crawlLog) {
+    public Entry registerProxyRequest(long proxyRequestId, String uri) {
         crawlLogsLock.lock();
         try {
-            crawlLogs.add(crawlLog);
+            Entry crawlLogEntry = new Entry(proxyRequestId, uri);
+            crawlLogs.add(crawlLogEntry);
             lastActivityTime = System.currentTimeMillis();
             crawlLogsUpdate.signalAll();
+            return crawlLogEntry;
         } finally {
             crawlLogsLock.unlock();
         }
@@ -88,19 +124,10 @@ public class CrawlLogRegistry {
         }
     }
 
-    public void deleteCrawlLog(CrawlLog.Builder crawlLog) {
+    private boolean isCrawlLogsResolved() {
         crawlLogsLock.lock();
         try {
-            crawlLogs.remove(crawlLog);
-        } finally {
-            crawlLogsLock.unlock();
-        }
-    }
-
-    public List<CrawlLog.Builder> getCrawlLogs() {
-        crawlLogsLock.lock();
-        try {
-            return new ArrayList<>(crawlLogs);
+            return crawlLogs.stream().allMatch(e -> e.resolved);
         } finally {
             crawlLogsLock.unlock();
         }
@@ -116,14 +143,25 @@ public class CrawlLogRegistry {
 
             while (finishLatch.getCount() > 0) {
                 waitForIdle();
-                innerMatchCrawlLogAndRequest(status);
+                crawlLogsLock.lock();
+                try {
+                    innerMatchCrawlLogAndRequest(status);
 
-                if (!status.allHandled()) {
-                    checkForFileDownload();
-                }
+                    if (!status.allHandled()) {
+                        checkForFileDownload();
+                    }
 
-                if (status.allHandled()) {
-                    finishLatch.countDown();
+                    if (!status.unhandledRequests.isEmpty()) {
+                        checkForCachedRequests();
+                    }
+
+                    if (status.allHandled()) {
+                        finishLatch.countDown();
+                    }
+                } catch (Exception e) {
+                    LOG.error(e.toString(), e);
+                } finally {
+                    crawlLogsLock.unlock();
                 }
             }
 
@@ -149,33 +187,56 @@ public class CrawlLogRegistry {
                     }
                 }
             } catch (InterruptedException e) {
-                e.printStackTrace();
+                LOG.error(e.toString(), e);
             } finally {
                 crawlLogsLock.unlock();
             }
         }
     }
 
+    private void checkForCachedRequests() {
+        for (UriRequest r : status.unhandledRequests) {
+            boolean isWaitingForResponse = crawlLogs.stream()
+                    .filter(e -> e.uri.equals(r.getUrl()))
+                    .anyMatch(e -> !e.isResponseReceived());
+
+            if (!isWaitingForResponse) {
+                crawlLogs.stream()
+                        .filter(e -> (e.uri.equals(r.getUrl()) && e.crawlLog.getStatusCode() == r.getStatusCode()))
+                        .findFirst().ifPresent(e -> {
+                    LOG.info("Found already resolved CrawlLog for {}. Setting fromCache for request {} to true",
+                            r.getUrl(), r.getRequestId());
+                    r.setFromProxy(true);
+                    r.setFromCache(true);
+                });
+            }
+        }
+
+        innerMatchCrawlLogAndRequest(status);
+    }
+
+    /**
+     * TODO: When there are crawllogs, but no request events have been received, then this is probably
+     * a file download. At the moment we are creating UriRequests to simulate events. This should be
+     * refactored into real events as soon as Chrome supports it.
+     * https://bugs.chromium.org/p/chromium/issues/detail?id=696481
+     */
     private void checkForFileDownload() {
-        // TODO: When there are crawllogs, but no request events have been received, then this is probably
-        // a file download. At the moment we are creating UriRequests to simulate events. This should be
-        // refactored into real events as soon as Chrome supports it.
-        // https://bugs.chromium.org/p/chromium/issues/detail?id=696481
         if (browserSession.getUriRequests().getInitialRequest() == null) {
             LOG.info("Guessing that we are downloading a file. Status: {}", status);
             crawlLogs.forEach(c -> {
                 browserSession.getUriRequests().resolveCurrentUriRequest("1").ifPresent(parent -> {
                     UriRequest r = UriRequest.create("1",
-                            c.getRequestedUri(), browserSession.queuedUri.getReferrer(), ResourceType.Other,
+                            c.crawlLog.getRequestedUri(), browserSession.queuedUri.getReferrer(), ResourceType.Other,
                             'R', parent, browserSession.getUriRequests().getPageSpan());
-                    r.setStatusCode(c.getStatusCode());
+                    r.setStatusCode(c.crawlLog.getStatusCode());
                     browserSession.getUriRequests().add(r);
                 }).otherwise(() -> {
                     // No parent, this is a root request;
                     UriRequest r = UriRequest.createRoot("1",
-                            c.getRequestedUri(), browserSession.queuedUri.getReferrer(), ResourceType.Other,
+                            c.crawlLog.getRequestedUri(), browserSession.queuedUri.getReferrer(), ResourceType.Other,
                             browserSession.queuedUri.getDiscoveryPath(), browserSession.getUriRequests().getPageSpan());
-                    r.setStatusCode(c.getStatusCode());
+                    r.setStatusCode(c.crawlLog.getStatusCode());
                     browserSession.getUriRequests().add(r);
                 });
             });
@@ -206,72 +267,88 @@ public class CrawlLogRegistry {
         }
     }
 
-    private boolean findRequestForCrawlLog(CrawlLog.Builder crawlLog, UriRequest r) {
+    private boolean findRequestForCrawlLog(Entry crawlLogEntry, UriRequest r) {
         if (r == null) {
             return false;
         }
 
-        if (innerFindRequestForCrawlLog(crawlLog, r)) {
+        if (innerFindRequestForCrawlLog(crawlLogEntry, r)) {
             return true;
         }
         for (UriRequest c : r.getChildren()) {
-            if (findRequestForCrawlLog(crawlLog, c)) {
+            if (findRequestForCrawlLog(crawlLogEntry, c)) {
                 return true;
             }
         }
         return false;
     }
 
-    private boolean innerFindRequestForCrawlLog(CrawlLog.Builder crawlLog, UriRequest r) {
+    private boolean innerFindRequestForCrawlLog(Entry crawlLogEntry, UriRequest r) {
+        boolean requestFound = false;
+        Timestamp now = ProtoUtils.getNowTs();
         if (r.getCrawlLog() == null
                 && !r.isFromCache()
-                && Objects.equals(r.getUrl(), crawlLog.getRequestedUri())
-                && crawlLog.getStatusCode() == r.getStatusCode()) {
+                && Objects.equals(r.getUrl(), crawlLogEntry.uri)) {
 
-            CrawlLog enrichedCrawlLog = r.setCrawlLog(crawlLog);
-            if (!r.isFromCache()) {
-                db.saveCrawlLog(enrichedCrawlLog);
+            if (crawlLogEntry.isResponseReceived() && crawlLogEntry.crawlLog.getStatusCode() == r.getStatusCode()) {
+                requestFound = true;
+            } else if (r.getStatusCode() == ExtraStatusCodes.CANCELED_BY_BROWSER.getCode()) {
+                if (crawlLogEntry.isResponseReceived()) {
+                    r.setStatusCode(crawlLogEntry.crawlLog.getStatusCode());
+                    requestFound = true;
+                } else {
+                    requestFound = true;
+                }
             }
-            deleteCrawlLog(crawlLog);
-            return true;
         }
-        LOG.trace("Did not find request for {}", crawlLog.getRequestedUri());
-        return false;
+
+        if (requestFound) {
+            if (crawlLogEntry.isResponseReceived()) {
+                crawlLogEntry.crawlLog.setTimeStamp(now);
+                CrawlLog enrichedCrawlLog = r.setCrawlLog(crawlLogEntry.crawlLog);
+                if (!r.isFromCache()) {
+                    db.saveCrawlLog(enrichedCrawlLog);
+                }
+            }
+            crawlLogEntry.resolved = true;
+        } else {
+            LOG.trace("Did not find request for {}", crawlLogEntry.uri);
+        }
+        return requestFound;
     }
 
     private void innerMatchCrawlLogAndRequest(MatchStatus status) {
         status.reset();
-        List<CrawlLog.Builder> crawlLogList = getCrawlLogs();
-        if (!crawlLogList.isEmpty()) {
-            for (CrawlLog.Builder c : crawlLogList) {
-                findRequestForCrawlLog(c, browserSession.getUriRequests().getInitialRequest());
-            }
-            crawlLogList = getCrawlLogs();
-            if (!crawlLogList.isEmpty()) {
-                LOG.trace("There are still {} unhandled crawl logs", crawlLogList.size());
-                status.unhandledCrawlLogs.addAll(crawlLogList);
+        if (!isCrawlLogsResolved()) {
+            crawlLogs.stream().filter(e -> (!e.isResolved()))
+                    .forEach(e -> findRequestForCrawlLog(e, browserSession.getUriRequests().getInitialRequest()));
+            if (!isCrawlLogsResolved()) {
+                LOG.trace("There are still unhandled crawl logs");
             }
         }
-        for (UriRequest re : browserSession.getUriRequests().getAllRequests()) {
-            if (!re.isFromCache() && re.isFromProxy() && re.getStatusCode() >= 0 && re.getCrawlLog() == null) {
+
+        browserSession.getUriRequests().getRequestStream().forEach(re -> {
+            if (re.getCrawlLog() == null) {
                 LOG.trace("Missing CrawlLog for {} {} {} {}", re.getRequestId(), re.getStatusCode(), re.getUrl(),
                         re.getDiscoveryPath());
-                status.unhandledRequests.add(re);
+
+                // Only requests that comes from the origin server should be added to the unhandled requests list
+                if (!re.isFromCache() && re.isFromProxy() && re.getStatusCode() >= 0) {
+                    status.unhandledRequests.add(re);
+                }
             }
-        }
+        });
     }
 
     private class MatchStatus {
-        List<CrawlLog.Builder> unhandledCrawlLogs = new ArrayList<>();
         List<UriRequest> unhandledRequests = new ArrayList<>();
 
         void reset() {
-            unhandledCrawlLogs.clear();
             unhandledRequests.clear();
         }
 
         boolean allHandled() {
-            return unhandledCrawlLogs.isEmpty() && unhandledRequests.isEmpty();
+            return isCrawlLogsResolved() && unhandledRequests.isEmpty();
         }
 
         @Override
@@ -279,8 +356,14 @@ public class CrawlLogRegistry {
             final StringBuilder sb = new StringBuilder();
 
             sb.append("unhandledCrawlLogs={");
-            unhandledCrawlLogs.forEach(c -> sb.append("\n    [").append(c.getStatusCode()).append(", ")
-                    .append(c.getRequestedUri()).append("], "));
+            crawlLogsLock.lock();
+            try {
+                crawlLogs.stream().filter(e -> !e.isResolved()).forEach(e -> sb.append("\n    [")
+                        .append(e.isResponseReceived() ? e.crawlLog.getStatusCode() : "abort").append(", ")
+                        .append(e.uri).append("], "));
+            } finally {
+                crawlLogsLock.unlock();
+            }
 
             sb.append("}, unhandledRequests={");
             unhandledRequests.forEach(r -> {

@@ -40,7 +40,7 @@ public class BrowserSessionRegistry implements VeidemannHeaderConstants {
     public synchronized BrowserSession get(String executionId) {
         BrowserSession session = executionIdToSession.get(executionId);
         if (session == null) {
-            LOG.error("Missing session for executionId {}", executionId);
+            LOG.debug("Missing session for executionId {}", executionId);
         }
         return session;
     }

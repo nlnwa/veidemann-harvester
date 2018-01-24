@@ -16,13 +16,13 @@
 
 package no.nb.nna.veidemann.chrome.client.codegen;
 
-import java.util.List;
-import java.util.Map;
-
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.ParameterSpec;
 import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeName;
+
+import java.util.List;
+import java.util.Map;
 
 /**
  *

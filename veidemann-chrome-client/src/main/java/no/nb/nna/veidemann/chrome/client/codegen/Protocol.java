@@ -15,16 +15,16 @@
  */
 package no.nb.nna.veidemann.chrome.client.codegen;
 
+import com.squareup.javapoet.AnnotationSpec;
+import com.squareup.javapoet.JavaFile;
+
+import javax.annotation.Generated;
 import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import com.squareup.javapoet.AnnotationSpec;
-import com.squareup.javapoet.JavaFile;
-import javax.annotation.Generated;
 
 /**
  *

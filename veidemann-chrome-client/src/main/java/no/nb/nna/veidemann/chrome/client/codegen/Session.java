@@ -15,6 +15,17 @@
  */
 package no.nb.nna.veidemann.chrome.client.codegen;
 
+import com.squareup.javapoet.ClassName;
+import com.squareup.javapoet.CodeBlock;
+import com.squareup.javapoet.FieldSpec;
+import com.squareup.javapoet.JavaFile;
+import com.squareup.javapoet.MethodSpec;
+import com.squareup.javapoet.ParameterSpec;
+import com.squareup.javapoet.TypeSpec;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.lang.model.element.Modifier;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
@@ -23,17 +34,6 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-
-import com.squareup.javapoet.ClassName;
-import com.squareup.javapoet.CodeBlock;
-import com.squareup.javapoet.FieldSpec;
-import com.squareup.javapoet.JavaFile;
-import com.squareup.javapoet.MethodSpec;
-import com.squareup.javapoet.ParameterSpec;
-import com.squareup.javapoet.TypeSpec;
-import javax.lang.model.element.Modifier;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  *

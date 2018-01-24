@@ -115,7 +115,185 @@
                     </excludes>
                 </configuration>
             </plugin>
+            <plugin>
+                <groupId>io.fabric8</groupId>
+                <artifactId>docker-maven-plugin</artifactId>
+                <configuration>
+                    <images>
+                        <image>
+                            <name>norsknettarkiv/testsites</name>
+                            <alias>testsites</alias>
+                            <run>
+                                <ports>
+                                    <port>+test.http.host:test.http.port:80</port>
+                                    <port>+test.dns.host:test.dns.port:53</port>
+                                </ports>
+                                <log>
+                                    <enabled>false</enabled>
+                                </log>
+                                <wait>
+                                    <tcp>
+                                        <mode>mapped</mode>
+                                        <ports>
+                                            <port>80</port>
+                                            <port>53</port>
+                                        </ports>
+                                    </tcp>
+                                    <time>20000</time>
+                                </wait>
+                            </run>
+                        </image>
+                        <image>
+                            <name>norsknettarkiv/chrome-headless:${chrome.version}</name>
+                            <alias>browser</alias>
+                            <run>
+                                <user>${uid}</user>
+                                <ports>
+                                    <port>+browser.host:browser.port:9222</port>
+                                </ports>
+                                <env>
+                                    <CHROME_OPTS>--ignore-certificate-errors --disable-web-security --allow-running-insecure-content --dbus-stub --hide-scrollbars</CHROME_OPTS>
+                                </env>
+                                <!-- 1GB -->
+                                <memory>1073741824</memory>
+                                <shmSize>1073741824</shmSize>
+                                <volumes>
+                                    <bind>
+                                        <volume>${project.build.directory}/it-workdir:/data</volume>
+                                    </bind>
+                                </volumes>
+                                <log>
+                                    <enabled>true</enabled>
+                                </log>
+                                <dns>${test.dns.host}</dns>
+                                <wait>
+                                    <!--<tcp>-->
+                                        <!--<mode>mapped</mode>-->
+                                        <!--<ports>-->
+                                            <!--<port>9222</port>-->
+                                        <!--</ports>-->
+                                    <!--</tcp>-->
+                                    <time>20000</time>
+                                    <log>Starting Chrome version: ${chrome.version}-1</log>
+                                </wait>
+                                <dependsOn>
+                                    <container>testsites</container>
+                                </dependsOn>
+                            </run>
+                        </image>
+                    </images>
+                </configuration>
+            </plugin>
         </plugins>
 
     </build>
+    <profiles>
+        <profile>
+            <id>integration-tests</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.gmaven</groupId>
+                        <artifactId>groovy-maven-plugin</artifactId>
+                        <version>2.0</version>
+                        <executions>
+                            <execution>
+                                <phase>generate-resources</phase>
+                                <goals>
+                                    <goal>execute</goal>
+                                </goals>
+                                <configuration>
+                                    <source>
+                                        def proc = 'id -u'.execute()
+                                        proc.waitForOrKill(1000)
+                                        if (proc.exitValue()) {
+                                            def err = new StringBuffer()
+                                            proc.consumeProcessErrorStream(err)
+                                            throw new RuntimeException("ERROR: " + err.toString())
+                                        }
+                                        project.properties.uid = proc.text.trim()
+
+                                        new File('${project.build.directory}/it-workdir/certificates').mkdirs()
+                                    </source>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>build-helper-maven-plugin</artifactId>
+                        <version>3.0.0</version>
+                        <executions>
+                            <execution>
+                                <id>get-local-ip</id>
+                                <goals>
+                                    <goal>local-ip</goal>
+                                </goals>
+                                <configuration>
+                                    <localIpProperty>proxy.ip</localIpProperty>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>reserve-network-port</id>
+                                <goals>
+                                    <goal>reserve-network-port</goal>
+                                </goals>
+                                <phase>process-resources</phase>
+                                <configuration>
+                                    <portNames>
+                                        <portName>proxy.port</portName>
+                                    </portNames>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>io.fabric8</groupId>
+                        <artifactId>docker-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>prepare-tests</id>
+                                <phase>pre-integration-test</phase>
+                                <goals>
+                                    <goal>start</goal>
+                                </goals>
+                            </execution>
+                            <execution>
+                                <id>remove-tests</id>
+                                <phase>post-integration-test</phase>
+                                <goals>
+                                    <goal>stop</goal>
+                                </goals>
+                                <configuration>
+                                    <removeVolumes>true</removeVolumes>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-failsafe-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <goals>
+                                    <goal>integration-test</goal>
+                                    <goal>verify</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                        <configuration>
+                            <systemPropertyVariables>
+                                <browser.host>${browser.host}</browser.host>
+                                <browser.port>${browser.port}</browser.port>
+                                <testsites.http.host>${test.http.host}</testsites.http.host>
+                                <testsites.http.port>${test.http.port}</testsites.http.port>
+                                <testsites.dns.host>${test.dns.host}</testsites.dns.host>
+                                <testsites.dns.port>${test.dns.port}</testsites.dns.port>
+                            </systemPropertyVariables>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

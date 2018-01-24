@@ -6,8 +6,10 @@ import com.squareup.javapoet.AnnotationSpec;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.FieldSpec;
 import com.squareup.javapoet.MethodSpec;
+import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
 
+import javax.lang.model.element.Modifier;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -18,8 +20,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Objects;
 
-import static javax.lang.model.element.Modifier.PUBLIC;
-import static javax.lang.model.element.Modifier.STATIC;
+import static javax.lang.model.element.Modifier.*;
 
 public class Codegen {
 
@@ -76,7 +77,7 @@ public class Codegen {
             if (Objects.equals(member.name, "this")) {
                 member.name = "this_";
             }
-            FieldSpec.Builder field = FieldSpec.builder(member.typeName(protocol, domain), member.name, PUBLIC);
+            FieldSpec.Builder field = FieldSpec.builder(member.typeName(protocol, domain), member.name, PRIVATE);
             if (member.name.equals("this_")) {
                 field.addAnnotation(AnnotationSpec.builder(SerializedName.class)
                         .addMember("value", "$S", "this").build());
@@ -84,12 +85,30 @@ public class Codegen {
             if (member.description != null) {
                 field.addJavadoc(member.description.replace("$", "$$") + "\n");
             }
-            typeSpec.addField(field.build());
+
+            FieldSpec fieldSpec = field.build();
+            typeSpec.addField(fieldSpec);
 
             if (fieldStrings.length() > 0) {
                 fieldStrings.append(", ");
             }
             fieldStrings.append(member.name + "=\" + " + member.name + " + \"");
+
+            typeSpec.addMethod(MethodSpec.methodBuilder("get" + cap(member.name))
+                    .addModifiers(PUBLIC)
+                    .returns(fieldSpec.type)
+                    .addStatement("return $N", fieldSpec)
+                    .addJavadoc(member.description == null ? "" : member.description.replace("$", "$$") + "\n")
+                    .build());
+            if (member.optional) {
+                typeSpec.addMethod(MethodSpec.methodBuilder("set" + cap(member.name))
+                        .addModifiers(PUBLIC)
+                        .returns(TypeName.VOID)
+                        .addParameter(fieldSpec.type, fieldSpec.name, Modifier.FINAL)
+                        .addStatement("this.$N = $N", fieldSpec, fieldSpec)
+                        .addJavadoc(member.description == null ? "" : member.description.replace("$", "$$") + "\n")
+                        .build());
+            }
         }
 
         typeSpec.addMethod(MethodSpec.methodBuilder("toString")

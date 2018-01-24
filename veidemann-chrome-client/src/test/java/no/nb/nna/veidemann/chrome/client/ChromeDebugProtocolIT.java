@@ -18,29 +18,20 @@ package no.nb.nna.veidemann.chrome.client;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+
 public class ChromeDebugProtocolIT {
 
     static String chromeHost;
 
     static int chromePort;
 
-    static String testSitesHttpHost;
-
-    static int testSitesHttpPort;
-
-    static String testSitesDnsHost;
-
-    static int testSitesDnsPort;
-
-
     @BeforeClass
     public static void init() {
         chromeHost = System.getProperty("browser.host");
         chromePort = Integer.parseInt(System.getProperty("browser.port"));
-        testSitesHttpHost = System.getProperty("testsites.http.host");
-        testSitesHttpPort = Integer.parseInt(System.getProperty("testsites.http.port"));
-        testSitesDnsHost = System.getProperty("testsites.dns.host");
-        testSitesDnsPort = Integer.parseInt(System.getProperty("testsites.dns.port"));
     }
 
     /**
@@ -50,39 +41,51 @@ public class ChromeDebugProtocolIT {
     public void testRender() throws Exception {
         System.out.println("Chrome address: " + chromeHost + ":" + chromePort);
         ChromeDebugProtocol chrome = new ChromeDebugProtocol(chromeHost, chromePort, null);
-        System.out.println("111111");
-        Thread.sleep(1000);
-        Session session = chrome.newSession(1280, 1024);
-        System.out.println("111111");
-        Thread.sleep(1000);
-        System.out.println(session.version());
-        System.out.println(session.toString());
+        List<Session> sessions = new ArrayList<>();
+        for (int i = 0; i < 100; i++) {
+            sessions.add(chrome.newSession(1280, 1024));
+        }
+//        System.out.println(session.version());
+//        System.out.println(session.toString());
+//        System.out.println("---- " + session.browser.getVersion().get());
 
-        System.out.println("---- " + session.browser.getVersion().get());
+        long sleep = 10;
+        AtomicInteger crashed = new AtomicInteger();
+        AtomicInteger navigated = new AtomicInteger();
 
-        ChromeDebugProtocol chrome2 = new ChromeDebugProtocol(chromeHost, chromePort, null);
-        System.out.println("222222");
-        Thread.sleep(1000);
-        Session session2 = chrome2.newSession(1280, 1024);
-        System.out.println("222222");
-        Thread.sleep(1000);
-        System.out.println(session2.version());
-        System.out.println(session2.toString());
+        for (Session session : sessions) {
+//        session.network.enable(0,0,0).get();
+            session.page.enable().get();
 
-        System.out.println("---- " + session2.browser.getVersion().get());
+            session.inspector.onTargetCrashed(c -> {
+                crashed.incrementAndGet();
+                System.out.println("Session crached " + c.toString());
+            });
+            session.page.onFrameNavigated(fn -> {
+                navigated.incrementAndGet();
+                System.out.println(fn.getFrame().getId());
+            });
+        }
 
-        System.out.println("111111");
-        Thread.sleep(1000);
-        System.out.println(session.version());
-        System.out.println(session.toString());
+        for (Session session : sessions) {
+            session.page.navigate("http://a1.com", "", "").get().getFrameId();
+            Thread.sleep(sleep);
+        }
+        Thread.sleep(5000);
+        System.out.println("Crashed: " + crashed.get() + ", Navigated: " + navigated.get());
 
-        System.out.println("---- " + session.browser.getVersion().get());
+        crashed.set(0);
+        navigated.set(0);
+        for (Session session : sessions) {
+            session.page.navigate("http://a1.com", "", "").get().getFrameId();
+            Thread.sleep(sleep);
+        }
+        Thread.sleep(5000);
+        System.out.println("Crashed: " + crashed.get() + ", Navigated: " + navigated.get());
 
-        session.network.enable(0,0,0).get();
-        session.page.enable().get();
-        session.page.navigate("http://a1.com", "", "");
-        System.out.println("111111");
-        Thread.sleep(20000);
+        for (Session session : sessions) {
+            session.close();
+        }
     }
 }
 

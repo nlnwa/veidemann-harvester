@@ -111,9 +111,9 @@ public class Session {
                 .addParameter(clientHeight)
                 .addStatement("this.$1N = $1N", entryPoint)
                 .beginControlFlow("try")
-                .addStatement("$N = $N.target.createBrowserContext().$L.browserContextId",
+                .addStatement("$N = $N.target.createBrowserContext().$L.getBrowserContextId()",
                         contextId, entryPoint, timeoutGet)
-                .addStatement("$N = $N.target.createTarget(\"about:blank\", $N, $N, $N, false).$L.targetId", targetId,
+                .addStatement("$N = $N.target.createTarget(\"about:blank\", $N, $N, $N, false).$L.getTargetId()", targetId,
                         entryPoint, clientWidth, clientHeight, contextId, timeoutGet)
                 .endControlFlow()
                 .beginControlFlow("catch ($T | $T | $T ex)",

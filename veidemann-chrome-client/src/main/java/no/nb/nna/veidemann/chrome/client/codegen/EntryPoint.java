@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static javax.lang.model.element.Modifier.PUBLIC;
 import static no.nb.nna.veidemann.chrome.client.codegen.Protocol.uncap;
 
 /**
@@ -131,10 +132,17 @@ public class EntryPoint {
         for (Domain domain : domains) {
             if ("Target".equals(domain.domain) || "Browser".equals(domain.domain)) {
                 FieldSpec field = FieldSpec
-                        .builder(domain.className, uncap(domain.domain), Modifier.FINAL)
+                        .builder(domain.className, uncap(domain.domain), Modifier.FINAL, Modifier.PRIVATE)
                         .build();
                 classBuilder.addField(field);
                 constructor.addStatement("$N = new $T($N)", field, field.type, protocolClient);
+
+                classBuilder.addMethod(MethodSpec.methodBuilder(Protocol.uncap(domain.domain))
+                        .addModifiers(PUBLIC)
+                        .returns(field.type)
+                        .addStatement("return $N", field)
+                        .addJavadoc(domain.description == null ? "" : domain.description.replace("$", "$$") + "\n")
+                        .build());
             }
         }
 
@@ -194,7 +202,7 @@ public class EntryPoint {
                 .beginControlFlow("while (!$N.isEmpty())", sessions)
                 .addStatement("$N.get(0).close()", sessions)
                 .endControlFlow()
-                .addStatement("$N.close()", protocolClient)
+                .addStatement("$N.close(\"Client is closed by user\")", protocolClient)
                 .build());
     }
 

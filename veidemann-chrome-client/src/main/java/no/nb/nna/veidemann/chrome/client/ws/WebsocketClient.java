@@ -44,7 +44,9 @@ import io.netty.handler.codec.http.websocketx.WebSocketVersion;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
+
 import javax.net.ssl.SSLException;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,7 +66,7 @@ public class WebsocketClient {
 
     private EventLoopGroup workerGroup;
 
-    Exception closeReason = null;
+    Throwable closeReason = null;
 
     private final WebSocketCallback callback;
 
@@ -132,7 +134,6 @@ public class WebsocketClient {
         try {
             final WebSocketClientHandshaker handshaker = WebSocketClientHandshakerFactory.newHandshaker(
                     uri, WebSocketVersion.V13, null, true, new DefaultHttpHeaders(), MAX_FRAME_PAYLOAD_LENGTH);
-//                    uri, WebSocketVersion.V13, null, true, new DefaultHttpHeaders(), MAX_FRAME_PAYLOAD_LENGTH, true, true);
 
             final ResponseHandler handler = new ResponseHandler();
 
@@ -156,6 +157,10 @@ public class WebsocketClient {
             });
 
             channel = b.connect(uri.getHost(), port).sync().channel();
+            channel.closeFuture().addListener(c -> {
+                LOG.info("Closed {}", uri, closeReason);
+                workerGroup.shutdownGracefully();
+            });
 
             handler.handshakeFuture().sync();
 
@@ -166,14 +171,10 @@ public class WebsocketClient {
     }
 
     public void close() {
-        try {
-            channel.writeAndFlush(new CloseWebSocketFrame());
-            channel.closeFuture().sync();
-        } catch (InterruptedException ex) {
-            throw new RuntimeException(ex);
-        } finally {
-            workerGroup.shutdownGracefully();
+        if (!channel.isOpen()) {
+            return;
         }
+        channel.writeAndFlush(new CloseWebSocketFrame());
     }
 
     public void ping() {
@@ -242,6 +243,7 @@ public class WebsocketClient {
 
         @Override
         public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+            closeReason = cause;
             cause.printStackTrace();
             if (!handshakeFuture.isDone()) {
                 handshakeFuture.setFailure(cause);

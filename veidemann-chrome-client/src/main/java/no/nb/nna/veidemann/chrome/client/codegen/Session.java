@@ -35,6 +35,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import static javax.lang.model.element.Modifier.PUBLIC;
+
 /**
  *
  */
@@ -111,9 +113,9 @@ public class Session {
                 .addParameter(clientHeight)
                 .addStatement("this.$1N = $1N", entryPoint)
                 .beginControlFlow("try")
-                .addStatement("$N = $N.target.createBrowserContext().$L.getBrowserContextId()",
+                .addStatement("$N = $N.target().createBrowserContext().$L.getBrowserContextId()",
                         contextId, entryPoint, timeoutGet)
-                .addStatement("$N = $N.target.createTarget(\"about:blank\", $N, $N, $N, false).$L.getTargetId()", targetId,
+                .addStatement("$N = $N.target().createTarget(\"about:blank\", $N, $N, $N, false).$L.getTargetId()", targetId,
                         entryPoint, clientWidth, clientHeight, contextId, timeoutGet)
                 .endControlFlow()
                 .beginControlFlow("catch ($T | $T | $T ex)",
@@ -121,8 +123,6 @@ public class Session {
                 .addStatement("throw new $T(ex)", IOException.class)
                 .endControlFlow()
                 .addCode("\n")
-                .addComment("Chrome is buggy and won't let us connect unless we've refreshed the json endpoint")
-                .addStatement("new $T($L).openStream().close()", URL.class, createUrl("http", host, port, "/json"))
                 .addStatement("$N = $N.$N.createSessionClient($N)",
                         sessionClient,
                         entryPoint,
@@ -131,17 +131,29 @@ public class Session {
                 .addCode("\n");
 
         for (Domain domain : domains) {
-            FieldSpec.Builder fieldBuilder = FieldSpec
-                    .builder(domain.className, Protocol.uncap(domain.domain), Modifier.PUBLIC, Modifier.FINAL);
-            if (domain.description != null) {
-                fieldBuilder.addJavadoc(domain.description + "\n");
+            if (!"Target".equals(domain.domain) && !"Browser".equals(domain.domain)) {
+                FieldSpec.Builder fieldBuilder = FieldSpec
+                        .builder(domain.className, Protocol.uncap(domain.domain), Modifier.PRIVATE, Modifier.FINAL);
+                if (domain.description != null) {
+                    fieldBuilder.addJavadoc(domain.description + "\n");
+                }
+
+                FieldSpec field = fieldBuilder.build();
+                classBuilder.addField(field);
+
+                constructor.addStatement("$N = new $T($N)", field, field.type, sessionClient);
+
+                classBuilder.addMethod(MethodSpec.methodBuilder(Protocol.uncap(domain.domain))
+                        .addModifiers(PUBLIC)
+                        .returns(field.type)
+                        .addStatement("return $N", field)
+                        .addJavadoc(domain.description == null ? "" : domain.description.replace("$", "$$") + "\n")
+                        .build());
             }
-
-            FieldSpec field = fieldBuilder.build();
-            classBuilder.addField(field);
-
-            constructor.addStatement("$N = new $T($N)", field, field.type, sessionClient);
         }
+
+        constructor.addCode("\n")
+                .addStatement("inspector.onTargetCrashed(c -> close(\"Session has crashed\"))");
 
         constructor.addCode("\n").addStatement("$N.debug($S, $N)", logger, "Browser session created: {}", contextId);
 
@@ -149,17 +161,31 @@ public class Session {
     }
 
     void genCloseMethod() {
+        classBuilder.addMethod(MethodSpec.methodBuilder("isClosed")
+                .addModifiers(Modifier.PUBLIC)
+                .returns(boolean.class)
+                .addStatement("return $N.isClosed()", sessionClient)
+                .build());
+
         classBuilder.addMethod(MethodSpec.methodBuilder("close")
                 .addModifiers(Modifier.PUBLIC)
                 .addAnnotation(Override.class)
+                .addStatement("close(\"Session is closed by user\")")
+                .build());
+
+        classBuilder.addMethod(MethodSpec.methodBuilder("close")
+                .addModifiers(Modifier.PRIVATE)
+                .addParameter(String.class, "reason", Modifier.FINAL)
                 .addStatement("$N.debug($S, $N)", logger, "Browser session closing: {}", contextId)
                 .beginControlFlow("try")
-                .addStatement("$N.close()", sessionClient)
+                .addStatement("$N.close(reason)", sessionClient)
                 .beginControlFlow("if ($N != null)", targetId)
-                .addStatement("$N.target.closeTarget(targetId).$L", entryPoint, timeoutGet)
+                .addStatement("$N.target().closeTarget(targetId).$L", entryPoint, timeoutGet)
                 .endControlFlow()
                 .beginControlFlow("if ($N != null)", contextId)
-                .addStatement("$N.target.disposeBrowserContext(contextId).$L", entryPoint, timeoutGet)
+                .beginControlFlow("if (!$N.target().disposeBrowserContext(contextId).$L.getSuccess())", entryPoint, timeoutGet)
+                .addStatement("$N.info($S, $N)", logger, "Failed closing context {}", contextId)
+                .endControlFlow()
                 .endControlFlow()
                 .endControlFlow()
                 .beginControlFlow("catch ($T | $T | $T ex)",

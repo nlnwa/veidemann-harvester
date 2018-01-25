@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
@@ -64,6 +65,10 @@ public class Cdp implements WebSocketCallback {
 
     final String scheme;
 
+    final AtomicBoolean closed = new AtomicBoolean(false);
+
+    String closedReason;
+
     final Tracer tracer;
 
     final boolean withActiveSpanOnly;
@@ -86,6 +91,7 @@ public class Cdp implements WebSocketCallback {
                 this.withActiveSpanOnly = withActiveSpanOnly;
             }
         } catch (URISyntaxException | IOException e) {
+            closed.set(true);
             throw new RuntimeException(e);
         }
     }
@@ -114,6 +120,14 @@ public class Cdp implements WebSocketCallback {
         try (ActiveSpan span = buildSpan(method)) {
 
             final ActiveSpan.Continuation cont = span.capture();
+
+            if (closed.get()) {
+                LOG.info("Calling {} on closed session", method);
+                CompletableFuture<JsonElement> future = new CompletableFuture<>();
+                future.completeExceptionally(new SessionClosedException(closedReason));
+                return future;
+            }
+
             CdpRequest request = new CdpRequest(idSeq.getAndIncrement(), method, params);
             CompletableFuture<JsonElement> future = new CompletableFuture<JsonElement>().whenComplete((json, error) -> {
                 try (ActiveSpan activeSpan = cont.activate()) {
@@ -137,7 +151,12 @@ public class Cdp implements WebSocketCallback {
                 }
             }
 
-            websocketClient.sendMessage(msg);
+            try {
+                websocketClient.sendMessage(msg);
+            } catch (Throwable t) {
+                methodFutures.remove(request.id);
+                future.completeExceptionally(t);
+            }
             return future;
         }
     }
@@ -234,7 +253,13 @@ public class Cdp implements WebSocketCallback {
         return span;
     }
 
-    public void close() {
+    public boolean isClosed() {
+        return closed.get();
+    }
+
+    public void close(String reason) {
+        closedReason = reason;
+        closed.set(true);
         websocketClient.close();
     }
 

@@ -66,7 +66,7 @@ public class CdpTest {
                 .handle((r, t) -> {System.out.println("  E: " + t + ", R: " + r); return instance.call("mm", null);})
                 .get());
 //        Thread.sleep(5000);
-        instance.close();
+        instance.close("");
         // TODO review the generated test code and remove the default call to fail.
         fail("The test case is a prototype.");
     }

@@ -44,7 +44,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static javax.lang.model.element.Modifier.PUBLIC;
 import static no.nb.nna.veidemann.chrome.client.codegen.Protocol.INDENT;
-import static no.nb.nna.veidemann.chrome.client.codegen.Protocol.uncap;
 
 /**
  * Generates the ChromeDebugProtocol class.
@@ -126,12 +125,12 @@ public class EntryPoint {
         for (Domain domain : domains) {
             if ("Target".equals(domain.domain) || "Browser".equals(domain.domain)) {
                 FieldSpec field = FieldSpec
-                        .builder(domain.className, uncap(domain.domain), Modifier.FINAL, Modifier.PRIVATE)
+                        .builder(domain.className, Codegen.uncap(domain.domain), Modifier.FINAL, Modifier.PRIVATE)
                         .build();
                 classBuilder.addField(field);
                 constructor.addStatement("$N = new $T(this, $N)", field, field.type, protocolClient);
 
-                classBuilder.addMethod(MethodSpec.methodBuilder(Protocol.uncap(domain.domain))
+                classBuilder.addMethod(MethodSpec.methodBuilder(Codegen.uncap(domain.domain))
                         .addModifiers(PUBLIC)
                         .returns(field.type)
                         .addException(ClientClosedException.class)
@@ -164,7 +163,7 @@ public class EntryPoint {
                 .addStatement("throw new $T($N.getClosedReason())", ClientClosedException.class, protocolClient)
                 .endControlFlow()
                 .beginControlFlow("try")
-                .beginControlFlow("if (target().getTargets().$L.getTargetInfos().size() > $N.getMaxOpenSessions())", timeoutGet, config)
+                .beginControlFlow("if (target().getTargets().$L.targetInfos().size() > $N.getMaxOpenSessions())", timeoutGet, config)
                 .addStatement("throw new $T($N.getMaxOpenSessions())", MaxActiveSessionsExceededException.class, config)
                 .endControlFlow()
                 .endControlFlow()

@@ -26,6 +26,7 @@ import no.nb.nna.veidemann.api.HarvesterProto.HarvestPageReply;
 import no.nb.nna.veidemann.api.MessagesProto.PageLog;
 import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
 import no.nb.nna.veidemann.chrome.client.ChromeDebugProtocol;
+import no.nb.nna.veidemann.chrome.client.ChromeDebugProtocolConfig;
 import no.nb.nna.veidemann.commons.VeidemannHeaderConstants;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.harvester.BrowserSessionRegistry;
@@ -60,7 +61,9 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
                              final BrowserSessionRegistry sessionRegistry)
             throws IOException {
 
-        this.chrome = new ChromeDebugProtocol(chromeHost, chromePort, GlobalTracer.get());
+        ChromeDebugProtocolConfig chromeDebugProtocolConfig = new ChromeDebugProtocolConfig(chromeHost, chromePort)
+                .withTracer(GlobalTracer.get());
+        this.chrome = new ChromeDebugProtocol(chromeDebugProtocolConfig);
         this.db = db;
         this.sessionRegistry = sessionRegistry;
     }

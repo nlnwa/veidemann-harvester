@@ -58,18 +58,18 @@ public class ChromeDebugProtocolIT {
     public void testRender() throws Exception {
         System.out.println("Chrome address: " + chromeHost + ":" + chromePort);
         ChromeDebugProtocol chrome = new ChromeDebugProtocol(config);
-        chrome.target().getTargets().get().getTargetInfos().forEach(t -> System.out.println(t));
+        chrome.target().getTargets().get().targetInfos().forEach(t -> System.out.println(t));
         System.out.println();
-        chrome.target().getTargets().get().getTargetInfos().forEach(t -> {
+        chrome.target().getTargets().get().targetInfos().forEach(t -> {
             try {
-                chrome.target().closeTarget(t.getTargetId());
+                chrome.target().closeTarget(t.targetId());
             } catch (ClientClosedException e) {
                 e.printStackTrace();
             } catch (SessionClosedException e) {
                 e.printStackTrace();
             }
         });
-        chrome.target().getTargets().get().getTargetInfos().forEach(t -> System.out.println(t));
+        chrome.target().getTargets().get().targetInfos().forEach(t -> System.out.println(t));
         System.out.println();
 
         chrome.target().setDiscoverTargets(true).get();
@@ -80,10 +80,10 @@ public class ChromeDebugProtocolIT {
         List<Sess> sessions = new ArrayList<>();
         for (int i = 0; i < 10; i++) {
             sessions.add(new Sess(chrome.newSession(1280, 1024)));
-            System.out.println("Targets: " + chrome.target().getTargets().get().getTargetInfos().size());
+            System.out.println("Targets: " + chrome.target().getTargets().get().targetInfos().size());
         }
 
-        chrome.target().getTargets().get().getTargetInfos().forEach(t -> System.out.println(t));
+        chrome.target().getTargets().get().targetInfos().forEach(t -> System.out.println(t));
         System.out.println();
 //        System.out.println(session.version());
 //        System.out.println(session.toString());
@@ -98,10 +98,10 @@ public class ChromeDebugProtocolIT {
             session.navigate();
             Thread.sleep(sleep);
         }
-        chrome.target().getTargets().get().getTargetInfos().forEach(t -> System.out.println(t));
+        chrome.target().getTargets().get().targetInfos().forEach(t -> System.out.println(t));
         System.out.println();
         Thread.sleep(5000);
-        chrome.target().getTargets().get().getTargetInfos().forEach(t -> System.out.println(t));
+        chrome.target().getTargets().get().targetInfos().forEach(t -> System.out.println(t));
         System.out.println();
         long crashed = sessions.stream().filter(s -> s.crashed).count();
         long navigated = sessions.stream().filter(s -> s.navigated.get() == 1).count();
@@ -117,10 +117,10 @@ public class ChromeDebugProtocolIT {
             s.session.close();
         });
 
-        chrome.target().getTargets().get().getTargetInfos().forEach(t -> System.out.println(t));
+        chrome.target().getTargets().get().targetInfos().forEach(t -> System.out.println(t));
         System.out.println();
         Thread.sleep(5000);
-        chrome.target().getTargets().get().getTargetInfos().forEach(t -> System.out.println(t));
+        chrome.target().getTargets().get().targetInfos().forEach(t -> System.out.println(t));
         System.out.println();
         crashed = sessions.stream().filter(s -> s.crashed).count();
         navigated = sessions.stream().filter(s -> s.navigated.get() == 2).count();
@@ -152,7 +152,7 @@ public class ChromeDebugProtocolIT {
 //            if (!session.isClosed()) {
             try {
                 crashed = false;
-                session.page().navigate("http://a1.com", "", "").get(20, TimeUnit.SECONDS).getFrameId();
+                session.page().navigate("http://a1.com", "", "").get(20, TimeUnit.SECONDS).frameId();
 //                session.close();
             } catch (InterruptedException e) {
                 e.printStackTrace();

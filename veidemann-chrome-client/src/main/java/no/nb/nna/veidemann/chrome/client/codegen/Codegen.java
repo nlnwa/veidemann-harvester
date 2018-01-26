@@ -6,7 +6,6 @@ import com.squareup.javapoet.AnnotationSpec;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.FieldSpec;
 import com.squareup.javapoet.MethodSpec;
-import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
 
 import javax.lang.model.element.Modifier;
@@ -19,10 +18,16 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
-import static javax.lang.model.element.Modifier.*;
+import static javax.lang.model.element.Modifier.PRIVATE;
+import static javax.lang.model.element.Modifier.PUBLIC;
+import static javax.lang.model.element.Modifier.STATIC;
 
 public class Codegen {
+
+    static final Pattern UNCAP_PATTERN = Pattern.compile("([A-Z]+)(.*)");
 
     static Gson gson = new Gson();
 
@@ -57,13 +62,13 @@ public class Codegen {
 
     static Protocol loadProtocol(String url) throws IOException {
         try (InputStream stream = Base64.getDecoder().wrap(new URL(url).openStream());
-                InputStreamReader reader = new InputStreamReader(stream, StandardCharsets.UTF_8)) {
+             InputStreamReader reader = new InputStreamReader(stream, StandardCharsets.UTF_8)) {
             return gson.fromJson(reader, Protocol.class);
         }
     }
 
     static ClassName buildStruct(TypeSpec.Builder b, String name, String description, List<Parameter> members, Protocol protocol, Domain domain) {
-        String typeName = name.substring(0, 1).toUpperCase() + name.substring(1);
+        String typeName = cap(name);
         TypeSpec.Builder typeSpec = TypeSpec.classBuilder(typeName)
                 .addModifiers(PUBLIC, STATIC);
 
@@ -72,6 +77,10 @@ public class Codegen {
         if (description != null) {
             typeSpec.addJavadoc(description.replace("$", "$$") + "\n");
         }
+
+        // Constructor
+        MethodSpec.Builder constructor = MethodSpec.constructorBuilder()
+                .addModifiers(Modifier.PUBLIC);
 
         for (Parameter member : members) {
             if (Objects.equals(member.name, "this")) {
@@ -94,29 +103,38 @@ public class Codegen {
             }
             fieldStrings.append(member.name + "=\" + " + member.name + " + \"");
 
-            typeSpec.addMethod(MethodSpec.methodBuilder("get" + cap(member.name))
+            // Add accessor methods
+            typeSpec.addMethod(MethodSpec.methodBuilder(uncap(member.name))
                     .addModifiers(PUBLIC)
                     .returns(fieldSpec.type)
                     .addStatement("return $N", fieldSpec)
                     .addJavadoc(member.description == null ? "" : member.description.replace("$", "$$") + "\n")
                     .build());
+
             if (member.optional) {
-                typeSpec.addMethod(MethodSpec.methodBuilder("set" + cap(member.name))
+                // Add fluent withNNN methods for optional arguments
+                typeSpec.addMethod(MethodSpec.methodBuilder("with" + cap(member.name))
                         .addModifiers(PUBLIC)
-                        .returns(TypeName.VOID)
+                        .returns(ClassName.get("", typeName))
                         .addParameter(fieldSpec.type, fieldSpec.name, Modifier.FINAL)
                         .addStatement("this.$N = $N", fieldSpec, fieldSpec)
+                        .addStatement("return this")
                         .addJavadoc(member.description == null ? "" : member.description.replace("$", "$$") + "\n")
                         .build());
+            } else {
+                // Add required arguments to constructor
+                constructor.addParameter(fieldSpec.type, fieldSpec.name, Modifier.FINAL)
+                        .addStatement("this.$1N = $1N", fieldSpec);
             }
         }
+
+        typeSpec.addMethod(constructor.build());
 
         typeSpec.addMethod(MethodSpec.methodBuilder("toString")
                 .addModifiers(PUBLIC)
                 .returns(String.class)
                 .addStatement("return \"" + typeName + "{" + fieldStrings + "}\"").build());
 
-        TypeSpec spec = typeSpec.build();
         b.addType(typeSpec.build());
         return ClassName.get(PACKAGE, domain.javaName, typeName);
     }
@@ -127,6 +145,10 @@ public class Codegen {
         TypeSpec.Builder typeSpec = TypeSpec.classBuilder(typeName)
                 .addModifiers(PUBLIC, STATIC);
 
+        // Private constructor to avoid instatiation
+        typeSpec.addMethod(MethodSpec.constructorBuilder()
+                .addModifiers(Modifier.PRIVATE).build());
+
         StringBuilder fieldStrings = new StringBuilder();
 
         if (description != null) {
@@ -154,7 +176,7 @@ public class Codegen {
             }
             fieldStrings.append(member.name + "=\" + " + member.name + " + \"");
 
-            typeSpec.addMethod(MethodSpec.methodBuilder("get" + cap(member.name))
+            typeSpec.addMethod(MethodSpec.methodBuilder(uncap(member.name))
                     .addModifiers(PUBLIC)
                     .returns(fieldSpec.type)
                     .addStatement("return $N", fieldSpec)
@@ -183,6 +205,15 @@ public class Codegen {
 
     static String cap(String name) {
         return name.substring(0, 1).toUpperCase() + name.substring(1);
+    }
+
+    public static String uncap(String name) {
+        Matcher m = UNCAP_PATTERN.matcher(name);
+        if (m.matches()) {
+            return m.group(1).toLowerCase() + m.group(2);
+        } else {
+            return name;
+        }
     }
 
 }

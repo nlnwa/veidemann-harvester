@@ -77,7 +77,7 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
 
     volatile boolean closed = false;
 
-    public BrowserSession(DbAdapter db, ChromeDebugProtocol chrome, ConfigProto.CrawlConfig config, QueuedUri queuedUri, BaseSpan span) {
+    public BrowserSession(DbAdapter db, ChromeDebugProtocol chrome, ConfigProto.CrawlConfig config, QueuedUri queuedUri, BaseSpan span) throws IOException {
         this.queuedUri = Objects.requireNonNull(queuedUri);
         // Ensure that we at least wait a second even if the configuration says less.
         long maxIdleTime = Math.max(config.getBrowserConfig().getSleepAfterPageloadMs(), 1000);
@@ -85,78 +85,66 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
         uriRequests = new UriRequestRegistry(crawlLogs, queuedUri, span);
         protocolTimeout = config.getBrowserConfig().getPageLoadTimeoutMs();
 
-        try {
-            session = chrome.newSession(
-                    config.getBrowserConfig().getWindowWidth(),
-                    config.getBrowserConfig().getWindowHeight());
+        session = chrome.newSession(config.getBrowserConfig().getWindowWidth(), config.getBrowserConfig().getWindowHeight());
 
-            LOG.debug("Browser session created");
+        LOG.debug("Browser session created");
 
-            String userAgent = config.getBrowserConfig().getUserAgent();
+        String userAgent = config.getBrowserConfig().getUserAgent();
 
-            // Set userAgent to config value if it exist, otherwise just replace HeadlessChrome with ChromeVersion
-            // like the real browser.
-            CompletableFuture<Void> setUserAgent;
-            if (userAgent.isEmpty()) {
-                setUserAgent = session.runtime
-                        .evaluate("navigator.userAgent;", null, false, false, null, false, false, false, false)
-                        .thenAccept(e -> {
-                            session.network.setUserAgentOverride(((String) e.result.value)
-                                    .replace("HeadlessChrome", session.version()));
-                        });
-            } else {
-                setUserAgent = session.network.setUserAgentOverride(userAgent);
-            }
-
-            CompletableFuture.allOf(
-                    session.debugger.enable(),
-                    session.network.enable(null, null, null),
-                    session.page.enable(),
-                    session.runtime.enable(),
-                    session.security.enable()
-            ).get(config.getBrowserConfig().getPageLoadTimeoutMs(), MILLISECONDS);
-
-            // Request patterns for enabling interception on requests and responses
-            RequestPattern rp1 = new RequestPattern();
-            RequestPattern rp2 = new RequestPattern();
-            rp2.interceptionStage = "HeadersReceived";
-            List<RequestPattern> requestPatterns = ImmutableList.of(rp1, rp2);
-
-            CompletableFuture.allOf(
-                    session.debugger.setBreakpointsActive(true),
-                    session.debugger.setAsyncCallStackDepth(32),
-                    session.security.setOverrideCertificateErrors(true),
-                    session.network.setCacheDisabled(true),
-                    setUserAgent,
-                    session.network.setRequestInterception(requestPatterns)
-            ).get(config.getBrowserConfig().getPageLoadTimeoutMs(), MILLISECONDS);
-
-            // set up listeners
-            session.network.onRequestIntercepted(nr -> this.onRequestIntercepted(nr));
-            session.network.onRequestWillBeSent(r -> {
-                uriRequests.onRequestWillBeSent(r);
-            });
-            session.network.onLoadingFinished(f -> uriRequests.onLoadingFinished(f));
-            session.network.onLoadingFailed(f -> uriRequests.onLoadingFailed(f));
-            session.network.onResponseReceived(l -> uriRequests.onResponseReceived(l));
-            session.network.onDataReceived(d -> uriRequests.onDataReceived(d));
-            session.security.onCertificateError(se -> {
-                LOG.info("Certificate error: " + se);
-                session.security.handleCertificateError(se.eventId, "continue");
-            });
-
-            session.page.setDownloadBehavior("allow", "/dev/null");
-
-            LOG.debug("Browser session configured");
-        } catch (IOException ex) {
-            throw new RuntimeException(ex);
-        } catch (InterruptedException ex) {
-            throw new RuntimeException(ex);
-        } catch (ExecutionException ex) {
-            throw new RuntimeException(ex);
-        } catch (TimeoutException ex) {
-            throw new RuntimeException(ex);
+        // Set userAgent to config value if it exist, otherwise just replace HeadlessChrome with ChromeVersion
+        // like the real browser.
+        CompletableFuture<Void> setUserAgent;
+        if (userAgent.isEmpty()) {
+            setUserAgent = session.runtime()
+                    .evaluate("navigator.userAgent;", null, false, false, null, false, false, false, false)
+                    .thenAccept(e -> {
+                        session.network().setUserAgentOverride(((String) e.getResult().getValue())
+                                .replace("HeadlessChrome", session.version()));
+                    });
+        } else {
+            setUserAgent = session.network().setUserAgentOverride(userAgent);
         }
+
+        CompletableFuture.allOf(
+                session.debugger().enable(),
+                session.network().enable(null, null, null),
+                session.page().enable(),
+                session.runtime().enable(),
+                session.security().enable()
+        ).get(config.getBrowserConfig().getPageLoadTimeoutMs(), MILLISECONDS);
+
+        // Request patterns for enabling interception on requests and responses
+        RequestPattern rp1 = new RequestPattern();
+        RequestPattern rp2 = new RequestPattern();
+        rp2.setInterceptionStage("HeadersReceived");
+        List<RequestPattern> requestPatterns = ImmutableList.of(rp1, rp2);
+
+        CompletableFuture.allOf(
+                session.debugger().setBreakpointsActive(true),
+                session.debugger().setAsyncCallStackDepth(32),
+                session.security().setOverrideCertificateErrors(true),
+                session.network().setCacheDisabled(true),
+                setUserAgent,
+                session.network().setRequestInterception(requestPatterns)
+        ).get(config.getBrowserConfig().getPageLoadTimeoutMs(), MILLISECONDS);
+
+        // set up listeners
+        session.network().onRequestIntercepted(nr -> this.onRequestIntercepted(nr));
+        session.network().onRequestWillBeSent(r -> {
+            uriRequests.onRequestWillBeSent(r);
+        });
+        session.network().onLoadingFinished(f -> uriRequests.onLoadingFinished(f));
+        session.network().onLoadingFailed(f -> uriRequests.onLoadingFailed(f));
+        session.network().onResponseReceived(l -> uriRequests.onResponseReceived(l));
+        session.network().onDataReceived(d -> uriRequests.onDataReceived(d));
+        session.security().onCertificateError(se -> {
+            LOG.info("Certificate error: " + se);
+            session.security().handleCertificateError(se.getEventId(), "continue");
+        });
+
+        session.page().setDownloadBehavior("allow", "/dev/null");
+
+        LOG.debug("Browser session configured");
     }
 
     public String getExecutionId() {
@@ -174,20 +162,20 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
     public void setBreakpoints() throws TimeoutException, ExecutionException, InterruptedException {
         // TODO: This should be part of configuration
         CompletableFuture.allOf(
-                session.debugger
+                session.debugger()
                         .setBreakpointByUrl(1, null, "https?://www.google-analytics.com/analytics.js", null, null, null)
-                        .thenAccept(b -> breakpoints.put(b.breakpointId, b.locations)),
-                session.debugger
+                        .thenAccept(b -> breakpoints.put(b.getBreakpointId(), b.getLocations())),
+                session.debugger()
                         .setBreakpointByUrl(1, null, "https?://www.google-analytics.com/ga.js", null, null, null)
-                        .thenAccept(b -> breakpoints.put(b.breakpointId, b.locations))
+                        .thenAccept(b -> breakpoints.put(b.getBreakpointId(), b.getLocations()))
         ).get(protocolTimeout, MILLISECONDS);
 
         //session.debugger.onBreakpointResolved(b -> breakpoints.put(b.breakpointId, b.location));
-        session.debugger.onPaused(p -> {
-            String scriptId = p.callFrames.get(0).location.scriptId;
+        session.debugger().onPaused(p -> {
+            String scriptId = p.getCallFrames().get(0).getLocation().getScriptId();
             LOG.debug("Script paused: " + scriptId);
-            session.debugger.setScriptSource(scriptId, "console.log(\"google analytics is no more!\");", null);
-            session.debugger.resume();
+            session.debugger().setScriptSource(scriptId, "console.log(\"google analytics is no more!\");", null);
+            session.debugger().resume();
             LOG.debug("Script resumed: " + scriptId);
         });
     }
@@ -197,22 +185,20 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
         if (queuedUri.getCookiesCount() > 0) {
             List<CookieParam> l = queuedUri.getCookiesList().stream()
                     .map(c -> {
-                                CookieParam nc = new CookieParam();
-                                nc.url = queuedUri.getUri();
-                                nc.name = c.getName();
-                                nc.value = c.getValue();
-                                nc.domain = c.getDomain();
-                                nc.path = c.getPath();
-                                nc.secure = c.getSecure();
-                                nc.httpOnly = c.getHttpOnly();
-                                nc.sameSite = c.getSameSite();
-                                nc.expires = c.getExpires();
+                                CookieParam nc = new CookieParam(c.getName(), c.getValue())
+                                .withUrl(queuedUri.getUri())
+                                .withDomain(c.getDomain())
+                                .withPath(c.getPath())
+                                .withSecure(c.getSecure())
+                                .withHttpOnly(c.getHttpOnly())
+                                .withSameSite(c.getSameSite())
+                                .withExpires(c.getExpires());
                                 return nc;
                             }
                     )
                     .collect(Collectors.toList());
 
-            session.network.setCookies(l).get(protocolTimeout, MILLISECONDS);
+            session.network().setCookies(l).get(protocolTimeout, MILLISECONDS);
         }
 
         LOG.debug("Browser cookies restored");
@@ -221,18 +207,18 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
     public void loadPage() {
         try {
             // TODO: Handling of dialogs should be configurable
-            session.page.onJavascriptDialogOpening(js -> {
-                LOG.debug("JS dialog: {} :: {}", js.type, js.message);
+            session.page().onJavascriptDialogOpening(js -> {
+                LOG.debug("JS dialog: {} :: {}", js.getType(), js.getMessage());
                 boolean accept = false;
-                if ("alert".equals(js.type)) {
+                if ("alert".equals(js.getType())) {
                     accept = true;
                 }
-                session.page.handleJavaScriptDialog(accept, null);
+                session.page().handleJavaScriptDialog(accept, null);
             });
 
-            session.network.setExtraHTTPHeaders(ImmutableMap.of(EXECUTION_ID, queuedUri.getExecutionId()))
+            session.network().setExtraHTTPHeaders(ImmutableMap.of(EXECUTION_ID, queuedUri.getExecutionId()))
                     .get(protocolTimeout, MILLISECONDS);
-            session.page.navigate(queuedUri.getUri(), queuedUri.getReferrer(), "link").get(protocolTimeout, MILLISECONDS);
+            session.page().navigate(queuedUri.getUri(), queuedUri.getReferrer(), "link").get(protocolTimeout, MILLISECONDS);
         } catch (InterruptedException | ExecutionException | TimeoutException ex) {
             throw new RuntimeException(ex);
         }
@@ -253,13 +239,13 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
                 // TODO: Add option for filling in user/passwd
                 AuthChallengeResponse authChallengeResponse = new AuthChallengeResponse();
                 authChallengeResponse.response = "Default";
-                session.network.continueInterceptedRequest(intercepted.interceptionId, null, null, null, null, null, null, authChallengeResponse);
+                session.network().continueInterceptedRequest(intercepted.interceptionId, null, null, null, null, null, null, authChallengeResponse);
             } else if (!followRedirects && intercepted.isNavigationRequest && intercepted.redirectUrl != null) {
                 // Request is a redirect and we are configured to not follow it.
                 LOG.debug("Aborting follow redirect");
-                session.network.continueInterceptedRequest(intercepted.interceptionId, "Aborted", null, null, null, null, headers, null);
+                session.network().continueInterceptedRequest(intercepted.interceptionId, "Aborted", null, null, null, null, headers, null);
             } else {
-                session.network.continueInterceptedRequest(intercepted.interceptionId, null, null, null,
+                session.network().continueInterceptedRequest(intercepted.interceptionId, null, null, null,
                         null, null, headers, null);
             }
         } catch (Throwable ex) {
@@ -269,7 +255,7 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
 
     public String getDocumentUrl() {
         try {
-            RuntimeDomain.Evaluate ev = session.runtime
+            RuntimeDomain.Evaluate ev = session.runtime()
                     .evaluate("document.URL", null, null, null, null, null, null, null, null)
                     .get(protocolTimeout, MILLISECONDS);
             return (String) ev.result.value;
@@ -280,7 +266,7 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
 
     public void scrollToTop() {
         try {
-            RuntimeDomain.Evaluate ev = session.runtime
+            RuntimeDomain.Evaluate ev = session.runtime()
                     .evaluate("window.scrollTo(0, 0);", null, null, null, null, null, null, null, null)
                     .get(protocolTimeout, MILLISECONDS);
             LOG.debug("Scroll to top: {}", ev);
@@ -298,7 +284,7 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
 
     public void saveScreenshot(DbAdapter db) {
         try {
-            PageDomain.CaptureScreenshot screenshot = session.page.captureScreenshot("png", null, null, null)
+            PageDomain.CaptureScreenshot screenshot = session.page().captureScreenshot("png", null, null, null)
                     .get(protocolTimeout, MILLISECONDS);
             byte[] img = Base64.getDecoder().decode(screenshot.data);
 
@@ -314,7 +300,7 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
 
     List<MessagesProto.Cookie> extractCookies() {
         try {
-            List<MessagesProto.Cookie> cookies = session.network.getAllCookies().get(protocolTimeout, MILLISECONDS)
+            List<MessagesProto.Cookie> cookies = session.network().getAllCookies().get(protocolTimeout, MILLISECONDS)
                     .cookies.stream()
                     .map(c -> {
                         MessagesProto.Cookie.Builder cb = MessagesProto.Cookie.newBuilder();
@@ -366,7 +352,7 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
             for (ConfigProto.BrowserScript script : scripts) {
                 if (ApiTools.hasLabel(script.getMeta(), outlinksLabel)) {
                     LOG.debug("Executing link extractor script '{}'", script.getMeta().getName());
-                    RuntimeDomain.Evaluate ev = session.runtime
+                    RuntimeDomain.Evaluate ev = session.runtime()
                             .evaluate(script.getScript(), null, null, null, null, Boolean.TRUE, null, null, null)
                             .get(protocolTimeout, MILLISECONDS);
 
@@ -406,7 +392,7 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
 
     public void tryLogin(String username, String password) {
         try {
-            RuntimeDomain.Evaluate ev = session.runtime
+            RuntimeDomain.Evaluate ev = session.runtime()
                     .evaluate("window.scrollTo(0, 0);", null, null, null, null, null, null, null, null)
                     .get(protocolTimeout, MILLISECONDS);
         } catch (InterruptedException | ExecutionException | TimeoutException ex) {

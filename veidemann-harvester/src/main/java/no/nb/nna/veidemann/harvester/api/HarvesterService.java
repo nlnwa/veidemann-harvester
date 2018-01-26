@@ -22,6 +22,8 @@ import no.nb.nna.veidemann.api.HarvesterGrpc;
 import no.nb.nna.veidemann.api.HarvesterProto.CleanupExecutionRequest;
 import no.nb.nna.veidemann.api.HarvesterProto.HarvestPageReply;
 import no.nb.nna.veidemann.api.HarvesterProto.HarvestPageRequest;
+import no.nb.nna.veidemann.chrome.client.ClientClosedException;
+import no.nb.nna.veidemann.chrome.client.MaxActiveSessionsExceededException;
 import no.nb.nna.veidemann.harvester.browsercontroller.BrowserController;
 import no.nb.nna.veidemann.harvester.proxy.RecordingProxy;
 import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
@@ -52,6 +54,15 @@ public class HarvesterService extends HarvesterGrpc.HarvesterImplBase {
 
             respObserver.onNext(reply);
             respObserver.onCompleted();
+        } catch (ClientClosedException ex) {
+            LOG.error(ex.getMessage(), ex);
+            Status status = Status.UNAVAILABLE.withDescription(ex.toString());
+            respObserver.onError(status.asException());
+            System.exit(1);
+        } catch (MaxActiveSessionsExceededException ex) {
+            LOG.error(ex.getMessage(), ex);
+            Status status = Status.RESOURCE_EXHAUSTED.withDescription(ex.toString());
+            respObserver.onError(status.asException());
         } catch (Exception ex) {
             LOG.error(ex.getMessage(), ex);
             Status status = Status.UNKNOWN.withDescription(ex.toString());

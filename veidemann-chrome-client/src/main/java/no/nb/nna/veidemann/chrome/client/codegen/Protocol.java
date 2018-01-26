@@ -23,8 +23,6 @@ import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  *
@@ -32,8 +30,6 @@ import java.util.regex.Pattern;
 public class Protocol {
 
     List<Domain> domains;
-
-    static Pattern pattern = Pattern.compile("([A-Z]+)(.*)");
 
     static final String INDENT = "    ";
 
@@ -57,15 +53,6 @@ public class Protocol {
         }
         EntryPoint.generate(domains, outdir);
         Session.generate(domains, outdir);
-    }
-
-    public static String uncap(String name) {
-        Matcher m = pattern.matcher(name);
-        if (m.matches()) {
-            return m.group(1).toLowerCase() + m.group(2);
-        } else {
-            return name;
-        }
     }
 
     public Domain domain(String domainName) {

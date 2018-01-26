@@ -115,9 +115,9 @@ public class Session {
                 .addStatement("this.$1N = $1N", entryPoint)
                 .addStatement("this.$1N = $1N", config)
                 .beginControlFlow("try")
-                .addStatement("$N = $N.target().createBrowserContext().$L.getBrowserContextId()",
+                .addStatement("$N = $N.target().createBrowserContext().$L.browserContextId()",
                         contextId, entryPoint, timeoutGet)
-                .addStatement("$N = $N.target().createTarget(\"about:blank\", $N, $N, $N, false).$L.getTargetId()", targetId,
+                .addStatement("$N = $N.target().createTarget(\"about:blank\", $N, $N, $N, false).$L.targetId()", targetId,
                         entryPoint, clientWidth, clientHeight, contextId, timeoutGet)
                 .endControlFlow()
                 .beginControlFlow("catch ($T | $T | $T ex)",
@@ -135,7 +135,7 @@ public class Session {
         for (Domain domain : domains) {
             if (!"Target".equals(domain.domain) && !"Browser".equals(domain.domain)) {
                 FieldSpec.Builder fieldBuilder = FieldSpec
-                        .builder(domain.className, Protocol.uncap(domain.domain), Modifier.PRIVATE, Modifier.FINAL);
+                        .builder(domain.className, Codegen.uncap(domain.domain), Modifier.PRIVATE, Modifier.FINAL);
                 if (domain.description != null) {
                     fieldBuilder.addJavadoc(domain.description + "\n");
                 }
@@ -145,7 +145,7 @@ public class Session {
 
                 constructor.addStatement("$N = new $T($N, $N)", field, field.type, entryPoint, sessionClient);
 
-                classBuilder.addMethod(MethodSpec.methodBuilder(Protocol.uncap(domain.domain))
+                classBuilder.addMethod(MethodSpec.methodBuilder(Codegen.uncap(domain.domain))
                         .addModifiers(PUBLIC)
                         .addException(ClientClosedException.class)
                         .addException(SessionClosedException.class)
@@ -202,7 +202,7 @@ public class Session {
                 .endControlFlow()
                 .beginControlFlow("if ($N != null)", contextId)
                 .beginControlFlow("try")
-                .beginControlFlow("if (!$N.target().disposeBrowserContext(contextId).$L.getSuccess())", entryPoint, timeoutGet)
+                .beginControlFlow("if (!$N.target().disposeBrowserContext(contextId).$L.success())", entryPoint, timeoutGet)
                 .addStatement("$N.info($S, $N)", logger, "Failed closing context {}", contextId)
                 .endControlFlow()
                 .endControlFlow()

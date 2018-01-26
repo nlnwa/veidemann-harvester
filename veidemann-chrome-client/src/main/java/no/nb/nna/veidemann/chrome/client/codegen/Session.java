@@ -22,7 +22,9 @@ import com.squareup.javapoet.JavaFile;
 import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.ParameterSpec;
 import com.squareup.javapoet.TypeSpec;
-import no.nb.nna.veidemann.chrome.client.ws.SessionClosedException;
+import no.nb.nna.veidemann.chrome.client.ChromeDebugProtocolConfig;
+import no.nb.nna.veidemann.chrome.client.ClientClosedException;
+import no.nb.nna.veidemann.chrome.client.SessionClosedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,6 +38,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import static javax.lang.model.element.Modifier.PUBLIC;
+import static no.nb.nna.veidemann.chrome.client.codegen.EntryPoint.protocolClient;
+import static no.nb.nna.veidemann.chrome.client.codegen.Protocol.INDENT;
 
 /**
  *
@@ -44,7 +48,7 @@ public class Session {
 
     static final ClassName type = ClassName.get(Codegen.PACKAGE, "Session");
 
-    final FieldSpec entryPoint = FieldSpec.builder(EntryPoint.type, "chromeDebugProtocol", Modifier.FINAL).build();
+    static final FieldSpec entryPoint = FieldSpec.builder(EntryPoint.type, "chromeDebugProtocol", Modifier.FINAL).build();
 
     final FieldSpec sessionClient = FieldSpec
             .builder(Codegen.CLIENT_CLASS, "sessionClient", Modifier.PRIVATE, Modifier.FINAL).build();
@@ -53,15 +57,14 @@ public class Session {
             .builder(Logger.class, "LOG", Modifier.PRIVATE, Modifier.FINAL, Modifier.STATIC)
             .initializer(CodeBlock.of("$T.getLogger($T.class)", LoggerFactory.class, type)).build();
 
-    final FieldSpec timeout = FieldSpec
-            .builder(long.class, "TIMEOUT", Modifier.PRIVATE, Modifier.FINAL, Modifier.STATIC)
-            .initializer("5000").build();
+    final FieldSpec config = FieldSpec
+            .builder(ChromeDebugProtocolConfig.class, "config", Modifier.PRIVATE, Modifier.FINAL).build();
 
     final FieldSpec contextId = FieldSpec.builder(String.class, "contextId", Modifier.FINAL).build();
 
     final FieldSpec targetId = FieldSpec.builder(String.class, "targetId", Modifier.FINAL).build();
 
-    final CodeBlock timeoutGet = CodeBlock.of("get($N, $T.MILLISECONDS)", timeout, TimeUnit.class);
+    final CodeBlock timeoutGet = CodeBlock.of("get($N.getProtocolTimeoutMs(), $T.MILLISECONDS)", config, TimeUnit.class);
 
     final List<Domain> domains;
 
@@ -76,7 +79,7 @@ public class Session {
         classBuilder = TypeSpec.classBuilder(type).addModifiers(Modifier.PUBLIC)
                 .addSuperinterface(Closeable.class)
                 .addField(logger)
-                .addField(timeout)
+                .addField(config)
                 .addField(entryPoint)
                 .addField(sessionClient)
                 .addField(contextId)
@@ -90,7 +93,7 @@ public class Session {
         s.genCloseMethod();
         s.genToStringAndVersionMethods();
 
-        JavaFile javaFile = JavaFile.builder(Codegen.PACKAGE, s.classBuilder.build()).build();
+        JavaFile javaFile = JavaFile.builder(Codegen.PACKAGE, s.classBuilder.build()).indent(INDENT).build();
         if (outdir == null) {
             javaFile.writeTo(System.out);
         } else {
@@ -99,19 +102,18 @@ public class Session {
     }
 
     void genConstructor() {
-        ParameterSpec host = ParameterSpec.builder(String.class, "host", Modifier.FINAL).build();
-        ParameterSpec port = ParameterSpec.builder(int.class, "port", Modifier.FINAL).build();
+        ParameterSpec config = ParameterSpec.builder(ChromeDebugProtocolConfig.class, "config", Modifier.FINAL).build();
         ParameterSpec clientWidth = ParameterSpec.builder(int.class, "clientWidth", Modifier.FINAL).build();
         ParameterSpec clientHeight = ParameterSpec.builder(int.class, "clientHeight", Modifier.FINAL).build();
 
         MethodSpec.Builder constructor = MethodSpec.constructorBuilder()
                 .addException(IOException.class)
                 .addParameter(entryPoint.type, entryPoint.name, Modifier.FINAL)
-                .addParameter(host)
-                .addParameter(port)
+                .addParameter(config)
                 .addParameter(clientWidth)
                 .addParameter(clientHeight)
                 .addStatement("this.$1N = $1N", entryPoint)
+                .addStatement("this.$1N = $1N", config)
                 .beginControlFlow("try")
                 .addStatement("$N = $N.target().createBrowserContext().$L.getBrowserContextId()",
                         contextId, entryPoint, timeoutGet)
@@ -126,7 +128,7 @@ public class Session {
                 .addStatement("$N = $N.$N.createSessionClient($N)",
                         sessionClient,
                         entryPoint,
-                        EntryPoint.protocolClient,
+                        protocolClient,
                         targetId)
                 .addCode("\n");
 
@@ -141,11 +143,17 @@ public class Session {
                 FieldSpec field = fieldBuilder.build();
                 classBuilder.addField(field);
 
-                constructor.addStatement("$N = new $T($N)", field, field.type, sessionClient);
+                constructor.addStatement("$N = new $T($N, $N)", field, field.type, entryPoint, sessionClient);
 
                 classBuilder.addMethod(MethodSpec.methodBuilder(Protocol.uncap(domain.domain))
                         .addModifiers(PUBLIC)
+                        .addException(ClientClosedException.class)
+                        .addException(SessionClosedException.class)
                         .returns(field.type)
+                        .beginControlFlow("if ($N.isClosed())", entryPoint)
+                        .addStatement("$N.info(\"Accessing $T on closed client. {}\", $N.$N.getClosedReason())", logger, domain.className, entryPoint, protocolClient)
+                        .addStatement("throw new $T($N.$N.getClosedReason())", ClientClosedException.class, entryPoint, protocolClient)
+                        .endControlFlow()
                         .beginControlFlow("if ($N.isClosed())", sessionClient)
                         .addStatement("$N.info(\"Accessing $T on closed session. {}\", $N.getClosedReason())", logger, domain.className, sessionClient)
                         .addStatement("throw new $T($N.getClosedReason())", SessionClosedException.class, sessionClient)
@@ -180,17 +188,26 @@ public class Session {
                 .build());
 
         classBuilder.addMethod(MethodSpec.methodBuilder("close")
-                .addModifiers(Modifier.PRIVATE)
                 .addParameter(String.class, "reason", Modifier.FINAL)
                 .addStatement("$N.debug($S, $N)", logger, "Browser session closing: {}", contextId)
                 .beginControlFlow("try")
-                .addStatement("$N.close(reason)", sessionClient)
+                .addStatement("$N.onClose(reason)", sessionClient)
                 .beginControlFlow("if ($N != null)", targetId)
+                .beginControlFlow("try")
                 .addStatement("$N.target().closeTarget(targetId).$L", entryPoint, timeoutGet)
                 .endControlFlow()
+                .beginControlFlow("catch ($T | $T ex)", ClientClosedException.class, SessionClosedException.class)
+                .addComment("Already closed, do nothing")
+                .endControlFlow()
+                .endControlFlow()
                 .beginControlFlow("if ($N != null)", contextId)
+                .beginControlFlow("try")
                 .beginControlFlow("if (!$N.target().disposeBrowserContext(contextId).$L.getSuccess())", entryPoint, timeoutGet)
                 .addStatement("$N.info($S, $N)", logger, "Failed closing context {}", contextId)
+                .endControlFlow()
+                .endControlFlow()
+                .beginControlFlow("catch ($T | $T ex)", ClientClosedException.class, SessionClosedException.class)
+                .addComment("Already closed, do nothing")
                 .endControlFlow()
                 .endControlFlow()
                 .endControlFlow()

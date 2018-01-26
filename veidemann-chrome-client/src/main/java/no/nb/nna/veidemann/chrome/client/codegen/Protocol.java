@@ -35,6 +35,8 @@ public class Protocol {
 
     static Pattern pattern = Pattern.compile("([A-Z]+)(.*)");
 
+    static final String INDENT = "    ";
+
     void gencode(File outdir) throws IOException {
         AnnotationSpec generatedAnnotation = AnnotationSpec.builder(Generated.class)
                 .addMember("value", "$S", Codegen.class.getCanonicalName()).addMember("date", "$S", Instant.now()
@@ -46,7 +48,7 @@ public class Protocol {
             domain.buildType(this);
         }
         for (Domain domain : domains) {
-            JavaFile javaFile = JavaFile.builder(Codegen.PACKAGE, domain.builder.build()).build();
+            JavaFile javaFile = JavaFile.builder(Codegen.PACKAGE, domain.builder.build()).indent(INDENT).build();
             if (outdir == null) {
                 javaFile.writeTo(System.out);
             } else {

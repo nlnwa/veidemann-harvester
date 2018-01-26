@@ -13,17 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package no.nb.nna.veidemann.chrome.client.ws;
+package no.nb.nna.veidemann.chrome.client;
 
-/**
- *
- */
-public interface WebSocketCallback {
+import java.io.IOException;
 
-    default void onConnect() {
+public class SessionClosedException extends IOException {
+
+    public SessionClosedException(String message) {
+        super(message);
     }
-
-    void onMessageReceived(String msg);
-
-    void onClose(String reason);
 }

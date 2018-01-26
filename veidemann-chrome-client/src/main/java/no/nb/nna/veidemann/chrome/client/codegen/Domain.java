@@ -17,10 +17,13 @@ package no.nb.nna.veidemann.chrome.client.codegen;
 
 import com.squareup.javapoet.AnnotationSpec;
 import com.squareup.javapoet.ClassName;
+import com.squareup.javapoet.CodeBlock;
 import com.squareup.javapoet.FieldSpec;
 import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeSpec;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.lang.model.element.Modifier;
 import java.util.List;
@@ -48,18 +51,28 @@ public class Domain {
 
     TypeSpec.Builder builder;
 
+    FieldSpec logger;
+
     final FieldSpec sessionClient = FieldSpec
             .builder(Codegen.CLIENT_CLASS, "sessionClient", Modifier.PRIVATE, Modifier.FINAL).build();
 
     void init(AnnotationSpec generatedAnnotation) {
         javaName = domain + "Domain";
         className = ClassName.get(Codegen.PACKAGE, javaName);
+        logger = FieldSpec
+                .builder(Logger.class, "LOG", Modifier.PRIVATE, Modifier.FINAL, Modifier.STATIC)
+                .initializer(CodeBlock.of("$T.getLogger($T.class)", LoggerFactory.class, className)).build();
+
         builder = TypeSpec.classBuilder(className)
                 .addModifiers(Modifier.PUBLIC)
                 .addAnnotation(generatedAnnotation)
+                .addField(logger)
+                .addField(Session.entryPoint)
                 .addField(sessionClient)
                 .addMethod(MethodSpec.constructorBuilder().addModifiers(Modifier.PUBLIC)
+                        .addParameter(Session.entryPoint.type, Session.entryPoint.name)
                         .addParameter(sessionClient.type, sessionClient.name)
+                        .addStatement("this.$1N = $1N", Session.entryPoint)
                         .addStatement("this.$1N = $1N", sessionClient)
                         .build());
     }

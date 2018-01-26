@@ -21,10 +21,11 @@ import io.opentracing.ActiveSpan;
 import io.opentracing.NoopActiveSpanSource;
 import io.opentracing.Tracer;
 import io.opentracing.tag.Tags;
+import no.nb.nna.veidemann.chrome.client.ChromeDebugProtocolConfig;
+import no.nb.nna.veidemann.chrome.client.SessionClosedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -60,9 +61,7 @@ public class Cdp implements WebSocketCallback {
 
     final WebsocketClient websocketClient;
 
-    final String host;
-
-    final int port;
+    final ChromeDebugProtocolConfig config;
 
     final String scheme;
 
@@ -70,18 +69,13 @@ public class Cdp implements WebSocketCallback {
 
     String closedReason;
 
-    final Tracer tracer;
+    ClientClosedListener clientClosedListener;
 
-    final boolean withActiveSpanOnly;
-
-    Closeable closeableCallback;
-
-    public Cdp(final String host, final int port, final Tracer tracer, final boolean withActiveSpanOnly) {
-        this.host = host;
-        this.port = port;
+    public Cdp(final ChromeDebugProtocolConfig config) {
+        this.config = config;
 
         try {
-            URL versionUrl = new URL("http", host, port, "/json/version");
+            URL versionUrl = new URL("http", config.getHost(), config.getPort(), "/json/version");
             try (InputStream in = versionUrl.openStream()) {
                 InputStreamReader inr = new InputStreamReader(in);
                 Map version = gson.fromJson(inr, Map.class);
@@ -89,9 +83,7 @@ public class Cdp implements WebSocketCallback {
                 String browserVersion = (String) version.get("Browser");
                 this.scheme = webSocketUri.getScheme();
 
-                this.websocketClient = new WebsocketClient(this, webSocketUri);
-                this.tracer = tracer;
-                this.withActiveSpanOnly = withActiveSpanOnly;
+                this.websocketClient = new WebsocketClient(this, webSocketUri, config);
             }
         } catch (URISyntaxException | IOException e) {
             closed.set(true);
@@ -99,24 +91,21 @@ public class Cdp implements WebSocketCallback {
         }
     }
 
-    private Cdp(final String scheme, final String host, final int port, final String path, final Tracer tracer, final boolean withActiveSpanOnly) {
+    private Cdp(final String scheme, final String path, final ChromeDebugProtocolConfig config) {
         this.scheme = scheme;
-        this.host = host;
-        this.port = port;
+        this.config = config;
 
         try {
-            URI webSocketUri = new URI(scheme, null, host, port, path, null, null);
+            URI webSocketUri = new URI(scheme, null, config.getHost(), config.getPort(), path, null, null);
 
-            this.websocketClient = new WebsocketClient(this, webSocketUri);
-            this.tracer = tracer;
-            this.withActiveSpanOnly = withActiveSpanOnly;
+            this.websocketClient = new WebsocketClient(this, webSocketUri, config);
         } catch (URISyntaxException e) {
             throw new RuntimeException(e);
         }
     }
 
     public Cdp createSessionClient(final String targetId) {
-        return new Cdp(scheme, host, port, "/devtools/page/" + targetId, tracer, withActiveSpanOnly);
+        return new Cdp(scheme, "/devtools/page/" + targetId, config);
     }
 
     public CompletableFuture<JsonElement> call(String method, Map<String, Object> params) {
@@ -244,11 +233,11 @@ public class Cdp implements WebSocketCallback {
     }
 
     ActiveSpan buildSpan(String operationName) {
-        if (tracer == null || (withActiveSpanOnly && tracer.activeSpan() == null)) {
+        if (config.getTracer() == null || (config.isActiveSpanOnly() && config.getTracer().activeSpan() == null)) {
             return NoopActiveSpanSource.NoopActiveSpan.INSTANCE;
         }
 
-        Tracer.SpanBuilder spanBuilder = tracer.buildSpan(operationName)
+        Tracer.SpanBuilder spanBuilder = config.getTracer().buildSpan(operationName)
                 .withTag(Tags.SPAN_KIND.getKey(), Tags.SPAN_KIND_CLIENT)
                 .withTag(Tags.COMPONENT.getKey(), "java-ChromeDebugProtocolClient");
 
@@ -256,8 +245,8 @@ public class Cdp implements WebSocketCallback {
         return span;
     }
 
-    public void setCloseableCallback(Closeable closeableCallback) {
-        this.closeableCallback = closeableCallback;
+    public void setClientClosedListener(ClientClosedListener clientClosedListener) {
+        this.clientClosedListener = clientClosedListener;
     }
 
     public boolean isClosed() {
@@ -268,16 +257,13 @@ public class Cdp implements WebSocketCallback {
         return closedReason;
     }
 
-    public void close(String reason) {
+    @Override
+    public void onClose(String reason) {
         closedReason = reason;
         closed.set(true);
         websocketClient.close();
-        if (closeableCallback != null) {
-            try {
-                closeableCallback.close();
-            } catch (IOException e) {
-                LOG.error(e.getMessage(), e);
-            }
+        if (clientClosedListener != null) {
+            clientClosedListener.clientClosed(reason);
         }
     }
 }

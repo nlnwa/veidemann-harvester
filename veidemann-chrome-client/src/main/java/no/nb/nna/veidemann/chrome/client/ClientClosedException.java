@@ -13,11 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package no.nb.nna.veidemann.chrome.client.ws;
+package no.nb.nna.veidemann.chrome.client;
 
-public class SessionClosedException extends RuntimeException {
+import java.io.IOException;
 
-    public SessionClosedException(String message) {
+public class ClientClosedException extends IOException {
+
+    public ClientClosedException(String message) {
         super(message);
     }
 }

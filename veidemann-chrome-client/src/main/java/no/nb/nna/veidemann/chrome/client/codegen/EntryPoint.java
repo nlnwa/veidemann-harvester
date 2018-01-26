@@ -24,7 +24,12 @@ import com.squareup.javapoet.ParameterSpec;
 import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
-import io.opentracing.Tracer;
+import no.nb.nna.veidemann.chrome.client.ChromeDebugProtocolConfig;
+import no.nb.nna.veidemann.chrome.client.ClientClosedException;
+import no.nb.nna.veidemann.chrome.client.MaxActiveSessionsExceededException;
+import no.nb.nna.veidemann.chrome.client.ws.ClientClosedListener;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.lang.model.element.Modifier;
 import java.io.Closeable;
@@ -32,10 +37,13 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static javax.lang.model.element.Modifier.PUBLIC;
+import static no.nb.nna.veidemann.chrome.client.codegen.Protocol.INDENT;
 import static no.nb.nna.veidemann.chrome.client.codegen.Protocol.uncap;
 
 /**
@@ -44,14 +52,11 @@ import static no.nb.nna.veidemann.chrome.client.codegen.Protocol.uncap;
 public class EntryPoint {
     static final ClassName type = ClassName.get(Codegen.PACKAGE, "ChromeDebugProtocol");
 
+    final FieldSpec logger = FieldSpec
+            .builder(Logger.class, "LOG", Modifier.PRIVATE, Modifier.FINAL, Modifier.STATIC)
+            .initializer(CodeBlock.of("$T.getLogger($T.class)", LoggerFactory.class, type)).build();
+
     static final FieldSpec protocolClient = FieldSpec.builder(Codegen.CLIENT_CLASS, "protocolClient", Modifier.FINAL)
-            .build();
-
-    static final FieldSpec tracer = FieldSpec.builder(Tracer.class, "tracer", Modifier.FINAL)
-            .build();
-
-    static final FieldSpec withActiveSpanOnly = FieldSpec
-            .builder(boolean.class, "withActiveSpanOnly", Modifier.FINAL)
             .build();
 
     final TypeName sessionListType = ParameterizedTypeName.get(ClassName.get(List.class), Session.type);
@@ -63,18 +68,12 @@ public class EntryPoint {
             .initializer("new $T<>()", ArrayList.class)
             .build();
 
-    final FieldSpec timeout = FieldSpec
-            .builder(long.class, "TIMEOUT", Modifier.PRIVATE, Modifier.FINAL, Modifier.STATIC)
-            .initializer("5000").build();
-
-    final FieldSpec host = FieldSpec.builder(String.class, "host", Modifier.FINAL).build();
-
-    final FieldSpec port = FieldSpec.builder(int.class, "port", Modifier.FINAL).build();
+    final FieldSpec config = FieldSpec.builder(ChromeDebugProtocolConfig.class, "config", Modifier.FINAL).build();
 
     final FieldSpec closed = FieldSpec.builder(AtomicBoolean.class, "closed", Modifier.FINAL)
             .initializer("new $T(false)", AtomicBoolean.class).build();
 
-    final CodeBlock timeoutGet = CodeBlock.of("get($N, $T.MILLISECONDS)", timeout, TimeUnit.class);
+    final CodeBlock timeoutGet = CodeBlock.of("get($N.getProtocolTimeoutMs(), $T.MILLISECONDS)", config, TimeUnit.class);
 
     final List<Domain> domains;
 
@@ -88,14 +87,12 @@ public class EntryPoint {
 
         classBuilder = TypeSpec.classBuilder(type).addModifiers(Modifier.PUBLIC)
                 .addSuperinterface(Closeable.class)
-                .addField(timeout)
-                .addField(host)
-                .addField(port)
+                .addSuperinterface(ClientClosedListener.class)
+                .addField(logger)
+                .addField(config)
                 .addField(protocolClient)
                 .addField(sessions)
-                .addField(closed)
-                .addField(tracer)
-                .addField(withActiveSpanOnly);
+                .addField(closed);
     }
 
     static void generate(List<Domain> domains, File outdir) throws IOException {
@@ -103,11 +100,13 @@ public class EntryPoint {
         e.genConstructors();
         e.genNewSessionMethod();
         e.genCloseMethod();
+        e.genIsClosesMethod();
         e.genOnSessionClosedMethod();
+        e.genClientClosedMethod();
         e.genToStringAndVersionMethods();
         e.genGetOpenContextsMethod();
 
-        JavaFile javaFile = JavaFile.builder(Codegen.PACKAGE, e.classBuilder.build()).build();
+        JavaFile javaFile = JavaFile.builder(Codegen.PACKAGE, e.classBuilder.build()).indent(INDENT).build();
         if (outdir == null) {
             javaFile.writeTo(System.out);
         } else {
@@ -119,16 +118,10 @@ public class EntryPoint {
 
         MethodSpec.Builder constructor = MethodSpec.constructorBuilder()
                 .addModifiers(Modifier.PUBLIC)
-                .addParameter(host.type, host.name, Modifier.FINAL)
-                .addParameter(port.type, port.name, Modifier.FINAL)
-                .addParameter(tracer.type, tracer.name, Modifier.FINAL)
-                .addParameter(withActiveSpanOnly.type, withActiveSpanOnly.name, Modifier.FINAL)
-                .addStatement("this.$1N = $1N", host)
-                .addStatement("this.$1N = $1N", port)
-                .addStatement("this.$1N = $1N", tracer)
-                .addStatement("this.$1N = $1N", withActiveSpanOnly)
-                .addStatement("$N = new Cdp($N, $N, $N, $N)", protocolClient, host, port, tracer, withActiveSpanOnly)
-                .addStatement("$N.setCloseableCallback(this)", protocolClient);
+                .addParameter(config.type, config.name, Modifier.FINAL)
+                .addStatement("this.$1N = $1N", config)
+                .addStatement("$N = new Cdp($N)", protocolClient, config)
+                .addStatement("$N.setClientClosedListener(this)", protocolClient);
 
         for (Domain domain : domains) {
             if ("Target".equals(domain.domain) || "Browser".equals(domain.domain)) {
@@ -136,11 +129,16 @@ public class EntryPoint {
                         .builder(domain.className, uncap(domain.domain), Modifier.FINAL, Modifier.PRIVATE)
                         .build();
                 classBuilder.addField(field);
-                constructor.addStatement("$N = new $T($N)", field, field.type, protocolClient);
+                constructor.addStatement("$N = new $T(this, $N)", field, field.type, protocolClient);
 
                 classBuilder.addMethod(MethodSpec.methodBuilder(Protocol.uncap(domain.domain))
                         .addModifiers(PUBLIC)
                         .returns(field.type)
+                        .addException(ClientClosedException.class)
+                        .beginControlFlow("if (isClosed())")
+                        .addStatement("$N.info(\"Accessing $T on closed client. {}\", $N.getClosedReason())", logger, domain.className, protocolClient)
+                        .addStatement("throw new $T($N.getClosedReason())", ClientClosedException.class, protocolClient)
+                        .endControlFlow()
                         .addStatement("return $N", field)
                         .addJavadoc("Get the $N domain.\n<p>\n", domain.domain)
                         .addJavadoc(domain.description == null ? "" : domain.description.replace("$", "$$") + "\n")
@@ -148,23 +146,6 @@ public class EntryPoint {
                         .build());
             }
         }
-
-        classBuilder.addMethod(constructor.build());
-
-        constructor = MethodSpec.constructorBuilder()
-                .addModifiers(Modifier.PUBLIC)
-                .addParameter(host.type, host.name, Modifier.FINAL)
-                .addParameter(port.type, port.name, Modifier.FINAL)
-                .addParameter(tracer.type, tracer.name, Modifier.FINAL)
-                .addStatement("this($N, $N, $N, true)", host, port, tracer);
-
-        classBuilder.addMethod(constructor.build());
-
-        constructor = MethodSpec.constructorBuilder()
-                .addModifiers(Modifier.PUBLIC)
-                .addParameter(host.type, host.name, Modifier.FINAL)
-                .addParameter(port.type, port.name, Modifier.FINAL)
-                .addStatement("this($N, $N, null, true)", host, port);
 
         classBuilder.addMethod(constructor.build());
     }
@@ -178,11 +159,21 @@ public class EntryPoint {
                 .addParameter(clientWidth)
                 .addParameter(clientHeight)
                 .returns(Session.type)
-                .beginControlFlow("if ($N.get())", closed)
-                .addStatement("throw new $T($S)", IOException.class, "Client is closed")
+                .beginControlFlow("if (isClosed())")
+                .addStatement("$N.info(\"Creating new session on closed client. {}\", $N.getClosedReason())", logger, protocolClient)
+                .addStatement("throw new $T($N.getClosedReason())", ClientClosedException.class, protocolClient)
                 .endControlFlow()
-                .addStatement("$1T s = new $1T(this, $2N, $3N, $4N, $5N)",
-                        Session.type, host, port, clientWidth, clientHeight)
+                .beginControlFlow("try")
+                .beginControlFlow("if (target().getTargets().$L.getTargetInfos().size() > $N.getMaxOpenSessions())", timeoutGet, config)
+                .addStatement("throw new $T($N.getMaxOpenSessions())", MaxActiveSessionsExceededException.class, config)
+                .endControlFlow()
+                .endControlFlow()
+                .beginControlFlow("catch ($T | $T | $T ex)",
+                        InterruptedException.class, ExecutionException.class, TimeoutException.class)
+                .addStatement("throw new $T(ex)", IOException.class)
+                .endControlFlow()
+                .addStatement("$1T s = new $1T(this, $2N, $3N, $4N)",
+                        Session.type, config, clientWidth, clientHeight)
                 .addStatement("$N.add(s)", sessions)
                 .addStatement("return s")
                 .build());
@@ -205,7 +196,27 @@ public class EntryPoint {
                 .beginControlFlow("while (!$N.isEmpty())", sessions)
                 .addStatement("$N.get(0).close()", sessions)
                 .endControlFlow()
-                .addStatement("$N.close(\"Client is closed by user\")", protocolClient)
+                .addStatement("$N.onClose(\"Client is closed by user\")", protocolClient)
+                .build());
+    }
+
+    void genIsClosesMethod() {
+        classBuilder.addMethod(MethodSpec.methodBuilder("isClosed")
+                .addModifiers(Modifier.PUBLIC)
+                .returns(boolean.class)
+                .addStatement("return $N.get()", closed)
+                .build());
+    }
+
+    void genClientClosedMethod() {
+        classBuilder.addMethod(MethodSpec.methodBuilder("clientClosed")
+                .addModifiers(Modifier.PUBLIC, Modifier.SYNCHRONIZED)
+                .addAnnotation(Override.class)
+                .addParameter(String.class, "reason")
+                .addStatement("$N.set(true)", closed)
+                .beginControlFlow("while (!$N.isEmpty())", sessions)
+                .addStatement("$N.get(0).close(\"Client closed\")", sessions)
+                .endControlFlow()
                 .build());
     }
 

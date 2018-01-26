@@ -22,6 +22,8 @@ import com.squareup.javapoet.ParameterSpec;
 import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
+import no.nb.nna.veidemann.chrome.client.ClientClosedException;
+import no.nb.nna.veidemann.chrome.client.SessionClosedException;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -31,6 +33,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+
+import static no.nb.nna.veidemann.chrome.client.codegen.EntryPoint.protocolClient;
 
 /**
  *
@@ -78,8 +82,18 @@ public class Command {
         for (Parameter param : parameters) {
             methodSpec.addStatement("params.put($S, $N)", param.name, param.spec);
         }
-        methodSpec.addStatement("return $N.call($S, params, $T.class)",
-                domain.sessionClient, domain.domain + "." + name, resultType);
+        methodSpec.addException(ClientClosedException.class)
+                .addException(SessionClosedException.class)
+                .beginControlFlow("if ($N.isClosed())", Session.entryPoint)
+                .addStatement("$N.info(\"Accessing $T on closed client. {}\", $N.$N.getClosedReason())", domain.logger, domain.className, Session.entryPoint, protocolClient)
+                .addStatement("throw new $T($N.$N.getClosedReason())", ClientClosedException.class, Session.entryPoint, protocolClient)
+                .endControlFlow()
+                .beginControlFlow("if ($N.isClosed())", domain.sessionClient)
+                .addStatement("$N.info(\"Accessing $T on closed session. {}\", $N.getClosedReason())", domain.logger, domain.className, domain.sessionClient)
+                .addStatement("throw new $T($N.getClosedReason())", SessionClosedException.class, domain.sessionClient)
+                .endControlFlow()
+                .addStatement("return $N.call($S, params, $T.class)",
+                        domain.sessionClient, domain.domain + "." + name, resultType);
         b.addMethod(methodSpec.build());
     }
 

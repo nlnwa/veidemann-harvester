@@ -42,6 +42,7 @@ import io.netty.handler.codec.http.websocketx.WebSocketVersion;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
+import no.nb.nna.veidemann.chrome.client.ChromeDebugProtocolConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,17 +75,18 @@ public class WebsocketClient {
 
     private int connectionAttempts = 0;
 
-    private int maxConnectionAttempts = 10;
+    private final ChromeDebugProtocolConfig config;
 
-    public WebsocketClient(WebSocketCallback callback, URI uri) {
+    public WebsocketClient(WebSocketCallback callback, URI uri, ChromeDebugProtocolConfig config) {
+        this.config = config;
         this.callback = callback;
         this.uri = uri;
-        while (!connected && connectionAttempts++ < maxConnectionAttempts) {
+        while (!connected && connectionAttempts++ < config.getMaxConnectionAttempts()) {
             try {
                 connect();
                 connected = true;
             } catch (Throwable t) {
-                LOG.error("Connection failed: {}", t.toString());
+                LOG.error("Connection failed: {}", t.toString(), t);
                 try {
                     Thread.sleep(2000);
                 } catch (InterruptedException ex) {
@@ -157,6 +159,15 @@ public class WebsocketClient {
             channel = b.connect(uri.getHost(), port).sync().channel();
             channel.closeFuture().addListener(c -> {
                 LOG.info("Closed {}", uri, closeReason);
+                try {
+                    if (closeReason == null) {
+                        callback.onClose("");
+                    } else {
+                        callback.onClose(closeReason.toString());
+                    }
+                } catch (Throwable t) {
+                    LOG.error("Callback is throwing an exception", t);
+                }
                 workerGroup.shutdownGracefully();
             });
 
@@ -185,9 +196,8 @@ public class WebsocketClient {
     }
 
     public void sendMessage(String msg) {
-        int retryLimit = 5;
         int retryAttempts = 0;
-        while (!channel.isActive() && retryAttempts < retryLimit) {
+        while (!channel.isActive() && retryAttempts < config.getMaxSendMessageAttempts()) {
             LOG.info("WS channel closed, try to reopen.");
             close();
             connect();
@@ -231,7 +241,7 @@ public class WebsocketClient {
                 callback.onMessageReceived(textFrame.text());
             } else if (frame instanceof CloseWebSocketFrame) {
                 channel.close();
-                callback.close("WebSocket Client received closing");
+                callback.onClose("WebSocket Client received closing");
             } else {
                 String message = "unsupported frame type: " + frame.getClass().getName();
                 throw new UnsupportedOperationException(message);
@@ -242,7 +252,7 @@ public class WebsocketClient {
         public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
             closeReason = cause;
             LOG.error("Exception received for {}", uri, cause);
-            callback.close(cause.toString());
+            callback.onClose(cause.toString());
             if (!handshakeFuture.isDone()) {
                 handshakeFuture.setFailure(cause);
             }

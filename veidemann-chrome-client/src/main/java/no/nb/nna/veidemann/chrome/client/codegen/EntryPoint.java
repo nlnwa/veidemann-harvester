@@ -127,7 +127,8 @@ public class EntryPoint {
                 .addStatement("this.$1N = $1N", port)
                 .addStatement("this.$1N = $1N", tracer)
                 .addStatement("this.$1N = $1N", withActiveSpanOnly)
-                .addStatement("$N = new Cdp($N, $N, $N, $N)", protocolClient, host, port, tracer, withActiveSpanOnly);
+                .addStatement("$N = new Cdp($N, $N, $N, $N)", protocolClient, host, port, tracer, withActiveSpanOnly)
+                .addStatement("$N.setCloseableCallback(this)", protocolClient);
 
         for (Domain domain : domains) {
             if ("Target".equals(domain.domain) || "Browser".equals(domain.domain)) {
@@ -141,7 +142,9 @@ public class EntryPoint {
                         .addModifiers(PUBLIC)
                         .returns(field.type)
                         .addStatement("return $N", field)
+                        .addJavadoc("Get the $N domain.\n<p>\n", domain.domain)
                         .addJavadoc(domain.description == null ? "" : domain.description.replace("$", "$$") + "\n")
+                        .addJavadoc("\n@return the $N domain\n", domain.domain)
                         .build());
             }
         }

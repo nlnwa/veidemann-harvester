@@ -15,7 +15,7 @@
  */
 package no.nb.nna.veidemann.chrome.client.ws;
 
-public class SessionClosedException extends Exception {
+public class SessionClosedException extends RuntimeException {
 
     public SessionClosedException(String message) {
         super(message);

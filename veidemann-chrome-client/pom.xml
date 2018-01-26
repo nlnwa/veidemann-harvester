@@ -137,7 +137,7 @@
                                     <removeVolumes>true</removeVolumes>
                                     <autoCreateCustomNetworks>true</autoCreateCustomNetworks>
                                     <verbose>true</verbose>
-                                    <startParallel>false</startParallel>
+                                    <startParallel>true</startParallel>
                                     <images>
                                         <image>
                                             <name>norsknettarkiv/testsites</name>
@@ -194,8 +194,7 @@
                                                     <port>+browser.host:browser.port:9222</port>
                                                 </ports>
                                                 <env>
-                                                    <CHROME_OPTS>--ignore-certificate-errors --disable-web-security --allow-running-insecure-content --dbus-stub --hide-scrollbars
-                                                    </CHROME_OPTS>
+                                                    <CHROME_OPTS>--ignore-certificate-errors --disable-web-security --allow-running-insecure-content --dbus-stub --hide-scrollbars</CHROME_OPTS>
                                                 </env>
                                                 <!-- 1GB -->
                                                 <memory>1073741824</memory>
@@ -207,7 +206,7 @@
                                                     <host>${docker.container.testsites.net.cdp-test-net.ip}</host>
                                                 </dns>
                                                 <wait>
-                                                    <time>20000</time>
+                                                    <time>5000</time>
                                                     <log>DevTools listening on ws</log>
                                                     <kill>1000</kill>
                                                 </wait>

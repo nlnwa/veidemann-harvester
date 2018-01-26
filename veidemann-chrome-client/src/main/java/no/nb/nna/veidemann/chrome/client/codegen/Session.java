@@ -22,6 +22,7 @@ import com.squareup.javapoet.JavaFile;
 import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.ParameterSpec;
 import com.squareup.javapoet.TypeSpec;
+import no.nb.nna.veidemann.chrome.client.ws.SessionClosedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,7 +30,6 @@ import javax.lang.model.element.Modifier;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
-import java.net.URL;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -146,8 +146,14 @@ public class Session {
                 classBuilder.addMethod(MethodSpec.methodBuilder(Protocol.uncap(domain.domain))
                         .addModifiers(PUBLIC)
                         .returns(field.type)
+                        .beginControlFlow("if ($N.isClosed())", sessionClient)
+                        .addStatement("$N.info(\"Accessing $T on closed session. {}\", $N.getClosedReason())", logger, domain.className, sessionClient)
+                        .addStatement("throw new $T($N.getClosedReason())", SessionClosedException.class, sessionClient)
+                        .endControlFlow()
                         .addStatement("return $N", field)
+                        .addJavadoc("Get the $N domain.\n<p>\n", domain.domain)
                         .addJavadoc(domain.description == null ? "" : domain.description.replace("$", "$$") + "\n")
+                        .addJavadoc("\n@return the $N domain\n", domain.domain)
                         .build());
             }
         }

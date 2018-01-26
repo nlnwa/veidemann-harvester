@@ -121,6 +121,57 @@ public class Codegen {
         return ClassName.get(PACKAGE, domain.javaName, typeName);
     }
 
+
+    static ClassName buildImmutableResponse(TypeSpec.Builder b, String name, String description, List<Parameter> members, Protocol protocol, Domain domain) {
+        String typeName = name.substring(0, 1).toUpperCase() + name.substring(1);
+        TypeSpec.Builder typeSpec = TypeSpec.classBuilder(typeName)
+                .addModifiers(PUBLIC, STATIC);
+
+        StringBuilder fieldStrings = new StringBuilder();
+
+        if (description != null) {
+            typeSpec.addJavadoc(description.replace("$", "$$") + "\n");
+        }
+
+        for (Parameter member : members) {
+            if (Objects.equals(member.name, "this")) {
+                member.name = "this_";
+            }
+            FieldSpec.Builder field = FieldSpec.builder(member.typeName(protocol, domain), member.name, PRIVATE);
+            if (member.name.equals("this_")) {
+                field.addAnnotation(AnnotationSpec.builder(SerializedName.class)
+                        .addMember("value", "$S", "this").build());
+            }
+            if (member.description != null) {
+                field.addJavadoc(member.description.replace("$", "$$") + "\n");
+            }
+
+            FieldSpec fieldSpec = field.build();
+            typeSpec.addField(fieldSpec);
+
+            if (fieldStrings.length() > 0) {
+                fieldStrings.append(", ");
+            }
+            fieldStrings.append(member.name + "=\" + " + member.name + " + \"");
+
+            typeSpec.addMethod(MethodSpec.methodBuilder("get" + cap(member.name))
+                    .addModifiers(PUBLIC)
+                    .returns(fieldSpec.type)
+                    .addStatement("return $N", fieldSpec)
+                    .addJavadoc(member.description == null ? "" : member.description.replace("$", "$$") + "\n")
+                    .build());
+        }
+
+        typeSpec.addMethod(MethodSpec.methodBuilder("toString")
+                .addModifiers(PUBLIC)
+                .returns(String.class)
+                .addStatement("return \"" + typeName + "{" + fieldStrings + "}\"").build());
+
+        TypeSpec spec = typeSpec.build();
+        b.addType(typeSpec.build());
+        return ClassName.get(PACKAGE, domain.javaName, typeName);
+    }
+
     public static String coalesce(String... strs) {
         for (String s : strs) {
             if (s != null) {

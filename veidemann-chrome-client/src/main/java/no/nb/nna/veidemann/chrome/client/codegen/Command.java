@@ -55,7 +55,7 @@ public class Command {
         if (returns.isEmpty()) {
             resultType = ClassName.get(Void.class);
         } else {
-            resultType = Codegen.buildStruct(b, name, null, returns, protocol, domain);
+            resultType = Codegen.buildImmutableResponse(b, name, null, returns, protocol, domain);
         }
         TypeName returnType = ParameterizedTypeName.get(ClassName.get(CompletableFuture.class), resultType);
         methodSpec.returns(returnType);

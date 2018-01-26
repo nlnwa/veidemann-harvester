@@ -24,6 +24,7 @@ import io.opentracing.tag.Tags;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -72,6 +73,8 @@ public class Cdp implements WebSocketCallback {
     final Tracer tracer;
 
     final boolean withActiveSpanOnly;
+
+    Closeable closeableCallback;
 
     public Cdp(final String host, final int port, final Tracer tracer, final boolean withActiveSpanOnly) {
         this.host = host;
@@ -122,7 +125,7 @@ public class Cdp implements WebSocketCallback {
             final ActiveSpan.Continuation cont = span.capture();
 
             if (closed.get()) {
-                LOG.info("Calling {} on closed session", method);
+                LOG.info("Calling {} on closed session. {}", method, closedReason);
                 CompletableFuture<JsonElement> future = new CompletableFuture<>();
                 future.completeExceptionally(new SessionClosedException(closedReason));
                 return future;
@@ -253,14 +256,28 @@ public class Cdp implements WebSocketCallback {
         return span;
     }
 
+    public void setCloseableCallback(Closeable closeableCallback) {
+        this.closeableCallback = closeableCallback;
+    }
+
     public boolean isClosed() {
         return closed.get();
+    }
+
+    public String getClosedReason() {
+        return closedReason;
     }
 
     public void close(String reason) {
         closedReason = reason;
         closed.set(true);
         websocketClient.close();
+        if (closeableCallback != null) {
+            try {
+                closeableCallback.close();
+            } catch (IOException e) {
+                LOG.error(e.getMessage(), e);
+            }
+        }
     }
-
 }

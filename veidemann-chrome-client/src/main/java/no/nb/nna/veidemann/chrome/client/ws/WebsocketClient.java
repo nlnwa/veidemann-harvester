@@ -15,8 +15,6 @@
  */
 package no.nb.nna.veidemann.chrome.client.ws;
 
-import java.net.URI;
-
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
@@ -44,11 +42,11 @@ import io.netty.handler.codec.http.websocketx.WebSocketVersion;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
-
-import javax.net.ssl.SSLException;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.net.ssl.SSLException;
+import java.net.URI;
 
 /**
  *
@@ -232,9 +230,8 @@ public class WebsocketClient {
                 TextWebSocketFrame textFrame = (TextWebSocketFrame) frame;
                 callback.onMessageReceived(textFrame.text());
             } else if (frame instanceof CloseWebSocketFrame) {
-                System.out.println("WebSocket Client received closing");
                 channel.close();
-                callback.onClose();
+                callback.close("WebSocket Client received closing");
             } else {
                 String message = "unsupported frame type: " + frame.getClass().getName();
                 throw new UnsupportedOperationException(message);
@@ -244,7 +241,8 @@ public class WebsocketClient {
         @Override
         public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
             closeReason = cause;
-            cause.printStackTrace();
+            LOG.error("Exception received for {}", uri, cause);
+            callback.close(cause.toString());
             if (!handshakeFuture.isDone()) {
                 handshakeFuture.setFailure(cause);
             }

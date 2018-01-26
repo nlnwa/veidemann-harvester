@@ -53,7 +53,7 @@ public class ChromeDebugProtocolIT {
 //        chrome.target.onTargetInfoChanged(t -> System.out.println(t));
 
         List<Sess> sessions = new ArrayList<>();
-        for (int i = 0; i < 50; i++) {
+        for (int i = 0; i < 20; i++) {
             sessions.add(new Sess(chrome.newSession(1280, 1024)));
         }
 //        System.out.println(session.version());
@@ -78,7 +78,8 @@ public class ChromeDebugProtocolIT {
 //            session.navigate();
 //            Thread.sleep(sleep);
 //        }
-        sessions.stream().filter(s -> s.crashed).forEach(s -> s.navigate());
+//        sessions.stream().filter(s -> s.crashed).forEach(s -> s.navigate());
+        sessions.stream().forEach(s -> s.navigate());
 
         Thread.sleep(5000);
         crashed = sessions.stream().filter(s -> s.crashed).count();
@@ -112,16 +113,16 @@ public class ChromeDebugProtocolIT {
             try {
                 crashed = false;
                 session.page().navigate("http://a1.com", "", "").get(5, TimeUnit.SECONDS).getFrameId();
-//                session.close();
+                session.close();
             } catch (InterruptedException e) {
                 e.printStackTrace();
             } catch (ExecutionException e) {
-                e.printStackTrace();
+                System.out.println(e);
             } catch (TimeoutException e) {
                 e.printStackTrace();
             }
-            }
 //        }
+        }
 
         @Override
         public String toString() {

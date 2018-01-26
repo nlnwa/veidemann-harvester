@@ -25,7 +25,7 @@ public interface WebSocketCallback {
 
     void onMessageReceived(String msg);
 
-    default void onClose() {
+    default void close(String reason) {
     }
 
 }

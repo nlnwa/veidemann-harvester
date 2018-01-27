@@ -23,6 +23,7 @@ import no.nb.nna.veidemann.api.ConfigProto;
 import no.nb.nna.veidemann.api.MessagesProto;
 import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
 import no.nb.nna.veidemann.chrome.client.ChromeDebugProtocol;
+import no.nb.nna.veidemann.chrome.client.ClientClosedException;
 import no.nb.nna.veidemann.chrome.client.DebuggerDomain;
 import no.nb.nna.veidemann.chrome.client.NetworkDomain;
 import no.nb.nna.veidemann.chrome.client.NetworkDomain.AuthChallengeResponse;
@@ -31,6 +32,7 @@ import no.nb.nna.veidemann.chrome.client.NetworkDomain.RequestPattern;
 import no.nb.nna.veidemann.chrome.client.PageDomain;
 import no.nb.nna.veidemann.chrome.client.RuntimeDomain;
 import no.nb.nna.veidemann.chrome.client.Session;
+import no.nb.nna.veidemann.chrome.client.SessionClosedException;
 import no.nb.nna.veidemann.commons.VeidemannHeaderConstants;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.util.ApiTools;
@@ -77,7 +79,7 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
 
     volatile boolean closed = false;
 
-    public BrowserSession(DbAdapter db, ChromeDebugProtocol chrome, ConfigProto.CrawlConfig config, QueuedUri queuedUri, BaseSpan span) throws IOException {
+    public BrowserSession(DbAdapter db, ChromeDebugProtocol chrome, ConfigProto.CrawlConfig config, QueuedUri queuedUri, BaseSpan span) throws IOException, InterruptedException, ExecutionException, TimeoutException {
         this.queuedUri = Objects.requireNonNull(queuedUri);
         // Ensure that we at least wait a second even if the configuration says less.
         long maxIdleTime = Math.max(config.getBrowserConfig().getSleepAfterPageloadMs(), 1000);
@@ -98,8 +100,12 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
             setUserAgent = session.runtime()
                     .evaluate("navigator.userAgent;", null, false, false, null, false, false, false, false)
                     .thenAccept(e -> {
-                        session.network().setUserAgentOverride(((String) e.getResult().getValue())
-                                .replace("HeadlessChrome", session.version()));
+                        try {
+                            session.network().setUserAgentOverride(((String) e.result().value())
+                                    .replace("HeadlessChrome", session.version()));
+                        } catch (ClientClosedException | SessionClosedException e1) {
+                            LOG.error(e1.getMessage(), e);
+                        }
                     });
         } else {
             setUserAgent = session.network().setUserAgentOverride(userAgent);
@@ -116,7 +122,7 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
         // Request patterns for enabling interception on requests and responses
         RequestPattern rp1 = new RequestPattern();
         RequestPattern rp2 = new RequestPattern();
-        rp2.setInterceptionStage("HeadersReceived");
+        rp2.withInterceptionStage("HeadersReceived");
         List<RequestPattern> requestPatterns = ImmutableList.of(rp1, rp2);
 
         CompletableFuture.allOf(
@@ -137,10 +143,10 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
         session.network().onLoadingFailed(f -> uriRequests.onLoadingFailed(f));
         session.network().onResponseReceived(l -> uriRequests.onResponseReceived(l));
         session.network().onDataReceived(d -> uriRequests.onDataReceived(d));
-        session.security().onCertificateError(se -> {
-            LOG.info("Certificate error: " + se);
-            session.security().handleCertificateError(se.getEventId(), "continue");
-        });
+//        session.security().onCertificateError(se -> {
+//            LOG.info("Certificate error: " + se);
+//            session.security().handleCertificateError(se.eventId(), "continue");
+//        });
 
         session.page().setDownloadBehavior("allow", "/dev/null");
 
@@ -159,28 +165,32 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
         return uriRequests;
     }
 
-    public void setBreakpoints() throws TimeoutException, ExecutionException, InterruptedException {
+    public void setBreakpoints() throws TimeoutException, ExecutionException, InterruptedException, ClientClosedException, SessionClosedException {
         // TODO: This should be part of configuration
         CompletableFuture.allOf(
                 session.debugger()
                         .setBreakpointByUrl(1, null, "https?://www.google-analytics.com/analytics.js", null, null, null)
-                        .thenAccept(b -> breakpoints.put(b.getBreakpointId(), b.getLocations())),
+                        .thenAccept(b -> breakpoints.put(b.breakpointId(), b.locations())),
                 session.debugger()
                         .setBreakpointByUrl(1, null, "https?://www.google-analytics.com/ga.js", null, null, null)
-                        .thenAccept(b -> breakpoints.put(b.getBreakpointId(), b.getLocations()))
+                        .thenAccept(b -> breakpoints.put(b.breakpointId(), b.locations()))
         ).get(protocolTimeout, MILLISECONDS);
 
         //session.debugger.onBreakpointResolved(b -> breakpoints.put(b.breakpointId, b.location));
         session.debugger().onPaused(p -> {
-            String scriptId = p.getCallFrames().get(0).getLocation().getScriptId();
+            String scriptId = p.callFrames().get(0).location().scriptId();
             LOG.debug("Script paused: " + scriptId);
-            session.debugger().setScriptSource(scriptId, "console.log(\"google analytics is no more!\");", null);
-            session.debugger().resume();
+            try {
+                session.debugger().setScriptSource(scriptId, "console.log(\"google analytics is no more!\");", null);
+                session.debugger().resume();
+            } catch (ClientClosedException | SessionClosedException e) {
+                LOG.error(e.getMessage(), e);
+            }
             LOG.debug("Script resumed: " + scriptId);
         });
     }
 
-    public void setCookies() throws TimeoutException, ExecutionException, InterruptedException {
+    public void setCookies() throws TimeoutException, ExecutionException, InterruptedException, ClientClosedException, SessionClosedException {
         LOG.debug("Restoring {} browser cookies", queuedUri.getCookiesCount());
         if (queuedUri.getCookiesCount() > 0) {
             List<CookieParam> l = queuedUri.getCookiesList().stream()
@@ -204,16 +214,20 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
         LOG.debug("Browser cookies restored");
     }
 
-    public void loadPage() {
+    public void loadPage() throws ClientClosedException, SessionClosedException {
         try {
             // TODO: Handling of dialogs should be configurable
             session.page().onJavascriptDialogOpening(js -> {
-                LOG.debug("JS dialog: {} :: {}", js.getType(), js.getMessage());
+                LOG.debug("JS dialog: {} :: {}", js.type(), js.message());
                 boolean accept = false;
-                if ("alert".equals(js.getType())) {
+                if ("alert".equals(js.type())) {
                     accept = true;
                 }
-                session.page().handleJavaScriptDialog(accept, null);
+                try {
+                    session.page().handleJavaScriptDialog(accept, null);
+                } catch (ClientClosedException | SessionClosedException e) {
+                    LOG.error(e.getMessage(), e);
+                }
             });
 
             session.network().setExtraHTTPHeaders(ImmutableMap.of(EXECUTION_ID, queuedUri.getExecutionId()))
@@ -232,20 +246,20 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
         LOG.trace("Request intercepted: {}", intercepted);
         try {
             crawlLogs.signalActivity();
-            Map<String, Object> headers = intercepted.request.headers;
+            Map<String, Object> headers = intercepted.request().headers();
             headers.put(EXECUTION_ID, queuedUri.getExecutionId());
 
-            if (intercepted.authChallenge != null) {
+            if (intercepted.authChallenge() != null) {
                 // TODO: Add option for filling in user/passwd
-                AuthChallengeResponse authChallengeResponse = new AuthChallengeResponse();
-                authChallengeResponse.response = "Default";
-                session.network().continueInterceptedRequest(intercepted.interceptionId, null, null, null, null, null, null, authChallengeResponse);
-            } else if (!followRedirects && intercepted.isNavigationRequest && intercepted.redirectUrl != null) {
+                AuthChallengeResponse authChallengeResponse = new AuthChallengeResponse("Default");
+                session.network().continueInterceptedRequest(intercepted.interceptionId(), null,
+                        null, null, null, null, null, authChallengeResponse);
+            } else if (!followRedirects && intercepted.isNavigationRequest() && intercepted.redirectUrl() != null) {
                 // Request is a redirect and we are configured to not follow it.
                 LOG.debug("Aborting follow redirect");
-                session.network().continueInterceptedRequest(intercepted.interceptionId, "Aborted", null, null, null, null, headers, null);
+                session.network().continueInterceptedRequest(intercepted.interceptionId(), "Aborted", null, null, null, null, headers, null);
             } else {
-                session.network().continueInterceptedRequest(intercepted.interceptionId, null, null, null,
+                session.network().continueInterceptedRequest(intercepted.interceptionId(), null, null, null,
                         null, null, headers, null);
             }
         } catch (Throwable ex) {
@@ -253,18 +267,18 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
         }
     }
 
-    public String getDocumentUrl() {
+    public String getDocumentUrl() throws ClientClosedException, SessionClosedException {
         try {
             RuntimeDomain.Evaluate ev = session.runtime()
                     .evaluate("document.URL", null, null, null, null, null, null, null, null)
                     .get(protocolTimeout, MILLISECONDS);
-            return (String) ev.result.value;
+            return (String) ev.result().value();
         } catch (InterruptedException | ExecutionException | TimeoutException ex) {
             throw new RuntimeException(ex);
         }
     }
 
-    public void scrollToTop() {
+    public void scrollToTop() throws ClientClosedException, SessionClosedException {
         try {
             RuntimeDomain.Evaluate ev = session.runtime()
                     .evaluate("window.scrollTo(0, 0);", null, null, null, null, null, null, null, null)
@@ -282,11 +296,11 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
         return uriRequests.getRootRequest().isRenderable();
     }
 
-    public void saveScreenshot(DbAdapter db) {
+    public void saveScreenshot(DbAdapter db) throws ClientClosedException, SessionClosedException {
         try {
             PageDomain.CaptureScreenshot screenshot = session.page().captureScreenshot("png", null, null, null)
                     .get(protocolTimeout, MILLISECONDS);
-            byte[] img = Base64.getDecoder().decode(screenshot.data);
+            byte[] img = Base64.getDecoder().decode(screenshot.data());
 
             db.saveScreenshot(MessagesProto.Screenshot.newBuilder()
                     .setImg(ByteString.copyFrom(img))
@@ -298,41 +312,41 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
         }
     }
 
-    List<MessagesProto.Cookie> extractCookies() {
+    List<MessagesProto.Cookie> extractCookies() throws ClientClosedException, SessionClosedException {
         try {
             List<MessagesProto.Cookie> cookies = session.network().getAllCookies().get(protocolTimeout, MILLISECONDS)
-                    .cookies.stream()
+                    .cookies().stream()
                     .map(c -> {
                         MessagesProto.Cookie.Builder cb = MessagesProto.Cookie.newBuilder();
-                        if (c.name != null) {
-                            cb.setName(c.name);
+                        if (c.name() != null) {
+                            cb.setName(c.name());
                         }
-                        if (c.value != null) {
-                            cb.setValue(c.value);
+                        if (c.value() != null) {
+                            cb.setValue(c.value());
                         }
-                        if (c.domain != null) {
-                            cb.setDomain(c.domain);
+                        if (c.domain() != null) {
+                            cb.setDomain(c.domain());
                         }
-                        if (c.path != null) {
-                            cb.setPath(c.path);
+                        if (c.path() != null) {
+                            cb.setPath(c.path());
                         }
-                        if (c.expires != null) {
-                            cb.setExpires(c.expires);
+                        if (c.expires() != null) {
+                            cb.setExpires(c.expires());
                         }
-                        if (c.size != null) {
-                            cb.setSize(c.size);
+                        if (c.size() != null) {
+                            cb.setSize(c.size());
                         }
-                        if (c.httpOnly != null) {
-                            cb.setHttpOnly(c.httpOnly);
+                        if (c.httpOnly() != null) {
+                            cb.setHttpOnly(c.httpOnly());
                         }
-                        if (c.secure != null) {
-                            cb.setSecure(c.secure);
+                        if (c.secure() != null) {
+                            cb.setSecure(c.secure());
                         }
-                        if (c.session != null) {
-                            cb.setSession(c.session);
+                        if (c.session() != null) {
+                            cb.setSession(c.session());
                         }
-                        if (c.sameSite != null) {
-                            cb.setSameSite(c.sameSite);
+                        if (c.sameSite() != null) {
+                            cb.setSameSite(c.sameSite());
                         }
                         return cb.build();
                     })
@@ -344,7 +358,7 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
         }
     }
 
-    public List<MessagesProto.QueuedUri> extractOutlinks(List<ConfigProto.BrowserScript> scripts) {
+    public List<MessagesProto.QueuedUri> extractOutlinks(List<ConfigProto.BrowserScript> scripts) throws ClientClosedException, SessionClosedException {
         ConfigProto.Label outlinksLabel = ApiTools.buildLabel("type", "extract_outlinks");
         List<MessagesProto.Cookie> cookies = extractCookies();
         try {
@@ -356,9 +370,9 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
                             .evaluate(script.getScript(), null, null, null, null, Boolean.TRUE, null, null, null)
                             .get(protocolTimeout, MILLISECONDS);
 
-                    LOG.trace("Outlinks: {}", ev.result.value);
-                    if (ev.result.value != null) {
-                        String resultString = ((String) ev.result.value).trim();
+                    LOG.trace("Outlinks: {}", ev.result().value());
+                    if (ev.result().value() != null) {
+                        String resultString = ((String) ev.result().value()).trim();
                         if (!resultString.isEmpty()) {
                             String[] links = resultString.split("\n+");
                             String path = uriRequests.getRootRequest().getDiscoveryPath() + "L";
@@ -390,7 +404,7 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
 //            self.run_behavior(behavior_script, timeout=900)
     }
 
-    public void tryLogin(String username, String password) {
+    public void tryLogin(String username, String password) throws ClientClosedException, SessionClosedException {
         try {
             RuntimeDomain.Evaluate ev = session.runtime()
                     .evaluate("window.scrollTo(0, 0);", null, null, null, null, null, null, null, null)

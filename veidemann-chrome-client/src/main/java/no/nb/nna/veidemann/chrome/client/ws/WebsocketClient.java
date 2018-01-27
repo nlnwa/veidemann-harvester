@@ -158,7 +158,7 @@ public class WebsocketClient {
 
             channel = b.connect(uri.getHost(), port).sync().channel();
             channel.closeFuture().addListener(c -> {
-                LOG.info("Closed {}", uri, closeReason);
+                LOG.debug("Closed {}", uri, closeReason);
                 try {
                     if (closeReason == null) {
                         callback.onClose("");

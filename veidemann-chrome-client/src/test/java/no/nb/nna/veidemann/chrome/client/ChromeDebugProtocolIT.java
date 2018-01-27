@@ -60,17 +60,6 @@ public class ChromeDebugProtocolIT {
         ChromeDebugProtocol chrome = new ChromeDebugProtocol(config);
         chrome.target().getTargets().get().targetInfos().forEach(t -> System.out.println(t));
         System.out.println();
-        chrome.target().getTargets().get().targetInfos().forEach(t -> {
-            try {
-                chrome.target().closeTarget(t.targetId());
-            } catch (ClientClosedException e) {
-                e.printStackTrace();
-            } catch (SessionClosedException e) {
-                e.printStackTrace();
-            }
-        });
-        chrome.target().getTargets().get().targetInfos().forEach(t -> System.out.println(t));
-        System.out.println();
 
         chrome.target().setDiscoverTargets(true).get();
 //        chrome.target.onTargetCreated(t -> System.out.println(t));

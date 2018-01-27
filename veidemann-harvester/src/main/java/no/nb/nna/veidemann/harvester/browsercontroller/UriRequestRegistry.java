@@ -160,22 +160,22 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
     }
 
     void onRequestWillBeSent(NetworkDomain.RequestWillBeSent request) {
-        resolveCurrentUriRequest(request.requestId).ifPresent(parent -> {
-            LOG.debug("Request will be sent: {}", request.requestId);
+        resolveCurrentUriRequest(request.requestId()).ifPresent(parent -> {
+            LOG.debug("Request will be sent: {}", request.requestId());
 
             // Already got request for this id
-            if (request.redirectResponse == null) {
+            if (request.redirectResponse() == null) {
                 LOG.error("Already got request, but no redirect");
                 return;
             } else {
                 LOG.debug("Redirect response: {}, url: {}, cache: {}, redirUrl: {}",
-                        request.requestId, request.request.url, request.redirectResponse.fromDiskCache, request.redirectResponse.url);
+                        request.requestId(), request.request().url(), request.redirectResponse().fromDiskCache(), request.redirectResponse().url());
                 UriRequest uriRequest = UriRequest.create(request, parent, span);
                 add(uriRequest);
             }
         }).otherwise(() -> {
-            MDC.put("uri", request.request.url);
-            LOG.debug("Request will be sent: {}", request.requestId);
+            MDC.put("uri", request.request().url());
+            LOG.debug("Request will be sent: {}", request.requestId());
 
             UriRequest uriRequest;
             if (getRootRequest() == null) {
@@ -190,12 +190,12 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
     }
 
     void onLoadingFinished(NetworkDomain.LoadingFinished f) {
-        resolveCurrentUriRequest(f.requestId)
+        resolveCurrentUriRequest(f.requestId())
                 .ifPresent(request -> {
-                    LOG.debug("Loading finished. rId{}, size: {}, chunksSize: {}", f.requestId, f.encodedDataLength, request.getSize());
+                    LOG.debug("Loading finished. rId{}, size: {}, chunksSize: {}", f.requestId(), f.encodedDataLength(), request.getSize());
                     request.finish(crawlLogRegistry);
                 })
-                .otherwise(() -> LOG.error("Could not find request for finished id {}.", f.requestId));
+                .otherwise(() -> LOG.error("Could not find request for finished id {}.", f.requestId()));
     }
 
     void onLoadingFailed(NetworkDomain.LoadingFailed f) {
@@ -204,32 +204,32 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
         // net::ERR_CONTENT_LENGTH_MISMATCH
         // net::ERR_TUNNEL_CONNECTION_FAILED
         // net::ERR_ABORTED
-        resolveCurrentUriRequest(f.requestId)
+        resolveCurrentUriRequest(f.requestId())
                 .ifPresent(request -> {
-                    if (!f.canceled) {
+                    if (!f.canceled()) {
                         LOG.error(
                                 "Failed fetching page: Error '{}', Blocked reason '{}', Resource type: '{}', Canceled: {}, Req: {}",
-                                f.errorText, f.blockedReason, f.type, f.canceled, request.getUrl());
+                                f.errorText(), f.blockedReason(), f.type(), f.canceled(), request.getUrl());
                     }
 
                     // Only set status code if not set from proxy already
                     if (request.getStatusCode() == 0) {
-                        if ("mixed-content".equals(f.blockedReason)) {
+                        if ("mixed-content".equals(f.blockedReason())) {
                             LOG.debug("Resource blocked due to mixed-content");
                             request.setStatusCode(ExtraStatusCodes.BLOCKED_MIXED_CONTENT.getCode());
-                        } else if (f.canceled) {
-                            LOG.debug("Resource canceled by browser: Error '{}', Blocked reason '{}'", f.errorText, f.blockedReason);
+                        } else if (f.canceled()) {
+                            LOG.debug("Resource canceled by browser: Error '{}', Blocked reason '{}'", f.errorText(), f.blockedReason());
                             request.setStatusCode(ExtraStatusCodes.CANCELED_BY_BROWSER.getCode());
                         } else {
                             request.setStatusCode(ExtraStatusCodes.BLOCKED_BY_CUSTOM_PROCESSOR.getCode());
                             LOG.error(
                                     "Failed fetching page: Error '{}', Blocked reason '{}', Resource type: '{}', Canceled: {}, Req: {}",
-                                    f.errorText, f.blockedReason, f.type, f.canceled, request.getUrl());
+                                    f.errorText(), f.blockedReason(), f.type(), f.canceled(), request.getUrl());
                         }
                     } else {
                         LOG.error(
                                 "Failed fetching page: Error '{}', Blocked reason '{}', Resource type: '{}', Canceled: {}, Status from proxy: {}",
-                                f.errorText, f.blockedReason, f.type, f.canceled, request.getStatusCode());
+                                f.errorText(), f.blockedReason(), f.type(), f.canceled(), request.getStatusCode());
                     }
 
                     // TODO: Add information to pagelog
@@ -238,22 +238,22 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
                 })
                 .otherwise(() ->
                         LOG.error("Could not find request for failed id {}. Error '{}', Blocked reason '{}', Resource type: '{}', Canceled: {}",
-                                f.requestId, f.errorText, f.blockedReason, f.type, f.canceled));
+                                f.requestId(), f.errorText(), f.blockedReason(), f.type(), f.canceled()));
 
-        LOG.debug("Loading failed. rId{}, blockedReason: {}, canceled: {}, error: {}", f.requestId, f.blockedReason, f.canceled, f);
+        LOG.debug("Loading failed. rId{}, blockedReason: {}, canceled: {}, error: {}", f.requestId(), f.blockedReason(), f.canceled(), f);
     }
 
     void onResponseReceived(NetworkDomain.ResponseReceived r) {
-        resolveCurrentUriRequest(r.requestId);
+        resolveCurrentUriRequest(r.requestId());
 
-        LOG.debug("Response received. rId{}, size: {}, status: {}, cache: {}", r.requestId, r.response.encodedDataLength, r.response.status, r.response.fromDiskCache);
+        LOG.debug("Response received. rId{}, size: {}, status: {}, cache: {}", r.requestId(), r.response().encodedDataLength(), r.response().status(), r.response().fromDiskCache());
         allRequestsLock.lock();
         try {
-            UriRequest request = getByRequestId(r.requestId);
+            UriRequest request = getByRequestId(r.requestId());
             if (request == null) {
                 LOG.error(
                         "Response received, but we missed the request: reqId '{}', loaderId '{}', ts '{}', type '{}', resp '{}', frameId '{}'",
-                        r.requestId, r.loaderId, r.timestamp, r.type, r.response, r.frameId);
+                        r.requestId(), r.loaderId(), r.timestamp(), r.type(), r.response(), r.frameId());
                 LOG.trace("Registry state:\n{}", toString("  "));
                 crawlLogRegistry.signalActivity();
             } else {
@@ -266,8 +266,8 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
     }
 
     void onDataReceived(NetworkDomain.DataReceived d) {
-        resolveCurrentUriRequest(d.requestId).ifPresent(r -> r.incrementSize(d.dataLength));
-        LOG.trace("Data received. rId{}, encodedDataLength: {}, dataLength: {}", d.requestId, d.encodedDataLength, d.dataLength);
+        resolveCurrentUriRequest(d.requestId()).ifPresent(r -> r.incrementSize(d.dataLength()));
+        LOG.trace("Data received. rId{}, encodedDataLength: {}, dataLength: {}", d.requestId(), d.encodedDataLength(), d.dataLength());
         crawlLogRegistry.signalActivity();
     }
 

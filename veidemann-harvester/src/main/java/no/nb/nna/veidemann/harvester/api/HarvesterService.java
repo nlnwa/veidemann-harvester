@@ -22,11 +22,11 @@ import no.nb.nna.veidemann.api.HarvesterGrpc;
 import no.nb.nna.veidemann.api.HarvesterProto.CleanupExecutionRequest;
 import no.nb.nna.veidemann.api.HarvesterProto.HarvestPageReply;
 import no.nb.nna.veidemann.api.HarvesterProto.HarvestPageRequest;
+import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
 import no.nb.nna.veidemann.chrome.client.ClientClosedException;
 import no.nb.nna.veidemann.chrome.client.MaxActiveSessionsExceededException;
 import no.nb.nna.veidemann.harvester.browsercontroller.BrowserController;
 import no.nb.nna.veidemann.harvester.proxy.RecordingProxy;
-import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,7 +55,7 @@ public class HarvesterService extends HarvesterGrpc.HarvesterImplBase {
             respObserver.onNext(reply);
             respObserver.onCompleted();
         } catch (ClientClosedException ex) {
-            LOG.error(ex.getMessage(), ex);
+            LOG.error("Chrome client can't contact chrome, shutting down", ex);
             Status status = Status.UNAVAILABLE.withDescription(ex.toString());
             respObserver.onError(status.asException());
             System.exit(1);

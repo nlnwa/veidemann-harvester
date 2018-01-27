@@ -104,15 +104,15 @@ public class UriRequest {
     }
 
     private UriRequest(NetworkDomain.RequestWillBeSent request, BaseSpan parentSpan) {
-        this(request.requestId,
-                request.request.url,
-                (String) request.request.headers.getOrDefault("referer", ""),
-                ResourceType.forName(request.type),
+        this(request.requestId(),
+                request.request().url(),
+                (String) request.request().headers().getOrDefault("referer", ""),
+                ResourceType.forName(request.type()),
                 parentSpan);
 
         LOG.debug("RequestId: {}, documentUrl: {}, URL: {}, initiator: {} {}, redirectResponse: {}, referer: {}",
-                request.requestId, request.documentURL, request.request.url, request.initiator.type, request.initiator.url,
-                request.redirectResponse, request.request.headers.get("Referer"));
+                request.requestId(), request.documentURL(), request.request().url(), request.initiator().type(), request.initiator().url(),
+                request.redirectResponse(), request.request().headers().get("Referer"));
     }
 
     public static UriRequest createRoot(NetworkDomain.RequestWillBeSent request, String initialDiscoveryPath, BaseSpan parentSpan) {
@@ -140,13 +140,13 @@ public class UriRequest {
         UriRequest result;
         char discoveryType;
 
-        if (request.redirectResponse != null) {
+        if (request.redirectResponse() != null) {
             discoveryType = 'R';
-            parent.statusCode = request.redirectResponse.status.intValue();
-            parent.fromCache = request.redirectResponse.fromDiskCache;
-            parent.setMimeType(request.redirectResponse.mimeType);
+            parent.statusCode = request.redirectResponse().status().intValue();
+            parent.fromCache = request.redirectResponse().fromDiskCache();
+            parent.setMimeType(request.redirectResponse().mimeType());
         } else {
-            if ("script".equals(request.initiator.type)) {
+            if ("script".equals(request.initiator().type())) {
                 // Resource is loaded by a script
                 discoveryType = 'X';
             } else {
@@ -154,7 +154,8 @@ public class UriRequest {
             }
         }
 
-        result = create(request.requestId, request.request.url, parent.getUrl(), ResourceType.forName(request.type), discoveryType, parent, parentSpan);
+        result = create(request.requestId(), request.request().url(), parent.getUrl(),
+                ResourceType.forName(request.type()), discoveryType, parent, parentSpan);
 
         return result;
     }
@@ -162,15 +163,15 @@ public class UriRequest {
     void addResponse(NetworkDomain.ResponseReceived response) {
         if (getMimeType() != null) {
             LOG.trace("Already got response, previous length: {}, new length: {}, Referrer: {}, DiscoveryPath: {}",
-                    this.responseSize, response.response.encodedDataLength, referrer, discoveryPath);
+                    this.responseSize, response.response().encodedDataLength(), referrer, discoveryPath);
         }
 
-        resourceType = ResourceType.forName(response.type);
-        setMimeType(response.response.mimeType);
-        statusCode = response.response.status.intValue();
-        fromCache = response.response.fromDiskCache;
+        resourceType = ResourceType.forName(response.type());
+        setMimeType(response.response().mimeType());
+        statusCode = response.response().status().intValue();
+        fromCache = response.response().fromDiskCache();
 
-        if (response.response.fromDiskCache || response.response.protocol.equals("data")) {
+        if (response.response().fromDiskCache() || response.response().protocol().equals("data")) {
             setFromProxy(false);
         }
 

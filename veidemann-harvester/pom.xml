@@ -214,7 +214,7 @@
                                 <port>+browser.host:browser.port:9222</port>
                             </ports>
                             <env>
-                                <CHROME_OPTS>--ignore-certificate-errors --disable-web-security --allow-running-insecure-content --proxy-server=${proxy.ip}:${proxy.port} --dbus-stub --hide-scrollbars</CHROME_OPTS>
+                                <CHROME_OPTS>--proxy-server=${proxy.ip}:${proxy.port} --hide-scrollbars --disable-dev-shm-usage</CHROME_OPTS>
                             </env>
                             <!-- 1GB -->
                             <memory>1073741824</memory>

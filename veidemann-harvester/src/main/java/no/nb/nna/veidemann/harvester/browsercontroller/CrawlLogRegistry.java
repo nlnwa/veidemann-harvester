@@ -223,7 +223,7 @@ public class CrawlLogRegistry {
      */
     private void checkForFileDownload() {
         if (browserSession.getUriRequests().getInitialRequest() == null) {
-            LOG.info("Guessing that we are downloading a file. Status: {}", status);
+            LOG.debug("Guessing that we are downloading a file. Status: {}", status);
             crawlLogs.forEach(c -> {
                 browserSession.getUriRequests().resolveCurrentUriRequest("1").ifPresent(parent -> {
                     UriRequest r = UriRequest.create("1",
@@ -233,11 +233,13 @@ public class CrawlLogRegistry {
                     browserSession.getUriRequests().add(r);
                 }).otherwise(() -> {
                     // No parent, this is a root request;
-                    UriRequest r = UriRequest.createRoot("1",
-                            c.crawlLog.getRequestedUri(), browserSession.queuedUri.getReferrer(), ResourceType.Other,
-                            browserSession.queuedUri.getDiscoveryPath(), browserSession.getUriRequests().getPageSpan());
-                    r.setStatusCode(c.crawlLog.getStatusCode());
-                    browserSession.getUriRequests().add(r);
+                    if (c.isResponseReceived()) {
+                            UriRequest r = UriRequest.createRoot("1",
+                                    c.uri, browserSession.queuedUri.getReferrer(), ResourceType.Other,
+                                    browserSession.queuedUri.getDiscoveryPath(), browserSession.getUriRequests().getPageSpan());
+                            r.setStatusCode(c.crawlLog.getStatusCode());
+                            browserSession.getUriRequests().add(r);
+                    }
                 });
             });
 

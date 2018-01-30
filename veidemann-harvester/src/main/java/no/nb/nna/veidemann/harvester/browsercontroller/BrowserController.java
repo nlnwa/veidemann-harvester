@@ -62,7 +62,7 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
             throws IOException {
 
         ChromeDebugProtocolConfig chromeDebugProtocolConfig = new ChromeDebugProtocolConfig(chromeHost, chromePort)
-                .withTracer(GlobalTracer.get());
+                .withTracer(GlobalTracer.get()).withMaxOpenSessions(3);
         this.chrome = new ChromeDebugProtocol(chromeDebugProtocolConfig);
         this.db = db;
         this.sessionRegistry = sessionRegistry;

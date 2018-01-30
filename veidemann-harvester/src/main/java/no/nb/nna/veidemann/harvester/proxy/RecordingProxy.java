@@ -26,6 +26,7 @@ import no.nb.nna.veidemann.harvester.BrowserSessionRegistry;
 import org.littleshoot.proxy.HostResolver;
 import org.littleshoot.proxy.HttpProxyServer;
 import org.littleshoot.proxy.impl.DefaultHttpProxyServer;
+import org.littleshoot.proxy.impl.ThreadPoolConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -97,6 +98,9 @@ public class RecordingProxy implements AutoCloseable {
                 .withManInTheMiddle(mitmManager)
                 .withMaxChunkSize(1024 * 1024)
                 .withMaxHeaderSize(1024 * 32)
+                .withConnectTimeout(60000)
+                .withIdleConnectionTimeout(10)
+                .withThreadPoolConfiguration(new ThreadPoolConfiguration().withAcceptorThreads(4).withClientToProxyWorkerThreads(16).withProxyToServerWorkerThreads(16))
                 .withFiltersSource(new RecorderFilterSourceAdapter(db, contentWriterClient, sessionRegistry, cache))
                 .start();
 

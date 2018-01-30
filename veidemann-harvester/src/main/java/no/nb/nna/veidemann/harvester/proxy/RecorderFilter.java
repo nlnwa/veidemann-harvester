@@ -435,7 +435,11 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                 .withTag("executionId", executionId)
                 .withTag("uri", uri);
 
-        return newSpan.startManual();
+        if (browserSession != null && browserSession.getUriRequests().getPageSpan() != null) {
+            return newSpan.asChildOf(browserSession.getUriRequests().getPageSpan()).startManual();
+        } else {
+            return newSpan.ignoreActiveSpan().startManual();
+        }
     }
 
     @Override

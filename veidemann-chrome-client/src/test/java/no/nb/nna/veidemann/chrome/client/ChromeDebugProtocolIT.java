@@ -15,7 +15,9 @@
  */
 package no.nb.nna.veidemann.chrome.client;
 
+import io.netty.channel.nio.NioEventLoopGroup;
 import no.nb.nna.veidemann.chrome.client.ws.Cdp;
+import no.nb.nna.veidemann.chrome.client.ws.WebSocketCallback;
 import no.nb.nna.veidemann.chrome.client.ws.WebsocketClient;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
@@ -48,7 +50,7 @@ public class ChromeDebugProtocolIT {
     public static void init() {
         chromeHost = System.getProperty("browser.host");
         chromePort = Integer.parseInt(System.getProperty("browser.port"));
-        config = new ChromeDebugProtocolConfig(chromeHost, chromePort).withMaxOpenSessions(25);
+        config = new ChromeDebugProtocolConfig(chromeHost, chromePort).withMaxOpenSessions(250);
     }
 
     /**
@@ -78,18 +80,23 @@ public class ChromeDebugProtocolIT {
 //        System.out.println(session.toString());
 //        System.out.println("---- " + session.browser.getVersion().get());
 
-        long sleep = 10;
+        long sleep = 100;
 
+        AtomicInteger i = new AtomicInteger(0);
         for (Sess session : sessions) {
             if (stop.get()) {
                 break;
             }
-            session.navigate();
-            Thread.sleep(sleep);
+            if (i.getAndIncrement() % 2 == 0) {
+                session.session.close();
+            } else {
+                session.navigate("http://a1.com");
+                Thread.sleep(sleep);
+            }
         }
         chrome.target().getTargets().get().targetInfos().forEach(t -> System.out.println(t));
         System.out.println();
-        Thread.sleep(5000);
+        Thread.sleep(2000);
         chrome.target().getTargets().get().targetInfos().forEach(t -> System.out.println(t));
         System.out.println();
         long crashed = sessions.stream().filter(s -> s.crashed).count();
@@ -101,14 +108,25 @@ public class ChromeDebugProtocolIT {
 //            Thread.sleep(sleep);
 //        }
 //        sessions.stream().filter(s -> s.crashed).forEach(s -> s.navigate());
-        sessions.stream().forEach(s -> {
-            s.navigate();
-            s.session.close();
+        sessions.stream().filter(s -> !s.session.isClosed()).forEach(s -> {
+            if (!stop.get()) {
+                if (i.getAndIncrement() % 2 == 0) {
+//                    s.session.close();
+                } else {
+                    s.navigate("http://a2.com");
+//                s.session.close();
+                    try {
+                        Thread.sleep(sleep);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
         });
 
         chrome.target().getTargets().get().targetInfos().forEach(t -> System.out.println(t));
         System.out.println();
-        Thread.sleep(5000);
+        Thread.sleep(2000);
         chrome.target().getTargets().get().targetInfos().forEach(t -> System.out.println(t));
         System.out.println();
         crashed = sessions.stream().filter(s -> s.crashed).count();
@@ -131,26 +149,27 @@ public class ChromeDebugProtocolIT {
             session.inspector().enable().get();
             session.inspector().onTargetCrashed(c -> {
                 crashed = true;
-//                session.close();
+                session.close();
 //                stop.set(true);
+                System.out.println("Session crashed");
             });
-            session.page().onFrameNavigated(n -> navigated.incrementAndGet());
+            session.page().onFrameNavigated(n -> System.out.println(navigated.incrementAndGet()));
         }
 
-        void navigate() {
-//            if (!session.isClosed()) {
-            try {
-                crashed = false;
-                session.page().navigate("http://a1.com", "", "").get(20, TimeUnit.SECONDS).frameId();
+        void navigate(String url) {
+            if (!session.isClosed()) {
+                try {
+                    crashed = false;
+                    session.page().navigate(url, "", "");
+//                    session.page().navigate(url, "", "").get(4, TimeUnit.SECONDS).frameId();
+                    System.out.println("NAV");
 //                session.close();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            } catch (ExecutionException | IOException e) {
-                System.out.println("Failed navigation: " + e);
-            } catch (TimeoutException e) {
-                e.printStackTrace();
+                } catch (ClientClosedException e) {
+                    stop.set(true);
+                } catch (Exception e) {
+                    System.out.println("Failed navigation: " + e);
+                }
             }
-//        }
         }
 
         @Override
@@ -161,20 +180,6 @@ public class ChromeDebugProtocolIT {
             sb.append('}');
             return sb.toString();
         }
-    }
-
-    /**
-     * Test of ping method, of class ChromeDebugClient.
-     */
-    @Test
-    @Ignore
-    public void testPing() throws InterruptedException, URISyntaxException {
-        System.out.println("ping");
-        WebsocketClient instance = new WebsocketClient(null, new URI("ws://echo.websocket.org"), config);
-        instance.ping();
-        instance.close();
-        // TODO review the generated test code and remove the default call to fail.
-        fail("The test case is a prototype.");
     }
 
     /**

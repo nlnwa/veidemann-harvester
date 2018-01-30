@@ -13,6 +13,8 @@ public class ChromeDebugProtocolConfig {
     private int maxSendMessageAttempts = 3;
     private int maxOpenSessions = 20;
     private long protocolTimeoutMs = 5000;
+    private long reconnectDelay = 2000;
+    private int workerThreads = 8;
 
     public ChromeDebugProtocolConfig(String host, int port) {
         this.host = Objects.requireNonNull(host, "Host must be set");
@@ -49,6 +51,16 @@ public class ChromeDebugProtocolConfig {
         return this;
     }
 
+    public ChromeDebugProtocolConfig withReconnectDelay(long reconnectDelay) {
+        this.reconnectDelay = reconnectDelay;
+        return this;
+    }
+
+    public ChromeDebugProtocolConfig withWorkerThreads(int workerThreads) {
+        this.workerThreads = workerThreads;
+        return this;
+    }
+
     public String getHost() {
         return host;
     }
@@ -79,5 +91,13 @@ public class ChromeDebugProtocolConfig {
 
     public long getProtocolTimeoutMs() {
         return protocolTimeoutMs;
+    }
+
+    public long getReconnectDelay() {
+        return reconnectDelay;
+    }
+
+    public int getWorkerThreads() {
+        return workerThreads;
     }
 }

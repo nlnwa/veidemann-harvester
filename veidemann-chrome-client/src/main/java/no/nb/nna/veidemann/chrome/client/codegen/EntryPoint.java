@@ -196,6 +196,7 @@ public class EntryPoint {
                 .addStatement("$N.get(0).close()", sessions)
                 .endControlFlow()
                 .addStatement("$N.onClose(\"Client is closed by user\")", protocolClient)
+                .addStatement("$N.cleanup()", protocolClient)
                 .build());
     }
 

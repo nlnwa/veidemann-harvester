@@ -16,7 +16,6 @@
 package no.nb.nna.veidemann.chrome.client.ws;
 
 import io.netty.bootstrap.Bootstrap;
-import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
@@ -25,14 +24,12 @@ import io.netty.channel.ChannelPipeline;
 import io.netty.channel.ChannelPromise;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.SimpleChannelInboundHandler;
-import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.HttpClientCodec;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
-import io.netty.handler.codec.http.websocketx.PingWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketClientHandshaker;
 import io.netty.handler.codec.http.websocketx.WebSocketClientHandshakerFactory;
@@ -63,7 +60,7 @@ public class WebsocketClient {
 
     private Channel channel;
 
-    private EventLoopGroup workerGroup;
+    private final EventLoopGroup workerGroup;
 
     Throwable closeReason = null;
 
@@ -77,10 +74,11 @@ public class WebsocketClient {
 
     private final ChromeDebugProtocolConfig config;
 
-    public WebsocketClient(WebSocketCallback callback, URI uri, ChromeDebugProtocolConfig config) {
+    public WebsocketClient(WebSocketCallback callback, URI uri, ChromeDebugProtocolConfig config, EventLoopGroup workerGroup) {
         this.config = config;
         this.callback = callback;
         this.uri = uri;
+        this.workerGroup = workerGroup;
         while (!connected && connectionAttempts++ < config.getMaxConnectionAttempts()) {
             try {
                 connect();
@@ -88,7 +86,7 @@ public class WebsocketClient {
             } catch (Throwable t) {
                 LOG.error("Connection failed: {}", t.toString(), t);
                 try {
-                    Thread.sleep(2000);
+                    Thread.sleep(config.getReconnectDelay());
                 } catch (InterruptedException ex) {
                     throw new RuntimeException(ex);
                 }
@@ -129,8 +127,6 @@ public class WebsocketClient {
             sslCtx = null;
         }
 
-        workerGroup = new NioEventLoopGroup();
-
         try {
             final WebSocketClientHandshaker handshaker = WebSocketClientHandshakerFactory.newHandshaker(
                     uri, WebSocketVersion.V13, null, true, new DefaultHttpHeaders(), MAX_FRAME_PAYLOAD_LENGTH);
@@ -168,7 +164,6 @@ public class WebsocketClient {
                 } catch (Throwable t) {
                     LOG.error("Callback is throwing an exception", t);
                 }
-                workerGroup.shutdownGracefully();
             });
 
             handler.handshakeFuture().sync();
@@ -186,20 +181,16 @@ public class WebsocketClient {
         channel.writeAndFlush(new CloseWebSocketFrame());
     }
 
-    public void ping() {
-        if (!channel.isActive()) {
-            throw new IllegalStateException("closed", closeReason);
-        }
-
-        WebSocketFrame frame = new PingWebSocketFrame(Unpooled.wrappedBuffer(new byte[]{8, 1, 8, 1}));
-        channel.writeAndFlush(frame);
-    }
-
     public void sendMessage(String msg) {
         int retryAttempts = 0;
         while (!channel.isActive() && retryAttempts < config.getMaxSendMessageAttempts()) {
             LOG.info("WS channel closed, try to reopen.");
             close();
+            try {
+                Thread.sleep(config.getReconnectDelay());
+            } catch (InterruptedException e) {
+                break;
+            }
             connect();
             retryAttempts++;
         }

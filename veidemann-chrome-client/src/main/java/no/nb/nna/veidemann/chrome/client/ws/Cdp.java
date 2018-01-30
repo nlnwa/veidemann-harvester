@@ -17,6 +17,8 @@ package no.nb.nna.veidemann.chrome.client.ws;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.nio.NioEventLoopGroup;
 import io.opentracing.ActiveSpan;
 import io.opentracing.NoopActiveSpanSource;
 import io.opentracing.Tracer;
@@ -71,8 +73,11 @@ public class Cdp implements WebSocketCallback {
 
     ClientClosedListener clientClosedListener;
 
+    private final EventLoopGroup workerGroup;
+
     public Cdp(final ChromeDebugProtocolConfig config) {
         this.config = config;
+        workerGroup = new NioEventLoopGroup(config.getWorkerThreads());
 
         try {
             URL versionUrl = new URL("http", config.getHost(), config.getPort(), "/json/version");
@@ -83,7 +88,7 @@ public class Cdp implements WebSocketCallback {
                 String browserVersion = (String) version.get("Browser");
                 this.scheme = webSocketUri.getScheme();
 
-                this.websocketClient = new WebsocketClient(this, webSocketUri, config);
+                this.websocketClient = new WebsocketClient(this, webSocketUri, config, workerGroup);
             }
         } catch (URISyntaxException | IOException e) {
             closed.set(true);
@@ -91,21 +96,22 @@ public class Cdp implements WebSocketCallback {
         }
     }
 
-    private Cdp(final String scheme, final String path, final ChromeDebugProtocolConfig config) {
+    private Cdp(final String scheme, final String path, final ChromeDebugProtocolConfig config, EventLoopGroup workerGroup) {
         this.scheme = scheme;
         this.config = config;
+        this.workerGroup = workerGroup;
 
         try {
             URI webSocketUri = new URI(scheme, null, config.getHost(), config.getPort(), path, null, null);
 
-            this.websocketClient = new WebsocketClient(this, webSocketUri, config);
+            this.websocketClient = new WebsocketClient(this, webSocketUri, config, workerGroup);
         } catch (URISyntaxException e) {
             throw new RuntimeException(e);
         }
     }
 
     public Cdp createSessionClient(final String targetId) {
-        return new Cdp(scheme, "/devtools/page/" + targetId, config);
+        return new Cdp(scheme, "/devtools/page/" + targetId, config, workerGroup);
     }
 
     public CompletableFuture<JsonElement> call(String method, Map<String, Object> params) {
@@ -265,5 +271,9 @@ public class Cdp implements WebSocketCallback {
         if (clientClosedListener != null) {
             clientClosedListener.clientClosed(reason);
         }
+    }
+
+    public void cleanup() {
+        workerGroup.shutdownGracefully();
     }
 }

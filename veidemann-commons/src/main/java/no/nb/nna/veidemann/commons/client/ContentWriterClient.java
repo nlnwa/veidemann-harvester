@@ -118,23 +118,23 @@ public class ContentWriterClient implements AutoCloseable {
             this.requestObserver = asyncStub.write(responseObserver);
         }
 
-        public ContentWriterSession sendMetadata(WriteRequestMeta meta) {
+        public synchronized ContentWriterSession sendMetadata(WriteRequestMeta meta) {
             sendRequest(() -> WriteRequest.newBuilder().setMeta(meta).build());
             requestCount.incrementAndGet();
             return this;
         }
 
-        public ContentWriterSession sendHeader(Data data) {
+        public synchronized ContentWriterSession sendHeader(Data data) {
             sendRequest(() -> WriteRequest.newBuilder().setHeader(data).build());
             return this;
         }
 
-        public ContentWriterSession sendPayload(Data data) {
+        public synchronized ContentWriterSession sendPayload(Data data) {
             sendRequest(() -> WriteRequest.newBuilder().setPayload(data).build());
             return this;
         }
 
-        public WriteResponseMeta finish() throws InterruptedException, StatusException {
+        public synchronized WriteResponseMeta finish() throws InterruptedException, StatusException {
             requestObserver.onCompleted();
             // Receiving happens asynchronously
             finishLatch.await(1, TimeUnit.MINUTES);
@@ -146,7 +146,7 @@ public class ContentWriterClient implements AutoCloseable {
             return responseMeta;
         }
 
-        public void cancel(String reason) {
+        public synchronized void cancel(String reason) {
             LOG.info("Cancelling content writer session");
             requestObserver.onError(Status.CANCELLED.withDescription(reason).asException());
             finishLatch.countDown();

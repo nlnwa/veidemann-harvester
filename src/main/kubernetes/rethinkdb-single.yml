@@ -25,12 +25,17 @@ spec:
     role: master
   type: NodePort
 ---
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: rethink
 spec:
   replicas: 1
+  selector:
+    matchLabels:
+      app: rethinkdb
+      tier: backend
+      role: master
   template:
     metadata:
       labels:

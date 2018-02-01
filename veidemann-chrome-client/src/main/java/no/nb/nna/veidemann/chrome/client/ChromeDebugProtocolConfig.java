@@ -16,11 +16,23 @@ public class ChromeDebugProtocolConfig {
     private long reconnectDelay = 2000;
     private int workerThreads = 8;
 
+    /**
+     * Construct a new ChromeDebugProtocolConfig.
+     *
+     * @param host host name or ip where Chrome is listening
+     * @param port port where Chrome is listening
+     */
     public ChromeDebugProtocolConfig(String host, int port) {
         this.host = Objects.requireNonNull(host, "Host must be set");
         this.port = port;
     }
 
+    /**
+     * Set an OpenTracing tracer for tracing requests.
+     *
+     * @param tracer the OpenTracing tracer
+     * @return this object for chaining
+     */
     public ChromeDebugProtocolConfig withTracer(Tracer tracer) {
         this.tracer = tracer;
         return this;

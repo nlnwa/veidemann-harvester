@@ -60,10 +60,10 @@ public class ChromeDebugProtocolIT {
     public void testRender() throws Exception {
         System.out.println("Chrome address: " + chromeHost + ":" + chromePort);
         ChromeDebugProtocol chrome = new ChromeDebugProtocol(config);
-        chrome.target().getTargets().get().targetInfos().forEach(t -> System.out.println(t));
+        chrome.target().getTargets().run().targetInfos().forEach(t -> System.out.println(t));
         System.out.println();
 
-        chrome.target().setDiscoverTargets(true).get();
+        chrome.target().setDiscoverTargets(true).run();
 //        chrome.target.onTargetCreated(t -> System.out.println(t));
 //        chrome.target.onTargetDestroyed(t -> System.out.println(t));
 //        chrome.target.onTargetInfoChanged(t -> System.out.println(t));
@@ -71,10 +71,10 @@ public class ChromeDebugProtocolIT {
         List<Sess> sessions = new ArrayList<>();
         for (int i = 0; i < 10; i++) {
             sessions.add(new Sess(chrome.newSession(1280, 1024)));
-            System.out.println("Targets: " + chrome.target().getTargets().get().targetInfos().size());
+            System.out.println("Targets: " + chrome.target().getTargets().run().targetInfos().size());
         }
 
-        chrome.target().getTargets().get().targetInfos().forEach(t -> System.out.println(t));
+        chrome.target().getTargets().run().targetInfos().forEach(t -> System.out.println(t));
         System.out.println();
 //        System.out.println(session.version());
 //        System.out.println(session.toString());
@@ -94,10 +94,10 @@ public class ChromeDebugProtocolIT {
                 Thread.sleep(sleep);
             }
         }
-        chrome.target().getTargets().get().targetInfos().forEach(t -> System.out.println(t));
+        chrome.target().getTargets().run().targetInfos().forEach(t -> System.out.println(t));
         System.out.println();
         Thread.sleep(2000);
-        chrome.target().getTargets().get().targetInfos().forEach(t -> System.out.println(t));
+        chrome.target().getTargets().run().targetInfos().forEach(t -> System.out.println(t));
         System.out.println();
         long crashed = sessions.stream().filter(s -> s.crashed).count();
         long navigated = sessions.stream().filter(s -> s.navigated.get() == 1).count();
@@ -124,10 +124,10 @@ public class ChromeDebugProtocolIT {
             }
         });
 
-        chrome.target().getTargets().get().targetInfos().forEach(t -> System.out.println(t));
+        chrome.target().getTargets().run().targetInfos().forEach(t -> System.out.println(t));
         System.out.println();
         Thread.sleep(2000);
-        chrome.target().getTargets().get().targetInfos().forEach(t -> System.out.println(t));
+        chrome.target().getTargets().run().targetInfos().forEach(t -> System.out.println(t));
         System.out.println();
         crashed = sessions.stream().filter(s -> s.crashed).count();
         navigated = sessions.stream().filter(s -> s.navigated.get() == 2).count();
@@ -143,10 +143,10 @@ public class ChromeDebugProtocolIT {
         boolean crashed;
         AtomicInteger navigated = new AtomicInteger();
 
-        Sess(Session session) throws ExecutionException, InterruptedException, IOException {
+        Sess(Session session) throws ExecutionException, InterruptedException, IOException, TimeoutException {
             this.session = session;
-            session.page().enable().get();
-            session.inspector().enable().get();
+            session.page().enable().run();
+            session.inspector().enable().run();
             session.inspector().onTargetCrashed(c -> {
                 crashed = true;
                 session.close();
@@ -160,7 +160,7 @@ public class ChromeDebugProtocolIT {
             if (!session.isClosed()) {
                 try {
                     crashed = false;
-                    session.page().navigate(url, "", "");
+                    session.page().navigate(url).run();
 //                    session.page().navigate(url, "", "").get(4, TimeUnit.SECONDS).frameId();
                     System.out.println("NAV");
 //                session.close();

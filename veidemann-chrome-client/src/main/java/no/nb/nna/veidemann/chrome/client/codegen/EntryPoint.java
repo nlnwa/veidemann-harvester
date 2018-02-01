@@ -38,7 +38,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -71,8 +70,6 @@ public class EntryPoint {
 
     final FieldSpec closed = FieldSpec.builder(AtomicBoolean.class, "closed", Modifier.FINAL)
             .initializer("new $T(false)", AtomicBoolean.class).build();
-
-    final CodeBlock timeoutGet = CodeBlock.of("get($N.getProtocolTimeoutMs(), $T.MILLISECONDS)", config, TimeUnit.class);
 
     final List<Domain> domains;
 
@@ -154,6 +151,8 @@ public class EntryPoint {
         ParameterSpec clientHeight = ParameterSpec.builder(int.class, "clientHeight", Modifier.FINAL).build();
         classBuilder.addMethod(MethodSpec.methodBuilder("newSession")
                 .addException(IOException.class)
+                .addException(TimeoutException.class)
+                .addException(ExecutionException.class)
                 .addModifiers(Modifier.PUBLIC, Modifier.SYNCHRONIZED)
                 .addParameter(clientWidth)
                 .addParameter(clientHeight)
@@ -162,14 +161,8 @@ public class EntryPoint {
                 .addStatement("$N.info(\"Creating new session on closed client. {}\", $N.getClosedReason())", logger, protocolClient)
                 .addStatement("throw new $T($N.getClosedReason())", ClientClosedException.class, protocolClient)
                 .endControlFlow()
-                .beginControlFlow("try")
-                .beginControlFlow("if (target().getTargets().$L.targetInfos().size() > $N.getMaxOpenSessions())", timeoutGet, config)
+                .beginControlFlow("if (target().getTargets().run().targetInfos().size() > $N.getMaxOpenSessions())", config)
                 .addStatement("throw new $T($N.getMaxOpenSessions())", MaxActiveSessionsExceededException.class, config)
-                .endControlFlow()
-                .endControlFlow()
-                .beginControlFlow("catch ($T | $T | $T ex)",
-                        InterruptedException.class, ExecutionException.class, TimeoutException.class)
-                .addStatement("throw new $T(ex)", IOException.class)
                 .endControlFlow()
                 .addStatement("$1T s = new $1T(this, $2N, $3N, $4N)",
                         Session.type, config, clientWidth, clientHeight)

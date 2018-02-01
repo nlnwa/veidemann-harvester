@@ -34,7 +34,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import static javax.lang.model.element.Modifier.PUBLIC;
@@ -63,8 +62,6 @@ public class Session {
     final FieldSpec contextId = FieldSpec.builder(String.class, "contextId", Modifier.FINAL).build();
 
     final FieldSpec targetId = FieldSpec.builder(String.class, "targetId", Modifier.FINAL).build();
-
-    final CodeBlock timeoutGet = CodeBlock.of("get($N.getProtocolTimeoutMs(), $T.MILLISECONDS)", config, TimeUnit.class);
 
     final List<Domain> domains;
 
@@ -108,22 +105,18 @@ public class Session {
 
         MethodSpec.Builder constructor = MethodSpec.constructorBuilder()
                 .addException(IOException.class)
+                .addException(ExecutionException.class)
+                .addException(TimeoutException.class)
                 .addParameter(entryPoint.type, entryPoint.name, Modifier.FINAL)
                 .addParameter(config)
                 .addParameter(clientWidth)
                 .addParameter(clientHeight)
                 .addStatement("this.$1N = $1N", entryPoint)
                 .addStatement("this.$1N = $1N", config)
-                .beginControlFlow("try")
-                .addStatement("$N = $N.target().createBrowserContext().$L.browserContextId()",
-                        contextId, entryPoint, timeoutGet)
-                .addStatement("$N = $N.target().createTarget(\"about:blank\", $N, $N, $N, false).$L.targetId()", targetId,
-                        entryPoint, clientWidth, clientHeight, contextId, timeoutGet)
-                .endControlFlow()
-                .beginControlFlow("catch ($T | $T | $T ex)",
-                        InterruptedException.class, ExecutionException.class, TimeoutException.class)
-                .addStatement("throw new $T(ex)", IOException.class)
-                .endControlFlow()
+                .addStatement("$N = $N.target().createBrowserContext().run().browserContextId()", contextId, entryPoint)
+                .addStatement("$N = $N.target().createTarget(\"about:blank\")\n.withWidth($N)\n.withHeight($N)\n" +
+                                ".withBrowserContextId($N)\n.withEnableBeginFrameControl(false)\n.run().targetId()",
+                        targetId, entryPoint, clientWidth, clientHeight, contextId)
                 .addCode("\n")
                 .addStatement("$N = $N.$N.createSessionClient($N)",
                         sessionClient,
@@ -194,29 +187,24 @@ public class Session {
                 .addStatement("$N.onClose(reason)", sessionClient)
                 .beginControlFlow("if ($N != null)", targetId)
                 .beginControlFlow("try")
-                .addStatement("$N.target().closeTarget(targetId).$L", entryPoint, timeoutGet)
-                .endControlFlow()
-                .beginControlFlow("catch ($T | $T ex)", ClientClosedException.class, SessionClosedException.class)
+                .addStatement("$N.target().closeTarget(targetId).run()", entryPoint)
+                .nextControlFlow("catch ($T | $T ex)", ClientClosedException.class, SessionClosedException.class)
                 .addComment("Already closed, do nothing")
                 .endControlFlow()
                 .endControlFlow()
                 .beginControlFlow("if ($N != null)", contextId)
                 .beginControlFlow("try")
-                .beginControlFlow("if (!$N.target().disposeBrowserContext(contextId).$L.success())", entryPoint, timeoutGet)
+                .beginControlFlow("if (!$N.target().disposeBrowserContext(contextId).run().success())", entryPoint)
                 .addStatement("$N.info($S, $N)", logger, "Failed closing context {}", contextId)
                 .endControlFlow()
-                .endControlFlow()
-                .beginControlFlow("catch ($T | $T ex)", ClientClosedException.class, SessionClosedException.class)
+                .nextControlFlow("catch ($T | $T ex)", ClientClosedException.class, SessionClosedException.class)
                 .addComment("Already closed, do nothing")
                 .endControlFlow()
                 .endControlFlow()
-                .endControlFlow()
-                .beginControlFlow("catch ($T | $T | $T ex)",
-                        InterruptedException.class, ExecutionException.class, TimeoutException.class)
+                .nextControlFlow("catch ($T | $T ex)", ExecutionException.class, TimeoutException.class)
                 .addStatement("$N.error($S, $N, ex.toString(), ex)",
                         logger, "Failed closing browser session '{}': {}", contextId)
-                .endControlFlow()
-                .beginControlFlow("finally")
+                .nextControlFlow("finally")
                 .addStatement("$N.onSessionClosed(this)", entryPoint)
                 .endControlFlow()
                 .build());

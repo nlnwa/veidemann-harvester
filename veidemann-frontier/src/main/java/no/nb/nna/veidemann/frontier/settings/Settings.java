@@ -17,6 +17,8 @@ package no.nb.nna.veidemann.frontier.settings;
 
 import no.nb.nna.veidemann.commons.settings.CommonSettings;
 
+import java.time.Duration;
+
 /**
  * Configuration settings for Veidemann Frontier.
  */
@@ -37,6 +39,8 @@ public class Settings extends CommonSettings {
     private String dnsResolverHost;
 
     private int dnsResolverPort;
+
+    private Duration maxWaitForExhaustedHarvester;
 
     public int getApiPort() {
         return apiPort;
@@ -102,4 +106,11 @@ public class Settings extends CommonSettings {
         this.dnsResolverPort = dnsResolverPort;
     }
 
+    public Duration getMaxWaitForExhaustedHarvester() {
+        return maxWaitForExhaustedHarvester;
+    }
+
+    public void setMaxWaitForExhaustedHarvester(Duration maxWaitForExhaustedHarvester) {
+        this.maxWaitForExhaustedHarvester = maxWaitForExhaustedHarvester;
+    }
 }

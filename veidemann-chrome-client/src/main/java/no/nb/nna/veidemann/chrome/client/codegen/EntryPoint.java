@@ -96,7 +96,7 @@ public class EntryPoint {
         e.genConstructors();
         e.genNewSessionMethod();
         e.genCloseMethod();
-        e.genIsClosesMethod();
+        e.genIsClosedMethod();
         e.genOnSessionClosedMethod();
         e.genClientClosedMethod();
         e.genToStringAndVersionMethods();
@@ -193,7 +193,7 @@ public class EntryPoint {
                 .build());
     }
 
-    void genIsClosesMethod() {
+    void genIsClosedMethod() {
         classBuilder.addMethod(MethodSpec.methodBuilder("isClosed")
                 .addModifiers(Modifier.PUBLIC)
                 .returns(boolean.class)

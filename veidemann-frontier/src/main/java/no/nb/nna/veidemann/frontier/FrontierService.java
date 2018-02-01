@@ -61,8 +61,9 @@ public class FrontierService {
      */
     public FrontierService start() {
         try (DbAdapter db = new RethinkDbAdapter(SETTINGS.getDbHost(), SETTINGS.getDbPort(), SETTINGS.getDbName());
-             HarvesterClient harvesterClient = new HarvesterClient(SETTINGS.getHarvesterHost(), SETTINGS
-                        .getHarvesterPort());
+             HarvesterClient harvesterClient = new HarvesterClient(
+                     SETTINGS.getHarvesterHost(), SETTINGS.getHarvesterPort())
+                     .withMaxWaitForExhaustedHarvesterMs(SETTINGS.getMaxWaitForExhaustedHarvester());
 
              RobotsServiceClient robotsServiceClient = new RobotsServiceClient(
                         SETTINGS.getRobotsEvaluatorHost(), SETTINGS.getRobotsEvaluatorPort());

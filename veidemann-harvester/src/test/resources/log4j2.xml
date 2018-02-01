@@ -2,14 +2,18 @@
 <Configuration status="WARN" monitorInterval="0">
     <Appenders>
         <Console name="Console" target="SYSTEM_OUT">
-            <PatternLayout pattern="%d{HH:mm:ss.SSS} [%t] %-5level %logger{36} %X{eid} %X{uri} - %msg%n"/>
+            <!--<PatternLayout pattern="%d{HH:mm:ss.SSS} [%t] %-5level %logger{36} %X{eid} %X{uri} - %msg%n"/>-->
+            <PatternLayout pattern="%X{uri} - %msg%n"/>
         </Console>
     </Appenders>
     <Loggers>
         <Logger name="no.nb.nna.veidemann" level="info" />
         <Logger name="no.nb.nna.veidemann.harvester.proxy" level="info" />
+        <Logger name="no.nb.nna.veidemann.harvester.proxy.RecorderFilter" level="info" />
         <Logger name="no.nb.nna.veidemann.harvester.browsercontroller.BrowserSession" level="info" />
+        <Logger name="no.nb.nna.veidemann.harvester.browsercontroller.BrowserController" level="debug" />
         <Logger name="no.nb.nna.veidemann.harvester.browsercontroller.UriRequest" level="info" />
+        <Logger name="no.nb.nna.veidemann.harvester.browsercontroller.UriRequestRegistry" level="info" />
         <Logger name="no.nb.nna.veidemann.harvester.browsercontroller.CrawlLogRegistry" level="info" />
         <Logger name="no.nb.nna.veidemann.harvester.BrowserSessionRegistry" level="info" />
         <Logger name="no.nb.nna.veidemann.chrome" level="info" />

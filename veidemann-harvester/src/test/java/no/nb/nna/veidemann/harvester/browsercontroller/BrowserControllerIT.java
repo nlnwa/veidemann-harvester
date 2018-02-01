@@ -47,7 +47,9 @@ import java.nio.file.Paths;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.fail;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  *
@@ -116,8 +118,12 @@ public class BrowserControllerIT {
             MessagesProto.QueuedUri queuedUri = MessagesProto.QueuedUri.newBuilder()
                     .setUri("http://a1.com")
 //                    .setUri("https://www.nb.no")
-//                    .setUri("https://www.nb.no/besok-oss/utstillinger")
-//                    .setUri("https://www.nb.no/statsmaktene/")
+//                    .setUri("http://www.nb.no/sbfil/tekst/Bokselskap_HTML.zip")
+//                    .setUri("https://www.nb.no/Fakta/Om-NB/Ledige-stillinger")
+//                    .setUri("http://www.nb.no/nbsok/search?page=0&menuOpen=false&instant=true&action=search&currentHit=0&currentSesamid=&searchString=%22fredrikke+marie+qvam%22") // Too many redirects
+//                    .setUri("https://www.nb.no/eventyr/?page_id=5") // Mixed-content
+//                    .setUri("https://www.nb.no/utstillinger/leksikon/tema01.php") // 404 problemer + data: scheme
+//                    .setUri("https://www.nb.no/baser/bjornson/talekart.html") // 404 problemer + data: scheme
                     .setExecutionId("testId")
 //                    .setDiscoveryPath("L")
 //                    .setReferrer("http://example.org/")
@@ -141,19 +147,19 @@ public class BrowserControllerIT {
                 int totalPages = result.getOutlinksCount() + 1;
                 for (QueuedUri qu : result.getOutlinksList()) {
                     String surt = UriConfigs.SURT_KEY.buildUri(qu.getUri()).toString();
-//                    if (!surt.startsWith("(no,nb,")) {
-//                        System.out.println("OOS: " + surt + " --- " + qu.getUri());
-//                        totalPages--;
-//                        continue;
-//                    }
+                    if (!surt.startsWith("(no,nb,")) {
+                        System.out.println("OOS: " + surt + " --- " + qu.getUri());
+                        totalPages--;
+                        continue;
+                    }
 
                     pagesHarvested++;
                     System.out.println("URI " + pagesHarvested + " of " + totalPages + ": " + qu.getUri());
                     Thread.sleep(1000);
                     HarvesterProto.HarvestPageReply result2 = controller.render(qu, config);
-//                    if (pagesHarvested > 10) {
-//                        break;
-//                    }
+                    if (pagesHarvested > 1) {
+                        break;
+                    }
                 }
 
 //                System.out.println("=========*\n" + result);
@@ -175,8 +181,8 @@ public class BrowserControllerIT {
                 .setUserAgent("veidemann/1.0")
                 .setWindowHeight(1280)
                 .setWindowWidth(1024)
-                .setPageLoadTimeoutMs(300000)
-                .setSleepAfterPageloadMs(5000)
+                .setPageLoadTimeoutMs(20000)
+                .setSleepAfterPageloadMs(10000)
                 .setScriptSelector(ConfigProto.Selector.newBuilder().addLabel(ApiTools.buildLabel("scope", "default")))
                 .build();
 
@@ -208,13 +214,13 @@ public class BrowserControllerIT {
         });
         when(db.savePageLog(any(PageLog.class))).then(a -> {
             PageLog o = a.getArgument(0);
-            System.out.println("PageLOG::::");
-            System.out.println(o);
-//            System.out.println("Uri: " + o.getUri());
-//            System.out.println("Referrer: " + o.getReferrer());
-//            System.out.println("resource count: " + o.getResourceCount());
-//            System.out.println("outlinks count: " + o.getOutlinkCount());
-            System.out.println("::::PageLOG");
+//            System.out.println("PageLOG::::");
+//            System.out.println(o);
+            System.out.println("Uri: " + o.getUri());
+            System.out.println("Referrer: " + o.getReferrer());
+            System.out.println("resource count: " + o.getResourceCount());
+            System.out.println("outlinks count: " + o.getOutlinkCount());
+//            System.out.println("::::PageLOG");
             return o;
         });
         when(db.listBrowserScripts(any())).thenReturn(ControllerProto.BrowserScriptListReply.newBuilder()

@@ -173,14 +173,14 @@
                                             <name>integration-test-net</name>
                                             <alias>browser</alias>
                                         </network>
-                                        <!-- 1GB -->
-                                        <memory>1073741824</memory>
-                                        <shmSize>1073741824</shmSize>
+                                        <!-- 2GB -->
+                                        <memory>2147483648</memory>
+                                        <shmSize>2147483648</shmSize>
                                         <ports>
                                             <port>+browser.host:browser.port:9222</port>
                                         </ports>
                                         <env>
-                                            <CHROME_OPTS>--ignore-certificate-errors --disable-web-security --allow-running-insecure-content --proxy-server=harvester:8080 --hide-scrollbars  --dbus-stub</CHROME_OPTS>
+                                            <CHROME_OPTS>--proxy-server=harvester:8080 --hide-scrollbars --disable-dev-shm-usage</CHROME_OPTS>
                                         </env>
                                         <volumes>
                                             <bind>

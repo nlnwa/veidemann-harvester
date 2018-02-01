@@ -26,6 +26,7 @@ import no.nb.nna.veidemann.api.HarvesterProto.HarvestPageReply;
 import no.nb.nna.veidemann.api.MessagesProto.PageLog;
 import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
 import no.nb.nna.veidemann.chrome.client.ChromeDebugProtocol;
+import no.nb.nna.veidemann.chrome.client.ChromeDebugProtocolConfig;
 import no.nb.nna.veidemann.commons.VeidemannHeaderConstants;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.harvester.BrowserSessionRegistry;
@@ -57,16 +58,21 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
     private final Map<String, BrowserScript> scriptCache = new HashMap<>();
 
     public BrowserController(final String chromeHost, final int chromePort, final DbAdapter db,
-                             final BrowserSessionRegistry sessionRegistry)
-            throws IOException {
+                             final BrowserSessionRegistry sessionRegistry) {
 
-        this.chrome = new ChromeDebugProtocol(chromeHost, chromePort, GlobalTracer.get());
+        ChromeDebugProtocolConfig chromeDebugProtocolConfig = new ChromeDebugProtocolConfig(chromeHost, chromePort)
+                .withTracer(GlobalTracer.get())
+                .withMaxOpenSessions(1)
+                .withProtocolTimeoutMs(10000)
+                .withWorkerThreads(32);
+
+        this.chrome = new ChromeDebugProtocol(chromeDebugProtocolConfig);
         this.db = db;
         this.sessionRegistry = sessionRegistry;
     }
 
     public HarvestPageReply render(QueuedUri queuedUri, CrawlConfig config)
-            throws ExecutionException, InterruptedException, IOException, TimeoutException {
+            throws ExecutionException, IOException, TimeoutException {
 
         Span span = GlobalTracer.get()
                 .buildSpan("render")

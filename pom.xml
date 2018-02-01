@@ -22,7 +22,7 @@
     <modules>
         <module>veidemann-harvester</module>
         <module>veidemann-dbadapter</module>
-        <module>veidemann-chrome</module>
+        <module>veidemann-chrome-client</module>
         <module>veidemann-contentwriter</module>
         <module>veidemann-contentexplorer</module>
         <module>veidemann-frontier</module>

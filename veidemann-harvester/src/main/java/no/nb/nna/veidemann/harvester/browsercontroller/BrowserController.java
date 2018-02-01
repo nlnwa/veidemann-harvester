@@ -58,18 +58,21 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
     private final Map<String, BrowserScript> scriptCache = new HashMap<>();
 
     public BrowserController(final String chromeHost, final int chromePort, final DbAdapter db,
-                             final BrowserSessionRegistry sessionRegistry)
-            throws IOException {
+                             final BrowserSessionRegistry sessionRegistry) {
 
         ChromeDebugProtocolConfig chromeDebugProtocolConfig = new ChromeDebugProtocolConfig(chromeHost, chromePort)
-                .withTracer(GlobalTracer.get()).withMaxOpenSessions(3);
+                .withTracer(GlobalTracer.get())
+                .withMaxOpenSessions(1)
+                .withProtocolTimeoutMs(10000)
+                .withWorkerThreads(32);
+
         this.chrome = new ChromeDebugProtocol(chromeDebugProtocolConfig);
         this.db = db;
         this.sessionRegistry = sessionRegistry;
     }
 
     public HarvestPageReply render(QueuedUri queuedUri, CrawlConfig config)
-            throws ExecutionException, InterruptedException, IOException, TimeoutException {
+            throws ExecutionException, IOException, TimeoutException {
 
         Span span = GlobalTracer.get()
                 .buildSpan("render")

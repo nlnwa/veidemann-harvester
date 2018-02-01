@@ -60,7 +60,7 @@ public class HarvesterService extends HarvesterGrpc.HarvesterImplBase {
             respObserver.onError(status.asException());
             System.exit(1);
         } catch (MaxActiveSessionsExceededException ex) {
-            LOG.error(ex.getMessage(), ex);
+            LOG.debug(ex.getMessage(), ex);
             Status status = Status.RESOURCE_EXHAUSTED.withDescription(ex.toString());
             respObserver.onError(status.asException());
         } catch (Exception ex) {

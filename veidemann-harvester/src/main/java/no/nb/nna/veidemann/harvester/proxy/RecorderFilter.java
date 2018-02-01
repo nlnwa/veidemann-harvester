@@ -239,7 +239,8 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
 
                     if (res.headers().contains(HttpHeaderNames.SET_COOKIE)
                             || res.headers().contains(HttpHeaderNames.SET_COOKIE2)
-                            || res.status().equals(HttpResponseStatus.PARTIAL_CONTENT)) {
+                            || res.status().equals(HttpResponseStatus.PARTIAL_CONTENT)
+                            || res.headers().contains("Strict-Transport-Security")) {
                         responseCollector.setShouldCache(false);
                     }
 

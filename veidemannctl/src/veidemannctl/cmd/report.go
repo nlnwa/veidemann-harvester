@@ -29,12 +29,17 @@ import (
 	"text/template"
 	"veidemannctl/bindata"
 	"veidemannctl/util"
+	"os/exec"
+	"bytes"
+	"time"
 )
 
 var (
 	executionId string
 	uri         string
 	img         bool
+	display     bool
+	displaySeconds int32
 	pageSize    int32
 	page        int32
 	goTemplate  string
@@ -99,7 +104,7 @@ var reportCmd = &cobra.Command{
 				if executionId != "" {
 					request.ExecutionId = executionId
 				}
-				if img {
+				if img || display {
 					request.ImgData = true
 				}
 				request.Filter = applyFilter(filter)
@@ -113,6 +118,8 @@ var reportCmd = &cobra.Command{
 
 				if img {
 					printScreenshot(r.Value[0])
+				} else if display {
+					showScreenshot(r.Value)
 				} else {
 					applyTemplate(r, "screenshot.template")
 				}
@@ -143,6 +150,8 @@ func init() {
 	reportCmd.PersistentFlags().StringVarP(&executionId, "executionid", "e", "", "All objects by Execution ID")
 	reportCmd.PersistentFlags().StringVarP(&uri, "uri", "", "", "All screenshots by URI")
 	reportCmd.PersistentFlags().BoolVarP(&img, "img", "", false, "Image binary")
+	reportCmd.PersistentFlags().BoolVarP(&display, "display", "", false, "Show image using ImageMagic's display")
+	reportCmd.PersistentFlags().Int32VarP(&displaySeconds, "displayTime", "", 4, "The time in seconds to show an image. 0 for no timeout")
 	reportCmd.PersistentFlags().Int32VarP(&pageSize, "pagesize", "s", 10, "Number of objects to get")
 	reportCmd.PersistentFlags().Int32VarP(&page, "page", "p", 0, "The page number")
 	reportCmd.PersistentFlags().StringVarP(&goTemplate, "template", "t", "", "A Go template used to format the output")
@@ -215,17 +224,36 @@ func applyTemplate(msg proto.Message, defaultTemplate string) {
 	}
 }
 
-func printPageLogLine(pageLog *api.PageLog) {
-	fmt.Printf("---\n%s %s %s\nResources:\n", pageLog.ExecutionId, pageLog.Uri, pageLog.WarcId)
-	for _, r := range pageLog.Resource {
-		fmt.Printf(" - %s %v %s %v %v %s %s %s\n", r.Uri, r.StatusCode, r.DiscoveryPath, r.FromCache, r.Renderable, r.MimeType, r.ResourceType, r.WarcId)
-	}
-	fmt.Println("Outlinks:")
-	for _, r := range pageLog.Outlink {
-		fmt.Printf(" - %s\n", r)
-	}
-}
-
 func printScreenshot(screenshot *api.Screenshot) {
 	os.Stdout.Write(screenshot.Img)
+}
+
+func showScreenshot(screenshot []*api.Screenshot) {
+	prog := "feh"
+	if _, err := exec.LookPath(prog); err != nil {
+		prog = "display"
+		if _, err := exec.LookPath(prog); err != nil {
+			log.Fatal("Neither 'feh' or 'display' is available")
+		}
+	}
+
+	for _, im := range screenshot {
+		cmd := exec.Command(prog, "-")
+		cmd.Stdin = bytes.NewReader(im.Img)
+
+		if displaySeconds == 0 {
+			err := cmd.Run()
+			if err != nil {
+				log.Fatal(err)
+			}
+		} else {
+			err := cmd.Start()
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			time.Sleep(time.Duration(displaySeconds) * time.Second)
+			cmd.Process.Kill()
+		}
+	}
 }

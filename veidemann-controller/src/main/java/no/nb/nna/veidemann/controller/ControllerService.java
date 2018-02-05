@@ -486,7 +486,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
                     seedRequest = SeedListRequest.newBuilder()
                             .setCrawlJobId(job.getId())
                             .setPageSize(100)
-                            .setPage(page++)
+                            .setPage(page)
                             .build();
                 } else {
                     seedRequest = SeedListRequest.newBuilder()
@@ -496,7 +496,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
 
                 SeedListReply seedList = db.listSeeds(seedRequest);
                 while (seedList.getValueCount() > 0) {
-                    for (Seed seed : db.listSeeds(seedRequest).getValueList()) {
+                    for (Seed seed : seedList.getValueList()) {
                         if (!seed.getDisabled()) {
                             if (LOG.isInfoEnabled()) {
                                 LOG.info("Start harvest of: {}", seed.getMeta().getName());
@@ -504,7 +504,8 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
                             }
                         }
                     }
-                    seedRequest = seedRequest.toBuilder().setPage(page++).build();
+                    seedRequest = seedRequest.toBuilder().setPage(++page).build();
+                    seedList = db.listSeeds(seedRequest);
                 }
                 LOG.info("All seeds for job '{}' started", job.getMeta().getName());
             }

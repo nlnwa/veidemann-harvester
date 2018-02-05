@@ -15,22 +15,19 @@
  */
 package no.nb.nna.veidemann.frontier.worker;
 
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.ReentrantLock;
-
-import no.nb.nna.veidemann.commons.db.FutureOptional;
 import no.nb.nna.veidemann.api.MessagesProto;
+import no.nb.nna.veidemann.commons.db.FutureOptional;
 import no.nb.nna.veidemann.db.DbException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
+
 /**
  *
  */
-public class QueueWorker extends ThreadPoolExecutor {
+public class QueueWorker {
 
     private static final Logger LOG = LoggerFactory.getLogger(QueueWorker.class);
 
@@ -46,9 +43,7 @@ public class QueueWorker extends ThreadPoolExecutor {
 
     private final Thread queueWatcher;
 
-    public QueueWorker(Frontier frontier, int numThreads) {
-        super(numThreads, numThreads, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>());
-        prestartAllCoreThreads();
+    public QueueWorker(Frontier frontier) {
         this.frontier = frontier;
         this.queueWatcher = new Thread(new QueueWatcher());
         this.queueWatcher.start();
@@ -64,33 +59,6 @@ public class QueueWorker extends ThreadPoolExecutor {
             Thread.currentThread().interrupt();
         } finally {
             threadsExhaustedLock.unlock();
-        }
-    }
-
-    @Override
-    protected void beforeExecute(Thread t, Runnable r) {
-        super.beforeExecute(t, r);
-        if (getActiveCount() >= getCorePoolSize()) {
-            threadsExhaustedLock.lock();
-            try {
-                isThreadsExhausted = true;
-            } finally {
-                threadsExhaustedLock.unlock();
-            }
-        }
-    }
-
-    @Override
-    protected void afterExecute(Runnable r, Throwable t) {
-        super.afterExecute(r, t);
-        if (getActiveCount() < getCorePoolSize()) {
-            threadsExhaustedLock.lock();
-            try {
-                isThreadsExhausted = false;
-                availableThread.signalAll();
-            } finally {
-                threadsExhaustedLock.unlock();
-            }
         }
     }
 
@@ -118,7 +86,7 @@ public class QueueWorker extends ThreadPoolExecutor {
             try {
                 // Execute fetch
                 LOG.debug("Running next fetch of exexcution: {}", exe.getId());
-                submit(exe);
+                exe.execute();
                 LOG.debug("End of Link crawl");
             } catch (Throwable t) {
                 LOG.error(t.toString(), t);

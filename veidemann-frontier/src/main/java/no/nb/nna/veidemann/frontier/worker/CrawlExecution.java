@@ -15,30 +15,31 @@
  */
 package no.nb.nna.veidemann.frontier.worker;
 
+import io.opentracing.Span;
+import io.opentracing.tag.Tags;
+import io.opentracing.util.GlobalTracer;
+import no.nb.nna.veidemann.api.ConfigProto.CrawlConfig;
+import no.nb.nna.veidemann.api.ConfigProto.CrawlJob;
+import no.nb.nna.veidemann.api.ConfigProto.CrawlLimitsConfig;
+import no.nb.nna.veidemann.api.ControllerProto;
+import no.nb.nna.veidemann.api.HarvesterProto.HarvestPageReply;
+import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus;
+import no.nb.nna.veidemann.api.MessagesProto.CrawlHostGroup;
+import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
+import no.nb.nna.veidemann.commons.ExtraStatusCodes;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
+
 import java.net.URISyntaxException;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
-import io.opentracing.ActiveSpan;
-import io.opentracing.tag.Tags;
-import io.opentracing.util.GlobalTracer;
-import no.nb.nna.veidemann.api.ControllerProto;
-import no.nb.nna.veidemann.api.HarvesterProto.HarvestPageReply;
-import no.nb.nna.veidemann.commons.ExtraStatusCodes;
-import no.nb.nna.veidemann.api.ConfigProto.CrawlConfig;
-import no.nb.nna.veidemann.api.ConfigProto.CrawlJob;
-import no.nb.nna.veidemann.api.ConfigProto.CrawlLimitsConfig;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlHostGroup;
-import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 /**
  *
  */
-public class CrawlExecution implements Runnable {
+public class CrawlExecution {
 
     private static final Logger LOG = LoggerFactory.getLogger(CrawlExecution.class);
 
@@ -61,6 +62,8 @@ public class CrawlExecution implements Runnable {
     private long fetchTimeMs = 0L;
 
     private final AtomicLong nextSeqNum = new AtomicLong(1L);
+
+    private Span span;
 
     public CrawlExecution(QueuedUri qUri, CrawlHostGroup crawlHostGroup, Frontier frontier) {
         this.status = StatusWrapper.getStatusWrapper(frontier.getDb(), qUri.getExecutionId());
@@ -99,32 +102,146 @@ public class CrawlExecution implements Runnable {
         return qUri;
     }
 
-    public void fetch() {
-        LOG.info("Fetching " + qUri.getUri());
+    /**
+     * Execute crawling of the queued Uri.
+     */
+    public void execute() {
+        if (preFetch()) {
+            fetch();
+        } else {
+            postFetchFinally();
+        }
+    }
+
+    /**
+     * Check if crawl is aborted.
+     * </p>
+     * @return true if we should do the fetch
+     */
+    private boolean preFetch() {
+        MDC.put("eid", qUri.getExecutionId());
+        MDC.put("uri", qUri.getUri());
+
+        span = GlobalTracer.get()
+                .buildSpan("runNextFetch")
+                .withTag(Tags.COMPONENT.getKey(), "CrawlExecution")
+                .withTag("uri", qUri.getUri())
+                .withTag("executionId", getId())
+                .ignoreActiveSpan()
+                .startManual();
 
         try {
-            long fetchStart = System.currentTimeMillis();
-            HarvestPageReply harvestReply = frontier.getHarvesterClient().fetchPage(qUri.getQueuedUri(), config);
-            long fetchEnd = System.currentTimeMillis();
-            fetchTimeMs = fetchEnd - fetchStart;
+            status.setState(CrawlExecutionStatus.State.FETCHING)
+                    .setStartTimeIfUnset()
+                    .saveStatus(frontier.getDb());
+            frontier.getDb().deleteQueuedUri(qUri.getQueuedUri());
 
-            outlinks = harvestReply.getOutlinksList();
-
-            status.incrementDocumentsCrawled()
-                    .incrementBytesCrawled(harvestReply.getBytesDownloaded())
-                    .incrementUrisCrawled(harvestReply.getUriCount());
-
-            if (outlinks.isEmpty()) {
-                LOG.debug("No outlinks from {}", qUri.getSurt());
+            if (isManualAbort() || LimitsCheck.isLimitReached(frontier, limits, status, qUri)) {
+                delayMs = 0L;
+                return false;
             } else {
-                queueOutlinks();
+                return true;
             }
-        } catch (Exception e) {
-            LOG.info("Failed fetch of {}", qUri.getUri(), e);
-            retryUri(qUri, e);
+        } catch (Throwable t) {
+            // Errors should be handled elsewhere. Exception here indicates a bug.
+            LOG.error(t.toString(), t);
+            return false;
+        }
+    }
+
+    private void fetch() {
+        LOG.info("Fetching " + qUri.getUri());
+
+            final long fetchStart = System.currentTimeMillis();
+
+            frontier.getHarvesterClient().fetchPage(qUri.getQueuedUri(), config)
+                    .thenAcceptAsync(r -> {
+                        postFetchSuccess(r, fetchStart);
+                    })
+                    .exceptionally(t -> {
+                        postFetchFailure(t);
+                        return null;
+                    })
+                    .whenCompleteAsync((r, t) -> {
+                        calculateDelay();
+                        postFetchFinally();
+                    });
+    }
+
+    /**
+     * Do post processing after a successful fetch.
+     */
+    private void postFetchSuccess(HarvestPageReply harvestReply, long fetchStart) {
+        MDC.put("eid", qUri.getExecutionId());
+        MDC.put("uri", qUri.getUri());
+
+        long fetchEnd = System.currentTimeMillis();
+        fetchTimeMs = fetchEnd - fetchStart;
+
+        outlinks = harvestReply.getOutlinksList();
+
+        status.incrementDocumentsCrawled()
+                .incrementBytesCrawled(harvestReply.getBytesDownloaded())
+                .incrementUrisCrawled(harvestReply.getUriCount());
+
+        if (outlinks.isEmpty()) {
+            LOG.debug("No outlinks from {}", qUri.getSurt());
+        } else {
+            queueOutlinks();
+        }
+    }
+
+    /**
+     * Do post proccessing after a failed fetch.
+     * @param t the exception thrown
+     */
+    private void postFetchFailure(Throwable t) {
+        MDC.put("eid", qUri.getExecutionId());
+        MDC.put("uri", qUri.getUri());
+
+        LOG.info("Failed fetch of {}", qUri.getUri(), t);
+        retryUri(qUri, t);
+    }
+
+    /**
+     * Do some housekeeping.
+     * </p>
+     * This should be run regardless of if we fetched anything or if the fetch failed in any way.
+     */
+    private void postFetchFinally() {
+        MDC.put("eid", qUri.getExecutionId());
+        MDC.put("uri", qUri.getUri());
+
+        try {
+            if (qUri.hasError() && qUri.getDiscoveryPath().isEmpty()) {
+                // Seed failed; mark crawl as failed
+                endCrawl(CrawlExecutionStatus.State.FAILED);
+            } else if (frontier.getDb().queuedUriCount(getId()) == 0) {
+                endCrawl(CrawlExecutionStatus.State.FINISHED);
+            } else if (status.getState() == CrawlExecutionStatus.State.FETCHING) {
+                status.setState(CrawlExecutionStatus.State.SLEEPING);
+            }
+            status.saveStatus(frontier.getDb());
+
+            // Recheck if user aborted crawl while fetching last uri.
+            if (isManualAbort()) {
+                // Save updated status
+                status.saveStatus(frontier.getDb());
+                delayMs = 0L;
+            }
+        } catch (Throwable t) {
+            // An error here indicates problems with DB communication. No idea how to handle that yet.
+            LOG.error("Error updating status after fetch: {}", t.toString(), t);
         }
 
-        calculateDelay();
+        try {
+            frontier.getDb().releaseCrawlHostGroup(getCrawlHostGroup(), getDelay(TimeUnit.MILLISECONDS));
+        } catch (Throwable t) {
+            // An error here indicates problems with DB communication. No idea how to handle that yet.
+            LOG.error("Error releasing CrawlHostGroup: {}", t.toString(), t);
+        }
+
+        span.finish();
     }
 
     void queueOutlinks() {
@@ -191,71 +308,14 @@ public class CrawlExecution implements Runnable {
         return nextSeqNum.getAndIncrement();
     }
 
-    private void retryUri(QueuedUriWrapper qUri, Exception e) {
+    private void retryUri(QueuedUriWrapper qUri, Throwable t) {
 
         LOG.info("Failed fetching ({}) at attempt #{}", qUri, qUri.getRetries());
         qUri.incrementRetries()
                 .setEarliestFetchDelaySeconds(getConfig().getPoliteness().getRetryDelaySeconds())
-                .setError(ExtraStatusCodes.RUNTIME_EXCEPTION.toFetchError(e.toString()));
+                .setError(ExtraStatusCodes.RUNTIME_EXCEPTION.toFetchError(t.toString()));
 
         Preconditions.checkPreconditions(frontier, config, status, qUri, qUri.getQueuedUri().getSequence());
-    }
-
-    @Override
-    public void run() {
-        try (ActiveSpan span = GlobalTracer.get()
-                .buildSpan("runNextFetch")
-                .withTag(Tags.COMPONENT.getKey(), "CrawlExecution")
-                .withTag("uri", qUri.getUri())
-                .withTag("executionId", getId())
-                .ignoreActiveSpan()
-                .startActive()) {
-
-            try {
-                status.setState(CrawlExecutionStatus.State.FETCHING)
-                        .setStartTimeIfUnset()
-                        .saveStatus(frontier.getDb());
-                frontier.getDb().deleteQueuedUri(qUri.getQueuedUri());
-
-                if (isManualAbort() || LimitsCheck.isLimitReached(frontier, limits, status, qUri)) {
-                    delayMs = 0L;
-                } else {
-                    fetch();
-                }
-            } catch (Throwable t) {
-                // Errors should be handled elsewhere. Exception here indicates a bug.
-                LOG.error(t.toString(), t);
-            }
-
-            try {
-                if (qUri.hasError() && qUri.getDiscoveryPath().isEmpty()) {
-                    // Seed failed; mark crawl as failed
-                    endCrawl(CrawlExecutionStatus.State.FAILED);
-                } else if (frontier.getDb().queuedUriCount(getId()) == 0) {
-                    endCrawl(CrawlExecutionStatus.State.FINISHED);
-                } else if (status.getState() == CrawlExecutionStatus.State.FETCHING) {
-                    status.setState(CrawlExecutionStatus.State.SLEEPING);
-                }
-                status.saveStatus(frontier.getDb());
-
-                // Recheck if user aborted crawl while fetching last uri.
-                if (isManualAbort()) {
-                    // Save updated status
-                    status.saveStatus(frontier.getDb());
-                    delayMs = 0L;
-                }
-            } catch (Throwable t) {
-                // An error here indicates problems with DB communication. No idea how to handle that yet.
-                LOG.error("Error updating status after fetch: {}", t.toString(), t);
-            }
-
-            try {
-                frontier.getDb().releaseCrawlHostGroup(getCrawlHostGroup(), getDelay(TimeUnit.MILLISECONDS));
-            } catch (Throwable t) {
-                // An error here indicates problems with DB communication. No idea how to handle that yet.
-                LOG.error("Error releasing CrawlHostGroup: {}", t.toString(), t);
-            }
-        }
     }
 
     private void endCrawl(CrawlExecutionStatus.State state) {

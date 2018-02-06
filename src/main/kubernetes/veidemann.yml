@@ -8,18 +8,9 @@ metadata:
     role: config
 data:
   openid.connect.issuer: ""
-  openid.connect.issuer.backend: "http://localhost:80/"
-  jaeger.sampler.type: "const"
-  jaeger.sampler.param: "1"
----
-kind: ConfigMap
-apiVersion: v1
-metadata:
-  name: log4j.conf
-  labels:
-    app: veidemann
-    role: config
-data:
+  openid.connect.issuer.backend: "http://dex:5556/veidemann/dex"
+  jaeger.sampler.type: "probabilistic"
+  jaeger.sampler.param: "0.1"
   log4j2.xml: |-
     <?xml version="1.0" encoding="UTF-8"?>
     <Configuration status="WARN" monitorInterval="0">
@@ -37,8 +28,14 @@ data:
             </Root>
         </Loggers>
     </Configuration>
-
-
+  environment.json: |-
+    {
+      "apiGateway": "http://veidemann-api-gateway:30895/api",
+      "auth": {
+        "issuer": "",
+        "requireHttps": false
+      }
+    }
 ---
 # Harvester (proxy and browser)
 apiVersion: v1
@@ -90,13 +87,14 @@ spec:
     spec:
       containers:
       - name: browser
-        image: norsknettarkiv/chrome-headless:64.0.3282.24
+        image: norsknettarkiv/chrome-headless:65.0.3322.3
         ports:
         - name: debug
           containerPort: 9222
         env:
         - name: CHROME_OPTS
-          value: "--proxy-server=localhost:8080 --ignore-certificate-errors --disable-web-security --allow-running-insecure-content --dbus-stub --deterministic-fetch"
+          value: "--proxy-server=localhost:8080 --hide-scrollbars"
+          # --disable-backgrond-networking
           # --disable-background-networking
         volumeMounts:
         - mountPath: /data
@@ -131,6 +129,8 @@ spec:
           value: "veidemann-dnsresolver"
         - name: DNS_RESOLVER_PORT
           value: "50052"
+        - name: MAX_CACHE_OBJECT_SIZE
+          value: 1B
         - name: JAEGER_SAMPLER_TYPE
           valueFrom:
             configMapKeyRef:
@@ -150,7 +150,7 @@ spec:
         resources:
             requests:
                 memory: "500Mi"
-      - image: jaegertracing/jaeger-agent:1.0.0
+      - image: jaegertracing/jaeger-agent:1.1.0
         name: jaeger-agent
         ports:
         - containerPort: 5775
@@ -170,7 +170,10 @@ spec:
         emptyDir: {}
       - name: log4j-config
         configMap:
-          name: log4j.conf
+          name: veidemann-properties
+          items:
+          - key: log4j2.xml
+            path: log4j2.xml
       - name: dshm
         emptyDir:
           medium: Memory
@@ -231,10 +234,14 @@ spec:
         env:
         - name: API_PORT
           value: "8082"
+        - name: HOST_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
         - name: WARC_WRITER_POOL_SIZE
-          value: "10"
+          value: "6"
         - name: WARC_SIZE
-          value: "1048576"
+          value: "1GiB"
         - name: WARC_COMPRESS
           value: "true"
         - name: DB_HOST
@@ -290,7 +297,7 @@ spec:
         - name: log4j-config
           mountPath: /veidemann/config/log4j2.xml
           subPath: log4j2.xml
-      - image: jaegertracing/jaeger-agent:1.0.0
+      - image: jaegertracing/jaeger-agent:1.1.0
         name: jaeger-agent
         ports:
         - containerPort: 5775
@@ -312,7 +319,10 @@ spec:
         emptyDir: {}
       - name: log4j-config
         configMap:
-          name: log4j.conf
+          name: veidemann-properties
+          items:
+          - key: log4j2.xml
+            path: log4j2.xml
 
 ---
 # Frontier
@@ -386,7 +396,7 @@ spec:
         - name: log4j-config
           mountPath: /veidemann/config/log4j2.xml
           subPath: log4j2.xml
-      - image: jaegertracing/jaeger-agent:1.0.0
+      - image: jaegertracing/jaeger-agent:1.1.0
         name: jaeger-agent
         ports:
         - containerPort: 5775
@@ -406,7 +416,10 @@ spec:
         emptyDir: {}
       - name: log4j-config
         configMap:
-          name: log4j.conf
+          name: veidemann-properties
+          items:
+          - key: log4j2.xml
+            path: log4j2.xml
 
 ---
 # Controller
@@ -454,7 +467,7 @@ spec:
     spec:
       containers:
       - name: controller
-        image: norsknettarkiv/veidemann-controller:1.0.0-SNAPSHOT
+        image: norsknettarkiv/veidemann-controller:latest
         ports:
         - containerPort: 50051
         env:
@@ -485,7 +498,7 @@ spec:
         - name: log4j-config
           mountPath: /veidemann/config/log4j2.xml
           subPath: log4j2.xml
-      - image: jaegertracing/jaeger-agent:1.0.0
+      - image: jaegertracing/jaeger-agent:1.1.0
         name: jaeger-agent
         ports:
         - containerPort: 5775
@@ -503,7 +516,10 @@ spec:
       volumes:
       - name: log4j-config
         configMap:
-          name: log4j.conf
+          name: veidemann-properties
+          items:
+          - key: log4j2.xml
+            path: log4j2.xml
 
 ---
 # Veidemann Robots honoring service
@@ -576,7 +592,7 @@ spec:
         - name: log4j-config
           mountPath: /veidemann/config/log4j2.xml
           subPath: log4j2.xml
-      - image: jaegertracing/jaeger-agent:1.0.0
+      - image: jaegertracing/jaeger-agent:1.1.0
         name: jaeger-agent
         ports:
         - containerPort: 5775
@@ -594,7 +610,10 @@ spec:
       volumes:
       - name: log4j-config
         configMap:
-          name: log4j.conf
+          name: veidemann-properties
+          items:
+          - key: log4j2.xml
+            path: log4j2.xml
 
 ---
 # Veidemann DNS resolver service
@@ -670,7 +689,7 @@ spec:
         - name: log4j-config
           mountPath: /veidemann/config/log4j2.xml
           subPath: log4j2.xml
-      - image: jaegertracing/jaeger-agent:1.0.0
+      - image: jaegertracing/jaeger-agent:1.1.0
         name: jaeger-agent
         ports:
         - containerPort: 5775
@@ -688,7 +707,10 @@ spec:
       volumes:
       - name: log4j-config
         configMap:
-          name: log4j.conf
+          name: veidemann-properties
+          items:
+          - key: log4j2.xml
+            path: log4j2.xml
 
 ---
 # API Gateway
@@ -705,6 +727,7 @@ spec:
   ports:
   - port: 3010
     targetPort: 3010
+    nodePort: 30895
   selector:
     app: veidemann
     component: api-gateway
@@ -800,18 +823,15 @@ spec:
         imagePullPolicy: Always
         ports:
         - containerPort: 80
-        env:
-        - name: API_GATEWAY
-          value: "http://veidemann-api-gateway:3010/api"
-        - name: OPENID_CONNECT_ISSUER
-          valueFrom:
-            configMapKeyRef:
-              name: veidemann-properties
-              key: openid.connect.issuer
-        - name: OPENID_CONNECT_ISSUER_BACKEND
-          valueFrom:
-            configMapKeyRef:
-              name: veidemann-properties
-              key: openid.connect.issuer.backend
+        volumeMounts:
+        - name: config-volume
+          mountPath: /usr/share/nginx/html/veidemann/assets/config/
       restartPolicy: Always
       dnsPolicy: ClusterFirst
+      volumes:
+      - name: config-volume
+        configMap:
+          name: veidemann-properties
+          items:
+          - key: environment.json
+            path: environment.json

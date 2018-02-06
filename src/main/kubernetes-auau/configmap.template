@@ -1,15 +1,6 @@
 kind: ConfigMap
 apiVersion: v1
 metadata:
-  name: veidemann-properties
-data:
-  openid.connect.issuer: "http://${EXTERNAL_HOSTNAME}:32000/dex"
-
-----
-
-kind: ConfigMap
-apiVersion: v1
-metadata:
   name: dex-config
 data:
   config.yaml: |-
@@ -66,7 +57,7 @@ data:
     staticClients:
     - id: veidemann-gui
       redirectURIs:
-      - 'http://${EXTERNAL_HOSTNAME}:30890/activity'
+      - 'http://${EXTERNAL_HOSTNAME}:30890/veidemann/activity'
       name: 'Veidemann Admin GUI'
       secret: ZXhhbXBsZS1hcHAtc2VjcmV0
     - id: veidemann-cli

@@ -29,7 +29,6 @@ data:
     </Configuration>
   environment.json: |-
     {
-      "apiGateway": "http://veidemann-api-gateway:30895/api",
       "auth": {
         "issuer": "",
         "requireHttps": false

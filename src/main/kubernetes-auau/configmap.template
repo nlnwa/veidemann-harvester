@@ -7,7 +7,7 @@ data:
     # The base path of dex and the external name of the OpenID Connect service.
     # This is the canonical URL that all clients MUST use to refer to dex. If a
     # path is provided, dex's HTTP service will listen at a non-root URL.
-    issuer: https://${EXTERNAL_HOSTNAME}:32000/dex
+    issuer: http://${EXTERNAL_HOSTNAME}:32000/dex
 
     # The storage configuration determines where dex stores its state. Supported
     # options include SQL flavors and Kubernetes third party resources.
@@ -25,7 +25,8 @@ data:
     web:
       http: 0.0.0.0:5556
       allowedOrigins:
-      - 'http://${EXTERNAL_HOSTNAME}:30890'
+      - 'https://${EXTERNAL_HOSTNAME}'
+      - 'http://localhost:4200'
 
     # Uncomment this block to enable the gRPC API. This values MUST be different
     # from the HTTP endpoints.
@@ -57,7 +58,8 @@ data:
     staticClients:
     - id: veidemann-gui
       redirectURIs:
-      - 'http://${EXTERNAL_HOSTNAME}:30890/veidemann/activity'
+      - 'https://${EXTERNAL_HOSTNAME}/veidemann/activity'
+      - 'http://localhost:4200/activity'
       name: 'Veidemann Admin GUI'
       secret: ZXhhbXBsZS1hcHAtc2VjcmV0
     - id: veidemann-cli
@@ -78,7 +80,7 @@ data:
       config:
         issuer: ${PILT_ADDR}
         # Connector config values starting with a "$" will read from the environment.
-        redirectURI: https://${EXTERNAL_HOSTNAME}:32000/dex/callback
+        redirectURI: http://${EXTERNAL_HOSTNAME}:32000/dex/callback
 
     # Let dex keep a list of passwords which can be used to login to dex.
     enablePasswordDB: true

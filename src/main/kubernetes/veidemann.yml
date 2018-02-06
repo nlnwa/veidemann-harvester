@@ -8,7 +8,6 @@ metadata:
     role: config
 data:
   openid.connect.issuer: ""
-  openid.connect.issuer.backend: "http://dex:5556/veidemann/dex"
   jaeger.sampler.type: "probabilistic"
   jaeger.sampler.param: "0.1"
   log4j2.xml: |-
@@ -725,7 +724,8 @@ metadata:
     role: api-gateway
 spec:
   ports:
-  - port: 3010
+  - name: http
+    port: 3010
     targetPort: 3010
     nodePort: 30895
   selector:
@@ -786,7 +786,7 @@ metadata:
     role: admin
 spec:
   ports:
-  - name: gui
+  - name: http
     port: 80
     targetPort: 80
     nodePort: 30890

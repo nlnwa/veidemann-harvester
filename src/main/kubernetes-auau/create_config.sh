@@ -10,7 +10,7 @@ fi
 SCRIPT_DIR=$(dirname $0)
 cd $SCRIPT_DIR
 
-envsubst '${EXTERNAL_HOSTNAME} ${PILT_ADDR}' < configmap.template > configmap.yaml
+envsubst '${EXTERNAL_HOSTNAME} ${PILT_ADDR}' < configmap.template > configmap.yml
 
-kubectl apply -f configmap.yaml
+kubectl apply -f configmap.yml
 kubectl apply -f auau.yml

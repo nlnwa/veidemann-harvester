@@ -31,7 +31,9 @@ data:
     {
       "auth": {
         "issuer": "",
-        "requireHttps": false
+        "requireHttps": false,
+        "clientId": "veidemann-gui",
+        "scope": "openid profile email groups offline_access audience:server:client_id:veidemann-api"
       }
     }
 ---

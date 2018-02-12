@@ -19,7 +19,6 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.util.AttributeKey;
-import no.nb.nna.veidemann.commons.AlreadyCrawledCache;
 import no.nb.nna.veidemann.commons.client.ContentWriterClient;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.harvester.BrowserSessionRegistry;
@@ -46,14 +45,11 @@ public class RecorderFilterSourceAdapter extends HttpFiltersSourceAdapter {
 
     private final BrowserSessionRegistry sessionRegistry;
 
-    private final AlreadyCrawledCache cache;
-
     public RecorderFilterSourceAdapter(final DbAdapter db, final ContentWriterClient contentWriterClient,
-            final BrowserSessionRegistry sessionRegistry, final AlreadyCrawledCache cache) {
+            final BrowserSessionRegistry sessionRegistry) {
         this.db = db;
         this.contentWriterClient = contentWriterClient;
         this.sessionRegistry = sessionRegistry;
-        this.cache = cache;
     }
 
     @Override
@@ -73,10 +69,10 @@ public class RecorderFilterSourceAdapter extends HttpFiltersSourceAdapter {
 
         String connectedUrl = clientCtx.channel().attr(CONNECTED_URL).get();
         if (connectedUrl == null) {
-            return new RecorderFilter(uri, originalRequest, clientCtx, db, contentWriterClient, sessionRegistry, cache);
+            return new RecorderFilter(uri, originalRequest, clientCtx, db, contentWriterClient, sessionRegistry);
         }
         return new RecorderFilter(
-                connectedUrl + uri, originalRequest, clientCtx, db, contentWriterClient, sessionRegistry, cache);
+                connectedUrl + uri, originalRequest, clientCtx, db, contentWriterClient, sessionRegistry);
     }
 
 }

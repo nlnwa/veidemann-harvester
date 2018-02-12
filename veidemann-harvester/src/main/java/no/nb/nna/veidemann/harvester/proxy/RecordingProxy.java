@@ -15,14 +15,18 @@
  */
 package no.nb.nna.veidemann.harvester.proxy;
 
+import io.netty.handler.codec.http.HttpRequest;
 import net.lightbody.bmp.mitm.CertificateInfo;
 import net.lightbody.bmp.mitm.RootCertificateGenerator;
+import net.lightbody.bmp.mitm.TrustSource;
 import net.lightbody.bmp.mitm.keys.ECKeyGenerator;
 import net.lightbody.bmp.mitm.manager.ImpersonatingMitmManager;
-import no.nb.nna.veidemann.commons.AlreadyCrawledCache;
 import no.nb.nna.veidemann.commons.client.ContentWriterClient;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.harvester.BrowserSessionRegistry;
+import org.littleshoot.proxy.ChainedProxy;
+import org.littleshoot.proxy.ChainedProxyAdapter;
+import org.littleshoot.proxy.ChainedProxyManager;
 import org.littleshoot.proxy.HostResolver;
 import org.littleshoot.proxy.HttpProxyServer;
 import org.littleshoot.proxy.impl.DefaultHttpProxyServer;
@@ -32,8 +36,10 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.nio.file.Files;
 import java.util.Date;
+import java.util.Queue;
 
 /**
  * A Recording proxy.
@@ -44,7 +50,9 @@ public class RecordingProxy implements AutoCloseable {
 
     private final HttpProxyServer server;
 
-    private final AlreadyCrawledCache cache;
+    private final String cacheHost;
+
+    private final int cachePort;
 
     /**
      * Construct a new Recording Proxy.
@@ -55,11 +63,12 @@ public class RecordingProxy implements AutoCloseable {
      */
     public RecordingProxy(File workDir, int port, DbAdapter db, final ContentWriterClient contentWriterClient,
             final HostResolver hostResolver, BrowserSessionRegistry sessionRegistry,
-            AlreadyCrawledCache cache) throws IOException {
+            String cacheHost, int cachePort) throws IOException {
 
         LOG.info("Starting recording proxy listening on port {}.", port);
 
-        this.cache = cache;
+        this.cacheHost = cacheHost;
+        this.cachePort = cachePort;
 
         File certificateDir = new File(workDir, "certificates");
         Files.createDirectories(certificateDir.toPath());
@@ -71,22 +80,25 @@ public class RecordingProxy implements AutoCloseable {
                 .notBefore(new Date(System.currentTimeMillis() - 365L * 24L * 60L * 60L * 1000L))
                 .notAfter(new Date(System.currentTimeMillis() + 365L * 24L * 60L * 60L * 1000L));
 
-        File certFile = new File(certificateDir, "VeidemannCA.pem");
+        File genratedCertFile = new File(certificateDir, "VeidemannCA.pem");
+        File cacheCaCertFile = new File(certificateDir, "cache-selfsignedCA.crt");
 
         // create a dyamic CA root certificate generator using Elliptic Curve keys
-        RootCertificateGenerator ecRootCertGenerator = RootCertificateGenerator.builder()
+        RootCertificateGenerator certificateAndKeySource = RootCertificateGenerator.builder()
                 .certificateInfo(certInfo)
                 .keyGenerator(new ECKeyGenerator()) // use EC keys, instead of the default RSA
                 .build();
-
         // save the dynamically-generated CA root certificate for installation in a browser
-        ecRootCertGenerator.saveRootCertificateAsPemFile(certFile);
+        certificateAndKeySource.saveRootCertificateAsPemFile(genratedCertFile);
+
+        TrustSource trustSource = TrustSource.defaultTrustSource().add(cacheCaCertFile);
 
         // tell the MitmManager to use the root certificate we just generated, and to use EC keys when
         // creating impersonated server certs
         ImpersonatingMitmManager mitmManager = ImpersonatingMitmManager.builder()
-                .rootCertificateSource(ecRootCertGenerator)
+                .rootCertificateSource(certificateAndKeySource)
                 .serverKeyGenerator(new ECKeyGenerator())
+                .trustSource(trustSource)
                 .trustAllServers(true)
                 .build();
 
@@ -101,7 +113,19 @@ public class RecordingProxy implements AutoCloseable {
                 .withConnectTimeout(60000)
                 .withIdleConnectionTimeout(10)
                 .withThreadPoolConfiguration(new ThreadPoolConfiguration().withAcceptorThreads(4).withClientToProxyWorkerThreads(16).withProxyToServerWorkerThreads(16))
-                .withFiltersSource(new RecorderFilterSourceAdapter(db, contentWriterClient, sessionRegistry, cache))
+                .withFiltersSource(new RecorderFilterSourceAdapter(db, contentWriterClient, sessionRegistry))
+                .withChainProxyManager(new ChainedProxyManager() {
+                    @Override
+                    public void lookupChainedProxies(HttpRequest httpRequest, Queue<ChainedProxy> chainedProxies) {
+                        chainedProxies.add(new ChainedProxyAdapter() {
+                            @Override
+                            public InetSocketAddress getChainedProxyAddress() {
+                                return InetSocketAddress.createUnresolved(cacheHost, cachePort);
+                            }
+                        });
+//                        chainedProxies.add(FALLBACK_TO_DIRECT_CONNECTION);
+                    }
+                })
                 .start();
 
         LOG.info("Recording proxy started.");
@@ -111,10 +135,6 @@ public class RecordingProxy implements AutoCloseable {
     public void close() {
         LOG.info("Shutting down recording proxy.");
         server.stop();
-    }
-
-    public void cleanCache(String executionId) {
-        cache.cleanExecution(executionId);
     }
 
 }

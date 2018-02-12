@@ -30,7 +30,6 @@ import no.nb.nna.veidemann.commons.client.ContentWriterClient;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.util.ApiTools;
 import no.nb.nna.veidemann.harvester.BrowserSessionRegistry;
-import no.nb.nna.veidemann.harvester.proxy.InMemoryAlreadyCrawledCache;
 import no.nb.nna.veidemann.harvester.proxy.RecordingProxy;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -39,7 +38,6 @@ import org.mockito.invocation.InvocationOnMock;
 import org.netpreserve.commons.uri.UriConfigs;
 
 import java.io.File;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.file.Files;
@@ -137,7 +135,7 @@ public class BrowserControllerIT {
             Thread.sleep(1000);
 
             try (RecordingProxy proxy = new RecordingProxy(tmpDir, proxyPort, db, contentWriterClient,
-                    new TestHostResolver(), sessionRegistry, new InMemoryAlreadyCrawledCache());
+                    new TestHostResolver(), sessionRegistry, "", 0);
 
                  BrowserController controller = new BrowserController(browserHost, browserPort, db,
                          sessionRegistry);) {

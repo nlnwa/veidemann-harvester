@@ -62,6 +62,10 @@ func MarshalTable(w io.Writer, msg proto.Message) error {
 	}
 
 	tm.Println(table)
+	count := reflect.ValueOf(msg).Elem().FieldByName("Count")
+	if count.IsValid() {
+		tm.Println("Total: ", count)
+	}
 	tm.Flush()
 
 	return nil

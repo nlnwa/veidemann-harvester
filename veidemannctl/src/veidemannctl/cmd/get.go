@@ -28,6 +28,7 @@ import (
 
 var (
 	label  string
+	name  string
 	file   string
 	format string
 )
@@ -48,11 +49,17 @@ var getCmd = &cobra.Command{
   veidemannctl get seed -f yaml`,
 
 	Run: func(cmd *cobra.Command, args []string) {
-		if len(args) == 1 {
+		if len(args) > 0 && len(args) <= 2 {
 			client, conn := util.NewControllerClient()
 			defer conn.Close()
 
 			var selector *api.Selector
+			var id string
+
+			if len(args) == 2 {
+				id = args[1]
+				fmt.Println("ID: ", id)
+			}
 
 			if label != "" {
 				selector = util.CreateSelector(label)
@@ -61,7 +68,11 @@ var getCmd = &cobra.Command{
 			switch args[0] {
 			case "entity":
 				request := api.ListRequest{}
-				if selector != nil {
+				if id != "" {
+					request.Qry = &api.ListRequest_Id{id}
+				} else if name != "" {
+					request.Qry = &api.ListRequest_Name{name}
+				} else if selector != nil {
 					request.Qry = &api.ListRequest_Selector{selector}
 				}
 				request.Page = page
@@ -77,7 +88,11 @@ var getCmd = &cobra.Command{
 				}
 			case "seed":
 				request := api.SeedListRequest{}
-				if selector != nil {
+				if id != "" {
+					request.Qry = &api.SeedListRequest_Id{id}
+				} else if name != "" {
+					request.Qry = &api.SeedListRequest_Name{name}
+				} else if selector != nil {
 					request.Qry = &api.SeedListRequest_Selector{selector}
 				}
 				request.Page = page
@@ -93,7 +108,11 @@ var getCmd = &cobra.Command{
 				}
 			case "job":
 				request := api.CrawlJobListRequest{}
-				if selector != nil {
+				if id != "" {
+					request.Qry = &api.CrawlJobListRequest_Id{id}
+				} else if name != "" {
+					request.Qry = &api.CrawlJobListRequest_Name{name}
+				} else if selector != nil {
 					request.Qry = &api.CrawlJobListRequest_Selector{selector}
 				}
 				request.Page = page
@@ -109,7 +128,11 @@ var getCmd = &cobra.Command{
 				}
 			case "crawlconfig":
 				request := api.ListRequest{}
-				if selector != nil {
+				if id != "" {
+					request.Qry = &api.ListRequest_Id{id}
+				} else if name != "" {
+					request.Qry = &api.ListRequest_Name{name}
+				} else if selector != nil {
 					request.Qry = &api.ListRequest_Selector{selector}
 				}
 				request.Page = page
@@ -125,7 +148,11 @@ var getCmd = &cobra.Command{
 				}
 			case "schedule":
 				request := api.ListRequest{}
-				if selector != nil {
+				if id != "" {
+					request.Qry = &api.ListRequest_Id{id}
+				} else if name != "" {
+					request.Qry = &api.ListRequest_Name{name}
+				} else if selector != nil {
 					request.Qry = &api.ListRequest_Selector{selector}
 				}
 				request.Page = page
@@ -141,7 +168,11 @@ var getCmd = &cobra.Command{
 				}
 			case "browser":
 				request := api.ListRequest{}
-				if selector != nil {
+				if id != "" {
+					request.Qry = &api.ListRequest_Id{id}
+				} else if name != "" {
+					request.Qry = &api.ListRequest_Name{name}
+				} else if selector != nil {
 					request.Qry = &api.ListRequest_Selector{selector}
 				}
 				request.Page = page
@@ -157,7 +188,11 @@ var getCmd = &cobra.Command{
 				}
 			case "politeness":
 				request := api.ListRequest{}
-				if selector != nil {
+				if id != "" {
+					request.Qry = &api.ListRequest_Id{id}
+				} else if name != "" {
+					request.Qry = &api.ListRequest_Name{name}
+				} else if selector != nil {
 					request.Qry = &api.ListRequest_Selector{selector}
 				}
 				request.Page = page
@@ -173,7 +208,11 @@ var getCmd = &cobra.Command{
 				}
 			case "script":
 				request := api.BrowserScriptListRequest{}
-				if selector != nil {
+				if id != "" {
+					request.Qry = &api.BrowserScriptListRequest_Id{id}
+				} else if name != "" {
+					request.Qry = &api.BrowserScriptListRequest_Name{name}
+				} else if selector != nil {
 					request.Qry = &api.BrowserScriptListRequest_Selector{selector}
 				}
 				request.Page = page
@@ -189,7 +228,11 @@ var getCmd = &cobra.Command{
 				}
 			case "group":
 				request := api.ListRequest{}
-				if selector != nil {
+				if id != "" {
+					request.Qry = &api.ListRequest_Id{id}
+				} else if name != "" {
+					request.Qry = &api.ListRequest_Name{name}
+				} else if selector != nil {
 					request.Qry = &api.ListRequest_Selector{selector}
 				}
 				request.Page = page
@@ -261,7 +304,8 @@ func init() {
 
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
-	getCmd.PersistentFlags().StringVarP(&label, "label", "l", "", "List objects by label")
+	getCmd.PersistentFlags().StringVarP(&label, "label", "l", "", "List objects by label (<type>=<value> | <value>)")
+	getCmd.PersistentFlags().StringVarP(&name, "name", "n", "", "List objects by name")
 	getCmd.PersistentFlags().StringVarP(&format, "format", "f", "table", "Output format (table|json|yaml)")
 	getCmd.PersistentFlags().StringVarP(&file, "output", "o", "", "File name to write to")
 	getCmd.PersistentFlags().Int32VarP(&pageSize, "pagesize", "s", 10, "Number of objects to get")

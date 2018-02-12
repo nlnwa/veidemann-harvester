@@ -9,7 +9,7 @@ spec:
     spec:
       containers:
       - name: initdb
-        image: norsknettarkiv/veidemann-db-initializer:1.0.0-SNAPSHOT
+        image: norsknettarkiv/veidemann-db-initializer:latest
         env:
         - name: DB_HOST
           value: "rethink"

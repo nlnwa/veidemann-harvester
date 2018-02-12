@@ -1,0 +1,16 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: ingress
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /veidemann
+        backend:
+          serviceName: veidemann-admin
+          servicePort: http
+      - path: /api
+        backend:
+          serviceName: veidemann-api-gateway
+          servicePort: http

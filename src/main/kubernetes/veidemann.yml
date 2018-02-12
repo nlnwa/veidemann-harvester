@@ -1,7 +1,15 @@
 # Veidemann app for Kubernetes
 kind: ConfigMap
 apiVersion: v1
+metadata:
+  name: veidemann-properties
+  labels:
+    app: veidemann
+    role: config
 data:
+  openid.connect.issuer: ""
+  jaeger.sampler.type: "probabilistic"
+  jaeger.sampler.param: "0.1"
   log4j2.xml: |-
     <?xml version="1.0" encoding="UTF-8"?>
     <Configuration status="WARN" monitorInterval="0">
@@ -19,11 +27,15 @@ data:
             </Root>
         </Loggers>
     </Configuration>
-metadata:
-  name: log4j.conf
-  labels:
-    tier: backend
-    role: config
+  environment.json: |-
+    {
+      "auth": {
+        "issuer": "",
+        "requireHttps": false,
+        "clientId": "veidemann-gui",
+        "scope": "openid profile email groups offline_access audience:server:client_id:veidemann-api"
+      }
+    }
 ---
 # Harvester (proxy and browser)
 apiVersion: v1
@@ -31,12 +43,13 @@ kind: Service
 metadata:
   name: veidemann-harvester
   labels:
-    app: harvester
+    app: veidemann
+    component: harvester
     tier: backend
     role: worker
 spec:
   ports:
-  - name: harvester-api
+  - name: grpc
     port: 9090
     targetPort: api
   - name: harvester-proxy
@@ -46,42 +59,54 @@ spec:
     port: 9222
     targetPort: debug
   selector:
-    app: harvester
+    app: veidemann
+    component: harvester
     tier: backend
     role: worker
   type: NodePort
 ---
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: veidemann-harvester
 spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: veidemann
+      component: harvester
+      tier: backend
+      role: worker
   template:
     metadata:
       labels:
-        app: harvester
+        app: veidemann
+        component: harvester
         tier: backend
         role: worker
     spec:
       containers:
       - name: browser
-        image: norsknettarkiv/chrome-headless:64.0.3269.3
+        image: norsknettarkiv/chrome-headless:65.0.3322.3
         ports:
         - name: debug
           containerPort: 9222
         env:
         - name: CHROME_OPTS
-          value: "--proxy-server=localhost:8080 --ignore-certificate-errors --disable-web-security --allow-running-insecure-content"
-          # --dbus-stub --deterministic-fetch
+          value: "--proxy-server=localhost:8080 --hide-scrollbars"
+          # --disable-backgrond-networking
           # --disable-background-networking
         volumeMounts:
         - mountPath: /data
           name: workdir
+        - mountPath: /dev/shm
+          name: dshm
         resources:
             requests:
                 memory: "500Mi"
       - name: proxy
-        image: norsknettarkiv/veidemann-harvester:1.0.0-SNAPSHOT
+        image: norsknettarkiv/veidemann-harvester:latest
+        imagePullPolicy: Always
         ports:
         - name: proxy
           containerPort: 8080
@@ -99,21 +124,33 @@ spec:
         - name: CONTENT_WRITER_HOST
           value: "veidemann-contentwriter"
         - name: CONTENT_WRITER_PORT
-          value: "8080"
+          value: "8082"
         - name: DNS_RESOLVER_HOST
           value: "veidemann-dnsresolver"
         - name: DNS_RESOLVER_PORT
           value: "50052"
+        - name: MAX_CACHE_OBJECT_SIZE
+          value: 1B
+        - name: JAEGER_SAMPLER_TYPE
+          valueFrom:
+            configMapKeyRef:
+              name: veidemann-properties
+              key: jaeger.sampler.type
+        - name: JAEGER_SAMPLER_PARAM
+          valueFrom:
+            configMapKeyRef:
+              name: veidemann-properties
+              key: jaeger.sampler.param
         volumeMounts:
         - mountPath: /workdir
           name: workdir
         - name: log4j-config
-          mountPath: /veidemann-harvester/config/log4j2.xml
+          mountPath: /veidemann/config/log4j2.xml
           subPath: log4j2.xml
         resources:
             requests:
                 memory: "500Mi"
-      - image: jaegertracing/jaeger-agent:0.9.0
+      - image: jaegertracing/jaeger-agent:1.1.0
         name: jaeger-agent
         ports:
         - containerPort: 5775
@@ -129,11 +166,17 @@ spec:
       restartPolicy: Always
       dnsPolicy: ClusterFirst
       volumes:
-      - emptyDir: {}
-        name: workdir
+      - name: workdir
+        emptyDir: {}
       - name: log4j-config
         configMap:
-          name: log4j.conf
+          name: veidemann-properties
+          items:
+          - key: log4j2.xml
+            path: log4j2.xml
+      - name: dshm
+        emptyDir:
+          medium: Memory
 ---
 # Content writer
 apiVersion: v1
@@ -141,61 +184,94 @@ kind: Service
 metadata:
   name: veidemann-contentwriter
   labels:
-    app: contentwriter
+    app: veidemann
+    component: contentwriter
     tier: backend
     role: worker
 spec:
   ports:
-  - name: api
-    port: 8080
-    targetPort: 8080
+  - name: grpc
+    port: 8082
+    targetPort: 8082
     nodePort: 31575
   - name: explorer
     port: 8081
     targetPort: 8081
     nodePort: 31576
   selector:
-    app: contentwriter
+    app: veidemann
+    component: contentwriter
     tier: backend
     role: worker
   type: NodePort
 ---
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: veidemann-contentwriter
 spec:
   replicas: 1
+  selector:
+    matchLabels:
+      app: veidemann
+      component: contentwriter
+      tier: backend
+      role: worker
   template:
     metadata:
       labels:
-        app: contentwriter
+        app: veidemann
+        component: contentwriter
         tier: backend
         role: worker
     spec:
       containers:
       - name: contentwriter
-        image: norsknettarkiv/veidemann-contentwriter:1.0.0-SNAPSHOT
+        image: norsknettarkiv/veidemann-contentwriter:latest
+        imagePullPolicy: Always
         ports:
-        - containerPort: 8080
+        - containerPort: 8082
         env:
+        - name: API_PORT
+          value: "8082"
+        - name: HOST_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: WARC_WRITER_POOL_SIZE
+          value: "6"
+        - name: WARC_SIZE
+          value: "1GiB"
+        - name: WARC_COMPRESS
+          value: "true"
         - name: DB_HOST
           value: "rethink"
         - name: DB_PORT
           value: "28015"
+        - name: JAEGER_SAMPLER_TYPE
+          valueFrom:
+            configMapKeyRef:
+              name: veidemann-properties
+              key: jaeger.sampler.type
+        - name: JAEGER_SAMPLER_PARAM
+          valueFrom:
+            configMapKeyRef:
+              name: veidemann-properties
+              key: jaeger.sampler.param
         volumeMounts:
         - mountPath: /workdir
           name: workdir
         - mountPath: /warcs
           name: warcs
         - name: log4j-config
-          mountPath: /veidemann-contentwriter/config/log4j2.xml
+          mountPath: /veidemann/config/log4j2.xml
           subPath: log4j2.xml
         resources:
             requests:
                 memory: "1Gi"
       - name: contentexplorer
-        image: norsknettarkiv/veidemann-contentexplorer:1.0.0-SNAPSHOT
+        image: norsknettarkiv/veidemann-contentexplorer:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 8081
         env:
@@ -203,15 +279,25 @@ spec:
           value: "rethink"
         - name: DB_PORT
           value: "28015"
+        - name: JAEGER_SAMPLER_TYPE
+          valueFrom:
+            configMapKeyRef:
+              name: veidemann-properties
+              key: jaeger.sampler.type
+        - name: JAEGER_SAMPLER_PARAM
+          valueFrom:
+            configMapKeyRef:
+              name: veidemann-properties
+              key: jaeger.sampler.param
         volumeMounts:
         - mountPath: /workdir
           name: workdir
         - mountPath: /warcs
           name: warcs
         - name: log4j-config
-          mountPath: /veidemann-contentwriter/config/log4j2.xml
+          mountPath: /veidemann/config/log4j2.xml
           subPath: log4j2.xml
-      - image: jaegertracing/jaeger-agent:0.9.0
+      - image: jaegertracing/jaeger-agent:1.1.0
         name: jaeger-agent
         ports:
         - containerPort: 5775
@@ -227,14 +313,16 @@ spec:
       restartPolicy: Always
       dnsPolicy: ClusterFirst
       volumes:
-      - emptyDir: {}
-        name: workdir
+      - name: workdir
+        emptyDir: {}
       - name: warcs
-        persistentVolumeClaim:
-          claimName: warc-data-claim
+        emptyDir: {}
       - name: log4j-config
         configMap:
-          name: log4j.conf
+          name: veidemann-properties
+          items:
+          - key: log4j2.xml
+            path: log4j2.xml
 
 ---
 # Frontier
@@ -243,36 +331,46 @@ kind: Service
 metadata:
   name: veidemann-frontier
   labels:
-    app: frontier
+    app: veidemann
+    component: frontier
     tier: backend
     role: worker
 spec:
   ports:
-  - name: api
+  - name: grpc
     port: 7700
     targetPort: 7700
   selector:
-    app: frontier
+    app: veidemann
+    component: frontier
     tier: backend
     role: worker
   type: NodePort
 ---
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: veidemann-frontier
 spec:
   replicas: 1
+  selector:
+    matchLabels:
+      app: veidemann
+      component: frontier
+      tier: backend
+      role: worker
   template:
     metadata:
       labels:
-        app: frontier
+        app: veidemann
+        component: frontier
         tier: backend
         role: worker
     spec:
       containers:
       - name: frontier
-        image: norsknettarkiv/veidemann-frontier:1.0.0-SNAPSHOT
+        image: norsknettarkiv/veidemann-frontier:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 7700
         env:
@@ -287,7 +385,7 @@ spec:
         - name: ROBOTS_EVALUATOR_HOST
           value: "veidemann-robots"
         - name: ROBOTS_EVALUATOR_PORT
-          value: "50052"
+          value: "50053"
         - name: DNS_RESOLVER_HOST
           value: "veidemann-dnsresolver"
         - name: DNS_RESOLVER_PORT
@@ -296,9 +394,9 @@ spec:
         - mountPath: /workdir
           name: workdir
         - name: log4j-config
-          mountPath: /veidemann-frontier/config/log4j2.xml
+          mountPath: /veidemann/config/log4j2.xml
           subPath: log4j2.xml
-      - image: jaegertracing/jaeger-agent:0.9.0
+      - image: jaegertracing/jaeger-agent:1.1.0
         name: jaeger-agent
         ports:
         - containerPort: 5775
@@ -314,11 +412,14 @@ spec:
       restartPolicy: Always
       dnsPolicy: ClusterFirst
       volumes:
-      - emptyDir: {}
-        name: workdir
+      - name: workdir
+        emptyDir: {}
       - name: log4j-config
         configMap:
-          name: log4j.conf
+          name: veidemann-properties
+          items:
+          - key: log4j2.xml
+            path: log4j2.xml
 
 ---
 # Controller
@@ -327,37 +428,46 @@ kind: Service
 metadata:
   name: veidemann-controller
   labels:
-    app: controller
+    app: veidemann
+    component: controller
     tier: backend
     role: master
 spec:
   ports:
-  - name: api
+  - name: grpc
     port: 50051
     targetPort: 50051
     nodePort: 30891
   selector:
-    app: controller
+    app: veidemann
+    component: controller
     tier: backend
     role: master
   type: NodePort
 ---
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: veidemann-controller
 spec:
   replicas: 1
+  selector:
+    matchLabels:
+      app: veidemann
+      component: controller
+      tier: backend
+      role: master
   template:
     metadata:
       labels:
-        app: controller
+        app: veidemann
+        component: controller
         tier: backend
         role: master
     spec:
       containers:
       - name: controller
-        image: norsknettarkiv/veidemann-controller:1.0.0-SNAPSHOT
+        image: norsknettarkiv/veidemann-controller:latest
         ports:
         - containerPort: 50051
         env:
@@ -372,13 +482,23 @@ spec:
         - name: OPENID_CONNECT_ISSUER
           valueFrom:
             configMapKeyRef:
-              name: veidemann-config
+              name: veidemann-properties
               key: openid.connect.issuer
+        - name: JAEGER_SAMPLER_TYPE
+          valueFrom:
+            configMapKeyRef:
+              name: veidemann-properties
+              key: jaeger.sampler.type
+        - name: JAEGER_SAMPLER_PARAM
+          valueFrom:
+            configMapKeyRef:
+              name: veidemann-properties
+              key: jaeger.sampler.param
         volumeMounts:
         - name: log4j-config
-          mountPath: /veidemann-controller/config/log4j2.xml
+          mountPath: /veidemann/config/log4j2.xml
           subPath: log4j2.xml
-      - image: jaegertracing/jaeger-agent:0.9.0
+      - image: jaegertracing/jaeger-agent:1.1.0
         name: jaeger-agent
         ports:
         - containerPort: 5775
@@ -396,7 +516,10 @@ spec:
       volumes:
       - name: log4j-config
         configMap:
-          name: log4j.conf
+          name: veidemann-properties
+          items:
+          - key: log4j2.xml
+            path: log4j2.xml
 
 ---
 # Veidemann Robots honoring service
@@ -405,38 +528,47 @@ kind: Service
 metadata:
   name: veidemann-robots
   labels:
-    app: robots
+    app: veidemann
+    component: robots
     tier: backend
     role: worker
 spec:
   ports:
-  - name: api
-    port: 50052
-    targetPort: 50052
+  - name: grpc
+    port: 50053
+    targetPort: 50053
   selector:
-    app: robots
+    app: veidemann
+    component: robots
     tier: backend
     role: worker
   type: NodePort
 ---
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: veidemann-robots
 spec:
   replicas: 1
+  selector:
+    matchLabels:
+      app: veidemann
+      component: robots
+      tier: backend
+      role: worker
   template:
     metadata:
       labels:
-        app: robots
+        app: veidemann
+        component: robots
         tier: backend
         role: worker
     spec:
       containers:
       - name: robots
-        image: norsknettarkiv/veidemann-robotsevaluator-service:1.0.0-SNAPSHOT
+        image: norsknettarkiv/veidemann-robotsevaluator-service:latest
         ports:
-        - containerPort: 50052
+        - containerPort: 50053
         env:
         - name: DB_HOST
           value: "rethink"
@@ -446,11 +578,21 @@ spec:
           value: "veidemann-harvester"
         - name: PROXY_PORT
           value: "8080"
+        - name: JAEGER_SAMPLER_TYPE
+          valueFrom:
+            configMapKeyRef:
+              name: veidemann-properties
+              key: jaeger.sampler.type
+        - name: JAEGER_SAMPLER_PARAM
+          valueFrom:
+            configMapKeyRef:
+              name: veidemann-properties
+              key: jaeger.sampler.param
         volumeMounts:
         - name: log4j-config
-          mountPath: /veidemann-robotsevaluator-service/config/log4j2.xml
+          mountPath: /veidemann/config/log4j2.xml
           subPath: log4j2.xml
-      - image: jaegertracing/jaeger-agent:0.9.0
+      - image: jaegertracing/jaeger-agent:1.1.0
         name: jaeger-agent
         ports:
         - containerPort: 5775
@@ -468,7 +610,10 @@ spec:
       volumes:
       - name: log4j-config
         configMap:
-          name: log4j.conf
+          name: veidemann-properties
+          items:
+          - key: log4j2.xml
+            path: log4j2.xml
 
 ---
 # Veidemann DNS resolver service
@@ -477,36 +622,46 @@ kind: Service
 metadata:
   name: veidemann-dnsresolver
   labels:
-    app: dnsresolver
+    app: veidemann
+    component: dnsresolver
     tier: backend
     role: worker
 spec:
   ports:
-  - name: api
+  - name: grpc
     port: 50052
     targetPort: 50052
   selector:
-    app: dnsresolver
+    app: veidemann
+    component: dnsresolver
     tier: backend
     role: worker
   type: NodePort
 ---
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: veidemann-dnsresolver
 spec:
   replicas: 1
+  selector:
+    matchLabels:
+      app: veidemann
+      component: dnsresolver
+      tier: backend
+      role: worker
   template:
     metadata:
       labels:
-        app: dnsresolver
+        app: veidemann
+        component: dnsresolver
         tier: backend
         role: worker
     spec:
       containers:
-      - name: robots
-        image: norsknettarkiv/veidemann-dnsresolver:1.0.0-SNAPSHOT
+      - name: dnsresolver
+        image: norsknettarkiv/veidemann-dnsresolver:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 50052
         env:
@@ -516,16 +671,25 @@ spec:
           value: "28015"
         - name: CONTENT_WRITER_HOST
           value: "veidemann-contentwriter"
-
         - name: CONTENT_WRITER_PORT
-          value: "8080"
+          value: "8082"
         - name: DNS_SERVER
           value: "8.8.8.8"
+        - name: JAEGER_SAMPLER_TYPE
+          valueFrom:
+            configMapKeyRef:
+              name: veidemann-properties
+              key: jaeger.sampler.type
+        - name: JAEGER_SAMPLER_PARAM
+          valueFrom:
+            configMapKeyRef:
+              name: veidemann-properties
+              key: jaeger.sampler.param
         volumeMounts:
         - name: log4j-config
-          mountPath: /veidemann-dnsresolver/config/log4j2.xml
+          mountPath: /veidemann/config/log4j2.xml
           subPath: log4j2.xml
-      - image: jaegertracing/jaeger-agent:0.9.0
+      - image: jaegertracing/jaeger-agent:1.1.0
         name: jaeger-agent
         ports:
         - containerPort: 5775
@@ -543,7 +707,10 @@ spec:
       volumes:
       - name: log4j-config
         configMap:
-          name: log4j.conf
+          name: veidemann-properties
+          items:
+          - key: log4j2.xml
+            path: log4j2.xml
 
 ---
 # API Gateway
@@ -552,40 +719,58 @@ kind: Service
 metadata:
   name: veidemann-api-gateway
   labels:
-    app: api-gateway
+    app: veidemann
+    component: api-gateway
     tier: frontend
     role: api-gateway
 spec:
   ports:
-  - port: 3010
+  - name: http
+    port: 3010
     targetPort: 3010
+    nodePort: 30895
   selector:
-    app: api-gateway
+    app: veidemann
+    component: api-gateway
     tier: frontend
     role: api-gateway
   type: NodePort
 ---
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: veidemann-api-gateway
 spec:
   replicas: 1
+  selector:
+    matchLabels:
+      app: veidemann
+      component: api-gateway
+      tier: frontend
+      role: api-gateway
   template:
     metadata:
       labels:
-        app: api-gateway
+        app: veidemann
+        component: api-gateway
         tier: frontend
         role: api-gateway
     spec:
       containers:
       - name: api-gateway
-        image: norsknettarkiv/veidemann-api-gateway
+        image: norsknettarkiv/veidemann-api-gateway:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 3010
         env:
         - name: GRPC_CONTROLLER
           value: "veidemann-controller:50051"
+        livenessProbe:
+          httpGet:
+            path: /api/healthz
+            port: 3010
+          initialDelaySeconds: 10
+          periodSeconds: 10
       restartPolicy: Always
       dnsPolicy: ClusterFirst
 
@@ -596,58 +781,58 @@ kind: Service
 metadata:
   name: veidemann-admin
   labels:
-    app: admin
+    app: veidemann
+    component: admin
     tier: frontend
     role: admin
 spec:
   ports:
-  - name: gui
+  - name: http
     port: 80
     targetPort: 80
     nodePort: 30890
   selector:
-    app: admin
+    app: veidemann
+    component: admin
     tier: frontend
     role: admin
   type: NodePort
 ---
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: veidemann-admin
 spec:
   replicas: 1
+  selector:
+    matchLabels:
+      app: veidemann
+      component: admin
+      tier: frontend
+      role: admin
   template:
     metadata:
       labels:
-        app: admin
+        app: veidemann
+        component: admin
         tier: frontend
         role: admin
     spec:
       containers:
       - name: admin
-        image: norsknettarkiv/veidemann-gui
+        image: norsknettarkiv/veidemann-gui:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 80
-        env:
-        - name: PROXY_ADDR
-          value: "veidemann-api-gateway:3010"
-        - name: OPENID_CONNECT_ISSUER
-          valueFrom:
-            configMapKeyRef:
-              name: veidemann-config
-              key: openid.connect.issuer
+        volumeMounts:
+        - name: config-volume
+          mountPath: /usr/share/nginx/html/veidemann/assets/config/
       restartPolicy: Always
       dnsPolicy: ClusterFirst
----
-kind: PersistentVolumeClaim
-apiVersion: v1
-metadata:
-  name: warc-data-claim
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 5Gi
-  storageClassName: gluster-heketi
+      volumes:
+      - name: config-volume
+        configMap:
+          name: veidemann-properties
+          items:
+          - key: environment.json
+            path: environment.json

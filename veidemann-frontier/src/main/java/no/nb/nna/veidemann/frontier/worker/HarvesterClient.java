@@ -15,25 +15,27 @@
  */
 package no.nb.nna.veidemann.frontier.worker;
 
-import java.time.Duration;
-import java.util.concurrent.TimeUnit;
-
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
+import io.grpc.stub.StreamObserver;
 import io.opentracing.contrib.ClientTracingInterceptor;
 import io.opentracing.util.GlobalTracer;
+import no.nb.nna.veidemann.api.ConfigProto.CrawlConfig;
 import no.nb.nna.veidemann.api.HarvesterGrpc;
 import no.nb.nna.veidemann.api.HarvesterGrpc.HarvesterBlockingStub;
 import no.nb.nna.veidemann.api.HarvesterGrpc.HarvesterStub;
 import no.nb.nna.veidemann.api.HarvesterProto.CleanupExecutionRequest;
 import no.nb.nna.veidemann.api.HarvesterProto.HarvestPageReply;
 import no.nb.nna.veidemann.api.HarvesterProto.HarvestPageRequest;
-import no.nb.nna.veidemann.api.ConfigProto.CrawlConfig;
 import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.time.Duration;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 /**
  *
@@ -68,7 +70,7 @@ public class HarvesterClient implements AutoCloseable {
         return this;
     }
 
-    public HarvestPageReply fetchPage(QueuedUri qUri, CrawlConfig config) {
+    public CompletableFuture<HarvestPageReply> fetchPage(QueuedUri qUri, CrawlConfig config) {
         if (qUri.getExecutionId().isEmpty()) {
             throw new IllegalArgumentException("A queued URI must have the execution ID set.");
         }
@@ -77,34 +79,55 @@ public class HarvesterClient implements AutoCloseable {
                 .setQueuedUri(qUri)
                 .setCrawlConfig(config)
                 .build();
-        HarvestPageReply reply = null;
 
-        boolean shouldFetch = true;
+        CompletableFuture<HarvestPageReply> result = new CompletableFuture<>();
+
         long start = System.currentTimeMillis();
 
-        while (shouldFetch) {
-            try {
-                reply =  blockingStub.harvestPage(request);
-                shouldFetch = false;
-            } catch (StatusRuntimeException ex) {
-                if (Status.RESOURCE_EXHAUSTED.getCode().equals(ex.getStatus().getCode())) {
-                    if (System.currentTimeMillis() - start > maxWaitForExhaustedHarvesterMs) {
-                        LOG.info("Harvester was exhausted for {}ms giving up", (System.currentTimeMillis() - start));
-                        throw ex;
+        innerFetchPage(request, result, start);
+
+        return result;
+    }
+
+    private void innerFetchPage(HarvestPageRequest request, CompletableFuture<HarvestPageReply> result, long start) {
+        asyncStub.harvestPage(request, new StreamObserver<HarvestPageReply>() {
+            HarvestPageReply reply;
+
+            @Override
+            public void onNext(HarvestPageReply value) {
+                reply = value;
+            }
+
+            @Override
+            public void onError(Throwable t) {
+                if (t instanceof StatusRuntimeException) {
+                    StatusRuntimeException ex = (StatusRuntimeException) t;
+                    if (Status.RESOURCE_EXHAUSTED.getCode().equals(ex.getStatus().getCode())) {
+                        if (System.currentTimeMillis() - start > maxWaitForExhaustedHarvesterMs) {
+                            LOG.info("Harvester was exhausted for {}ms giving up", (System.currentTimeMillis() - start));
+                            result.completeExceptionally(t);
+                        } else {
+                            LOG.debug("Harvester was exhausted, will retry in one second: {}", ex.getStatus());
+                            try {
+                                Thread.sleep(1000);
+                                innerFetchPage(request, result, start);
+                            } catch (InterruptedException e) {
+                                LOG.error("RPC was interrupted", e);
+                                result.completeExceptionally(t);
+                            }
+                        }
+                    } else {
+                        LOG.error("RPC failed: " + ex.getStatus(), ex);
+                        result.completeExceptionally(t);
                     }
-                    LOG.debug("Harvester was exhausted, will retry in one second: {}", ex.getStatus());
-                    try {
-                        Thread.sleep(1000);
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
-                    }
-                } else {
-                    LOG.error("RPC failed: " + ex.getStatus(), ex);
-                    throw ex;
                 }
             }
-        }
-        return reply;
+
+            @Override
+            public void onCompleted() {
+                result.complete(reply);
+            }
+        });
     }
 
     public void cleanupExecution(String executionId) {

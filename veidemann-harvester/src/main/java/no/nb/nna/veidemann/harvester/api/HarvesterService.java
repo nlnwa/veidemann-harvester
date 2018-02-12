@@ -29,6 +29,7 @@ import no.nb.nna.veidemann.harvester.browsercontroller.BrowserController;
 import no.nb.nna.veidemann.harvester.proxy.RecordingProxy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 /**
  *
@@ -49,6 +50,9 @@ public class HarvesterService extends HarvesterGrpc.HarvesterImplBase {
     @Override
     public void harvestPage(HarvestPageRequest request, StreamObserver<HarvestPageReply> respObserver) {
         QueuedUri fetchUri = request.getQueuedUri();
+        MDC.put("eid", fetchUri.getExecutionId());
+        MDC.put("uri", fetchUri.getUri());
+
         try {
             HarvestPageReply reply = controller.render(fetchUri, request.getCrawlConfig());
 

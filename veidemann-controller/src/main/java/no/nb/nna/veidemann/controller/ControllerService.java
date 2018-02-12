@@ -475,14 +475,18 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
                     .setId(request.getJobId())
                     .setExpand(true)
                     .build();
-            SeedListRequest seedRequest;
 
             for (CrawlJob job : db.listCrawlJobs(jobRequest).getValueList()) {
                 LOG.info("Job '{}' starting", job.getMeta().getName());
 
+                SeedListRequest seedRequest;
+                int page = 0;
+
                 if (request.getSeedId().isEmpty()) {
                     seedRequest = SeedListRequest.newBuilder()
                             .setCrawlJobId(job.getId())
+                            .setPageSize(100)
+                            .setPage(page)
                             .build();
                 } else {
                     seedRequest = SeedListRequest.newBuilder()
@@ -490,13 +494,18 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
                             .build();
                 }
 
-                for (Seed seed : db.listSeeds(seedRequest).getValueList()) {
-                    if (!seed.getDisabled()) {
-                        if (LOG.isInfoEnabled()) {
-                            LOG.info("Start harvest of: {}", seed.getMeta().getName());
-                            reply.addSeedExecutionId(frontierClient.crawlSeed(job, seed).getId());
+                SeedListReply seedList = db.listSeeds(seedRequest);
+                while (seedList.getValueCount() > 0) {
+                    for (Seed seed : seedList.getValueList()) {
+                        if (!seed.getDisabled()) {
+                            if (LOG.isInfoEnabled()) {
+                                LOG.info("Start harvest of: {}", seed.getMeta().getName());
+                                reply.addSeedExecutionId(frontierClient.crawlSeed(job, seed).getId());
+                            }
                         }
                     }
+                    seedRequest = seedRequest.toBuilder().setPage(++page).build();
+                    seedList = db.listSeeds(seedRequest);
                 }
                 LOG.info("All seeds for job '{}' started", job.getMeta().getName());
             }

@@ -15,19 +15,18 @@
  */
 package no.nb.nna.veidemann.frontier.worker;
 
-import java.net.URISyntaxException;
-import java.util.concurrent.TimeUnit;
-
-import no.nb.nna.veidemann.commons.client.DnsServiceClient;
-import no.nb.nna.veidemann.commons.client.RobotsServiceClient;
-import no.nb.nna.veidemann.db.ProtoUtils;
-import no.nb.nna.veidemann.db.RethinkDbAdapter;
 import no.nb.nna.veidemann.api.ConfigProto.CrawlJob;
 import no.nb.nna.veidemann.api.ConfigProto.Seed;
 import no.nb.nna.veidemann.api.MessagesProto;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus;
+import no.nb.nna.veidemann.commons.client.DnsServiceClient;
+import no.nb.nna.veidemann.commons.client.RobotsServiceClient;
+import no.nb.nna.veidemann.db.ProtoUtils;
+import no.nb.nna.veidemann.db.RethinkDbAdapter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.net.URISyntaxException;
 
 /**
  *
@@ -51,7 +50,7 @@ public class Frontier implements AutoCloseable {
         this.harvesterClient = harvesterClient;
         this.robotsServiceClient = robotsServiceClient;
         this.dnsServiceClient = dnsServiceClient;
-        this.queueWorker = new QueueWorker(this, 5);
+        this.queueWorker = new QueueWorker(this);
     }
 
     public CrawlExecutionStatus scheduleSeed(final CrawlJob job, final Seed seed) {
@@ -127,12 +126,6 @@ public class Frontier implements AutoCloseable {
 
     @Override
     public void close() {
-        try {
-            queueWorker.shutdown();
-            queueWorker.awaitTermination(60, TimeUnit.SECONDS);
-        } catch (InterruptedException ex) {
-            throw new RuntimeException(ex);
-        }
     }
 
 }

@@ -113,7 +113,7 @@ public class RecordingProxy implements AutoCloseable {
                 .withConnectTimeout(60000)
                 .withIdleConnectionTimeout(10)
                 .withThreadPoolConfiguration(new ThreadPoolConfiguration().withAcceptorThreads(4).withClientToProxyWorkerThreads(16).withProxyToServerWorkerThreads(16))
-                .withFiltersSource(new RecorderFilterSourceAdapter(db, contentWriterClient, sessionRegistry))
+                .withFiltersSource(new RecorderFilterSourceAdapter(db, contentWriterClient, sessionRegistry, hostResolver))
                 .withChainProxyManager(new ChainedProxyManager() {
                     @Override
                     public void lookupChainedProxies(HttpRequest httpRequest, Queue<ChainedProxy> chainedProxies) {

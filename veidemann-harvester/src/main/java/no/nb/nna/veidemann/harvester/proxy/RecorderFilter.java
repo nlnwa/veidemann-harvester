@@ -44,6 +44,7 @@ import no.nb.nna.veidemann.db.ProtoUtils;
 import no.nb.nna.veidemann.harvester.BrowserSessionRegistry;
 import no.nb.nna.veidemann.harvester.browsercontroller.BrowserSession;
 import no.nb.nna.veidemann.harvester.browsercontroller.CrawlLogRegistry;
+import org.littleshoot.proxy.HostResolver;
 import org.littleshoot.proxy.HttpFiltersAdapter;
 import org.littleshoot.proxy.impl.ProxyUtils;
 import org.netpreserve.commons.uri.Uri;
@@ -96,13 +97,15 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
 
     private final ContentWriterClient contentWriterClient;
 
+    private final HostResolver hostResolver;
+
     private ContentWriterSession contentWriterSession;
 
     private boolean foundInCache = false;
 
     public RecorderFilter(final String uri, final HttpRequest originalRequest, final ChannelHandlerContext ctx,
                           final DbAdapter db, final ContentWriterClient contentWriterClient,
-                          final BrowserSessionRegistry sessionRegistry) {
+                          final BrowserSessionRegistry sessionRegistry, final HostResolver hostResolver) {
 
         super(originalRequest, ctx);
         this.db = db;
@@ -112,6 +115,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
         this.requestCollector = new ContentCollector(0, ContentWriterProto.RecordType.REQUEST, uri, db);
         this.responseCollector = new ContentCollector(1, ContentWriterProto.RecordType.RESPONSE, uri, db);
         this.sessionRegistry = sessionRegistry;
+        this.hostResolver = hostResolver;
         this.fetchTimeStamp = ProtoUtils.getNowTs();
     }
 
@@ -134,6 +138,9 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                     return new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_GATEWAY);
                 }
 
+                Uri parsedUri = UriConfigs.WHATWG.buildUri(uri);
+                resolvedRemoteAddress = hostResolver.resolve(parsedUri.getHost(), parsedUri.getDecodedPort());
+
                 // Lookup browser session, but skip if it is a robots.txt request since that is not coming from browser.
                 if (!uri.endsWith("robots.txt")) {
                     browserSession = sessionRegistry.get(executionId);
@@ -149,7 +156,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                 try (ActiveSpan span = GlobalTracer.get().makeActive(requestSpan)) {
                     // Fix headers before sending to final destination
                     request.headers().set("Accept-Encoding", "identity");
-                    request.headers().remove(EXECUTION_ID);
+//                    request.headers().remove(EXECUTION_ID);
 
                     // Store request
                     requestCollector.setHeaders(ContentCollector.createRequestPreamble(request), request.headers(), getContentWriterSession());
@@ -293,9 +300,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                     try {
                         Duration fetchDuration = Timestamps.between(fetchTimeStamp, ProtoUtils.getNowTs());
 
-                        // TODO: Since we added a separate cache, the ip resolution is done there. Setting ip to localhost
-                        // temporarly to avoid error messages.
-                        String ipAddress = "127.0.0.1";
+                        String ipAddress = "";
                         if (resolvedRemoteAddress != null) {
                             ipAddress = resolvedRemoteAddress.getAddress().getHostAddress();
                         }

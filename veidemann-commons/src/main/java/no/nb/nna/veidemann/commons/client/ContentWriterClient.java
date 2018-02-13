@@ -108,7 +108,11 @@ public class ContentWriterClient implements AutoCloseable {
                     } else {
                         LOG.warn("ContentWriter Failed: {}", status);
                     }
-                    error = status.asException();
+                    if (t instanceof StatusException) {
+                        error = (StatusException) t;
+                    } else {
+                        error = status.asException();
+                    }
                     finishLatch.countDown();
                 }
 
@@ -156,8 +160,8 @@ public class ContentWriterClient implements AutoCloseable {
             } else {
                 LOG.info("Cancelling content writer session. Reason: {}", reason);
             }
-            requestObserver.onError(Status.CANCELLED.withDescription(reason).asException());
-//            finishLatch.countDown();
+            sendRequest(() -> WriteRequest.newBuilder().setCancel(reason).build());
+            requestObserver.onCompleted();
 
             finishLatch.await(1, TimeUnit.MINUTES);
             if (error != null) {

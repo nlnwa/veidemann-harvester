@@ -26,7 +26,6 @@ import no.nb.nna.veidemann.api.ConfigProto.CrawlLimitsConfig;
 import no.nb.nna.veidemann.api.ContentWriterGrpc;
 import no.nb.nna.veidemann.api.ControllerGrpc;
 import no.nb.nna.veidemann.api.ControllerProto;
-import no.nb.nna.veidemann.api.ControllerProto.CrawlJobListRequest;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus;
 import no.nb.nna.veidemann.api.ReportProto.CrawlLogListReply;
 import no.nb.nna.veidemann.api.ReportProto.CrawlLogListRequest;
@@ -121,7 +120,7 @@ public class SimpleCrawlIT implements VeidemannHeaderConstants {
                 .setName("unscheduled").build())
                 .getValue(0);
 
-        CrawlLimitsConfig limits = job.getLimits().toBuilder().setDepth(10).setMaxDurationS(90).build();
+        CrawlLimitsConfig limits = job.getLimits().toBuilder().setDepth(10).setMaxDurationS(60).build();
         job = job.toBuilder().setLimits(limits).build();
         job = controllerClient.saveCrawlJob(job);
         String jobId = job.getId();
@@ -154,13 +153,13 @@ public class SimpleCrawlIT implements VeidemannHeaderConstants {
 
         System.out.println("\nPAGE LOG");
         pageLog.getValueList().forEach(p -> {
-            System.out.println(p.getUri());
+            System.out.println(p.getUri() + ", eid: " + p.getExecutionId());
             p.getResourceList().forEach(r -> System.out.println("  - " + r.getUri() + ", cache: " + r.getFromCache()));
         });
 
         // The goal is to get as low as 25 when we cache 404, 302, etc
         // assertThat(WarcInspector.getWarcFiles().getRecordCount()).isEqualTo(25L);
-        assertThat(WarcInspector.getWarcFiles().getRecordCount()).isEqualTo(43L);
+        assertThat(WarcInspector.getWarcFiles().getRecordCount()).isEqualTo(45L);
 
         // TODO: check these values instead of just printing
         System.out.println("\nCRAWL LOG");
@@ -169,7 +168,7 @@ public class SimpleCrawlIT implements VeidemannHeaderConstants {
 
         // The goal is to get as low as 14 when we cache 404, 302, etc
         // assertThat(crawlLog.getCount()).isEqualTo(14L);
-        assertThat(crawlLog.getCount()).isEqualTo(22L);
+        assertThat(crawlLog.getCount()).isEqualTo(24L);
         assertThat(pageLog.getCount()).isEqualTo(6L);
 
         try {
@@ -180,6 +179,13 @@ public class SimpleCrawlIT implements VeidemannHeaderConstants {
 
         executeJob(request).get();
         crawlLog = db.listCrawlLogs(CrawlLogListRequest.newBuilder().setPageSize(100).build());
+        pageLog = db.listPageLogs(PageLogListRequest.getDefaultInstance());
+
+        System.out.println("\nPAGE LOG");
+        pageLog.getValueList().forEach(p -> {
+            System.out.println(p.getUri() + ", eid: " + p.getExecutionId());
+            p.getResourceList().forEach(r -> System.out.println("  - " + r.getUri() + ", cache: " + r.getFromCache()));
+        });
 
         // TODO: check these values instead of just printing
         System.out.println("---------------");
@@ -188,7 +194,7 @@ public class SimpleCrawlIT implements VeidemannHeaderConstants {
 
         // The goal is to get as low as 24 when we cache 404, 302, etc
         // assertThat(crawlLog.getCount()).isEqualTo(24);
-        assertThat(crawlLog.getCount()).isEqualTo(54);
+        assertThat(crawlLog.getCount()).isEqualTo(44);
     }
 
     JobCompletion executeJob(ControllerProto.RunCrawlRequest crawlRequest) {

@@ -74,6 +74,8 @@ public class ContentWriter {
             LOG.info("Veidemann Content Writer (v. {}) started",
                     ContentWriter.class.getPackage().getImplementationVersion());
 
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> warcWriterPool.close()));
+
             try {
                 Thread.currentThread().join();
             } catch (InterruptedException ex) {

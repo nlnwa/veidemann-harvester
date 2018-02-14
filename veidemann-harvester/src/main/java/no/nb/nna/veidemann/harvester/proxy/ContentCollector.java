@@ -20,10 +20,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
-import io.netty.handler.codec.http.HttpResponseStatus;
-import io.netty.handler.codec.http.HttpVersion;
 import no.nb.nna.veidemann.api.ContentWriterProto;
-import no.nb.nna.veidemann.commons.AlreadyCrawledCache;
 import no.nb.nna.veidemann.commons.client.ContentWriterClient.ContentWriterSession;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.util.Sha1Digest;
@@ -65,20 +62,11 @@ public class ContentCollector {
 
     private boolean shouldAddSeparator = false;
 
-    private final AlreadyCrawledCache cache;
-
-    private boolean shouldCache = false;
-
-    private HttpHeaders cacheHeaders;
-
-    private ByteString cacheValue;
-
     public ContentCollector(int recordNum, ContentWriterProto.RecordType type,
-                            final String targetUri, AlreadyCrawledCache cache, final DbAdapter db) {
+                            final String targetUri, final DbAdapter db) {
         this.recordNum = recordNum;
         this.type = type;
         this.targetUri = targetUri;
-        this.cache = cache;
         this.db = db;
         this.digest = new Sha1Digest();
         this.recordMeta = ContentWriterProto.WriteRequestMeta.RecordMeta.newBuilder()
@@ -120,10 +108,6 @@ public class ContentCollector {
         contentWriterSession.sendHeader(ContentWriterProto.Data.newBuilder().setRecordNum(recordNum).setData(headerData).build());
         shouldAddSeparator = true;
         size = headerData.size();
-
-        if (shouldCache) {
-            cacheHeaders = headers;
-        }
     }
 
     private ByteString serializeHeaders(HttpHeaders headers) {
@@ -159,21 +143,6 @@ public class ContentCollector {
                 digest.update(data);
                 contentWriterSession.sendPayload(ContentWriterProto.Data.newBuilder().setRecordNum(recordNum).setData(data).build());
                 size += data.size();
-
-                if (shouldCache) {
-                    if (cacheValue == null) {
-                        cacheValue = data;
-                    } else {
-                        int dataSize = cacheValue.size() + data.size();
-                        if (dataSize > cache.getMaxObjectSize()) {
-                            LOG.info("Won't cache {} content exceeds max cache size: {}", targetUri, cache.getMaxObjectSize());
-                            shouldCache = false;
-                            cacheValue = null;
-                        } else {
-                            cacheValue = cacheValue.concat(data);
-                        }
-                    }
-                }
             }
         }
     }
@@ -195,34 +164,6 @@ public class ContentCollector {
                 .setBlockDigest(digest.getPrefixedDigestString())
                 .setSize(size)
                 .build();
-    }
-
-    public void setShouldCache(boolean shouldCache) {
-        this.shouldCache = shouldCache;
-    }
-
-    public boolean isShouldCache() {
-        return shouldCache;
-    }
-
-    public ByteString getCacheValue() {
-        return cacheValue;
-    }
-
-    public void writeCache(String executionId, HttpResponseStatus httpResponseStatus, HttpVersion httpResponseProtocolVersion) {
-
-        if (shouldCache && getCacheValue() != null) {
-            cacheHeaders.set("Content-Length", getCacheValue().size());
-            cacheHeaders.remove("Transfer-Encoding");
-            LOG.trace("Cached headers: {}", getCacheValue().size(), cacheHeaders.entries());
-
-            cache.put(httpResponseProtocolVersion,
-                    httpResponseStatus,
-                    targetUri,
-                    executionId,
-                    cacheHeaders,
-                    getCacheValue());
-        }
     }
 
 }

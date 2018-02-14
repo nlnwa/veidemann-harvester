@@ -19,13 +19,11 @@ import com.typesafe.config.Config;
 import com.typesafe.config.ConfigBeanFactory;
 import com.typesafe.config.ConfigException;
 import com.typesafe.config.ConfigFactory;
-import no.nb.nna.veidemann.commons.AlreadyCrawledCache;
 import no.nb.nna.veidemann.commons.client.ContentWriterClient;
 import no.nb.nna.veidemann.commons.client.DnsServiceClient;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.opentracing.TracerFactory;
 import no.nb.nna.veidemann.db.RethinkDbAdapter;
-import no.nb.nna.veidemann.db.RethinkDbAlreadyCrawledCache;
 import no.nb.nna.veidemann.harvester.api.HarvesterApiServer;
 import no.nb.nna.veidemann.harvester.browsercontroller.BrowserController;
 import no.nb.nna.veidemann.harvester.proxy.DnsServiceHostResolver;
@@ -79,13 +77,10 @@ public class Harvester {
              ContentWriterClient contentWriterClient = new ContentWriterClient(
                      SETTINGS.getContentWriterHost(), SETTINGS.getContentWriterPort());
 
-             AlreadyCrawledCache cache = new RethinkDbAlreadyCrawledCache(
-                     SETTINGS.getDbHost(), SETTINGS.getDbPort(), SETTINGS.getDbName(), SETTINGS.getMaxCacheObjectSize().toBytes());
-
              RecordingProxy proxy = new RecordingProxy(
                      new File(SETTINGS.getWorkDir()),
                      SETTINGS.getProxyPort(), db, contentWriterClient,
-                     new DnsServiceHostResolver(dnsServiceClient), sessionRegistry, cache);
+                     new DnsServiceHostResolver(dnsServiceClient), sessionRegistry, SETTINGS.getCacheHost(), SETTINGS.getCachePort());
 
              HarvesterApiServer apiServer = new HarvesterApiServer(controller, proxy).start();) {
 

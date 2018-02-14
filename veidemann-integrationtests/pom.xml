@@ -9,6 +9,11 @@
     <artifactId>veidemann-integrationtests</artifactId>
     <packaging>jar</packaging>
 
+    <properties>
+        <test.dns.server>testsites</test.dns.server>
+        <!--<test.dns.server>8.8.8.8</test.dns.server>-->
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>${project.groupId}</groupId>
@@ -95,6 +100,9 @@
                                     <name>contentwriter-workdir</name>
                                 </volume>
                                 <volume>
+                                    <name>cache-data</name>
+                                </volume>
+                                <volume>
                                     <name>contentwriter-warcs</name>
                                     <driver>local</driver>
                                     <opts>
@@ -109,6 +117,10 @@
 
 
                             <images>
+                                <image>
+                                    <name>norsknettarkiv/veidemann-certgen</name>
+                                    <alias>certgen</alias>
+                                </image>
                                 <image>
                                     <name>rethinkdb:2.3.6</name>
                                     <alias>db</alias>
@@ -211,8 +223,12 @@
                                             <alias>harvester</alias>
                                         </network>
                                         <ports>
+                                            <port>+harvester.proxy.host:harvester.proxy.port:8080</port>
                                             <port>+harvester.host:harvester.port:9090</port>
                                         </ports>
+                                        <capAdd>
+                                            <add>NET_ADMIN</add>
+                                        </capAdd>
                                         <dependsOn>
                                             <container>db-initializer</container>
                                             <container>browser</container>
@@ -225,6 +241,9 @@
                                             <bind>
                                                 <volume>harvester-workdir:/workdir</volume>
                                             </bind>
+                                            <from>
+                                                <image>certgen</image>
+                                            </from>
                                         </volumes>
                                         <env>
                                             <BROWSER_HOST>browser</BROWSER_HOST>
@@ -233,7 +252,7 @@
                                             <CONTENT_WRITER_PORT>8080</CONTENT_WRITER_PORT>
                                             <DNS_RESOLVER_HOST>dnsresolver</DNS_RESOLVER_HOST>
                                             <DNS_RESOLVER_PORT>50052</DNS_RESOLVER_PORT>
-                                            <MAX_CACHE_OBJECT_SIZE>10MiB</MAX_CACHE_OBJECT_SIZE>
+                                            <CACHE_HOST>cache</CACHE_HOST>
                                         </env>
                                         <log>
                                             <enabled>true</enabled>
@@ -248,6 +267,55 @@
                                             <log>Veidemann Harvester .* started</log>
                                             <time>20000</time>
                                         </wait>
+                                    </run>
+                                </image>
+                                <image>
+                                    <name>norsknettarkiv/veidemann-cache</name>
+                                    <alias>cache</alias>
+                                    <run>
+                                        <network>
+                                            <mode>custom</mode>
+                                            <name>integration-test-net</name>
+                                            <alias>cache</alias>
+                                        </network>
+                                        <ports>
+                                            <port>+cache.http.host:cache.http.port:3128</port>
+                                            <port>+cache.https.host:cache.https.port:3129</port>
+                                        </ports>
+                                        <capAdd>
+                                            <add>NET_ADMIN</add>
+                                        </capAdd>
+                                        <!-- 2GB -->
+                                        <memory>2147483648</memory>
+                                        <shmSize>2147483648</shmSize>
+                                        <volumes>
+                                            <bind>
+                                                <volume>cache-data:/var/cache/squid</volume>
+                                            </bind>
+                                            <from>
+                                                <image>certgen</image>
+                                            </from>
+                                        </volumes>
+                                        <env>
+                                            <DNS_SERVERS>${test.dns.server}</DNS_SERVERS>
+                                            <!--<DNS_SERVERS>8.8.8.8 8.8.4.4</DNS_SERVERS>-->
+                                        </env>
+                                        <log>
+                                            <enabled>false</enabled>
+                                        </log>
+                                        <dependsOn>
+                                            <container>db-initializer</container>
+                                            <container>testsites</container>
+                                        </dependsOn>
+                                        <!--<wait>-->
+                                            <!--<tcp>-->
+                                                <!--<mode>mapped</mode>-->
+                                                <!--<ports>-->
+                                                    <!--<port>80</port>-->
+                                                <!--</ports>-->
+                                            <!--</tcp>-->
+                                            <!--<time>20000</time>-->
+                                        <!--</wait>-->
                                     </run>
                                 </image>
                                 <image>
@@ -429,7 +497,7 @@
                                             <DB_HOST>db</DB_HOST>
                                             <CONTENT_WRITER_HOST>contentwriter</CONTENT_WRITER_HOST>
                                             <CONTENT_WRITER_PORT>8080</CONTENT_WRITER_PORT>
-                                            <DNS_SERVER>testsites</DNS_SERVER>
+                                            <DNS_SERVER>${test.dns.server}</DNS_SERVER>
                                         </env>
                                         <log>
                                             <enabled>true</enabled>

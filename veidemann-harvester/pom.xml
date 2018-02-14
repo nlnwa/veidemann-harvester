@@ -54,11 +54,14 @@
             <groupId>io.netty</groupId>
             <artifactId>netty-all</artifactId>
         </dependency>
-        <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-tcnative-boringssl-static</artifactId>
-            <classifier>linux-x86_64</classifier>
-        </dependency>
+        <!--<dependency>-->
+            <!--<groupId>io.netty</groupId>-->
+            <!--&lt;!&ndash;<artifactId>netty-tcnative-boringssl-static</artifactId>&ndash;&gt;-->
+            <!--<artifactId>netty-tcnative</artifactId>-->
+            <!--<classifier>linux-x86_64</classifier>-->
+            <!--<scope>system</scope>-->
+            <!--<systemPath>${project.basedir}/src/main/distfiles/lib/netty-tcnative-2.0.7.Final-linux-x86_64.jar</systemPath>-->
+        <!--</dependency>-->
         <dependency>
             <groupId>com.google.code.gson</groupId>
             <artifactId>gson</artifactId>
@@ -124,6 +127,7 @@
                                 <tag>${docker.tag}</tag>
                             </tags>
                             <runCmds>
+                                <run>apk add --no-cache su-exec openssl libuuid</run>
                                 <run>mkdir /workdir</run>
                             </runCmds>
                             <volumes>
@@ -131,14 +135,17 @@
                             </volumes>
                             <env>
                                 <WORK_DIR>/workdir</WORK_DIR>
+                                <!--<CACHE_HOST></CACHE_HOST>-->
                             </env>
                             <ports>
                                 <port>8080</port>
                                 <port>9090</port>
                             </ports>
+                            <!--<user>operator</user>-->
                             <cmd>
                                 <exec>
-                                    <arg>/veidemann/bin/${project.artifactId}</arg>
+                                    <!--<arg>/veidemann/bin/${project.artifactId}</arg>-->
+                                    <arg>/veidemann/bin/start.sh</arg>
                                 </exec>
                             </cmd>
                             <assembly>
@@ -152,6 +159,7 @@
                                             <outputDirectory>bin</outputDirectory>
                                             <includes>
                                                 <include>${project.artifactId}</include>
+                                                <include>start.sh</include>
                                             </includes>
                                             <fileMode>0755</fileMode>
                                         </fileSet>
@@ -160,6 +168,7 @@
                                             <outputDirectory>bin</outputDirectory>
                                             <excludes>
                                                 <exclude>${project.artifactId}</exclude>
+                                                <exclude>start.sh</exclude>
                                             </excludes>
                                             <fileMode>0644</fileMode>
                                         </fileSet>
@@ -268,6 +277,7 @@
                             <binFolder>bin</binFolder>
                             <repositoryName>lib</repositoryName>
                             <repositoryLayout>flat</repositoryLayout>
+                            <useWildcardClassPath>true</useWildcardClassPath>
                             <configurationDirectory>config</configurationDirectory>
                             <endorsedDir>plugins</endorsedDir>
                             <preAssembleDirectory>src/main/distfiles</preAssembleDirectory>

@@ -17,7 +17,6 @@ package no.nb.nna.veidemann.contentwriter;
 
 import com.google.protobuf.Empty;
 import io.grpc.Status;
-import io.grpc.Status.Code;
 import io.grpc.StatusException;
 import io.grpc.stub.StreamObserver;
 import no.nb.nna.veidemann.api.ContentWriterGrpc;
@@ -77,6 +76,8 @@ public class ContentWriterService extends ContentWriterGrpc.ContentWriterImplBas
 
             private WriteRequestMeta writeRequestMeta;
 
+            private boolean canceled = false;
+
             private ContentBuffer getContentBuffer(Integer recordNum) {
                 return contentBuffers.computeIfAbsent(recordNum, n -> new ContentBuffer());
             }
@@ -115,6 +116,14 @@ public class ContentWriterService extends ContentWriterGrpc.ContentWriterImplBas
                         contentBuffer = getContentBuffer(value.getPayload().getRecordNum());
                         contentBuffer.addPayload(value.getPayload().getData());
                         break;
+                    case CANCEL:
+                        canceled = true;
+                        String cancelReason = value.getCancel();
+                        LOG.info("Request cancelled before WARC record written. Reason {}", cancelReason);
+                        for (ContentBuffer cb : contentBuffers.values()) {
+                            cb.close();
+                        }
+                        break;
                     default:
                         break;
                 }
@@ -122,16 +131,11 @@ public class ContentWriterService extends ContentWriterGrpc.ContentWriterImplBas
 
             @Override
             public void onError(Throwable t) {
-                Status status = Status.fromThrowable(t);
-                if (status.getCode().equals(Code.CANCELLED)) {
-                    if (writeRequestMeta != null) {
-                        MDC.put("uri", writeRequestMeta.getTargetUri());
-                        MDC.put("eid", writeRequestMeta.getExecutionId());
-                    }
-                    LOG.info("Request cancelled before WARC record written. Reason {}", status.getDescription());
-                } else {
-                    LOG.error("Error caught: {}", t.getMessage(), t);
+                if (writeRequestMeta != null) {
+                    MDC.put("uri", writeRequestMeta.getTargetUri());
+                    MDC.put("eid", writeRequestMeta.getExecutionId());
                 }
+                LOG.error("Error caught: {}", t.getMessage(), t);
                 for (ContentBuffer contentBuffer : contentBuffers.values()) {
                     contentBuffer.close();
                 }
@@ -139,6 +143,12 @@ public class ContentWriterService extends ContentWriterGrpc.ContentWriterImplBas
 
             @Override
             public void onCompleted() {
+                if (canceled) {
+                    responseObserver.onNext(WriteReply.getDefaultInstance());
+                    responseObserver.onCompleted();
+                    return;
+                }
+
                 if (writeRequestMeta == null) {
                     LOG.error("Missing metadata object");
                     Status status = Status.INVALID_ARGUMENT.withDescription("Missing metadata object");

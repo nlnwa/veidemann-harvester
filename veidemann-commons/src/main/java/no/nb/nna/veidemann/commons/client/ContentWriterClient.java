@@ -103,8 +103,16 @@ public class ContentWriterClient implements AutoCloseable {
                 @Override
                 public void onError(Throwable t) {
                     Status status = Status.fromThrowable(t);
-                    LOG.warn("ContentWriter Failed: {}", status);
-                    error = status.asException();
+                    if (status.toString().contains(" OK:")) {
+                        LOG.debug("ContentWriter threw expected exception: {}", status.toString());
+                    } else {
+                        LOG.warn("ContentWriter Failed: {}", status);
+                    }
+                    if (t instanceof StatusException) {
+                        error = (StatusException) t;
+                    } else {
+                        error = status.asException();
+                    }
                     finishLatch.countDown();
                 }
 
@@ -146,10 +154,25 @@ public class ContentWriterClient implements AutoCloseable {
             return responseMeta;
         }
 
-        public synchronized void cancel(String reason) {
-            LOG.info("Cancelling content writer session");
-            requestObserver.onError(Status.CANCELLED.withDescription(reason).asException());
-            finishLatch.countDown();
+        public synchronized void cancel(String reason) throws InterruptedException {
+            if (reason != null && reason.startsWith("OK:")) {
+                LOG.debug("Cancelling content writer session. Reason: {}", reason);
+            } else {
+                LOG.info("Cancelling content writer session. Reason: {}", reason);
+            }
+            sendRequest(() -> WriteRequest.newBuilder().setCancel(reason).build());
+            requestObserver.onCompleted();
+
+            finishLatch.await(1, TimeUnit.MINUTES);
+            if (error != null) {
+                LOG.info("Cancel got error: {}", error.toString());
+            }
+            responseCount.incrementAndGet();
+            LOG.trace("Session count: {}, Request count: {}, Response count: {}", sessionCount.get(), requestCount.get(), responseCount.get());
+        }
+
+        public boolean isOpen() {
+            return finishLatch.getCount() > 0;
         }
 
         private void sendRequest(Supplier<WriteRequest> request) {

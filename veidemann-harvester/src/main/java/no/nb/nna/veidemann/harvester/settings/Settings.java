@@ -31,6 +31,10 @@ public class Settings extends CommonSettings {
 
     private int browserPort;
 
+    private String cacheHost;
+
+    private int cachePort;
+
     private String workDir;
 
     private String contentWriterHost;
@@ -40,8 +44,6 @@ public class Settings extends CommonSettings {
     private String dnsResolverHost;
 
     private int dnsResolverPort;
-
-    private ConfigMemorySize maxCacheObjectSize;
 
     public int getProxyPort() {
         return proxyPort;
@@ -115,11 +117,19 @@ public class Settings extends CommonSettings {
         this.dnsResolverPort = dnsResolverPort;
     }
 
-    public ConfigMemorySize getMaxCacheObjectSize() {
-        return maxCacheObjectSize;
+    public String getCacheHost() {
+        return cacheHost;
     }
 
-    public void setMaxCacheObjectSize(ConfigMemorySize maxCacheObjectSize) {
-        this.maxCacheObjectSize = maxCacheObjectSize;
+    public void setCacheHost(String cacheHost) {
+        this.cacheHost = cacheHost;
+    }
+
+    public int getCachePort() {
+        return cachePort;
+    }
+
+    public void setCachePort(int cachePort) {
+        this.cachePort = cachePort;
     }
 }

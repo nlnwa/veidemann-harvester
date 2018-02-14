@@ -76,7 +76,6 @@ public class HarvesterService extends HarvesterGrpc.HarvesterImplBase {
 
     @Override
     public void cleanupExecution(CleanupExecutionRequest request, StreamObserver<Empty> responseObserver) {
-        proxy.cleanCache(request.getExecutionId());
         responseObserver.onNext(Empty.getDefaultInstance());
         responseObserver.onCompleted();
     }

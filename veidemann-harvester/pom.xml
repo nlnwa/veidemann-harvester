@@ -191,57 +191,6 @@
                             </assembly>
                         </build>
                     </image>
-                    <!--<image>-->
-                        <!--<name>norsknettarkiv/harvester-init</name>-->
-                        <!--<alias>harvester-init</alias>-->
-                        <!--<run><skip>true</skip></run>-->
-                        <!--<build>-->
-                            <!--<from>${docker.java.image}</from>-->
-                            <!--<maintainer>National Library of Norway</maintainer>-->
-                            <!--<tags>-->
-                                <!--<tag>${docker.tag}</tag>-->
-                            <!--</tags>-->
-                            <!--<runCmds>-->
-                                <!--<run>apk add &#45;&#45;update iptables ip6tables iproute2 &amp;&amp; rm -rf /var/cache/apk/*</run>-->
-                                <!--<run>mkdir /workdir</run>-->
-                            <!--</runCmds>-->
-                            <!--<volumes>-->
-                                <!--<volume>/workdir</volume>-->
-                            <!--</volumes>-->
-                            <!--<env>-->
-                                <!--<WORK_DIR>/workdir</WORK_DIR>-->
-                            <!--</env>-->
-                            <!--<cmd>-->
-                                <!--<exec>-->
-                                    <!--<arg>/veidemann/bin/start.sh</arg>-->
-                                <!--</exec>-->
-                            <!--</cmd>-->
-                            <!--<assembly>-->
-                                <!--<targetDir>/veidemann</targetDir>-->
-
-                                <!--<inline>-->
-                                    <!--<includeBaseDirectory>true</includeBaseDirectory>-->
-                                    <!--<fileSets>-->
-                                        <!--<fileSet>-->
-                                            <!--<directory>target/appassembler/bin</directory>-->
-                                            <!--<outputDirectory>bin</outputDirectory>-->
-                                            <!--<includes>-->
-                                                <!--<include>start.sh</include>-->
-                                            <!--</includes>-->
-                                            <!--<fileMode>0755</fileMode>-->
-                                        <!--</fileSet>-->
-                                    <!--</fileSets>-->
-                                    <!--<files>-->
-                                        <!--<file>-->
-                                            <!--<source>../LICENSE</source>-->
-                                            <!--<outputDirectory></outputDirectory>-->
-                                            <!--<fileMode>0644</fileMode>-->
-                                        <!--</file>-->
-                                    <!--</files>-->
-                                <!--</inline>-->
-                            <!--</assembly>-->
-                        <!--</build>-->
-                    <!--</image>-->
                     <image>
                         <name>norsknettarkiv/testsites</name>
                         <alias>testsites</alias>

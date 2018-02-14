@@ -58,7 +58,7 @@ message WriteRequest {
         WriteRequestMeta meta = 1;
         Data header = 2; // Send headers for the payload.
         Data payload = 3; // Send part of the payload for the request. Repeat until complete payload is sent.
-        string cancel = 4; // Roll back the request. The content is the reason for doing so.
+        string cancel = 4; // Roll back the request. The message should contain the reason for canceling the request.
     }
 }
 

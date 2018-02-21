@@ -30,6 +30,7 @@ import no.nb.nna.veidemann.api.ControllerProto.CrawlJobListReply;
 import no.nb.nna.veidemann.api.ControllerProto.CrawlJobListRequest;
 import no.nb.nna.veidemann.api.ControllerProto.CrawlScheduleConfigListReply;
 import no.nb.nna.veidemann.api.ControllerProto.ListRequest;
+import no.nb.nna.veidemann.api.ControllerProto.OpenIdConnectIssuerReply;
 import no.nb.nna.veidemann.api.ControllerProto.PolitenessConfigListReply;
 import no.nb.nna.veidemann.api.ControllerProto.RoleList;
 import no.nb.nna.veidemann.api.ControllerProto.RoleMappingsListReply;
@@ -55,6 +56,7 @@ import no.nb.nna.veidemann.api.ConfigProto.PolitenessConfig;
 import no.nb.nna.veidemann.api.ConfigProto.Role;
 import no.nb.nna.veidemann.api.ConfigProto.RoleMapping;
 import no.nb.nna.veidemann.api.ConfigProto.Seed;
+import no.nb.nna.veidemann.controller.settings.Settings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -71,7 +73,10 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
 
     private final FrontierClient frontierClient;
 
-    public ControllerService(DbAdapter db, FrontierClient frontierClient) {
+    private final Settings settings;
+
+    public ControllerService(Settings settings, DbAdapter db, FrontierClient frontierClient) {
+        this.settings = settings;
         this.db = db;
         this.frontierClient = frontierClient;
     }
@@ -586,6 +591,20 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
         } catch (Exception e) {
             LOG.error(e.getMessage(), e);
             Status status = Status.UNKNOWN.withDescription(e.toString());
+            respObserver.onError(status.asException());
+        }
+    }
+
+    @Override
+    public void getOpenIdConnectIssuer(Empty request, StreamObserver<OpenIdConnectIssuerReply> respObserver) {
+        try {
+            LOG.debug("OpenIdConnectIssuer requested. Returning '{}'", settings.getOpenIdConnectIssuer());
+            respObserver.onNext(OpenIdConnectIssuerReply.newBuilder()
+                    .setOpenIdConnectIssuer(settings.getOpenIdConnectIssuer()).build());
+            respObserver.onCompleted();
+        } catch (Exception ex) {
+            LOG.error(ex.getMessage(), ex);
+            Status status = Status.UNKNOWN.withDescription(ex.toString());
             respObserver.onError(status.asException());
         }
     }

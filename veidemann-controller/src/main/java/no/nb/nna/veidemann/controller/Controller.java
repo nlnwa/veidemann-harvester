@@ -25,11 +25,11 @@ import no.nb.nna.veidemann.commons.auth.IdTokenAuAuServerInterceptor;
 import no.nb.nna.veidemann.commons.auth.IdTokenValidator;
 import no.nb.nna.veidemann.commons.auth.NoopAuAuServerInterceptor;
 import no.nb.nna.veidemann.commons.auth.UserRoleMapper;
+import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.opentracing.TracerFactory;
 import no.nb.nna.veidemann.controller.scheduler.CrawlJobScheduler;
 import no.nb.nna.veidemann.controller.scheduler.FrontierClient;
 import no.nb.nna.veidemann.controller.settings.Settings;
-import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.db.RethinkDbAdapter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,7 +64,7 @@ public class Controller {
              FrontierClient frontierClient = new FrontierClient(SETTINGS.getFrontierHost(), SETTINGS
                         .getFrontierPort());
 
-             ControllerApiServer apiServer = new ControllerApiServer(SETTINGS.getApiPort(), db, frontierClient,
+             ControllerApiServer apiServer = new ControllerApiServer(SETTINGS, db, frontierClient,
                      getAuAuServerInterceptor(db)).start();
 
              CrawlJobScheduler scheduler = new CrawlJobScheduler(db, frontierClient).start();) {

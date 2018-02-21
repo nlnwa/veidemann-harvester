@@ -30,8 +30,8 @@
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-all</artifactId>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-netty</artifactId>
         </dependency>
 
         <!-- ARC/WARC libraries -->

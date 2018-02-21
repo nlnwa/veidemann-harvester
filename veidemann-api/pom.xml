@@ -14,10 +14,6 @@
     <dependencies>
         <dependency>
             <groupId>io.grpc</groupId>
-            <artifactId>grpc-netty-shaded</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.grpc</groupId>
             <artifactId>grpc-protobuf</artifactId>
         </dependency>
         <dependency>
@@ -46,7 +42,7 @@
                             <goal>wget</goal>
                         </goals>
                         <configuration>
-                            <url>https://github.com/nlnwa/veidemann-api/archive/v0.1.tar.gz</url>
+                            <url>https://github.com/nlnwa/veidemann-api/archive/v${veidemann.api.version}.tar.gz</url>
                             <unpack>true</unpack>
                             <outputDirectory>${project.build.directory}</outputDirectory>
                         </configuration>
@@ -64,7 +60,7 @@
                             <goal>compile-custom</goal>
                         </goals>
                         <configuration>
-                            <protoSourceRoot>${project.build.directory}/veidemann-api-0.1/protobuf</protoSourceRoot>
+                            <protoSourceRoot>${project.build.directory}/veidemann-api-${veidemann.api.version}/protobuf</protoSourceRoot>
                             <protocArtifact>com.google.protobuf:protoc:${com.google.protobuf.protoc.version}:exe:${os.detected.classifier}</protocArtifact>
                             <pluginId>grpc-java</pluginId>
                             <pluginArtifact>io.grpc:protoc-gen-grpc-java:${io.grpc.protoc-gen-grpc-java.version}:exe:${os.detected.classifier}</pluginArtifact>

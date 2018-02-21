@@ -37,6 +37,87 @@ data:
       }
     }
 ---
+# Secret for signing MITM responses from cache
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cache-certificate
+data:
+  cache-selfsigned.key: LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1JR0hBZ0VBTUJNR0J5cUdTTTQ5QWdFR0NDcUdTTTQ5QXdFSEJHMHdhd0lCQVFRZ0JJOW91NitLVDVRVFNyT0UKYThYR2N3SlM1SmZHKytUUUc2Ukt4YzA2RHZHaFJBTkNBQVJBcU5XSS96dS9QNGNEdEJxOWVuSXI0d3J6QXBCZQp1M0MxaHUydmI1a1BrcnllRUVUTXdCZ3ozUkdQaTRDS243QXpaaFVGMmNqYmV0bk9VdXVJaHlRbgotLS0tLUVORCBQUklWQVRFIEtFWS0tLS0tCg==
+  cache-selfsignedCA.crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUI2RENDQVk2Z0F3SUJBZ0lKQU11M1gxcmRVR1RmTUFvR0NDcUdTTTQ5QkFNRE1GWXhIREFhQmdOVkJBb00KRTFabGFXUmxiV0Z1YmlCb1lYSjJaWE4wWlhJeEdEQVdCZ05WQkFzTUQxWmxhV1JsYldGdWJpQmpZV05vWlRFYwpNQm9HQTFVRUF3d1RkbVZwWkdWdFlXNXVMV2hoY25abGMzUmxjakFlRncweE9EQXlNVE14TVRBNU1qbGFGdzB4Ck9UQXlNVE14TVRBNU1qbGFNRll4SERBYUJnTlZCQW9NRTFabGFXUmxiV0Z1YmlCb1lYSjJaWE4wWlhJeEdEQVcKQmdOVkJBc01EMVpsYVdSbGJXRnViaUJqWVdOb1pURWNNQm9HQTFVRUF3d1RkbVZwWkdWdFlXNXVMV2hoY25abApjM1JsY2pCWk1CTUdCeXFHU000OUFnRUdDQ3FHU000OUF3RUhBMElBQkVDbzFZai9PNzgvaHdPMEdyMTZjaXZqCkN2TUNrRjY3Y0xXRzdhOXZtUStTdko0UVJNekFHRFBkRVkrTGdJcWZzRE5tRlFYWnlOdDYyYzVTNjRpSEpDZWoKUlRCRE1BOEdBMVVkRXdFQi93UUZNQU1CQWY4d0N3WURWUjBQQkFRREFnRzJNQ01HQTFVZEpRUWNNQm9HQ0NzRwpBUVVGQndNQkJnZ3JCZ0VGQlFjREFnWUVWUjBsQURBS0JnZ3Foa2pPUFFRREF3TklBREJGQWlCelNoY2pRSUJzCmhtby91a0RtTTVjZ081d0krck5UYURjWEZDd1JUUk15bmdJaEFOdkp0TDkrdGhVZVJUQzBwVE1RbG9NV0cxbEQKeWo5UjVSQmUzK2FqRTRpZwotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg==
+  ec.param: LS0tLS1CRUdJTiBFQyBQQVJBTUVURVJTLS0tLS0KQmdncWhrak9QUU1CQnc9PQotLS0tLUVORCBFQyBQQVJBTUVURVJTLS0tLS0K
+
+---
+# Cache
+apiVersion: v1
+kind: Service
+metadata:
+  name: veidemann-cache
+  labels:
+    app: veidemann
+    component: cache
+    tier: backend
+    role: worker
+spec:
+  ports:
+  - name: proxy
+    port: 3128
+    targetPort: 3128
+  selector:
+    app: veidemann
+    component: cache
+    tier: backend
+    role: worker
+  type: ClusterIP
+---
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: veidemann-cache
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: veidemann
+        component: cache
+        tier: backend
+        role: worker
+    spec:
+      containers:
+      - name: cache
+        image: norsknettarkiv/veidemann-cache:v0.1.0-alpha5
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 3128
+        env:
+        - name: DNS_SERVERS
+          value: "8.8.8.8 8.8.4.4"
+        volumeMounts:
+        - name: workdir
+          mountPath: /var/cache/squid
+        - name: cache-certificate
+          mountPath: "/ca-certificates"
+          readOnly: true
+        resources:
+          requests:
+            memory: "200Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "1"
+      dnsPolicy: "ClusterFirst"
+      volumes:
+      - name: workdir
+        emptyDir: {}
+      - name: dshm
+        emptyDir:
+          medium: Memory
+      - name: cache-certificate
+        secret:
+          secretName: cache-certificate
+
+---
 # Harvester (proxy and browser)
 apiVersion: v1
 kind: Service
@@ -113,6 +194,10 @@ spec:
         - name: api
           containerPort: 9090
         env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
         - name: BROWSER_HOST
           value: "localhost"
         - name: BROWSER_PORT
@@ -129,8 +214,8 @@ spec:
           value: "veidemann-dnsresolver"
         - name: DNS_RESOLVER_PORT
           value: "50052"
-        - name: MAX_CACHE_OBJECT_SIZE
-          value: 1B
+        - name: CACHE_HOST
+          value: "veidemann-cache"
         - name: JAEGER_SAMPLER_TYPE
           valueFrom:
             configMapKeyRef:
@@ -147,6 +232,9 @@ spec:
         - name: log4j-config
           mountPath: /veidemann/config/log4j2.xml
           subPath: log4j2.xml
+        - name: cache-certificate
+          mountPath: "/ca-certificates"
+          readOnly: true
         resources:
             requests:
                 memory: "500Mi"
@@ -177,6 +265,10 @@ spec:
       - name: dshm
         emptyDir:
           medium: Memory
+      - name: cache-certificate
+        secret:
+          secretName: cache-certificate
+
 ---
 # Content writer
 apiVersion: v1
@@ -374,6 +466,10 @@ spec:
         ports:
         - containerPort: 7700
         env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
         - name: DB_HOST
           value: "rethink"
         - name: DB_PORT
@@ -471,6 +567,10 @@ spec:
         ports:
         - containerPort: 50051
         env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
         - name: DB_HOST
           value: "rethink"
         - name: DB_PORT
@@ -570,6 +670,10 @@ spec:
         ports:
         - containerPort: 50053
         env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
         - name: DB_HOST
           value: "rethink"
         - name: DB_PORT
@@ -665,6 +769,10 @@ spec:
         ports:
         - containerPort: 50052
         env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
         - name: DB_HOST
           value: "rethink"
         - name: DB_PORT
@@ -763,6 +871,10 @@ spec:
         ports:
         - containerPort: 3010
         env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
         - name: GRPC_CONTROLLER
           value: "veidemann-controller:50051"
         livenessProbe:
@@ -822,6 +934,11 @@ spec:
       - name: admin
         image: norsknettarkiv/veidemann-gui:latest
         imagePullPolicy: Always
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
         ports:
         - containerPort: 80
         volumeMounts:

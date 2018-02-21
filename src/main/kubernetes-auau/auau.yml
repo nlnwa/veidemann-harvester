@@ -38,13 +38,12 @@ apiVersion: v1
 metadata:
   name: dex
 spec:
-  type: NodePort
+  type: ClusterIP
   ports:
     - name: dex
       port: 5556
       protocol: TCP
       targetPort: http
-      nodePort: 32000
   selector:
     app: dex
 

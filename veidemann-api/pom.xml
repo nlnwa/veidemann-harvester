@@ -14,10 +14,6 @@
     <dependencies>
         <dependency>
             <groupId>io.grpc</groupId>
-            <artifactId>grpc-netty-shaded</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.grpc</groupId>
             <artifactId>grpc-protobuf</artifactId>
         </dependency>
         <dependency>
@@ -35,9 +31,27 @@
         </extensions>
         <plugins>
             <plugin>
+                <groupId>com.googlecode.maven-download-plugin</groupId>
+                <artifactId>download-maven-plugin</artifactId>
+                <version>1.4.0</version>
+                <executions>
+                    <execution>
+                        <id>get-proto-files</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>wget</goal>
+                        </goals>
+                        <configuration>
+                            <url>https://github.com/nlnwa/veidemann-api/archive/v${veidemann.api.version}.tar.gz</url>
+                            <unpack>true</unpack>
+                            <outputDirectory>${project.build.directory}</outputDirectory>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>            <plugin>
                 <groupId>org.xolstice.maven.plugins</groupId>
                 <artifactId>protobuf-maven-plugin</artifactId>
-                <version>0.5.0</version>
+                <version>0.5.1</version>
                 <executions>
                     <execution>
                         <id>java</id>
@@ -46,62 +60,10 @@
                             <goal>compile-custom</goal>
                         </goals>
                         <configuration>
+                            <protoSourceRoot>${project.build.directory}/veidemann-api-${veidemann.api.version}/protobuf</protoSourceRoot>
                             <protocArtifact>com.google.protobuf:protoc:${com.google.protobuf.protoc.version}:exe:${os.detected.classifier}</protocArtifact>
                             <pluginId>grpc-java</pluginId>
                             <pluginArtifact>io.grpc:protoc-gen-grpc-java:${io.grpc.protoc-gen-grpc-java.version}:exe:${os.detected.classifier}</pluginArtifact>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>golang</id>
-                        <goals>
-                            <goal>compile-custom</goal>
-                        </goals>
-                        <configuration>
-                            <protocArtifact>com.google.protobuf:protoc:${com.google.protobuf.protoc.version}:exe:${os.detected.classifier}</protocArtifact>
-                            <pluginId>grpc-go</pluginId>
-                            <pluginExecutable>${project.build.directory}${file.separator}protoc-plugins${file.separator}protoc-gen-go</pluginExecutable>
-                            <outputDirectory>${project.build.directory}/generated-sources/protobuf/go/veidemann_api</outputDirectory>
-                            <pluginParameter>plugins=grpc</pluginParameter>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
-                <groupId>com.igormaznitsa</groupId>
-                <artifactId>mvn-golang-wrapper</artifactId>
-                <version>${go.wrapper.plugin.version}</version>
-                <configuration>
-                    <goVersion>${go.sdk.version}</goVersion>
-                </configuration>
-                <executions>
-                    <execution>
-                        <id>get-protoc-go-plugin</id>
-                        <goals>
-                            <goal>get</goal>
-                        </goals>
-                        <configuration>
-                            <goVersion>${go.sdk.version}</goVersion>
-                            <packages>
-                                <package>github.com/golang/protobuf/protoc-gen-go</package>
-                            </packages>
-                            <goBin>${project.build.directory}${file.separator}protoc-plugins</goBin>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-jar-plugin</artifactId>
-                <version>3.0.2</version>
-                <executions>
-                    <execution>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>jar</goal>
-                        </goals>
-                        <configuration>
-                            <classifier>golang</classifier>
-                            <classesDirectory>${project.build.directory}/generated-sources/protobuf/go</classesDirectory>
                         </configuration>
                     </execution>
                 </executions>

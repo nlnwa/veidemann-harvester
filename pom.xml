@@ -32,7 +32,6 @@
         <module>veidemann-commons</module>
         <module>veidemann-dnsresolver</module>
         <module>veidemann-robotsevaluator</module>
-        <module>veidemannctl</module>
     </modules>
 
     <properties>
@@ -44,6 +43,8 @@
         <chrome.version>65.0.3322.3</chrome.version>
         <docker.java.image>openjdk:8u151-jdk-alpine</docker.java.image>
 
+        <veidemann.api.version>0.1.1</veidemann.api.version>
+
         <log4j.version>2.7</log4j.version>
         <org.jwat.version>1.0.4</org.jwat.version>
         <org.glassfish.jersey.version>2.25.1</org.glassfish.jersey.version>
@@ -52,8 +53,8 @@
         <io.opentracing.version>0.30.0</io.opentracing.version>
         <io.opentracing.brave.version>0.20.0</io.opentracing.brave.version>
         <com.uber.jaeger.version>0.21.0</com.uber.jaeger.version>
-        <io.grpc.version>1.9.0</io.grpc.version>
-        <io.grpc.protoc-gen-grpc-java.version>1.9.0</io.grpc.protoc-gen-grpc-java.version>
+        <io.grpc.version>1.9.1</io.grpc.version>
+        <io.grpc.protoc-gen-grpc-java.version>1.10.0</io.grpc.protoc-gen-grpc-java.version>
         <com.google.protobuf.protoc.version>3.5.1</com.google.protobuf.protoc.version>
         <io.zipkin.reporter.version>0.10.0</io.zipkin.reporter.version>
         <io.zipkin.brave.version>4.3.4</io.zipkin.brave.version>
@@ -170,6 +171,11 @@
                 <groupId>io.opentracing.contrib</groupId>
                 <artifactId>grpc-opentracing</artifactId>
                 <version>0.2.0</version>
+            </dependency>
+            <dependency>
+                <groupId>io.grpc</groupId>
+                <artifactId>grpc-netty</artifactId>
+                <version>${io.grpc.version}</version>
             </dependency>
             <dependency>
                 <groupId>io.grpc</groupId>

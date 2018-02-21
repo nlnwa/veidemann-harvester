@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>no.nb.nna</groupId>
@@ -26,6 +27,11 @@
             <groupId>${project.groupId}</groupId>
             <artifactId>veidemann-commons</artifactId>
             <version>${project.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-netty</artifactId>
         </dependency>
 
         <dependency>
@@ -96,10 +102,13 @@
                             <binFolder>bin</binFolder>
                             <repositoryName>lib</repositoryName>
                             <repositoryLayout>flat</repositoryLayout>
+                            <useWildcardClassPath>true</useWildcardClassPath>
                             <configurationDirectory>config</configurationDirectory>
                             <endorsedDir>plugins</endorsedDir>
                             <preAssembleDirectory>src/main/distfiles</preAssembleDirectory>
-                            <extraJvmArguments>-Dconfig.file=@BASEDIR@/config/application.conf -XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap</extraJvmArguments>
+                            <extraJvmArguments>-Dconfig.file=@BASEDIR@/config/application.conf
+                                -XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap
+                            </extraJvmArguments>
                         </configuration>
                     </plugin>
 
@@ -127,7 +136,7 @@
                                         <tags>
                                             <tag>${docker.tag}</tag>
                                         </tags>
-                                        <runCmds>apk add --update openssl &amp;&amp; rm -rf /var/cache/apk/*</runCmds>
+                                        <runCmds>apk add --no-cache openssl libuuid</runCmds>
 
                                         <ports>
                                             <port>50051</port>

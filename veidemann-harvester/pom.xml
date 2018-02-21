@@ -54,14 +54,10 @@
             <groupId>io.netty</groupId>
             <artifactId>netty-all</artifactId>
         </dependency>
-        <!--<dependency>-->
-            <!--<groupId>io.netty</groupId>-->
-            <!--&lt;!&ndash;<artifactId>netty-tcnative-boringssl-static</artifactId>&ndash;&gt;-->
-            <!--<artifactId>netty-tcnative</artifactId>-->
-            <!--<classifier>linux-x86_64</classifier>-->
-            <!--<scope>system</scope>-->
-            <!--<systemPath>${project.basedir}/src/main/distfiles/lib/netty-tcnative-2.0.7.Final-linux-x86_64.jar</systemPath>-->
-        <!--</dependency>-->
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-netty-shaded</artifactId>
+        </dependency>
         <dependency>
             <groupId>com.google.code.gson</groupId>
             <artifactId>gson</artifactId>

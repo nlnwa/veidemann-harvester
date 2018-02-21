@@ -37,6 +37,7 @@ import no.nb.nna.veidemann.commons.auth.IdTokenAuAuServerInterceptor;
 import no.nb.nna.veidemann.commons.auth.IdTokenValidator;
 import no.nb.nna.veidemann.commons.auth.NoopAuAuServerInterceptor;
 import no.nb.nna.veidemann.commons.auth.UserRoleMapper;
+import no.nb.nna.veidemann.controller.settings.Settings;
 import no.nb.nna.veidemann.db.ProtoUtils;
 import no.nb.nna.veidemann.api.ConfigProto;
 import no.nb.nna.veidemann.api.ConfigProto.CrawlEntity;
@@ -76,6 +77,8 @@ public class ControllerServiceTest {
 
     private ControllerGrpc.ControllerStub asyncStub;
 
+    private Settings settings = new Settings();
+
     @Rule
     public ExpectedException thrown = ExpectedException.none();
 
@@ -97,7 +100,7 @@ public class ControllerServiceTest {
     public void testSaveEntity() throws InterruptedException {
         DbAdapter dbMock = mock(DbAdapter.class);
         AuAuServerInterceptor auau = new NoopAuAuServerInterceptor();
-        inProcessServer = new ControllerApiServer(inProcessServerBuilder, dbMock, null, auau).start();
+        inProcessServer = new ControllerApiServer(settings, inProcessServerBuilder, dbMock, null, auau).start();
 
         CrawlEntity request = CrawlEntity.newBuilder()
                 .setMeta(ConfigProto.Meta.newBuilder()
@@ -158,7 +161,7 @@ public class ControllerServiceTest {
     public void testListCrawlEntities() throws InterruptedException {
         DbAdapter dbMock = mock(DbAdapter.class);
         AuAuServerInterceptor auau = new NoopAuAuServerInterceptor();
-        inProcessServer = new ControllerApiServer(inProcessServerBuilder, dbMock, null, auau).start();
+        inProcessServer = new ControllerApiServer(settings, inProcessServerBuilder, dbMock, null, auau).start();
 
         ListRequest request = ListRequest.newBuilder().build();
         CrawlEntityListReply reply = CrawlEntityListReply.newBuilder().build();
@@ -213,7 +216,7 @@ public class ControllerServiceTest {
         IdTokenValidator idValidatorMock = mock(IdTokenValidator.class);
         UserRoleMapper roleMapperMock = mock(UserRoleMapper.class);
         AuAuServerInterceptor auau = new IdTokenAuAuServerInterceptor(roleMapperMock, idValidatorMock);
-        inProcessServer = new ControllerApiServer(inProcessServerBuilder, dbMock, null, auau).start();
+        inProcessServer = new ControllerApiServer(settings, inProcessServerBuilder, dbMock, null, auau).start();
 
         when(dbMock.listCrawlEntities(ListRequest.getDefaultInstance()))
                 .thenReturn(CrawlEntityListReply.getDefaultInstance());

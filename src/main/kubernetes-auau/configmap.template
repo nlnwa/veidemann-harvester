@@ -7,7 +7,7 @@ data:
     # The base path of dex and the external name of the OpenID Connect service.
     # This is the canonical URL that all clients MUST use to refer to dex. If a
     # path is provided, dex's HTTP service will listen at a non-root URL.
-    issuer: https://${EXTERNAL_HOSTNAME}/dex
+    issuer: http://${EXTERNAL_HOSTNAME}:32000/dex
 
     # The storage configuration determines where dex stores its state. Supported
     # options include SQL flavors and Kubernetes third party resources.
@@ -80,7 +80,7 @@ data:
       config:
         issuer: ${PILT_ADDR}
         # Connector config values starting with a "$" will read from the environment.
-        redirectURI: https://${EXTERNAL_HOSTNAME}/dex/callback
+        redirectURI: http://${EXTERNAL_HOSTNAME}:32000/dex/callback
 
     # Let dex keep a list of passwords which can be used to login to dex.
     enablePasswordDB: true

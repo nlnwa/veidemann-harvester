@@ -14,7 +14,3 @@ spec:
         backend:
           serviceName: veidemann-api-gateway
           servicePort: http
-      - path: /dex
-        backend:
-          serviceName: dex
-          servicePort: dex

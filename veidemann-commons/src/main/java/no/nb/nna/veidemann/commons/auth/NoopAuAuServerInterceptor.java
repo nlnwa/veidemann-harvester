@@ -16,13 +16,22 @@
 package no.nb.nna.veidemann.commons.auth;
 
 import io.grpc.BindableService;
+import io.grpc.Context;
+import io.grpc.Contexts;
 import io.grpc.Metadata;
 import io.grpc.ServerCall;
 import io.grpc.ServerCall.Listener;
 import io.grpc.ServerCallHandler;
+import io.grpc.ServerInterceptors;
 import io.grpc.ServerServiceDefinition;
+import no.nb.nna.veidemann.api.ConfigProto.Role;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
 
 public class NoopAuAuServerInterceptor implements AuAuServerInterceptor {
     private static final Logger LOG = LoggerFactory.getLogger(IdTokenAuAuServerInterceptor.class);
@@ -30,11 +39,23 @@ public class NoopAuAuServerInterceptor implements AuAuServerInterceptor {
     @Override
     public ServerServiceDefinition intercept(BindableService bindableService) {
         LOG.warn("No authorization configured");
-        return bindableService.bindService();
+        ServerServiceDefinition def = bindableService.bindService();
+        return ServerInterceptors.intercept(def, this);
     }
 
     @Override
-    public <ReqT, RespT> Listener<ReqT> interceptCall(ServerCall<ReqT, RespT> call, Metadata headers, ServerCallHandler<ReqT, RespT> next) {
-        return next.startCall(call, headers);
+    public <ReqT, RespT> Listener<ReqT> interceptCall(ServerCall<ReqT, RespT> call, Metadata requestHeaders, ServerCallHandler<ReqT, RespT> next) {
+
+        Collection<Role> roles = new HashSet<>();
+        roles.add(Role.ANY);
+        roles.add(Role.ANY_USER);
+        roles.add(Role.READONLY);
+        roles.add(Role.CURATOR);
+        roles.add(Role.ADMIN);
+
+        Context contextWithAllRoles = Context.current()
+                .withValue(RolesContextKey.getKey(), roles);
+
+        return Contexts.interceptCall(contextWithAllRoles, call, requestHeaders, next);
     }
 }

@@ -71,7 +71,7 @@ public class LimitsCheck {
                 case UNDEFINED:
                 case UNRECOGNIZED:
                     status.setEndState(State.ABORTED_SIZE);
-                    status.incrementDocumentsDenied(frontier.getDb().deleteQueuedUrisForExecution(status.getId()));
+                    status.incrementDocumentsDenied(DbUtil.getInstance().getDb().deleteQueuedUrisForExecution(status.getId()));
                     frontier.getHarvesterClient().cleanupExecution(status.getId());
             }
             return true;
@@ -88,7 +88,7 @@ public class LimitsCheck {
                 case UNDEFINED:
                 case UNRECOGNIZED:
                     status.setEndState(State.ABORTED_TIMEOUT);
-                    status.incrementDocumentsDenied(frontier.getDb().deleteQueuedUrisForExecution(status.getId()));
+                    status.incrementDocumentsDenied(DbUtil.getInstance().getDb().deleteQueuedUrisForExecution(status.getId()));
                     frontier.getHarvesterClient().cleanupExecution(status.getId());
             }
             return true;

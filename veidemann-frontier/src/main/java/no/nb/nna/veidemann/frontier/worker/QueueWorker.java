@@ -114,7 +114,7 @@ public class QueueWorker {
 
             while (true) {
                 try {
-                    FutureOptional<MessagesProto.CrawlHostGroup> crawlHostGroup = frontier.getDb()
+                    FutureOptional<MessagesProto.CrawlHostGroup> crawlHostGroup = DbUtil.getInstance().getDb()
                             .borrowFirstReadyCrawlHostGroup();
                     LOG.trace("Borrow Crawl Host Group: {}", crawlHostGroup);
 
@@ -123,7 +123,7 @@ public class QueueWorker {
                         LOG.trace("Crawl Host Group not ready yet, delaying: {}", crawlHostGroup.getDelayMs());
                         sleep = crawlHostGroup.getDelayMs();
                     } else if (crawlHostGroup.isPresent()) {
-                        FutureOptional<MessagesProto.QueuedUri> foqu = frontier.getDb()
+                        FutureOptional<MessagesProto.QueuedUri> foqu = DbUtil.getInstance().getDb()
                                 .getNextQueuedUriToFetch(crawlHostGroup.get());
 
                         if (foqu.isPresent()) {
@@ -139,7 +139,7 @@ public class QueueWorker {
                             LOG.trace("No Queued URI found waiting {}ms before retry", RESCHEDULE_DELAY);
                             sleep = RESCHEDULE_DELAY;
                         }
-                        frontier.getDb().releaseCrawlHostGroup(crawlHostGroup.get(), sleep);
+                        DbUtil.getInstance().getDb().releaseCrawlHostGroup(crawlHostGroup.get(), sleep);
                     } else {
                         // No CrawlHostGroup ready. Wait a moment and try again
                         sleep = RESCHEDULE_DELAY;

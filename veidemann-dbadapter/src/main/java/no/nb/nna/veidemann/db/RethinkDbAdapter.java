@@ -27,6 +27,17 @@ import com.rethinkdb.gen.exc.ReqlError;
 import com.rethinkdb.model.OptArgs;
 import com.rethinkdb.net.Connection;
 import com.rethinkdb.net.Cursor;
+import no.nb.nna.veidemann.api.ConfigProto.BrowserConfig;
+import no.nb.nna.veidemann.api.ConfigProto.BrowserScript;
+import no.nb.nna.veidemann.api.ConfigProto.CrawlConfig;
+import no.nb.nna.veidemann.api.ConfigProto.CrawlEntity;
+import no.nb.nna.veidemann.api.ConfigProto.CrawlHostGroupConfig;
+import no.nb.nna.veidemann.api.ConfigProto.CrawlJob;
+import no.nb.nna.veidemann.api.ConfigProto.CrawlScheduleConfig;
+import no.nb.nna.veidemann.api.ConfigProto.LogLevels;
+import no.nb.nna.veidemann.api.ConfigProto.PolitenessConfig;
+import no.nb.nna.veidemann.api.ConfigProto.RoleMapping;
+import no.nb.nna.veidemann.api.ConfigProto.Seed;
 import no.nb.nna.veidemann.api.ControllerProto.BrowserConfigListReply;
 import no.nb.nna.veidemann.api.ControllerProto.BrowserScriptListReply;
 import no.nb.nna.veidemann.api.ControllerProto.BrowserScriptListRequest;
@@ -34,14 +45,23 @@ import no.nb.nna.veidemann.api.ControllerProto.CrawlConfigListReply;
 import no.nb.nna.veidemann.api.ControllerProto.CrawlEntityListReply;
 import no.nb.nna.veidemann.api.ControllerProto.CrawlHostGroupConfigListReply;
 import no.nb.nna.veidemann.api.ControllerProto.CrawlJobListReply;
-import no.nb.nna.veidemann.api.ControllerProto.CrawlJobListRequest;
 import no.nb.nna.veidemann.api.ControllerProto.CrawlScheduleConfigListReply;
+import no.nb.nna.veidemann.api.ControllerProto.GetRequest;
 import no.nb.nna.veidemann.api.ControllerProto.ListRequest;
 import no.nb.nna.veidemann.api.ControllerProto.PolitenessConfigListReply;
 import no.nb.nna.veidemann.api.ControllerProto.RoleMappingsListReply;
 import no.nb.nna.veidemann.api.ControllerProto.RoleMappingsListRequest;
 import no.nb.nna.veidemann.api.ControllerProto.SeedListReply;
 import no.nb.nna.veidemann.api.ControllerProto.SeedListRequest;
+import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus;
+import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus.State;
+import no.nb.nna.veidemann.api.MessagesProto.CrawlHostGroup;
+import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
+import no.nb.nna.veidemann.api.MessagesProto.CrawledContent;
+import no.nb.nna.veidemann.api.MessagesProto.ExtractedText;
+import no.nb.nna.veidemann.api.MessagesProto.PageLog;
+import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
+import no.nb.nna.veidemann.api.MessagesProto.Screenshot;
 import no.nb.nna.veidemann.api.ReportProto.CrawlLogListReply;
 import no.nb.nna.veidemann.api.ReportProto.CrawlLogListRequest;
 import no.nb.nna.veidemann.api.ReportProto.PageLogListReply;
@@ -54,27 +74,6 @@ import no.nb.nna.veidemann.commons.db.ChangeFeed;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.db.FutureOptional;
 import no.nb.nna.veidemann.db.opentracing.ConnectionTracingInterceptor;
-import no.nb.nna.veidemann.api.ConfigProto.BrowserConfig;
-import no.nb.nna.veidemann.api.ConfigProto.BrowserScript;
-import no.nb.nna.veidemann.api.ConfigProto.CrawlConfig;
-import no.nb.nna.veidemann.api.ConfigProto.CrawlEntity;
-import no.nb.nna.veidemann.api.ConfigProto.CrawlHostGroupConfig;
-import no.nb.nna.veidemann.api.ConfigProto.CrawlJob;
-import no.nb.nna.veidemann.api.ConfigProto.CrawlScheduleConfig;
-import no.nb.nna.veidemann.api.ConfigProto.LogLevels;
-import no.nb.nna.veidemann.api.ConfigProto.PolitenessConfig;
-import no.nb.nna.veidemann.api.ConfigProto.RoleMapping;
-import no.nb.nna.veidemann.api.ConfigProto.Seed;
-import no.nb.nna.veidemann.api.ConfigProto.Selector;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus.State;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlHostGroup;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
-import no.nb.nna.veidemann.api.MessagesProto.CrawledContent;
-import no.nb.nna.veidemann.api.MessagesProto.ExtractedText;
-import no.nb.nna.veidemann.api.MessagesProto.PageLog;
-import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
-import no.nb.nna.veidemann.api.MessagesProto.Screenshot;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -197,6 +196,11 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
+    public BrowserScript getBrowserScript(GetRequest req) {
+        return getMessage(req, BrowserScript.class, TABLES.BROWSER_SCRIPTS);
+    }
+
+    @Override
     public BrowserScript saveBrowserScript(BrowserScript script) {
         return saveConfigMessage(script, TABLES.BROWSER_SCRIPTS);
     }
@@ -211,6 +215,11 @@ public class RethinkDbAdapter implements DbAdapter {
     public BrowserScriptListReply listBrowserScripts(BrowserScriptListRequest request) {
         BrowserScriptListRequestQueryBuilder queryBuilder = new BrowserScriptListRequestQueryBuilder(request);
         return queryBuilder.executeList(this).build();
+    }
+
+    @Override
+    public CrawlHostGroupConfig getCrawlHostGroupConfig(GetRequest req) {
+        return getMessage(req, CrawlHostGroupConfig.class, TABLES.CRAWL_HOST_GROUP_CONFIGS);
     }
 
     @Override
@@ -523,6 +532,11 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
+    public CrawlEntity getCrawlEntity(GetRequest req) {
+        return getMessage(req, CrawlEntity.class, TABLES.CRAWL_ENTITIES);
+    }
+
+    @Override
     public CrawlEntity saveCrawlEntity(CrawlEntity entity) {
         return saveConfigMessage(entity, TABLES.CRAWL_ENTITIES);
     }
@@ -537,6 +551,11 @@ public class RethinkDbAdapter implements DbAdapter {
     public CrawlEntityListReply listCrawlEntities(ListRequest request) {
         ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, TABLES.CRAWL_ENTITIES);
         return queryBuilder.executeList(this, CrawlEntityListReply.newBuilder()).build();
+    }
+
+    @Override
+    public Seed getSeed(GetRequest req) {
+        return getMessage(req, Seed.class, TABLES.SEEDS);
     }
 
     @Override
@@ -556,61 +575,34 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
-    public CrawlJobListReply listCrawlJobs(CrawlJobListRequest request) {
-        CrawlJobListRequestQueryBuilder queryBuilder = new CrawlJobListRequestQueryBuilder(request);
-        return queryBuilder.executeList(this).build();
+    public CrawlJob getCrawlJob(GetRequest req) {
+        return getMessage(req, CrawlJob.class, TABLES.CRAWL_JOBS);
+    }
+
+    @Override
+    public CrawlJobListReply listCrawlJobs(ListRequest request) {
+        ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, TABLES.CRAWL_JOBS);
+        return queryBuilder.executeList(this, CrawlJobListReply.newBuilder()).build();
     }
 
     @Override
     public CrawlJob saveCrawlJob(CrawlJob crawlJob) {
-        CrawlJob.Builder builder = crawlJob.toBuilder();
-
-        switch (crawlJob.getScheduleConfigOrIdCase()) {
-            case SCHEDULE:
-                CrawlScheduleConfig schedule = crawlJob.getSchedule();
-                schedule = saveCrawlScheduleConfig(schedule);
-                builder.setScheduleId(schedule.getId());
-                break;
-            case SCHEDULE_SELECTOR:
-                Selector selector = crawlJob.getScheduleSelector();
-                CrawlScheduleConfigListReply res = listCrawlScheduleConfigs(
-                        ListRequest.newBuilder().setSelector(selector).build());
-                if (res.getCount() == 1) {
-                    builder.setScheduleId(res.getValue(0).getId());
-                } else {
-                    throw new IllegalArgumentException("Schedule selector should return exactly one match, was: "
-                            + res.getCount());
-                }
-                break;
+        if (crawlJob.getCrawlConfigId().isEmpty()) {
+            throw new IllegalArgumentException("A crawl config is required for crawl jobs");
         }
 
-        switch (crawlJob.getCrawlConfigOrIdCase()) {
-            case CRAWL_CONFIG:
-                CrawlConfig crawlConfig = crawlJob.getCrawlConfig();
-                crawlConfig = saveCrawlConfig(crawlConfig);
-                builder.setCrawlConfigId(crawlConfig.getId());
-                break;
-            case CRAWL_CONFIG_SELECTOR:
-                Selector selector = crawlJob.getCrawlConfigSelector();
-                CrawlConfigListReply res = listCrawlConfigs(ListRequest.newBuilder().setSelector(selector).build());
-                if (res.getCount() == 1) {
-                    builder.setCrawlConfigId(res.getValue(0).getId());
-                } else {
-                    throw new IllegalArgumentException("CrawlConfig selector should return exactly one match, was: "
-                            + res.getCount());
-                }
-                break;
-            case CRAWLCONFIGORID_NOT_SET:
-                throw new IllegalArgumentException("A crawl config is required for crawl jobs");
-        }
-
-        return saveConfigMessage(builder.build(), TABLES.CRAWL_JOBS);
+        return saveConfigMessage(crawlJob, TABLES.CRAWL_JOBS);
     }
 
     @Override
     public Empty deleteCrawlJob(CrawlJob crawlJob) {
         checkDependencies(crawlJob, TABLES.SEEDS, Seed.getDefaultInstance(), "job_id");
         return deleteConfigMessage(crawlJob, TABLES.CRAWL_JOBS);
+    }
+
+    @Override
+    public CrawlConfig getCrawlConfig(GetRequest req) {
+        return getMessage(req, CrawlConfig.class, TABLES.CRAWL_CONFIGS);
     }
 
     @Override
@@ -621,52 +613,18 @@ public class RethinkDbAdapter implements DbAdapter {
 
     @Override
     public CrawlConfig saveCrawlConfig(CrawlConfig crawlConfig) {
-        CrawlConfig.Builder builder = crawlConfig.toBuilder();
-
-        switch (crawlConfig.getBrowserConfigOrIdCase()) {
-            case BROWSER_CONFIG:
-                BrowserConfig browserConfig = crawlConfig.getBrowserConfig();
-                browserConfig = saveBrowserConfig(browserConfig);
-                builder.setBrowserConfigId(browserConfig.getId());
-                break;
-            case BROWSER_CONFIG_SELECTOR:
-                Selector selector = crawlConfig.getBrowserConfigSelector();
-                BrowserConfigListReply res = listBrowserConfigs(ListRequest.newBuilder().setSelector(selector).build());
-                if (res.getCount() == 1) {
-                    builder.setBrowserConfigId(res.getValue(0).getId());
-                } else {
-                    throw new IllegalArgumentException("BrowserConfig selector should return exactly one match, was: "
-                            + res.getCount());
-                }
-                break;
-        }
-
-        switch (crawlConfig.getPolitenessOrIdCase()) {
-            case POLITENESS:
-                PolitenessConfig politenessConfig = crawlConfig.getPoliteness();
-                politenessConfig = savePolitenessConfig(politenessConfig);
-                builder.setPolitenessId(politenessConfig.getId());
-                break;
-            case POLITENESS_SELECTOR:
-                Selector selector = crawlConfig.getPolitenessSelector();
-                PolitenessConfigListReply res = listPolitenessConfigs(
-                        ListRequest.newBuilder().setSelector(selector).build());
-                if (res.getCount() == 1) {
-                    builder.setPolitenessId(res.getValue(0).getId());
-                } else {
-                    throw new IllegalArgumentException("Politeness selector should return exactly one match, was: "
-                            + res.getCount());
-                }
-                break;
-        }
-
-        return saveConfigMessage(builder.build(), TABLES.CRAWL_CONFIGS);
+        return saveConfigMessage(crawlConfig, TABLES.CRAWL_CONFIGS);
     }
 
     @Override
     public Empty deleteCrawlConfig(CrawlConfig crawlConfig) {
         checkDependencies(crawlConfig, TABLES.CRAWL_JOBS, CrawlJob.getDefaultInstance(), "crawl_config_id");
         return deleteConfigMessage(crawlConfig, TABLES.CRAWL_CONFIGS);
+    }
+
+    @Override
+    public CrawlScheduleConfig getCrawlScheduleConfig(GetRequest req) {
+        return getMessage(req, CrawlScheduleConfig.class, TABLES.CRAWL_SCHEDULE_CONFIGS);
     }
 
     @Override
@@ -687,6 +645,11 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
+    public PolitenessConfig getPolitenessConfig(GetRequest req) {
+        return getMessage(req, PolitenessConfig.class, TABLES.POLITENESS_CONFIGS);
+    }
+
+    @Override
     public PolitenessConfigListReply listPolitenessConfigs(ListRequest request) {
         ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, TABLES.POLITENESS_CONFIGS);
         return queryBuilder.executeList(this, PolitenessConfigListReply.newBuilder()).build();
@@ -701,6 +664,11 @@ public class RethinkDbAdapter implements DbAdapter {
     public Empty deletePolitenessConfig(PolitenessConfig politenessConfig) {
         checkDependencies(politenessConfig, TABLES.CRAWL_CONFIGS, CrawlConfig.getDefaultInstance(), "politeness_id");
         return deleteConfigMessage(politenessConfig, TABLES.POLITENESS_CONFIGS);
+    }
+
+    @Override
+    public BrowserConfig getBrowserConfig(GetRequest req) {
+        return getMessage(req, BrowserConfig.class, TABLES.BROWSER_CONFIGS);
     }
 
     @Override
@@ -790,6 +758,19 @@ public class RethinkDbAdapter implements DbAdapter {
                                 ))),
                 (Class<T>) msg.getClass()
         );
+    }
+
+    public <T extends Message> T getMessage(GetRequest req, Class<T> type, TABLES table) {
+        Map<String, Object> response = executeRequest("db-get" + type.getSimpleName(),
+                r.table(table.name)
+                        .get(req.getId())
+        );
+
+        if (response == null) {
+            return null;
+        }
+
+        return ProtoUtils.rethinkToProto(response, type);
     }
 
     public <T extends Message> T saveMessage(T msg, TABLES table) {

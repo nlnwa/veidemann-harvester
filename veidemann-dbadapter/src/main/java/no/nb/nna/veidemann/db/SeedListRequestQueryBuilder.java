@@ -31,9 +31,6 @@ public class SeedListRequestQueryBuilder extends ConfigListQueryBuilder<SeedList
         setPaging(request.getPageSize(), request.getPage());
 
         switch (request.getQryCase()) {
-            case ID:
-                buildIdQuery(request.getId());
-                break;
             case NAME:
                 buildNameQuery(request.getName());
                 break;

@@ -193,8 +193,8 @@ public class BrowserControllerIT {
 
         ConfigProto.CrawlConfig config = ConfigProto.CrawlConfig.newBuilder()
                 .setMeta(ApiTools.buildMeta("Default", "Default crawl configuration"))
-                .setBrowserConfig(browserConfig)
-                .setPoliteness(politenessConfig)
+                .setBrowserConfigId(browserConfig.getId())
+                .setPolitenessId(politenessConfig.getId())
                 .setExtra(ConfigProto.ExtraConfig.newBuilder().setCreateSnapshot(true).setExtractText(true))
                 .build();
 

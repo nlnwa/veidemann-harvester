@@ -16,10 +16,9 @@
 package no.nb.nna.veidemann.frontier.worker;
 
 import com.google.protobuf.Timestamp;
-import no.nb.nna.veidemann.commons.db.DbAdapter;
-import no.nb.nna.veidemann.db.ProtoUtils;
 import no.nb.nna.veidemann.api.ConfigProto;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus;
+import no.nb.nna.veidemann.db.ProtoUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,8 +39,8 @@ public class StatusWrapper {
         this.status = status;
     }
 
-    public static StatusWrapper getStatusWrapper(DbAdapter db, String executionId) {
-        return new StatusWrapper(db.getExecutionStatus(executionId));
+    public static StatusWrapper getStatusWrapper(String executionId) {
+        return new StatusWrapper(DbUtil.getInstance().getDb().getExecutionStatus(executionId));
     }
 
     public static StatusWrapper getStatusWrapper(CrawlExecutionStatus status) {
@@ -52,8 +51,8 @@ public class StatusWrapper {
         return new StatusWrapper(status);
     }
 
-    public StatusWrapper saveStatus(DbAdapter db) {
-        status = db.saveExecutionStatus(status.build()).toBuilder();
+    public StatusWrapper saveStatus() {
+        status = DbUtil.getInstance().getDb().saveExecutionStatus(status.build()).toBuilder();
         return this;
     }
 

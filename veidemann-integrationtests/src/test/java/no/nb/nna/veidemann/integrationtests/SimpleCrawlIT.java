@@ -116,7 +116,7 @@ public class SimpleCrawlIT implements VeidemannHeaderConstants {
     @Test
     public void testHarvest() throws InterruptedException, ExecutionException {
         Thread.sleep(5000);
-        CrawlJob job = controllerClient.listCrawlJobs(ControllerProto.CrawlJobListRequest.newBuilder()
+        CrawlJob job = controllerClient.listCrawlJobs(ControllerProto.ListRequest.newBuilder()
                 .setName("unscheduled").build())
                 .getValue(0);
 

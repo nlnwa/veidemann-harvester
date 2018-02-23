@@ -29,9 +29,6 @@ public class BrowserScriptListRequestQueryBuilder extends ConfigListQueryBuilder
         setPaging(request.getPageSize(), request.getPage());
 
         switch (request.getQryCase()) {
-            case ID:
-                buildIdQuery(request.getId());
-                break;
             case NAME:
                 buildNameQuery(request.getName());
                 break;

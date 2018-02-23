@@ -207,13 +207,13 @@ spec:
         - name: DB_PORT
           value: "28015"
         - name: CONTENT_WRITER_HOST
-          value: "veidemann-contentwriter"
+          value: $(NODE_NAME)
         - name: CONTENT_WRITER_PORT
-          value: "8082"
+          value: "4340"
         - name: DNS_RESOLVER_HOST
-          value: "veidemann-dnsresolver"
+          value: $(NODE_NAME)
         - name: DNS_RESOLVER_PORT
-          value: "50052"
+          value: "4340"
         - name: CACHE_HOST
           value: "veidemann-cache"
         - name: JAEGER_SAMPLER_TYPE
@@ -475,17 +475,17 @@ spec:
         - name: DB_PORT
           value: "28015"
         - name: HARVESTER_HOST
-          value: "veidemann-harvester"
+          value: $(NODE_NAME)
         - name: HARVESTER_PORT
-          value: "9090"
+          value: "4340"
         - name: ROBOTS_EVALUATOR_HOST
-          value: "veidemann-robots"
+          value: $(NODE_NAME)
         - name: ROBOTS_EVALUATOR_PORT
-          value: "50053"
+          value: "4340"
         - name: DNS_RESOLVER_HOST
-          value: "veidemann-dnsresolver"
+          value: $(NODE_NAME)
         - name: DNS_RESOLVER_PORT
-          value: "50052"
+          value: "4340"
         volumeMounts:
         - mountPath: /workdir
           name: workdir
@@ -576,9 +576,9 @@ spec:
         - name: DB_PORT
           value: "28015"
         - name: FRONTIER_HOST
-          value: "veidemann-frontier"
+          value: $(NODE_NAME)
         - name: FRONTIER_PORT
-          value: "7700"
+          value: "4340"
         - name: OPENID_CONNECT_ISSUER
           valueFrom:
             configMapKeyRef:
@@ -778,9 +778,9 @@ spec:
         - name: DB_PORT
           value: "28015"
         - name: CONTENT_WRITER_HOST
-          value: "veidemann-contentwriter"
+          value: $(NODE_NAME)
         - name: CONTENT_WRITER_PORT
-          value: "8082"
+          value: "4340"
         - name: DNS_SERVER
           value: "8.8.8.8"
         - name: JAEGER_SAMPLER_TYPE
@@ -876,7 +876,7 @@ spec:
             fieldRef:
               fieldPath: status.hostIP
         - name: GRPC_CONTROLLER
-          value: "veidemann-controller:50051"
+          value: $(NODE_NAME):4340
         livenessProbe:
           httpGet:
             path: /api/healthz

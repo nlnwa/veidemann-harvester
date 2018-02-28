@@ -51,6 +51,5 @@ public class PageLogListRequestQueryBuilder extends ConfigListQueryBuilder<PageL
                 .getAll(name)
                 .optArg("index", "executionId");
         setListQry(qry);
-        setCountQry(qry);
     }
 }

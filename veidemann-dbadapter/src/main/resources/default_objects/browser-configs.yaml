@@ -8,6 +8,4 @@ windowHeight: 1024
 pageLoadTimeoutMs: 180000
 sleepAfterPageloadMs: 2000
 scriptSelector:
-    label:
-    - key: "scope"
-      value: "default"
+      - "scope:default"

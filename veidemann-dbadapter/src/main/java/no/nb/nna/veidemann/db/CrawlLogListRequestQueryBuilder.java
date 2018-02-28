@@ -51,6 +51,5 @@ public class CrawlLogListRequestQueryBuilder extends ConfigListQueryBuilder<Craw
                 .getAll(name)
                 .optArg("index", "executionId");
         setListQry(qry);
-        setCountQry(qry);
     }
 }

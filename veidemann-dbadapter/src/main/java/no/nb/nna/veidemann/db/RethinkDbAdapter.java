@@ -40,7 +40,6 @@ import no.nb.nna.veidemann.api.ConfigProto.RoleMapping;
 import no.nb.nna.veidemann.api.ConfigProto.Seed;
 import no.nb.nna.veidemann.api.ControllerProto.BrowserConfigListReply;
 import no.nb.nna.veidemann.api.ControllerProto.BrowserScriptListReply;
-import no.nb.nna.veidemann.api.ControllerProto.BrowserScriptListRequest;
 import no.nb.nna.veidemann.api.ControllerProto.CrawlConfigListReply;
 import no.nb.nna.veidemann.api.ControllerProto.CrawlEntityListReply;
 import no.nb.nna.veidemann.api.ControllerProto.CrawlHostGroupConfigListReply;
@@ -212,9 +211,9 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
-    public BrowserScriptListReply listBrowserScripts(BrowserScriptListRequest request) {
-        BrowserScriptListRequestQueryBuilder queryBuilder = new BrowserScriptListRequestQueryBuilder(request);
-        return queryBuilder.executeList(this).build();
+    public BrowserScriptListReply listBrowserScripts(ListRequest request) {
+        ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, TABLES.BROWSER_SCRIPTS);
+        return queryBuilder.executeList(this, BrowserScriptListReply.newBuilder()).build();
     }
 
     @Override

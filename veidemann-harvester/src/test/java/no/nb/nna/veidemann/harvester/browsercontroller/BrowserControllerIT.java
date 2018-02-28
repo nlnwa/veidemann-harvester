@@ -181,7 +181,7 @@ public class BrowserControllerIT {
                 .setWindowWidth(1024)
                 .setPageLoadTimeoutMs(20000)
                 .setSleepAfterPageloadMs(10000)
-                .setScriptSelector(ConfigProto.Selector.newBuilder().addLabel(ApiTools.buildLabel("scope", "default")))
+                .addScriptSelector("scope:default")
                 .build();
 
         ConfigProto.PolitenessConfig politenessConfig = ConfigProto.PolitenessConfig.newBuilder()

@@ -34,7 +34,6 @@ import no.nb.nna.veidemann.api.ControllerGrpc;
 import no.nb.nna.veidemann.api.ControllerProto.AbortCrawlRequest;
 import no.nb.nna.veidemann.api.ControllerProto.BrowserConfigListReply;
 import no.nb.nna.veidemann.api.ControllerProto.BrowserScriptListReply;
-import no.nb.nna.veidemann.api.ControllerProto.BrowserScriptListRequest;
 import no.nb.nna.veidemann.api.ControllerProto.CrawlConfigListReply;
 import no.nb.nna.veidemann.api.ControllerProto.CrawlEntityListReply;
 import no.nb.nna.veidemann.api.ControllerProto.CrawlHostGroupConfigListReply;
@@ -427,7 +426,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
 
     @Override
     @AllowedRoles({Role.READONLY, Role.CURATOR, Role.ADMIN})
-    public void listBrowserScripts(BrowserScriptListRequest request,
+    public void listBrowserScripts(ListRequest request,
             StreamObserver<BrowserScriptListReply> responseObserver) {
         try {
             responseObserver.onNext(db.listBrowserScripts(request));

@@ -60,7 +60,6 @@ public class ScreenshotListRequestQueryBuilder extends ConfigListQueryBuilder<Sc
                 .getAll(name)
                 .optArg("index", "executionId");
         setListQry(qry);
-        setCountQry(qry);
     }
 
     void withoutImg() {

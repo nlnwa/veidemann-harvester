@@ -30,7 +30,6 @@ import no.nb.nna.veidemann.api.ConfigProto.RoleMapping;
 import no.nb.nna.veidemann.api.ConfigProto.Seed;
 import no.nb.nna.veidemann.api.ControllerProto.BrowserConfigListReply;
 import no.nb.nna.veidemann.api.ControllerProto.BrowserScriptListReply;
-import no.nb.nna.veidemann.api.ControllerProto.BrowserScriptListRequest;
 import no.nb.nna.veidemann.api.ControllerProto.CrawlConfigListReply;
 import no.nb.nna.veidemann.api.ControllerProto.CrawlEntityListReply;
 import no.nb.nna.veidemann.api.ControllerProto.CrawlHostGroupConfigListReply;
@@ -184,7 +183,7 @@ public interface DbAdapter extends AutoCloseable {
 
     Empty deleteBrowserScript(BrowserScript script);
 
-    BrowserScriptListReply listBrowserScripts(BrowserScriptListRequest request);
+    BrowserScriptListReply listBrowserScripts(ListRequest request);
 
     CrawlHostGroupConfig getCrawlHostGroupConfig(GetRequest req);
 

@@ -132,7 +132,7 @@ public class Preconditions {
     private static void setCrawlHostGroup(QueuedUriWrapper qUri, PolitenessConfig politeness) {
         List<CrawlHostGroupConfig> groupConfigs = DbUtil.getInstance().getDb()
                 .listCrawlHostGroupConfigs(ControllerProto.ListRequest.newBuilder()
-                        .setSelector(politeness.getCrawlHostGroupSelector()).build()).getValueList();
+                        .addAllLabelSelector(politeness.getCrawlHostGroupSelectorList()).build()).getValueList();
 
         String crawlHostGroupId = CrawlHostGroupCalculator.calculateCrawlHostGroup(qUri.getIp(), groupConfigs);
         DbUtil.getInstance().getDb().getOrCreateCrawlHostGroup(crawlHostGroupId, politeness.getId());

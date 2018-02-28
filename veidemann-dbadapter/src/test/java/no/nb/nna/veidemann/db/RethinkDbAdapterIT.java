@@ -33,10 +33,8 @@ import no.nb.nna.veidemann.api.ConfigProto.PolitenessConfig;
 import no.nb.nna.veidemann.api.ConfigProto.Role;
 import no.nb.nna.veidemann.api.ConfigProto.RoleMapping;
 import no.nb.nna.veidemann.api.ConfigProto.Seed;
-import no.nb.nna.veidemann.api.ConfigProto.Selector;
 import no.nb.nna.veidemann.api.ControllerProto;
 import no.nb.nna.veidemann.api.ControllerProto.BrowserScriptListReply;
-import no.nb.nna.veidemann.api.ControllerProto.BrowserScriptListRequest;
 import no.nb.nna.veidemann.api.ControllerProto.CrawlEntityListReply;
 import no.nb.nna.veidemann.api.ControllerProto.GetRequest;
 import no.nb.nna.veidemann.api.ControllerProto.ListRequest;
@@ -215,6 +213,12 @@ public class RethinkDbAdapterIT {
         Label fooLower = Label.newBuilder().setKey("foo").setValue("lower").build();
         Label fooLowest = Label.newBuilder().setKey("foo").setValue("lowest").build();
 
+        String freqHourlySelector = "frequency:Hourly";
+        String orgNewsSelector = "orgType:News";
+        String fooLowTruncSelector = "foo:low*";
+        String anyHighSelector = ":high";
+        String anyLowTruncSelector = ":low*";
+
         CrawlEntity entity1 = CrawlEntity.newBuilder()
                 .setMeta(Meta.newBuilder()
                         .setName("Nasjonalbiblioteket")
@@ -288,31 +292,27 @@ public class RethinkDbAdapterIT {
         assertThat(result.getValueList()).contains(entity2);
 
         // Select on label
-        request = ListRequest.newBuilder().setSelector(Selector.newBuilder().addLabel(freqHourly)).build();
+        request = ListRequest.newBuilder().addLabelSelector(freqHourlySelector).build();
         result = db.listCrawlEntities(request);
         assertThat(result.getCount()).isEqualTo(2);
         assertThat(result.getValueList()).contains(entity2, entity3);
 
-        request = ListRequest.newBuilder().setSelector(
-                Selector.newBuilder().addLabel(freqHourly).addLabel(orgNews)).build();
+        request = ListRequest.newBuilder().addLabelSelector(freqHourlySelector).addLabelSelector(orgNewsSelector).build();
         result = db.listCrawlEntities(request);
         assertThat(result.getCount()).isEqualTo(1);
         assertThat(result.getValueList()).contains(entity2);
 
-        Label fooLowTrunc = Label.newBuilder().setKey("foo").setValue("low*").build();
-        request = ListRequest.newBuilder().setSelector(Selector.newBuilder().addLabel(fooLowTrunc)).build();
+        request = ListRequest.newBuilder().addLabelSelector(fooLowTruncSelector).build();
         result = db.listCrawlEntities(request);
         assertThat(result.getCount()).isEqualTo(2);
         assertThat(result.getValueList()).contains(entity2, entity3);
 
-        Label anyHigh = Label.newBuilder().setValue("high").build();
-        request = ListRequest.newBuilder().setSelector(Selector.newBuilder().addLabel(anyHigh)).build();
+        request = ListRequest.newBuilder().addLabelSelector(anyHighSelector).build();
         result = db.listCrawlEntities(request);
         assertThat(result.getCount()).isEqualTo(2);
         assertThat(result.getValueList()).contains(entity1, entity2);
 
-        Label anyLowTrunc = Label.newBuilder().setValue("low*").build();
-        request = ListRequest.newBuilder().setSelector(Selector.newBuilder().addLabel(anyLowTrunc)).build();
+        request = ListRequest.newBuilder().addLabelSelector(anyLowTruncSelector).build();
         result = db.listCrawlEntities(request);
         assertThat(result.getCount()).isEqualTo(2);
         assertThat(result.getValueList()).contains(entity2, entity3);
@@ -512,26 +512,24 @@ public class RethinkDbAdapterIT {
         script1 = db.saveBrowserScript(script1);
         script2 = db.saveBrowserScript(script2);
 
-        BrowserScriptListRequest request = BrowserScriptListRequest.getDefaultInstance();
+        ListRequest request = ListRequest.getDefaultInstance();
         BrowserScriptListReply result = db.listBrowserScripts(request);
         assertThat(result.getValueCount()).isEqualTo(2);
         assertThat(result.getCount()).isEqualTo(2);
         assertThat(result.getValueList()).containsExactly(script2, script1);
 
-        request = BrowserScriptListRequest.newBuilder()
-                .setSelector(ApiTools.buildSelector(ApiTools.buildLabel("type", "extract_outlinks"))).build();
+        request = ListRequest.newBuilder().addLabelSelector("type:extract_outlinks").build();
         result = db.listBrowserScripts(request);
         assertThat(result.getValueCount()).isEqualTo(1);
         assertThat(result.getCount()).isEqualTo(1);
         assertThat(result.getValueList()).containsExactly(script2);
 
-        request = BrowserScriptListRequest.newBuilder()
-                .setSelector(ApiTools.buildSelector(ApiTools.buildLabel("type", "behavior"))).build();
+        request = ListRequest.newBuilder().addLabelSelector("type:behavior").build();
         result = db.listBrowserScripts(request);
         assertThat(result.getValueCount()).isEqualTo(0);
         assertThat(result.getCount()).isEqualTo(0);
 
-        request = BrowserScriptListRequest.newBuilder().setName("extr.*").build();
+        request = ListRequest.newBuilder().setName("extr.*").build();
         result = db.listBrowserScripts(request);
         assertThat(result.getValueCount()).isEqualTo(1);
         assertThat(result.getCount()).isEqualTo(1);

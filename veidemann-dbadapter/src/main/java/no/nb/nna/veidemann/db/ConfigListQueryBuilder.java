@@ -21,7 +21,8 @@ import com.rethinkdb.gen.ast.ReqlExpr;
 import com.rethinkdb.gen.ast.ReqlFunction1;
 import com.rethinkdb.net.Cursor;
 import no.nb.nna.veidemann.api.ReportProto.Filter;
-import no.nb.nna.veidemann.api.ConfigProto;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -37,11 +38,11 @@ import static no.nb.nna.veidemann.db.RethinkDbAdapter.r;
  */
 public abstract class ConfigListQueryBuilder<T extends Message> {
 
+    private static final Logger LOG = LoggerFactory.getLogger(ConfigListQueryBuilder.class);
+
     private final T request;
 
     private ReqlExpr listQry;
-
-    private ReqlExpr countQry;
 
     private int page;
 
@@ -58,23 +59,16 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
 
     /**
      * Build a query for a list of objects.
-     * <p>
-     * When this method returns, both {@link #getListQry()} and {@link #getCountQry()} will return the generated
-     * queries.
      *
      * @param id the object id
      */
     void buildIdQuery(List<String> id) {
         this.id = id.stream().filter(i -> !i.isEmpty()).collect(Collectors.toList());
-        countQry = r.table(table.name).getAll(this.id.toArray());
         listQry = r.table(table.name).getAll(this.id.toArray());
     }
 
     /**
      * Build a query for a single object.
-     * <p>
-     * When this method returns, both {@link #getListQry()} and {@link #getCountQry()} will return the generated
-     * queries.
      *
      * @param id the object id
      */
@@ -82,7 +76,6 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
         if (id != null && !id.isEmpty()) {
             this.id = Collections.singletonList(id);
         }
-        countQry = r.table(table.name).getAll(this.id.toArray());
         listQry = r.table(table.name).getAll(this.id.toArray());
     }
 
@@ -90,106 +83,103 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
      * Build a query for a name request.
      * <p>
      * The name parameter accepts regular expressions.
-     * <p>
-     * When this method returns, both {@link #getListQry()} and {@link #getCountQry()} will return the generated
-     * queries.
      *
      * @param name the name regex
      */
     void buildNameQuery(String name) {
+        if (name.isEmpty()) {
+            return;
+        }
+
         final String qry = "(?i)" + name;
-        countQry = r.table(table.name)
+
+        LOG.warn("Adding name query: {qry={}}", qry);
+
+        addQuery(r.table(table.name)
                 .orderBy().optArg("index", "name")
-                .filter(doc -> doc.g("meta").g("name").match(qry));
-        listQry = r.table(table.name)
-                .orderBy().optArg("index", "name")
-                .filter(doc -> doc.g("meta").g("name").match(qry));
+                .filter(doc -> doc.g("meta").g("name").match(qry)));
     }
 
     /**
      * Build a query for a label selector.
-     * <p>
-     * When this method returns, both {@link #getListQry()} and {@link #getCountQry()} will return the generated
-     * queries.
      *
      * @param selector
      */
-    void buildSelectorQuery(ConfigProto.Selector selector) {
-        List<List> exactQry = r.array();
-        List<ReqlExpr> spanQry = r.array();
+    void buildSelectorQuery(List<String> selector) {
+        selector.forEach(q -> {
+            String key;
+            String value;
 
-        for (int i = 0; i < selector.getLabelCount(); i++) {
-            ConfigProto.Label label = selector.getLabel(i);
-            if (!label.getKey().isEmpty() && !label.getValue().isEmpty() && !label.getValue().endsWith("*")) {
-                exactQry.add(r.array(label.getKey().toLowerCase(), label.getValue().toLowerCase()));
-            } else if (!label.getKey().isEmpty()) {
-                List startSpan = r.array();
-                List endSpan = r.array();
+            int sepIdx = q.indexOf(':');
+            if (sepIdx == -1) {
+                key = "";
+                value = q.toLowerCase();
+            } else {
+                key = q.substring(0, sepIdx).toLowerCase();
+                value = q.substring(sepIdx + 1).toLowerCase();
+            }
 
-                startSpan.add(label.getKey().toLowerCase());
-                endSpan.add(label.getKey().toLowerCase());
+            LOG.warn("Adding selector: {key={}, value={}}", key, value);
 
-                if (label.getValue().endsWith("*")) {
-                    String prefix = label.getValue().toLowerCase().substring(0, label.getValue().length() - 1);
+            if (!key.isEmpty() && !value.isEmpty() && !value.endsWith("*")) {
+                // Exact match
+                List indexKey = r.array(key, value);
+                addQuery(r.table(table.name).between(indexKey, indexKey).optArg("right_bound", "closed").optArg("index", "label"));
+            } else if (!key.isEmpty()) {
+                // Exact match on key, value ends with '*' or is empty
+
+                List startSpan = r.array(key);
+                List endSpan = r.array(key);
+
+                if (value.endsWith("*")) {
+                    String prefix = value.substring(0, value.length() - 1);
                     startSpan.add(prefix);
                     endSpan.add(prefix + Character.toString(Character.MAX_VALUE));
-                } else if (label.getValue().isEmpty()) {
+                } else if (value.isEmpty()) {
                     startSpan.add(r.minval());
                     endSpan.add(r.maxval());
                 } else {
-                    startSpan.add(label.getValue().toLowerCase());
-                    endSpan.add(label.getValue().toLowerCase());
+                    startSpan.add(value);
+                    endSpan.add(value);
                 }
 
-                spanQry.add(r.table(table.name).between(startSpan, endSpan).optArg("index", "label").g("id"));
+                addQuery(r.table(table.name).between(startSpan, endSpan).optArg("index", "label"));
             } else {
-                Object startSpan;
-                Object endSpan;
-                if (label.getValue().endsWith("*")) {
-                    String prefix = label.getValue().toLowerCase().substring(0, label.getValue().length() - 1);
-                    startSpan = prefix;
-                    endSpan = prefix + Character.toString(Character.MAX_VALUE);
-                    spanQry.add(r.table(table.name).between(startSpan, endSpan).optArg("index", "label_value").g("id"));
-                } else if (label.getValue().isEmpty()) {
-                    spanQry.add(r.table(table.name).getAll().optArg("index", "label_value").g("id"));
-                } else {
-                    spanQry.add(r.table(table.name).getAll(label.getValue().toLowerCase())
-                            .optArg("index", "label_value").g("id"));
+                // Key is empty
+                if (value.endsWith("*")) {
+                    String prefix = value.toLowerCase().substring(0, value.length() - 1);
+                    String startSpan = prefix;
+                    String endSpan = prefix + Character.toString(Character.MAX_VALUE);
+                    addQuery(r.table(table.name).between(startSpan, endSpan).optArg("index", "label_value"));
+                } else if (!value.isEmpty()) {
+                    addQuery(r.table(table.name).between(value, value).optArg("right_bound", "closed").optArg("index", "label_value"));
                 }
             }
-        }
-
-        countQry = r.table(table.name).getAll(r.args(
-                r.table(table.name).getAll(exactQry.toArray()).optArg("index", "label")
-                        .pluck("id").group("id").count().ungroup()
-                        .filter(row -> row.g("reduction").eq(selector.getLabelCount()))
-                        .g("group").union(spanQry.toArray()).distinct()));
-        listQry = r.table(table.name).getAll(r.args(
-                r.table(table.name).getAll(exactQry.toArray()).optArg("index", "label")
-                        .pluck("id").group("id").count().ungroup()
-                        .filter(row -> row.g("reduction").eq(selector.getLabelCount()))
-                        .g("group").union(spanQry.toArray()).distinct()));
+        });
     }
 
-    /**
-     * Build a query returning all values ordered by name.
-     */
-    void buildAllOrderedOnNameQuery() {
-        countQry = r.table(table.name);
-        listQry = r.table(table.name).orderBy().optArg("index", "name");
+    public ReqlExpr addQuery(ReqlExpr qry) {
+        if (listQry == null) {
+            listQry = qry;
+        } else {
+            listQry = listQry.innerJoin(qry, (l, r) -> l.g("id").eq(r.g("id"))).zip();
+        }
+        return listQry;
     }
 
     /**
      * Build a query returning all values.
      */
     void buildAllQuery() {
-        countQry = r.table(table.name);
         listQry = r.table(table.name);
     }
 
     void addFilter(ReqlFunction1... filter) {
+        if (listQry == null) {
+            listQry = r.table(table.name).orderBy().optArg("index", "name");
+        }
+
         Arrays.stream(filter).forEach(f -> {
-            countQry = countQry.filter(f);
             listQry = listQry.filter(f);
         });
     }
@@ -224,14 +214,6 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
         this.listQry = listQry;
     }
 
-    ReqlExpr getCountQry() {
-        return countQry;
-    }
-
-    void setCountQry(ReqlExpr countQry) {
-        this.countQry = countQry;
-    }
-
     void setPaging(int pageSize, int page) {
         this.pageSize = pageSize == 0 ? 30 : pageSize;
         this.page = page;
@@ -250,13 +232,21 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
     }
 
     public long executeCount(RethinkDbAdapter db) {
-        return db.executeRequest("db-countConfigObjects", countQry.count());
+        if (listQry == null) {
+            listQry = r.table(table.name).orderBy().optArg("index", "name");
+        }
+
+        return db.executeRequest("db-countConfigObjects", listQry.count());
     }
 
     public <R extends Message.Builder> R executeList(RethinkDbAdapter db, R resultBuilder) {
-        listQry = listQry.skip(page * pageSize).limit(pageSize);
+        if (listQry == null) {
+            listQry = r.table(table.name).orderBy().optArg("index", "name");
+        }
 
-        Object res = db.executeRequest("db-listConfigObjects", listQry);
+        ReqlExpr qry = listQry.skip(page * pageSize).limit(pageSize);
+
+        Object res = db.executeRequest("db-listConfigObjects", qry);
 
         Descriptors.Descriptor resDescr = resultBuilder.getDescriptorForType();
         Descriptors.FieldDescriptor pageSizeField = resDescr.findFieldByName("page_size");

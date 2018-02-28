@@ -23,6 +23,7 @@ import no.nb.nna.veidemann.api.ConfigProto.BrowserConfig;
 import no.nb.nna.veidemann.api.ConfigProto.BrowserScript;
 import no.nb.nna.veidemann.api.ConfigProto.CrawlConfig;
 import no.nb.nna.veidemann.api.ControllerProto;
+import no.nb.nna.veidemann.api.ControllerProto.ListRequest;
 import no.nb.nna.veidemann.api.HarvesterProto.HarvestPageReply;
 import no.nb.nna.veidemann.api.MessagesProto.PageLog;
 import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
@@ -174,16 +175,14 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
             }
             scripts.add(script);
         }
-        if (browserConfig.hasScriptSelector()) {
-            ControllerProto.BrowserScriptListRequest req = ControllerProto.BrowserScriptListRequest.newBuilder()
-                    .setSelector(browserConfig.getScriptSelector())
-                    .build();
-            for (BrowserScript script : DbHelper.getInstance().getDb().listBrowserScripts(req).getValueList()) {
-                if (!scriptCache.containsKey(script.getId())) {
-                    scriptCache.put(script.getId(), script);
-                }
-                scripts.add(script);
+        ListRequest req = ListRequest.newBuilder()
+                .addAllLabelSelector(browserConfig.getScriptSelectorList())
+                .build();
+        for (BrowserScript script : DbHelper.getInstance().getDb().listBrowserScripts(req).getValueList()) {
+            if (!scriptCache.containsKey(script.getId())) {
+                scriptCache.put(script.getId(), script);
             }
+            scripts.add(script);
         }
         return scripts;
     }

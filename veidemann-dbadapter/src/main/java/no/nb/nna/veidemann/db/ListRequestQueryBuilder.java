@@ -26,18 +26,8 @@ public class ListRequestQueryBuilder extends ConfigListQueryBuilder<ListRequest>
         super(request, table);
         setPaging(request.getPageSize(), request.getPage());
 
-        switch (request.getQryCase()) {
-            case NAME:
-                buildNameQuery(request.getName());
-                break;
-            case SELECTOR:
-                buildSelectorQuery(request.getSelector());
-                break;
-            default:
-                buildAllOrderedOnNameQuery();
-                break;
-        }
-
+        buildNameQuery(request.getName());
+        buildSelectorQuery(request.getLabelSelectorList());
     }
 
 }

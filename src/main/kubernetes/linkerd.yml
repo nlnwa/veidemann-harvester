@@ -10,68 +10,106 @@ data:
       ip: 0.0.0.0
       port: 9990
 
-    namers:
-    - kind: io.l5d.k8s
-
     usage:
       orgId: nettarkivet.nb.no
       enabled: false
 
     routers:
+    - protocol: http
+      label: ingress-http
+      identifier:
+        kind: io.l5d.ingress
+        namespace: default
+      interpreter:
+        kind: io.l5d.mesh
+        experimental: true
+        dst: /$/inet/namerd.default.svc.cluster.local/4321
+        root: /ingress
+      servers:
+      - port: 443
+        ip: 0.0.0.0
+        clearContext: true
+        tls:
+          certPath: /io.buoyant/linkerd/certs/tls.crt
+          keyPath: /io.buoyant/linkerd/certs/tls.key
+
+    - protocol: h2
+      label: ingress-grpc
+      identifier:
+        kind: io.l5d.ingress
+        namespace: default
+      interpreter:
+        kind: io.l5d.mesh
+        experimental: true
+        dst: /$/inet/namerd.default.svc.cluster.local/4321
+        root: /ingress
+      servers:
+      - port: 4443
+        ip: 0.0.0.0
+        clearContext: true
+        tls:
+          certPath: /io.buoyant/linkerd/certs/tls.crt
+          keyPath: /io.buoyant/linkerd/certs/tls.key
+
     - protocol: h2
       label: grpc-outgoing
-      experimental: true
       identifier:
         kind: io.l5d.header.path
         segments: 1
       interpreter:
-        kind: io.l5d.namerd
-        dst: /$/inet/namerd.default.svc.cluster.local/4100
-        namespace: grpc # name of the namerd tab to use
+        kind: io.l5d.mesh
+        experimental: true
+        dst: /$/inet/namerd.default.svc.cluster.local/4321
+        root: /grpc
         transformers:
         - kind: io.l5d.k8s.daemonset
           namespace: default
           port: grpc-incoming
           service: l5d
+          hostNetwork: false
       servers:
       - port: 4340
         ip: 0.0.0.0
 
     - protocol: h2
       label: grpc-incoming
-      experimental: true
       identifier:
         kind: io.l5d.header.path
         segments: 1
       interpreter:
-        kind: io.l5d.namerd
-        dst: /$/inet/namerd.default.svc.cluster.local/4100
-        namespace: grpc
+        kind: io.l5d.mesh
+        experimental: true
+        dst: /$/inet/namerd.default.svc.cluster.local/4321
+        root: /grpc
         transformers:
         - kind: io.l5d.k8s.localnode
-          hostNetwork: true
+          hostNetwork: false
       servers:
       - port: 4341
         ip: 0.0.0.0
 ---
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  labels:
-    app: l5d
   name: l5d
 spec:
+  selector:
+    matchLabels:
+      app: l5d
   template:
     metadata:
       labels:
         app: l5d
     spec:
-      hostNetwork: true
+      hostNetwork: false
       dnsPolicy: ClusterFirst
       volumes:
       - name: l5d-config
         configMap:
           name: "l5d-config"
+      - name: certificates
+        secret:
+          secretName: ingress-certs
       containers:
       - name: l5d
         image: buoyantio/linkerd:1.3.5
@@ -87,6 +125,12 @@ spec:
         args:
         - /io.buoyant/linkerd/config/config.yaml
         ports:
+        - name: tls
+          containerPort: 443
+          hostPort: 443
+        - name: grpc-ingress
+          containerPort: 4443
+          hostPort: 4443
         - name: grpc-outgoing
           containerPort: 4340
           hostPort: 4340
@@ -98,7 +142,9 @@ spec:
         - name: "l5d-config"
           mountPath: "/io.buoyant/linkerd/config"
           readOnly: true
-
+        - name: "certificates"
+          mountPath: "/io.buoyant/linkerd/certs"
+          readOnly: true
       - name: kubectl
         image: buoyantio/kubectl:v1.8.5
         args:
@@ -113,12 +159,15 @@ metadata:
 spec:
   selector:
     app: l5d
-  type: NodePort
+  type: ClusterIP
   ports:
+  - name: tls
+    port: 443
+  - name: grpc-ingress
+    port: 4443
   - name: grpc-outgoing
     port: 4340
   - name: grpc-incoming
     port: 4341
   - name: admin
     port: 9990
-    nodePort: 30987

@@ -24,45 +24,30 @@ data:
 
     namers:
     - kind: io.l5d.k8s
-      host: localhost
-      port: 8001
 
     storage:
       kind: io.l5d.k8s
-      host: localhost
-      port: 8001
-      namespace: default
 
     interfaces:
     - kind: io.l5d.thriftNameInterpreter
       ip: 0.0.0.0
       port: 4100
-    - kind: io.l5d.thriftNameInterpreter
-      ip: 0.0.0.0
-      port: 4101
     - kind: io.l5d.httpController
       ip: 0.0.0.0
       port: 4180
-    - kind: io.l5d.httpController
-      ip: 0.0.0.0
-      port: 4181
     - kind: io.l5d.mesh
       ip: 0.0.0.0
       port: 4321
-    - kind: io.l5d.mesh
-      ip: 0.0.0.0
-      port: 4322
-    
-
 ---
-kind: ReplicationController
-apiVersion: v1
+kind: Deployment
+apiVersion: apps/v1
 metadata:
   name: namerd
 spec:
   replicas: 1
   selector:
-    app: namerd
+    matchLabels:
+      app: namerd
   template:
     metadata:
       labels:
@@ -111,7 +96,7 @@ metadata:
 spec:
   selector:
     app: namerd
-  type: NodePort
+  type: ClusterIP
   ports:
   - name: thrift
     port: 4100
@@ -121,7 +106,6 @@ spec:
     port: 4321
   - name: admin
     port: 9991
-    nodePort: 30989
 ---
 kind: ConfigMap
 apiVersion: v1
@@ -132,20 +116,38 @@ data:
     #!/bin/sh
 
     set -e
+
+    if namerctl dtab get ingress > /dev/null 2>&1; then
+      echo "ingress namespace already exists"
+    else
+      echo "
+        /srv                                => /#/io.l5d.k8s/default ;
+        /grpc                               => /srv/grpc ;
+        /http                               => /srv/http ;
+
+        # identifier: io.l5d.ingress
+        /svc/default/grpc/veidemann-controller  => /grpc/veidemann-controller ;
+        /svc/default/http/veidemann-api-gateway => /http/veidemann-api-gateway ;
+        /svc/default/http/veidemann-admin       => /http/veidemann-admin ;
+      " | namerctl dtab create ingress -
+    fi
+
     if namerctl dtab get grpc > /dev/null 2>&1; then
       echo "grpc namespace already exists"
     else
       echo "
-        /srv                                => /#/io.l5d.k8s/default/grpc ;
-        /grpc                               => /srv ;
-        /svc/veidemann.api.Frontier         => /srv/veidemann-frontier ;
-        /svc/veidemann.api.ContentWriter    => /srv/veidemann-contentwriter ;
-        /svc/veidemann.api.Controller       => /srv/veidemann-controller ;
-        /svc/veidemann.api.DnsResolver      => /srv/veidemann-dnsresolver ;
-        /svc/veidemann.api.Harvester        => /srv/veidemann-harvester ;
-        /svc/veidemann.api.RobotsEvaluator  => /srv/veidemann-robots ;
-        /svc/veidemann.api.Status           => /srv/veidemann-controller ;
-        /svc/veidemann.api.Report           => /srv/veidemann-controller ;
+        /srv                                => /#/io.l5d.k8s/default ;
+        /grpc                               => /srv/grpc ;
+
+        # identifier: io.l5d.header.path (segments: 1)
+        /svc/veidemann.api.Frontier         => /grpc/veidemann-frontier ;
+        /svc/veidemann.api.ContentWriter    => /grpc/veidemann-contentwriter ;
+        /svc/veidemann.api.Controller       => /grpc/veidemann-controller ;
+        /svc/veidemann.api.DnsResolver      => /grpc/veidemann-dnsresolver ;
+        /svc/veidemann.api.Harvester        => /grpc/veidemann-harvester ;
+        /svc/veidemann.api.RobotsEvaluator  => /grpc/veidemann-robots ;
+        /svc/veidemann.api.Status           => /grpc/veidemann-controller ;
+        /svc/veidemann.api.Report           => /grpc/veidemann-controller ;
       " | namerctl dtab create grpc -
     fi
 ---

@@ -22,6 +22,7 @@ import io.grpc.StatusRuntimeException;
 import io.opentracing.contrib.ClientTracingInterceptor;
 import io.opentracing.util.GlobalTracer;
 import no.nb.nna.veidemann.api.ConfigProto.CrawlConfig;
+import no.nb.nna.veidemann.api.ConfigProto.PolitenessConfig;
 import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
 import no.nb.nna.veidemann.api.RobotsEvaluatorGrpc;
 import no.nb.nna.veidemann.api.RobotsEvaluatorProto;
@@ -56,13 +57,13 @@ public class RobotsServiceClient implements AutoCloseable {
         asyncStub = RobotsEvaluatorGrpc.newStub(channel);
     }
 
-    public boolean isAllowed(QueuedUri queuedUri, CrawlConfig config) {
+    public boolean isAllowed(QueuedUri queuedUri, String userAgent, PolitenessConfig politeness) {
         try {
             RobotsEvaluatorProto.IsAllowedRequest request = RobotsEvaluatorProto.IsAllowedRequest.newBuilder()
                     .setExecutionId(queuedUri.getExecutionId())
                     .setUri(queuedUri.getUri())
-                    .setUserAgent(config.getBrowserConfig().getUserAgent())
-                    .setPoliteness(config.getPoliteness())
+                    .setUserAgent(userAgent)
+                    .setPoliteness(politeness)
                     .build();
             RobotsEvaluatorProto.IsAllowedReply reply = blockingStub.isAllowed(request);
             return reply.getIsAllowed();

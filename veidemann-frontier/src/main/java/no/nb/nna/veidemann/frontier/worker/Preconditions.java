@@ -18,6 +18,8 @@ package no.nb.nna.veidemann.frontier.worker;
 import java.net.UnknownHostException;
 import java.util.List;
 
+import no.nb.nna.veidemann.api.ConfigProto.BrowserConfig;
+import no.nb.nna.veidemann.api.ConfigProto.PolitenessConfig;
 import no.nb.nna.veidemann.api.ConfigProto.PolitenessConfig.RobotsPolicy;
 import no.nb.nna.veidemann.api.ControllerProto;
 import no.nb.nna.veidemann.commons.ExtraStatusCodes;
@@ -41,18 +43,21 @@ public class Preconditions {
     public static boolean checkPreconditions(Frontier frontier, CrawlConfig config, StatusWrapper status,
             QueuedUriWrapper qUri, long sequence) {
 
+        PolitenessConfig politeness = DbUtil.getInstance().getPolitenessConfigForCrawlConfig(config);
+        BrowserConfig browserConfig = DbUtil.getInstance().getBrowserConfigForCrawlConfig(config);
+
         qUri.setExecutionId(status.getId())
-                .setPolitenessId(config.getPoliteness().getId())
+                .setPolitenessId(config.getPolitenessId())
                 .setSequence(sequence);
 
-        if (!checkRobots(frontier, config, qUri)) {
+        if (!checkRobots(frontier, browserConfig.getUserAgent(), politeness, qUri)) {
             status.incrementDocumentsDenied(1L);
             return false;
         }
 
-        resolveDns(frontier, config, qUri);
+        resolveDns(frontier, politeness, qUri);
 
-        if (retryLimitReached(frontier, config, qUri)) {
+        if (retryLimitReached(politeness, qUri)) {
             LOG.info("Failed fetching '{}' due to retry limit", qUri.getUri());
             status.incrementDocumentsFailed();
             return false;
@@ -62,34 +67,34 @@ public class Preconditions {
             // If ip is empty (caused by failed dns resolution) the value 'dns_failure' is used as crawl host group
             // To be able so schedule uri for new dns resolution attempt.
 
-            frontier.getDb().getOrCreateCrawlHostGroup(DNS_FAILURE, config.getPoliteness().getId());
+            DbUtil.getInstance().getDb().getOrCreateCrawlHostGroup(DNS_FAILURE, config.getPolitenessId());
             qUri.setCrawlHostGroupId(DNS_FAILURE);
         } else {
-            setCrawlHostGroup(frontier, qUri, config);
+            setCrawlHostGroup(qUri, politeness);
         }
 
         if (qUri.hasError()) {
             status.incrementDocumentsRetried();
         }
 
-        qUri.addUriToQueue(frontier.getDb());
+        qUri.addUriToQueue();
         return true;
     }
 
-    private static boolean checkRobots(Frontier frontier, CrawlConfig config, QueuedUriWrapper qUri) {
+    private static boolean checkRobots(Frontier frontier, String userAgent, PolitenessConfig politeness, QueuedUriWrapper qUri) {
         LOG.debug("Check robots.txt for URI '{}'", qUri.getUri());
         // Check robots.txt
-        if (config.getPoliteness().getRobotsPolicy() != RobotsPolicy.IGNORE_ROBOTS
-                && !frontier.getRobotsServiceClient().isAllowed(qUri.getQueuedUri(), config)) {
+        if (politeness.getRobotsPolicy() != RobotsPolicy.IGNORE_ROBOTS
+                && !frontier.getRobotsServiceClient().isAllowed(qUri.getQueuedUri(), userAgent, politeness)) {
             LOG.info("URI '{}' precluded by robots.txt", qUri.getUri());
             qUri = qUri.setError(ExtraStatusCodes.PRECLUDED_BY_ROBOTS.toFetchError());
-            frontier.writeLog(frontier, qUri);
+            DbUtil.getInstance().writeLog(qUri);
             return false;
         }
         return true;
     }
 
-    private static void resolveDns(Frontier frontier, CrawlConfig config, QueuedUriWrapper qUri) {
+    private static void resolveDns(Frontier frontier, PolitenessConfig politeness, QueuedUriWrapper qUri) {
         if (!qUri.getIp().isEmpty()) {
             return;
         }
@@ -110,27 +115,27 @@ public class Preconditions {
                     ex);
 
             qUri.setError(ExtraStatusCodes.FAILED_DNS.toFetchError(ex.toString()))
-                .setEarliestFetchDelaySeconds(config.getPoliteness().getRetryDelaySeconds())
+                .setEarliestFetchDelaySeconds(politeness.getRetryDelaySeconds())
                 .incrementRetries();
         }
     }
 
-    private static boolean retryLimitReached(Frontier frontier, CrawlConfig config, QueuedUriWrapper qUri) {
-        if (qUri.getRetries() < config.getPoliteness().getMaxRetries()) {
+    private static boolean retryLimitReached(PolitenessConfig politeness, QueuedUriWrapper qUri) {
+        if (qUri.getRetries() < politeness.getMaxRetries()) {
             return false;
         } else {
-            frontier.writeLog(frontier, qUri, ExtraStatusCodes.RETRY_LIMIT_REACHED.getCode());
+            DbUtil.getInstance().writeLog(qUri, ExtraStatusCodes.RETRY_LIMIT_REACHED.getCode());
             return true;
         }
     }
 
-    private static void setCrawlHostGroup(Frontier frontier, QueuedUriWrapper qUri, CrawlConfig config) {
-        List<CrawlHostGroupConfig> groupConfigs = frontier.getDb()
+    private static void setCrawlHostGroup(QueuedUriWrapper qUri, PolitenessConfig politeness) {
+        List<CrawlHostGroupConfig> groupConfigs = DbUtil.getInstance().getDb()
                 .listCrawlHostGroupConfigs(ControllerProto.ListRequest.newBuilder()
-                        .setSelector(config.getPoliteness().getCrawlHostGroupSelector()).build()).getValueList();
+                        .addAllLabelSelector(politeness.getCrawlHostGroupSelectorList()).build()).getValueList();
 
         String crawlHostGroupId = CrawlHostGroupCalculator.calculateCrawlHostGroup(qUri.getIp(), groupConfigs);
-        frontier.getDb().getOrCreateCrawlHostGroup(crawlHostGroupId, config.getPoliteness().getId());
+        DbUtil.getInstance().getDb().getOrCreateCrawlHostGroup(crawlHostGroupId, politeness.getId());
 
         qUri.setCrawlHostGroupId(crawlHostGroupId);
     }

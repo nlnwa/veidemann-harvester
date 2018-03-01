@@ -53,10 +53,9 @@ public class UserRoleMapper {
         }, 0, 60, TimeUnit.SECONDS);
     }
 
-    public Collection<Role> getRolesForUser(String email, Collection<String> groups) {
+    public Collection<Role> getRolesForUser(String email, Collection<String> groups, Collection<Role> roles) {
         roleUpdateLock.lock();
         try {
-            Set<Role> roles = new HashSet<>();
             if (email != null && rolesByEmail.containsKey(email)) {
                 roles.addAll(rolesByEmail.get(email));
             }

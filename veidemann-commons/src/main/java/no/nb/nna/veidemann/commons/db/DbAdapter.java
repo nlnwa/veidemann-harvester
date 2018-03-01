@@ -30,13 +30,12 @@ import no.nb.nna.veidemann.api.ConfigProto.RoleMapping;
 import no.nb.nna.veidemann.api.ConfigProto.Seed;
 import no.nb.nna.veidemann.api.ControllerProto.BrowserConfigListReply;
 import no.nb.nna.veidemann.api.ControllerProto.BrowserScriptListReply;
-import no.nb.nna.veidemann.api.ControllerProto.BrowserScriptListRequest;
 import no.nb.nna.veidemann.api.ControllerProto.CrawlConfigListReply;
 import no.nb.nna.veidemann.api.ControllerProto.CrawlEntityListReply;
 import no.nb.nna.veidemann.api.ControllerProto.CrawlHostGroupConfigListReply;
 import no.nb.nna.veidemann.api.ControllerProto.CrawlJobListReply;
-import no.nb.nna.veidemann.api.ControllerProto.CrawlJobListRequest;
 import no.nb.nna.veidemann.api.ControllerProto.CrawlScheduleConfigListReply;
+import no.nb.nna.veidemann.api.ControllerProto.GetRequest;
 import no.nb.nna.veidemann.api.ControllerProto.ListRequest;
 import no.nb.nna.veidemann.api.ControllerProto.PolitenessConfigListReply;
 import no.nb.nna.veidemann.api.ControllerProto.RoleMappingsListReply;
@@ -122,11 +121,15 @@ public interface DbAdapter extends AutoCloseable {
 
     Empty deleteScreenshot(Screenshot screenshot);
 
+    CrawlEntity getCrawlEntity(GetRequest req);
+
     CrawlEntity saveCrawlEntity(CrawlEntity msg);
 
     CrawlEntityListReply listCrawlEntities(ListRequest request);
 
     Empty deleteCrawlEntity(CrawlEntity entity);
+
+    Seed getSeed(GetRequest req);
 
     SeedListReply listSeeds(SeedListRequest request);
 
@@ -134,11 +137,15 @@ public interface DbAdapter extends AutoCloseable {
 
     Empty deleteSeed(Seed seed);
 
-    CrawlJobListReply listCrawlJobs(CrawlJobListRequest request);
+    CrawlJob getCrawlJob(GetRequest req);
+
+    CrawlJobListReply listCrawlJobs(ListRequest request);
 
     CrawlJob saveCrawlJob(CrawlJob crawlJob);
 
     Empty deleteCrawlJob(CrawlJob crawlJob);
+
+    CrawlConfig getCrawlConfig(GetRequest req);
 
     CrawlConfigListReply listCrawlConfigs(ListRequest request);
 
@@ -146,11 +153,15 @@ public interface DbAdapter extends AutoCloseable {
 
     Empty deleteCrawlConfig(CrawlConfig crawlConfig);
 
+    CrawlScheduleConfig getCrawlScheduleConfig(GetRequest req);
+
     CrawlScheduleConfigListReply listCrawlScheduleConfigs(ListRequest request);
 
     CrawlScheduleConfig saveCrawlScheduleConfig(CrawlScheduleConfig crawlScheduleConfig);
 
     Empty deleteCrawlScheduleConfig(CrawlScheduleConfig crawlScheduleConfig);
+
+    PolitenessConfig getPolitenessConfig(GetRequest req);
 
     PolitenessConfigListReply listPolitenessConfigs(ListRequest request);
 
@@ -158,17 +169,23 @@ public interface DbAdapter extends AutoCloseable {
 
     Empty deletePolitenessConfig(PolitenessConfig politenessConfig);
 
+    BrowserConfig getBrowserConfig(GetRequest req);
+
     BrowserConfigListReply listBrowserConfigs(ListRequest request);
 
     BrowserConfig saveBrowserConfig(BrowserConfig browserConfig);
 
     Empty deleteBrowserConfig(BrowserConfig browserConfig);
 
+    BrowserScript getBrowserScript(GetRequest req);
+
     BrowserScript saveBrowserScript(BrowserScript script);
 
     Empty deleteBrowserScript(BrowserScript script);
 
-    BrowserScriptListReply listBrowserScripts(BrowserScriptListRequest request);
+    BrowserScriptListReply listBrowserScripts(ListRequest request);
+
+    CrawlHostGroupConfig getCrawlHostGroupConfig(GetRequest req);
 
     CrawlHostGroupConfig saveCrawlHostGroupConfig(CrawlHostGroupConfig crawlHostGroupConfig);
 

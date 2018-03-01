@@ -181,7 +181,7 @@ public class BrowserControllerIT {
                 .setWindowWidth(1024)
                 .setPageLoadTimeoutMs(20000)
                 .setSleepAfterPageloadMs(10000)
-                .setScriptSelector(ConfigProto.Selector.newBuilder().addLabel(ApiTools.buildLabel("scope", "default")))
+                .addScriptSelector("scope:default")
                 .build();
 
         ConfigProto.PolitenessConfig politenessConfig = ConfigProto.PolitenessConfig.newBuilder()
@@ -193,8 +193,8 @@ public class BrowserControllerIT {
 
         ConfigProto.CrawlConfig config = ConfigProto.CrawlConfig.newBuilder()
                 .setMeta(ApiTools.buildMeta("Default", "Default crawl configuration"))
-                .setBrowserConfig(browserConfig)
-                .setPoliteness(politenessConfig)
+                .setBrowserConfigId(browserConfig.getId())
+                .setPolitenessId(politenessConfig.getId())
                 .setExtra(ConfigProto.ExtraConfig.newBuilder().setCreateSnapshot(true).setExtractText(true))
                 .build();
 

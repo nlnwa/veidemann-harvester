@@ -32,7 +32,9 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class IdTokenAuAuServerInterceptor implements AuAuServerInterceptor {
     private static final Logger LOG = LoggerFactory.getLogger(IdTokenAuAuServerInterceptor.class);
@@ -81,6 +83,12 @@ public class IdTokenAuAuServerInterceptor implements AuAuServerInterceptor {
         String method = call.getMethodDescriptor().getFullMethodName();
         LOG.debug("Method: {}", method);
 
+        Collection<Role> roles = new HashSet<>();
+
+        // All users should have the ANY role. Even if their not logged in.
+        roles.add(Role.ANY);
+
+        // Check if user is logged in
         JWTClaimsSet claims = validateBearerToken(requestHeaders);
         if (claims == null) {
             if (grants.isRequireAuthenticatedUser(method)) {
@@ -91,14 +99,19 @@ public class IdTokenAuAuServerInterceptor implements AuAuServerInterceptor {
             }
         }
 
+        // User is logged in so add ANY_USER independently of specific role assignments
+        roles.add(Role.ANY_USER);
+
         String email = (String) claims.getClaim("email");
         List<String> groups = (List<String>) claims.getClaim("groups");
 
         LOG.debug("E-mail: {}", email);
         LOG.debug("Groups: {}", groups);
 
-        Collection<Role> roles = userRoleMapper.getRolesForUser(email, groups);
+        roles = userRoleMapper.getRolesForUser(email, groups, roles);
         LOG.debug("Roles: {}", roles);
+
+        // Check if user has required role
         if (!grants.isAllowed(method, roles)) {
             call.close(Status.PERMISSION_DENIED, new Metadata());
             return NOOP_LISTENER;

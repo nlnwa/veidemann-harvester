@@ -21,6 +21,7 @@ import io.opentracing.util.GlobalTracer;
 import no.nb.nna.veidemann.api.ConfigProto.CrawlConfig;
 import no.nb.nna.veidemann.api.ConfigProto.CrawlJob;
 import no.nb.nna.veidemann.api.ConfigProto.CrawlLimitsConfig;
+import no.nb.nna.veidemann.api.ConfigProto.PolitenessConfig;
 import no.nb.nna.veidemann.api.ControllerProto;
 import no.nb.nna.veidemann.api.HarvesterProto.HarvestPageReply;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus;
@@ -47,7 +48,9 @@ public class CrawlExecution {
 
     private final Frontier frontier;
 
-    private final CrawlConfig config;
+    private final CrawlConfig crawlConfig;
+
+    private final PolitenessConfig politenessConfig;
 
     private final CrawlLimitsConfig limits;
 
@@ -66,14 +69,13 @@ public class CrawlExecution {
     private Span span;
 
     public CrawlExecution(QueuedUri qUri, CrawlHostGroup crawlHostGroup, Frontier frontier) {
-        this.status = StatusWrapper.getStatusWrapper(frontier.getDb(), qUri.getExecutionId());
+        this.status = StatusWrapper.getStatusWrapper(qUri.getExecutionId());
         this.status.setCurrentUri(qUri.getUri());
 
-        ControllerProto.CrawlJobListRequest jobRequest = ControllerProto.CrawlJobListRequest.newBuilder()
+        ControllerProto.GetRequest jobRequest = ControllerProto.GetRequest.newBuilder()
                 .setId(status.getJobId())
-                .setExpand(true)
                 .build();
-        CrawlJob job = frontier.getDb().listCrawlJobs(jobRequest).getValueList().get(0);
+        CrawlJob job = DbUtil.getInstance().getDb().getCrawlJob(jobRequest);
 
         try {
             this.qUri = QueuedUriWrapper.getQueuedUriWrapper(frontier, qUri).clearError();
@@ -82,7 +84,8 @@ public class CrawlExecution {
         }
         this.crawlHostGroup = crawlHostGroup;
         this.frontier = frontier;
-        this.config = job.getCrawlConfig();
+        this.crawlConfig = DbUtil.getInstance().getCrawlConfigForJob(job);
+        this.politenessConfig = DbUtil.getInstance().getPolitenessConfigForCrawlConfig(crawlConfig);
         this.limits = job.getLimits();
     }
 
@@ -90,9 +93,9 @@ public class CrawlExecution {
         return status.getId();
     }
 
-    public CrawlConfig getConfig() {
-        return config;
-    }
+//    public CrawlConfig getConfig() {
+//        return crawlConfig;
+//    }
 
     public CrawlHostGroup getCrawlHostGroup() {
         return crawlHostGroup;
@@ -133,8 +136,8 @@ public class CrawlExecution {
         try {
             status.setState(CrawlExecutionStatus.State.FETCHING)
                     .setStartTimeIfUnset()
-                    .saveStatus(frontier.getDb());
-            frontier.getDb().deleteQueuedUri(qUri.getQueuedUri());
+                    .saveStatus();
+            DbUtil.getInstance().getDb().deleteQueuedUri(qUri.getQueuedUri());
 
             if (isManualAbort() || LimitsCheck.isLimitReached(frontier, limits, status, qUri)) {
                 delayMs = 0L;
@@ -154,7 +157,7 @@ public class CrawlExecution {
 
             final long fetchStart = System.currentTimeMillis();
 
-            frontier.getHarvesterClient().fetchPage(qUri.getQueuedUri(), config)
+            frontier.getHarvesterClient().fetchPage(qUri.getQueuedUri(), crawlConfig)
                     .thenAcceptAsync(r -> {
                         postFetchSuccess(r, fetchStart);
                     })
@@ -216,17 +219,17 @@ public class CrawlExecution {
             if (qUri.hasError() && qUri.getDiscoveryPath().isEmpty()) {
                 // Seed failed; mark crawl as failed
                 endCrawl(CrawlExecutionStatus.State.FAILED);
-            } else if (frontier.getDb().queuedUriCount(getId()) == 0) {
+            } else if (DbUtil.getInstance().getDb().queuedUriCount(getId()) == 0) {
                 endCrawl(CrawlExecutionStatus.State.FINISHED);
             } else if (status.getState() == CrawlExecutionStatus.State.FETCHING) {
                 status.setState(CrawlExecutionStatus.State.SLEEPING);
             }
-            status.saveStatus(frontier.getDb());
+            status.saveStatus();
 
             // Recheck if user aborted crawl while fetching last uri.
             if (isManualAbort()) {
                 // Save updated status
-                status.saveStatus(frontier.getDb());
+                status.saveStatus();
                 delayMs = 0L;
             }
         } catch (Throwable t) {
@@ -235,7 +238,7 @@ public class CrawlExecution {
         }
 
         try {
-            frontier.getDb().releaseCrawlHostGroup(getCrawlHostGroup(), getDelay(TimeUnit.MILLISECONDS));
+            DbUtil.getInstance().getDb().releaseCrawlHostGroup(getCrawlHostGroup(), getDelay(TimeUnit.MILLISECONDS));
         } catch (Throwable t) {
             // An error here indicates problems with DB communication. No idea how to handle that yet.
             LOG.error("Error releasing CrawlHostGroup: {}", t.toString(), t);
@@ -246,7 +249,7 @@ public class CrawlExecution {
 
     void queueOutlinks() {
         long nextSequenceNum = 1L;
-        if (!config.getDepthFirst()) {
+        if (!crawlConfig.getDepthFirst()) {
             nextSequenceNum = getNextSequenceNum();
         }
 
@@ -255,7 +258,7 @@ public class CrawlExecution {
                 QueuedUriWrapper outUri = QueuedUriWrapper.getQueuedUriWrapper(frontier, outlink);
 
                 if (shouldInclude(outUri)) {
-                    Preconditions.checkPreconditions(frontier, config, status, outUri, nextSequenceNum);
+                    Preconditions.checkPreconditions(frontier, crawlConfig, status, outUri, nextSequenceNum);
                     LOG.debug("Found new URI: {}, queueing.", outUri.getSurt());
                 }
             } catch (URISyntaxException ex) {
@@ -274,7 +277,7 @@ public class CrawlExecution {
             return false;
         }
 
-        if (frontier.getDb().uriNotIncludedInQueue(outlink.getQueuedUri(), status.getStartTime())) {
+        if (DbUtil.getInstance().getDb().uriNotIncludedInQueue(outlink.getQueuedUri(), status.getStartTime())) {
             return true;
         }
 
@@ -283,9 +286,9 @@ public class CrawlExecution {
     }
 
     private void calculateDelay() {
-        float delayFactor = getConfig().getPoliteness().getDelayFactor();
-        long minTimeBetweenPageLoadMs = getConfig().getPoliteness().getMinTimeBetweenPageLoadMs();
-        long maxTimeBetweenPageLoadMs = getConfig().getPoliteness().getMaxTimeBetweenPageLoadMs();
+        float delayFactor = politenessConfig.getDelayFactor();
+        long minTimeBetweenPageLoadMs = politenessConfig.getMinTimeBetweenPageLoadMs();
+        long maxTimeBetweenPageLoadMs = politenessConfig.getMaxTimeBetweenPageLoadMs();
         if (delayFactor == 0f) {
             delayFactor = 1f;
         } else if (delayFactor < 0f) {
@@ -312,10 +315,10 @@ public class CrawlExecution {
 
         LOG.info("Failed fetching ({}) at attempt #{}", qUri, qUri.getRetries());
         qUri.incrementRetries()
-                .setEarliestFetchDelaySeconds(getConfig().getPoliteness().getRetryDelaySeconds())
+                .setEarliestFetchDelaySeconds(politenessConfig.getRetryDelaySeconds())
                 .setError(ExtraStatusCodes.RUNTIME_EXCEPTION.toFetchError(t.toString()));
 
-        Preconditions.checkPreconditions(frontier, config, status, qUri, qUri.getQueuedUri().getSequence());
+        Preconditions.checkPreconditions(frontier, crawlConfig, status, qUri, qUri.getQueuedUri().getSequence());
     }
 
     private void endCrawl(CrawlExecutionStatus.State state) {
@@ -333,7 +336,7 @@ public class CrawlExecution {
     private boolean isManualAbort() {
         if (status.getState() == CrawlExecutionStatus.State.ABORTED_MANUAL) {
             status.clearCurrentUri()
-                    .incrementDocumentsDenied(frontier.getDb().deleteQueuedUrisForExecution(status.getId()));
+                    .incrementDocumentsDenied(DbUtil.getInstance().getDb().deleteQueuedUrisForExecution(status.getId()));
             frontier.getHarvesterClient().cleanupExecution(status.getId());
             return true;
         }

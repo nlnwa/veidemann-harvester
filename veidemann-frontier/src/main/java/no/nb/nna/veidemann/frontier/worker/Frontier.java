@@ -35,8 +35,6 @@ public class Frontier implements AutoCloseable {
 
     private static final Logger LOG = LoggerFactory.getLogger(Frontier.class);
 
-    private final RethinkDbAdapter db;
-
     private final HarvesterClient harvesterClient;
 
     private final RobotsServiceClient robotsServiceClient;
@@ -46,7 +44,8 @@ public class Frontier implements AutoCloseable {
     private final QueueWorker queueWorker;
 
     public Frontier(RethinkDbAdapter db, HarvesterClient harvesterClient, RobotsServiceClient robotsServiceClient, DnsServiceClient dnsServiceClient) {
-        this.db = db;
+        DbUtil.getInstance().configure(db);
+
         this.harvesterClient = harvesterClient;
         this.robotsServiceClient = robotsServiceClient;
         this.dnsServiceClient = dnsServiceClient;
@@ -60,7 +59,7 @@ public class Frontier implements AutoCloseable {
                 .setSeedId(seed.getId())
                 .setState(CrawlExecutionStatus.State.CREATED)
                 .setScope(seed.getScope()));
-        status.saveStatus(db);
+        status.saveStatus();
         LOG.debug("New crawl execution: " + status.getId());
 
         String uri = seed.getMeta().getName();
@@ -68,19 +67,15 @@ public class Frontier implements AutoCloseable {
         try {
             QueuedUriWrapper qUri = QueuedUriWrapper.getQueuedUriWrapper(this, uri);
             Preconditions
-                    .checkPreconditions(this, job.getCrawlConfig(), status, qUri, 1L);
+                    .checkPreconditions(this, DbUtil.getInstance().getCrawlConfigForJob(job), status, qUri, 1L);
             LOG.debug("Seed '{}' added to queue", qUri.getUri());
         } catch (URISyntaxException ex) {
             status.incrementDocumentsFailed()
                     .setEndState(CrawlExecutionStatus.State.FAILED)
-                    .saveStatus(db);
+                    .saveStatus();
         }
 
         return status.getCrawlExecutionStatus();
-    }
-
-    public RethinkDbAdapter getDb() {
-        return db;
     }
 
     public HarvesterClient getHarvesterClient() {
@@ -93,35 +88,6 @@ public class Frontier implements AutoCloseable {
 
     public DnsServiceClient getDnsServiceClient() {
         return dnsServiceClient;
-    }
-
-    /**
-     * Write crawl log entry for uris failing preconditions.
-     * <p>
-     * Normally the crawl log is written by the harvester, but when preconditions fail a fetch will never be tried and
-     * the crawl log must be written by the frontier.
-     *
-     * @param frontier the frontier
-     * @param qUri the uri with failed precondition
-     */
-    public void writeLog(Frontier frontier, QueuedUriWrapper qUri) {
-        writeLog(frontier, qUri, qUri.getError().getCode());
-    }
-
-    public void writeLog(Frontier frontier, QueuedUriWrapper qUri, int statusCode) {
-        MessagesProto.CrawlLog crawlLog = MessagesProto.CrawlLog.newBuilder()
-                .setRequestedUri(qUri.getUri())
-                .setExecutionId(qUri.getExecutionId())
-                .setDiscoveryPath(qUri.getDiscoveryPath())
-                .setReferrer(qUri.getReferrer())
-                .setSurt(qUri.getSurt())
-                .setRecordType("response")
-                .setStatusCode(statusCode)
-                .setError(qUri.getError())
-                .setRetries(qUri.getRetries())
-                .setFetchTimeStamp(ProtoUtils.getNowTs())
-                .build();
-        frontier.getDb().saveCrawlLog(crawlLog);
     }
 
     @Override

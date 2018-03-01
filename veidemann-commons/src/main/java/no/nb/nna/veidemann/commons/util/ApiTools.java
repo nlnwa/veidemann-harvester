@@ -17,7 +17,6 @@ package no.nb.nna.veidemann.commons.util;
 
 import no.nb.nna.veidemann.api.ConfigProto.Label;
 import no.nb.nna.veidemann.api.ConfigProto.Meta;
-import no.nb.nna.veidemann.api.ConfigProto.Selector;
 
 import java.util.Arrays;
 
@@ -65,12 +64,6 @@ public class ApiTools {
         return Label.newBuilder()
                 .setKey(key)
                 .setValue(value)
-                .build();
-    }
-
-    public static Selector buildSelector(Label... label) {
-        return Selector.newBuilder()
-                .addAllLabel(Arrays.asList(label))
                 .build();
     }
 

@@ -20,6 +20,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.protobuf.ByteString;
 import io.opentracing.BaseSpan;
 import no.nb.nna.veidemann.api.ConfigProto;
+import no.nb.nna.veidemann.api.ConfigProto.BrowserConfig;
 import no.nb.nna.veidemann.api.MessagesProto;
 import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
 import no.nb.nna.veidemann.chrome.client.ChromeDebugProtocol;
@@ -34,7 +35,7 @@ import no.nb.nna.veidemann.chrome.client.RuntimeDomain;
 import no.nb.nna.veidemann.chrome.client.Session;
 import no.nb.nna.veidemann.chrome.client.SessionClosedException;
 import no.nb.nna.veidemann.commons.VeidemannHeaderConstants;
-import no.nb.nna.veidemann.commons.db.DbAdapter;
+import no.nb.nna.veidemann.commons.db.DbHelper;
 import no.nb.nna.veidemann.commons.util.ApiTools;
 import no.nb.nna.veidemann.db.ProtoUtils;
 import org.slf4j.Logger;
@@ -76,19 +77,20 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
 
     volatile boolean closed = false;
 
-    public BrowserSession(DbAdapter db, ChromeDebugProtocol chrome, ConfigProto.CrawlConfig config, QueuedUri queuedUri, BaseSpan span) throws IOException, ExecutionException, TimeoutException {
+    public BrowserSession(ChromeDebugProtocol chrome, BrowserConfig browserConfig, QueuedUri queuedUri, BaseSpan span) throws IOException, ExecutionException, TimeoutException {
         this.queuedUri = Objects.requireNonNull(queuedUri);
-        // Ensure that we at least wait a second even if the configuration says less.
-        long maxIdleTime = Math.max(config.getBrowserConfig().getSleepAfterPageloadMs(), 1000);
-        crawlLogs = new CrawlLogRegistry(db, this, config.getBrowserConfig().getPageLoadTimeoutMs(), maxIdleTime);
-        uriRequests = new UriRequestRegistry(crawlLogs, queuedUri, span);
-        protocolTimeout = config.getBrowserConfig().getPageLoadTimeoutMs();
 
-        session = chrome.newSession(config.getBrowserConfig().getWindowWidth(), config.getBrowserConfig().getWindowHeight());
+        // Ensure that we at least wait a second even if the configuration says less.
+        long maxIdleTime = Math.max(browserConfig.getSleepAfterPageloadMs(), 1000);
+        crawlLogs = new CrawlLogRegistry(this, browserConfig.getPageLoadTimeoutMs(), maxIdleTime);
+        uriRequests = new UriRequestRegistry(crawlLogs, queuedUri, span);
+        protocolTimeout = browserConfig.getPageLoadTimeoutMs();
+
+        session = chrome.newSession(browserConfig.getWindowWidth(), browserConfig.getWindowHeight());
 
         LOG.debug("Browser session created");
 
-        String userAgent = config.getBrowserConfig().getUserAgent();
+        String userAgent = browserConfig.getUserAgent();
 
         // Set userAgent to config value if it exist, otherwise just replace HeadlessChrome with ChromeVersion
         // like the real browser.
@@ -280,12 +282,12 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
         return uriRequests.getRootRequest().isRenderable();
     }
 
-    public void saveScreenshot(DbAdapter db) throws ClientClosedException, SessionClosedException {
+    public void saveScreenshot() throws ClientClosedException, SessionClosedException {
         try {
             PageDomain.CaptureScreenshotResponse screenshot = session.page().captureScreenshot().withFormat("png").run();
             byte[] img = Base64.getDecoder().decode(screenshot.data());
 
-            db.saveScreenshot(MessagesProto.Screenshot.newBuilder()
+            DbHelper.getInstance().getDb().saveScreenshot(MessagesProto.Screenshot.newBuilder()
                     .setImg(ByteString.copyFrom(img))
                     .setExecutionId(getExecutionId())
                     .setUri(uriRequests.getRootRequest().getUrl())

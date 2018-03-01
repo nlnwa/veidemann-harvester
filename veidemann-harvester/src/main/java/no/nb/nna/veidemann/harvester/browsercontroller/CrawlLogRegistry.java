@@ -19,7 +19,7 @@ import com.google.protobuf.Timestamp;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlLog.Builder;
 import no.nb.nna.veidemann.commons.ExtraStatusCodes;
-import no.nb.nna.veidemann.commons.db.DbAdapter;
+import no.nb.nna.veidemann.commons.db.DbHelper;
 import no.nb.nna.veidemann.db.ProtoUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,7 +37,6 @@ import java.util.concurrent.locks.ReentrantLock;
 public class CrawlLogRegistry {
     private static final Logger LOG = LoggerFactory.getLogger(CrawlLogRegistry.class);
 
-    private final DbAdapter db;
     private final BrowserSession browserSession;
 
     private final List<Entry> crawlLogs = new ArrayList<>();
@@ -83,8 +82,7 @@ public class CrawlLogRegistry {
         }
     }
 
-    public CrawlLogRegistry(final DbAdapter db, final BrowserSession session, final long pageLoadTimeout, final long maxIdleTime) {
-        this.db = db;
+    public CrawlLogRegistry(final BrowserSession session, final long pageLoadTimeout, final long maxIdleTime) {
         this.browserSession = session;
         this.pageLoadTimeout = pageLoadTimeout;
         this.maxIdleTime = maxIdleTime;
@@ -309,7 +307,7 @@ public class CrawlLogRegistry {
                 crawlLogEntry.crawlLog.setTimeStamp(now);
                 CrawlLog enrichedCrawlLog = r.setCrawlLog(crawlLogEntry.crawlLog);
                 if (!r.isFromCache()) {
-                    db.saveCrawlLog(enrichedCrawlLog);
+                    DbHelper.getInstance().getDb().saveCrawlLog(enrichedCrawlLog);
                 }
             }
             crawlLogEntry.resolved = true;

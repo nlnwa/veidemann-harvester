@@ -19,9 +19,11 @@ import io.opentracing.Span;
 import io.opentracing.contrib.OpenTracingContextKey;
 import io.opentracing.tag.Tags;
 import io.opentracing.util.GlobalTracer;
+import no.nb.nna.veidemann.api.ConfigProto.BrowserConfig;
 import no.nb.nna.veidemann.api.ConfigProto.BrowserScript;
 import no.nb.nna.veidemann.api.ConfigProto.CrawlConfig;
 import no.nb.nna.veidemann.api.ControllerProto;
+import no.nb.nna.veidemann.api.ControllerProto.ListRequest;
 import no.nb.nna.veidemann.api.HarvesterProto.HarvestPageReply;
 import no.nb.nna.veidemann.api.MessagesProto.PageLog;
 import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
@@ -29,6 +31,7 @@ import no.nb.nna.veidemann.chrome.client.ChromeDebugProtocol;
 import no.nb.nna.veidemann.chrome.client.ChromeDebugProtocolConfig;
 import no.nb.nna.veidemann.commons.VeidemannHeaderConstants;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
+import no.nb.nna.veidemann.commons.db.DbHelper;
 import no.nb.nna.veidemann.harvester.BrowserSessionRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,14 +54,13 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
 
     private final ChromeDebugProtocol chrome;
 
-    private final DbAdapter db;
-
     private final BrowserSessionRegistry sessionRegistry;
 
     private final Map<String, BrowserScript> scriptCache = new HashMap<>();
 
     public BrowserController(final String chromeHost, final int chromePort, final DbAdapter db,
                              final BrowserSessionRegistry sessionRegistry) {
+        DbHelper.getInstance().configure(db);
 
         ChromeDebugProtocolConfig chromeDebugProtocolConfig = new ChromeDebugProtocolConfig(chromeHost, chromePort)
                 .withTracer(GlobalTracer.get())
@@ -67,7 +69,6 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
                 .withWorkerThreads(32);
 
         this.chrome = new ChromeDebugProtocol(chromeDebugProtocolConfig);
-        this.db = db;
         this.sessionRegistry = sessionRegistry;
     }
 
@@ -87,7 +88,8 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
         MDC.put("eid", queuedUri.getExecutionId());
         MDC.put("uri", queuedUri.getUri());
 
-        BrowserSession session = new BrowserSession(db, chrome, config, queuedUri, span);
+        BrowserConfig browserConfig = DbHelper.getInstance().getBrowserConfigForCrawlConfig(config);
+        BrowserSession session = new BrowserSession(chrome, browserConfig, queuedUri, span);
         try {
             sessionRegistry.put(session);
 
@@ -99,7 +101,7 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
             if (session.isPageRenderable()) {
                 if (config.getExtra().getCreateSnapshot()) {
                     LOG.debug("Save screenshot");
-                    session.saveScreenshot(db);
+                    session.saveScreenshot();
                 }
 
 //                System.out.println("LINKS >>>>>>");
@@ -113,7 +115,7 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
                 LOG.debug("Extract outlinks");
 
                 try {
-                    List<BrowserScript> scripts = getScripts(config);
+                    List<BrowserScript> scripts = getScripts(browserConfig);
                     resultBuilder.addAllOutlinks(session.extractOutlinks(scripts));
                 } catch (Throwable t) {
                     LOG.error("Failed extracting outlinks", t);
@@ -140,7 +142,7 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
 
                 session.getUriRequests().getPageLogResources().forEach(r -> pageLog.addResource(r));
                 resultBuilder.getOutlinksOrBuilderList().forEach(o -> pageLog.addOutlink(o.getUri()));
-                db.savePageLog(pageLog.build());
+                DbHelper.getInstance().getDb().savePageLog(pageLog.build());
             } catch (Throwable t) {
                 LOG.error("Failed writing pagelog", t);
             }
@@ -160,29 +162,27 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
         return resultBuilder.build();
     }
 
-    private List<BrowserScript> getScripts(CrawlConfig config) {
+    private List<BrowserScript> getScripts(BrowserConfig browserConfig) {
         List<BrowserScript> scripts = new ArrayList<>();
-        for (String scriptId : config.getBrowserConfig().getScriptIdList()) {
+        for (String scriptId : browserConfig.getScriptIdList()) {
             BrowserScript script = scriptCache.get(scriptId);
             if (script == null) {
-                ControllerProto.BrowserScriptListRequest req = ControllerProto.BrowserScriptListRequest.newBuilder()
+                ControllerProto.GetRequest req = ControllerProto.GetRequest.newBuilder()
                         .setId(scriptId)
                         .build();
-                script = db.listBrowserScripts(req).getValue(0);
+                script = DbHelper.getInstance().getDb().getBrowserScript(req);
                 scriptCache.put(scriptId, script);
             }
             scripts.add(script);
         }
-        if (config.getBrowserConfig().hasScriptSelector()) {
-            ControllerProto.BrowserScriptListRequest req = ControllerProto.BrowserScriptListRequest.newBuilder()
-                    .setSelector(config.getBrowserConfig().getScriptSelector())
-                    .build();
-            for (BrowserScript script : db.listBrowserScripts(req).getValueList()) {
-                if (!scriptCache.containsKey(script.getId())) {
-                    scriptCache.put(script.getId(), script);
-                }
-                scripts.add(script);
+        ListRequest req = ListRequest.newBuilder()
+                .addAllLabelSelector(browserConfig.getScriptSelectorList())
+                .build();
+        for (BrowserScript script : DbHelper.getInstance().getDb().listBrowserScripts(req).getValueList()) {
+            if (!scriptCache.containsKey(script.getId())) {
+                scriptCache.put(script.getId(), script);
             }
+            scripts.add(script);
         }
         return scripts;
     }

@@ -43,7 +43,7 @@
         <chrome.version>65.0.3322.3</chrome.version>
         <docker.java.image>openjdk:8u151-jdk-alpine</docker.java.image>
 
-        <veidemann.api.version>0.1.1</veidemann.api.version>
+        <veidemann.api.version>0.1.2</veidemann.api.version>
 
         <log4j.version>2.7</log4j.version>
         <org.jwat.version>1.0.4</org.jwat.version>

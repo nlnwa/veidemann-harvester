@@ -30,27 +30,15 @@ public class SeedListRequestQueryBuilder extends ConfigListQueryBuilder<SeedList
         super(request, RethinkDbAdapter.TABLES.SEEDS);
         setPaging(request.getPageSize(), request.getPage());
 
-        switch (request.getQryCase()) {
-            case ID:
-                buildIdQuery(request.getId());
-                break;
-            case NAME:
-                buildNameQuery(request.getName());
-                break;
-            case SELECTOR:
-                buildSelectorQuery(request.getSelector());
-                break;
-            case CRAWL_JOB_ID:
-                setCountQry(r.table(table.name).getAll(request.getCrawlJobId()).optArg("index", "jobId"));
-                setListQry(getCountQry());
-                break;
-            case ENTITY_ID:
-                setCountQry(r.table(table.name).getAll(request.getEntityId()).optArg("index", "entityId"));
-                setListQry(getCountQry());
-                break;
-            default:
-                buildAllOrderedOnNameQuery();
-                break;
+        buildNameQuery(request.getName());
+        buildSelectorQuery(request.getLabelSelectorList());
+
+        if (!request.getCrawlJobId().isEmpty()) {
+            addQuery(r.table(table.name).getAll(request.getCrawlJobId()).optArg("index", "jobId"));
+        }
+
+        if (!request.getEntityId().isEmpty()) {
+            addQuery(r.table(table.name).getAll(request.getEntityId()).optArg("index", "entityId"));
         }
     }
 

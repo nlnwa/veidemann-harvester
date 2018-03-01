@@ -15,21 +15,20 @@
  */
 package no.nb.nna.veidemann.frontier.worker;
 
-import java.net.URISyntaxException;
-
 import com.google.protobuf.Timestamp;
 import com.google.protobuf.util.Durations;
 import com.google.protobuf.util.Timestamps;
-import no.nb.nna.veidemann.commons.db.DbAdapter;
-import no.nb.nna.veidemann.commons.ExtraStatusCodes;
-import no.nb.nna.veidemann.db.ProtoUtils;
 import no.nb.nna.veidemann.api.MessagesProto;
 import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
 import no.nb.nna.veidemann.api.MessagesProto.QueuedUriOrBuilder;
+import no.nb.nna.veidemann.commons.ExtraStatusCodes;
+import no.nb.nna.veidemann.db.ProtoUtils;
 import org.netpreserve.commons.uri.Uri;
 import org.netpreserve.commons.uri.UriConfigs;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.net.URISyntaxException;
 
 /**
  *
@@ -49,7 +48,7 @@ public class QueuedUriWrapper {
             qUri = ((QueuedUri) uri).toBuilder();
         }
         if (qUri.getSurt().isEmpty()) {
-            createSurt(frontier);
+            createSurt();
         }
     }
 
@@ -61,12 +60,12 @@ public class QueuedUriWrapper {
         return new QueuedUriWrapper(frontier, QueuedUri.newBuilder().setUri(uri));
     }
 
-    public QueuedUriWrapper addUriToQueue(DbAdapter db) {
-        qUri = db.saveQueuedUri(qUri.build()).toBuilder();
+    public QueuedUriWrapper addUriToQueue() {
+        qUri = DbUtil.getInstance().getDb().saveQueuedUri(qUri.build()).toBuilder();
         return this;
     }
 
-    private void createSurt(Frontier frontier) throws URISyntaxException {
+    private void createSurt() throws URISyntaxException {
         LOG.debug("Parse URI '{}'", qUri.getUri());
         try {
             surt = UriConfigs.SURT_KEY.buildUri(qUri.getUri());
@@ -74,7 +73,7 @@ public class QueuedUriWrapper {
         } catch (Throwable t) {
             LOG.info("Unparseable URI '{}'", qUri.getUri());
             qUri = qUri.setError(ExtraStatusCodes.ILLEGAL_URI.toFetchError());
-            frontier.writeLog(frontier, this);
+            DbUtil.getInstance().writeLog(this);
             throw new URISyntaxException(qUri.getUri(), t.getMessage());
         }
     }

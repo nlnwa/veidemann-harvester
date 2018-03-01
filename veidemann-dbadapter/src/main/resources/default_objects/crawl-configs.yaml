@@ -1,0 +1,15 @@
+id: "f8609d3f-9bf2-416c-ad50-7774b7d2dd95"
+meta:
+    name: "Default"
+    description: "Default crawl configuration"
+    label:
+    - key: "type"
+      value: "default"
+
+browserConfigId: "407a9600-4f25-4f17-8cff-ee1b8ee950f6"
+
+politenessId: "3c80fe91-98ca-44a1-b240-ead10990b686"
+extra:
+    extractText: true
+    createSnapshot: true
+depthFirst: false

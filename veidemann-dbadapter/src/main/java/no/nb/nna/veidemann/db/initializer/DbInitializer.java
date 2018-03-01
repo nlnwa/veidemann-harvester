@@ -22,8 +22,12 @@ import com.rethinkdb.net.Connection;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigBeanFactory;
 import com.typesafe.config.ConfigFactory;
+import no.nb.nna.veidemann.api.ConfigProto.BrowserConfig;
 import no.nb.nna.veidemann.api.ConfigProto.BrowserScript;
+import no.nb.nna.veidemann.api.ConfigProto.CrawlConfig;
 import no.nb.nna.veidemann.api.ConfigProto.CrawlJob;
+import no.nb.nna.veidemann.api.ConfigProto.CrawlScheduleConfig;
+import no.nb.nna.veidemann.api.ConfigProto.PolitenessConfig;
 import no.nb.nna.veidemann.api.ConfigProto.RoleMapping;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.opentracing.TracerFactory;
@@ -227,6 +231,26 @@ public class DbInitializer {
     private final void populateDb() {
         DbAdapter db = new RethinkDbAdapter(conn);
         try {
+            try (InputStream in = getClass().getClassLoader()
+                    .getResourceAsStream("default_objects/schedule-configs.yaml")) {
+                readYamlFile(in, CrawlScheduleConfig.class)
+                        .forEach(o -> db.saveCrawlScheduleConfig(o));
+            }
+            try (InputStream in = getClass().getClassLoader()
+                    .getResourceAsStream("default_objects/politeness-configs.yaml")) {
+                readYamlFile(in, PolitenessConfig.class)
+                        .forEach(o -> db.savePolitenessConfig(o));
+            }
+            try (InputStream in = getClass().getClassLoader()
+                    .getResourceAsStream("default_objects/browser-configs.yaml")) {
+                readYamlFile(in, BrowserConfig.class)
+                        .forEach(o -> db.saveBrowserConfig(o));
+            }
+            try (InputStream in = getClass().getClassLoader()
+                    .getResourceAsStream("default_objects/crawl-configs.yaml")) {
+                readYamlFile(in, CrawlConfig.class)
+                        .forEach(o -> db.saveCrawlConfig(o));
+            }
             try (InputStream in = getClass().getClassLoader()
                     .getResourceAsStream("default_objects/browser-scripts.yaml")) {
                 readYamlFile(in, BrowserScript.class)

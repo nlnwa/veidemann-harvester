@@ -233,7 +233,7 @@ public class ControllerServiceTest {
                         .claim("email", "user@example.com")
                         .claim("groups", new JSONArray())
                         .build());
-        when(roleMapperMock.getRolesForUser(eq("user@example.com"), anyList()))
+        when(roleMapperMock.getRolesForUser(eq("user@example.com"), anyList(), anyCollection()))
                 .thenReturn(ImmutableList.of(Role.READONLY));
 
 

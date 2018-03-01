@@ -21,13 +21,16 @@ import it.sauronsoftware.cron4j.TaskCollector;
 import it.sauronsoftware.cron4j.TaskTable;
 import no.nb.nna.veidemann.api.ConfigProto.CrawlJob;
 import no.nb.nna.veidemann.api.ConfigProto.CrawlScheduleConfig;
-import no.nb.nna.veidemann.api.ControllerProto.CrawlJobListRequest;
+import no.nb.nna.veidemann.api.ControllerProto.GetRequest;
+import no.nb.nna.veidemann.api.ControllerProto.ListRequest;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.db.ProtoUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.OffsetDateTime;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  *
@@ -38,24 +41,32 @@ public class CrawlJobCollector implements TaskCollector {
 
     final DbAdapter db;
 
-    final CrawlJobListRequest listRequest;
+    final ListRequest listRequest;
 
     final FrontierClient frontierClient;
 
     public CrawlJobCollector(DbAdapter db, FrontierClient frontierClient) {
         this.db = db;
-        this.listRequest = CrawlJobListRequest.newBuilder().setExpand(true).build();
+        this.listRequest = ListRequest.newBuilder().build();
         this.frontierClient = frontierClient;
     }
 
     @Override
     public TaskTable getTasks() {
         TaskTable tasks = new TaskTable();
+        Map<String, CrawlScheduleConfig> schedules = new HashMap<>();
 
         for (CrawlJob job : db.listCrawlJobs(listRequest).getValueList()) {
             // Check if job is disabled
             if (!job.getDisabled()) {
-                CrawlScheduleConfig schedule = job.getSchedule();
+                CrawlScheduleConfig schedule = schedules.computeIfAbsent(job.getScheduleId(),
+                        k -> {
+                            if (k.isEmpty()) {
+                                return CrawlScheduleConfig.getDefaultInstance();
+                            } else {
+                                return db.getCrawlScheduleConfig(GetRequest.newBuilder().setId(k).build());
+                            }
+                        });
 
                 // Check if job is valid for current date
                 OffsetDateTime now = ProtoUtils.getNowOdt();

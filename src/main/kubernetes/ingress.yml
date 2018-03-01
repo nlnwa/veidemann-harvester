@@ -1,16 +1,23 @@
 apiVersion: extensions/v1beta1
 kind: Ingress
 metadata:
-  name: ingress
+  name: ingress-linkerd
+  namespace: default
+  annotations:
+    kubernetes.io/ingress.class: "linkerd"
 spec:
   rules:
   - http:
       paths:
-      - path: /veidemann
+      - path: /veidemann\.api.*
+        backend:
+          serviceName: veidemann-controller
+          servicePort: grpc
+      - path: /veidemann.*
         backend:
           serviceName: veidemann-admin
           servicePort: http
-      - path: /api
+      - path: /api/.*
         backend:
           serviceName: veidemann-api-gateway
           servicePort: http

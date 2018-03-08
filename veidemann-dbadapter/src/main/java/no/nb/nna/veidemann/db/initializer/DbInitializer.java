@@ -81,6 +81,7 @@ public class DbInitializer {
                         .hostname(SETTINGS.getDbHost())
                         .port(SETTINGS.getDbPort())
                         .db(SETTINGS.getDbName())
+                        .user(SETTINGS.getDbUser(), SETTINGS.getDbPassword())
                         .connect();
             } catch (ReqlDriverError e) {
                 System.err.println(e.getMessage());

@@ -58,7 +58,8 @@ public class ContentExplorer {
      */
     public ContentExplorer start() {
         try {
-            DbAdapter db = new RethinkDbAdapter(SETTINGS.getDbHost(), SETTINGS.getDbPort(), SETTINGS.getDbName());
+            DbAdapter db = new RethinkDbAdapter(SETTINGS.getDbHost(), SETTINGS.getDbPort(), SETTINGS.getDbName(),
+                    SETTINGS.getDbUser(), SETTINGS.getDbPassword());
             ApiServer apiServer = new ApiServer(db, new File(SETTINGS.getWarcDir()));
 
             LOG.info("Veidemann Content Explorer (v. {}) started",

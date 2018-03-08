@@ -60,7 +60,8 @@ public class Controller {
      * @return this instance
      */
     public Controller start() {
-        try (DbAdapter db = new RethinkDbAdapter(SETTINGS.getDbHost(), SETTINGS.getDbPort(), SETTINGS.getDbName());
+        try (DbAdapter db = new RethinkDbAdapter(SETTINGS.getDbHost(), SETTINGS.getDbPort(), SETTINGS.getDbName(),
+                SETTINGS.getDbUser(), SETTINGS.getDbPassword());
              FrontierClient frontierClient = new FrontierClient(SETTINGS.getFrontierHost(), SETTINGS
                         .getFrontierPort());
 

@@ -42,10 +42,12 @@ public class RethinkDbConfigServer implements ConfigServer {
         String dbHost = config.getString("dbHost");
         int dbPort = config.getInt("dbPort");
         String dbName = config.getString("dbName");
+        String dbUser = config.getString("dbUser");
+        String dbPassword = config.getString("dbPassword");
 
         LOG.debug("Connecting Config Server to: {}:{}", dbHost, dbPort);
         LogLevels logLevels = LogLevels.getDefaultInstance();
-        try (Connection conn = connect(dbHost, dbPort, dbName);) {
+        try (Connection conn = connect(dbHost, dbPort, dbName, dbUser, dbPassword);) {
             Map msg = r.table(RethinkDbAdapter.TABLES.SYSTEM.name).get("log_levels").pluck("logLevel").run(conn);
             logLevels = ProtoUtils.rethinkToProto(msg, LogLevels.class);
         } catch (Exception ex) {
@@ -55,11 +57,12 @@ public class RethinkDbConfigServer implements ConfigServer {
         return logLevels;
     }
 
-    private Connection connect(String dbHost, int dbPort, String dbName) {
+    private Connection connect(String dbHost, int dbPort, String dbName, String dbUser, String dbPassword) {
         return r.connection()
                 .hostname(dbHost)
                 .port(dbPort)
                 .db(dbName)
+                .user(dbUser, dbPassword)
                 .connect();
     }
 

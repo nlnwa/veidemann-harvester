@@ -27,7 +27,7 @@ public class ConfigListQueryBuilderTestIT {
     public static void init() {
         String dbHost = System.getProperty("db.host");
         int dbPort = Integer.parseInt(System.getProperty("db.port"));
-        db = new RethinkDbAdapter(dbHost, dbPort, "veidemann");
+        db = new RethinkDbAdapter(dbHost, dbPort, "veidemann", "admin", "");
 
         RethinkDB r = RethinkDB.r;
         for (RethinkDbAdapter.TABLES table : RethinkDbAdapter.TABLES.values()) {

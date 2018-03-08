@@ -82,7 +82,7 @@ public class RethinkDbAdapterIT {
     public static void init() {
         String dbHost = System.getProperty("db.host");
         int dbPort = Integer.parseInt(System.getProperty("db.port"));
-        db = new RethinkDbAdapter(dbHost, dbPort, "veidemann");
+        db = new RethinkDbAdapter(dbHost, dbPort, "veidemann", "admin", "");
     }
 
     @AfterClass

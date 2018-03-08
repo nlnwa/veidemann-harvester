@@ -54,7 +54,8 @@ public class DnsServiceServer {
      */
     public DnsServiceServer start() {
         try (
-                DbAdapter db = new RethinkDbAdapter(SETTINGS.getDbHost(), SETTINGS.getDbPort(), SETTINGS.getDbName());
+                DbAdapter db = new RethinkDbAdapter(SETTINGS.getDbHost(), SETTINGS.getDbPort(), SETTINGS.getDbName(),
+                        SETTINGS.getDbUser(), SETTINGS.getDbPassword());
                 ContentWriterClient contentWriterClient = new ContentWriterClient(
                         SETTINGS.getContentWriterHost(), SETTINGS.getContentWriterPort());
                 DnsServiceApiServer apiServer = new DnsServiceApiServer(

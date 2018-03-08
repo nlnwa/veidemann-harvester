@@ -66,7 +66,8 @@ public class Harvester {
     public Harvester start() {
         BrowserSessionRegistry sessionRegistry = new BrowserSessionRegistry();
 
-        try (DbAdapter db = new RethinkDbAdapter(SETTINGS.getDbHost(), SETTINGS.getDbPort(), SETTINGS.getDbName());
+        try (DbAdapter db = new RethinkDbAdapter(SETTINGS.getDbHost(), SETTINGS.getDbPort(), SETTINGS.getDbName(),
+                SETTINGS.getDbUser(), SETTINGS.getDbPassword());
 
              DnsServiceClient dnsServiceClient = new DnsServiceClient(
                      SETTINGS.getDnsResolverHost(), SETTINGS.getDnsResolverPort());

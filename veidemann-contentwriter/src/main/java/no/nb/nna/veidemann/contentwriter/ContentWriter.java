@@ -60,7 +60,8 @@ public class ContentWriter {
      * @return this instance
      */
     public ContentWriter start() {
-        try (DbAdapter db = new RethinkDbAdapter(SETTINGS.getDbHost(), SETTINGS.getDbPort(), SETTINGS.getDbName());
+        try (DbAdapter db = new RethinkDbAdapter(SETTINGS.getDbHost(), SETTINGS.getDbPort(), SETTINGS.getDbName(),
+                SETTINGS.getDbUser(), SETTINGS.getDbPassword());
              WarcWriterPool warcWriterPool = new WarcWriterPool(
                      SETTINGS.getFilePrefix(),
                      new File(SETTINGS.getWarcDir()),

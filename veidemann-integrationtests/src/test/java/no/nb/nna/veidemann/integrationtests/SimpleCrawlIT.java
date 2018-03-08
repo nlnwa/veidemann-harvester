@@ -85,7 +85,7 @@ public class SimpleCrawlIT implements VeidemannHeaderConstants {
                 .build();
         contentWriterClient = ContentWriterGrpc.newBlockingStub(contentWriterChannel).withWaitForReady();
 
-        db = new RethinkDbAdapter(dbHost, dbPort, "veidemann");
+        db = new RethinkDbAdapter(dbHost, dbPort, "veidemann", "admin", "");
     }
 
     @AfterClass

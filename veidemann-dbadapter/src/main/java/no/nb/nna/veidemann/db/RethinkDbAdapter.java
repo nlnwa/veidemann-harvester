@@ -123,8 +123,8 @@ public class RethinkDbAdapter implements DbAdapter {
 
     final Connection conn;
 
-    public RethinkDbAdapter(String dbHost, int dbPort, String dbName) {
-        this(r.connection().hostname(dbHost).port(dbPort).db(dbName).connect());
+    public RethinkDbAdapter(String dbHost, int dbPort, String dbName, String dbUser, String dbPassword) {
+        this(r.connection().hostname(dbHost).port(dbPort).db(dbName).user(dbUser, dbPassword).connect());
     }
 
     public RethinkDbAdapter(Connection conn) {

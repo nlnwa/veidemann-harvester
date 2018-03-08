@@ -57,19 +57,21 @@ public class FrontierService {
     /**
      * Start the service.
      * <p>
+     *
      * @return this instance
      */
     public FrontierService start() {
-        try (DbAdapter db = new RethinkDbAdapter(SETTINGS.getDbHost(), SETTINGS.getDbPort(), SETTINGS.getDbName());
+        try (DbAdapter db = new RethinkDbAdapter(SETTINGS.getDbHost(), SETTINGS.getDbPort(), SETTINGS.getDbName(),
+                SETTINGS.getDbUser(), SETTINGS.getDbPassword());
              HarvesterClient harvesterClient = new HarvesterClient(
                      SETTINGS.getHarvesterHost(), SETTINGS.getHarvesterPort())
                      .withMaxWaitForExhaustedHarvesterMs(SETTINGS.getMaxWaitForExhaustedHarvester());
 
              RobotsServiceClient robotsServiceClient = new RobotsServiceClient(
-                        SETTINGS.getRobotsEvaluatorHost(), SETTINGS.getRobotsEvaluatorPort());
+                     SETTINGS.getRobotsEvaluatorHost(), SETTINGS.getRobotsEvaluatorPort());
 
              DnsServiceClient dnsServiceClient = new DnsServiceClient(
-                        SETTINGS.getDnsResolverHost(), SETTINGS.getDnsResolverPort());
+                     SETTINGS.getDnsResolverHost(), SETTINGS.getDnsResolverPort());
 
              Frontier frontier = new Frontier((RethinkDbAdapter) db, harvesterClient, robotsServiceClient, dnsServiceClient);
              FrontierApiServer apiServer = new FrontierApiServer(SETTINGS.getApiPort(), frontier).start();) {
@@ -95,6 +97,7 @@ public class FrontierService {
     /**
      * Get the settings object.
      * <p>
+     *
      * @return the settings
      */
     public static Settings getSettings() {

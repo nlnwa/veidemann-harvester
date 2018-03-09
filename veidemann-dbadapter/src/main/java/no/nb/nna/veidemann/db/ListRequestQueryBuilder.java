@@ -26,8 +26,12 @@ public class ListRequestQueryBuilder extends ConfigListQueryBuilder<ListRequest>
         super(request, table);
         setPaging(request.getPageSize(), request.getPage());
 
-        buildNameQuery(request.getName());
-        buildSelectorQuery(request.getLabelSelectorList());
+        if (request.getIdCount() > 0) {
+            buildIdQuery(request.getIdList());
+        } else {
+            buildNameQuery(request.getName());
+            buildSelectorQuery(request.getLabelSelectorList());
+        }
     }
 
 }

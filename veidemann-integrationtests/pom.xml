@@ -132,6 +132,7 @@
                                         </network>
                                         <ports>
                                             <port>+db.host:db.port:28015</port>
+                                            <port>+dbgui.host:dbgui.port:8080</port>
                                         </ports>
                                         <volumes>
                                             <bind>
@@ -166,6 +167,8 @@
                                         </dependsOn>
                                         <env>
                                             <DB_HOST>db</DB_HOST>
+                                            <DB_USER>admin</DB_USER>
+                                            <DB_PASSWORD></DB_PASSWORD>
                                         </env>
                                         <log>
                                             <enabled>true</enabled>

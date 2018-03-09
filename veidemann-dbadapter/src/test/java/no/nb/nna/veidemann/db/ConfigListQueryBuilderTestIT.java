@@ -106,6 +106,11 @@ public class ConfigListQueryBuilderTestIT {
         assertThat(reply.getCount()).isEqualTo(5);
         assertThat(reply.getValueList()).containsExactlyInAnyOrder(e1, e2, e3, e4, e5);
 
+        // No match
+        reply = db.listCrawlEntities(ListRequest.newBuilder().addLabelSelector("tomt").build());
+        assertThat(reply.getCount()).isEqualTo(0);
+        assertThat(reply.getValueList()).isEmpty();
+
         // Exact match
         reply = db.listCrawlEntities(ListRequest.newBuilder().addLabelSelector("foo:abc").build());
         assertThat(reply.getCount()).isEqualTo(1);

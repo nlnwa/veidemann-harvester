@@ -30,15 +30,19 @@ public class SeedListRequestQueryBuilder extends ConfigListQueryBuilder<SeedList
         super(request, RethinkDbAdapter.TABLES.SEEDS);
         setPaging(request.getPageSize(), request.getPage());
 
-        buildNameQuery(request.getName());
-        buildSelectorQuery(request.getLabelSelectorList());
+        if (request.getIdCount() > 0) {
+            buildIdQuery(request.getIdList());
+        } else {
+            buildNameQuery(request.getName());
+            buildSelectorQuery(request.getLabelSelectorList());
 
-        if (!request.getCrawlJobId().isEmpty()) {
-            addQuery(r.table(table.name).getAll(request.getCrawlJobId()).optArg("index", "jobId"));
-        }
+            if (!request.getCrawlJobId().isEmpty()) {
+                addQuery(r.table(table.name).getAll(request.getCrawlJobId()).optArg("index", "jobId"));
+            }
 
-        if (!request.getEntityId().isEmpty()) {
-            addQuery(r.table(table.name).getAll(request.getEntityId()).optArg("index", "entityId"));
+            if (!request.getEntityId().isEmpty()) {
+                addQuery(r.table(table.name).getAll(request.getEntityId()).optArg("index", "entityId"));
+            }
         }
     }
 

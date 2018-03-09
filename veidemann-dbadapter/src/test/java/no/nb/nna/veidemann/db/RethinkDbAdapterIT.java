@@ -589,12 +589,17 @@ public class RethinkDbAdapterIT {
      */
     @Test
     public void testSaveAndListSeeds() {
-        CrawlEntity entity1 = CrawlEntity.newBuilder()
+        CrawlEntity entity1 = db.saveCrawlEntity(CrawlEntity.newBuilder()
                 .setMeta(Meta.newBuilder()
                         .setName("Nasjonalbiblioteket")
                         .setCreated(ProtoUtils.odtToTs(OffsetDateTime.parse("2017-04-06T06:20:35.779Z"))))
-                .build();
-        entity1 = db.saveCrawlEntity(entity1);
+                .build());
+
+        CrawlEntity entity2 = db.saveCrawlEntity(CrawlEntity.newBuilder()
+                .setMeta(Meta.newBuilder()
+                        .setName("Foo")
+                        .setCreated(ProtoUtils.odtToTs(OffsetDateTime.parse("2017-04-06T06:20:35.779Z"))))
+                .build());
 
         Seed seed1 = Seed.newBuilder()
                 .setMeta(Meta.newBuilder().setName("http://seed1.foo"))
@@ -607,6 +612,7 @@ public class RethinkDbAdapterIT {
                 .setMeta(Meta.newBuilder().setName("http://seed2.foo"))
                 .addJobId("job1")
                 .addJobId("job2")
+                .setEntityId(entity2.getId())
                 .build();
         Seed savedSeed2 = db.saveSeed(seed2);
 
@@ -624,6 +630,10 @@ public class RethinkDbAdapterIT {
         request = SeedListRequest.newBuilder().setEntityId(entity1.getId()).build();
         result = db.listSeeds(request);
         assertThat(result.getValueList()).containsOnly(savedSeed1, savedSeed3);
+
+        request = SeedListRequest.newBuilder().setEntityId(entity2.getId()).build();
+        result = db.listSeeds(request);
+        assertThat(result.getValueList()).containsOnly(savedSeed2);
     }
 
     /**

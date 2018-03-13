@@ -58,6 +58,7 @@ import no.nb.nna.veidemann.api.MessagesProto.CrawlHostGroup;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
 import no.nb.nna.veidemann.api.MessagesProto.CrawledContent;
 import no.nb.nna.veidemann.api.MessagesProto.ExtractedText;
+import no.nb.nna.veidemann.api.MessagesProto.JobExecutionStatus;
 import no.nb.nna.veidemann.api.MessagesProto.PageLog;
 import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
 import no.nb.nna.veidemann.api.MessagesProto.Screenshot;
@@ -95,6 +96,7 @@ public class RethinkDbAdapter implements DbAdapter {
         URI_QUEUE("uri_queue", QueuedUri.getDefaultInstance()),
         SCREENSHOT("screenshot", Screenshot.getDefaultInstance()),
         EXECUTIONS("executions", CrawlExecutionStatus.getDefaultInstance()),
+        JOB_EXECUTIONS("job_executions", JobExecutionStatus.getDefaultInstance()),
         CRAWL_HOST_GROUP("crawl_host_group", CrawlHostGroup.getDefaultInstance()),
         ALREADY_CRAWLED_CACHE("already_crawled_cache", null),
         BROWSER_SCRIPTS("config_browser_scripts", BrowserScript.getDefaultInstance()),
@@ -331,6 +333,32 @@ public class RethinkDbAdapter implements DbAdapter {
                 .build();
 
         return chg;
+    }
+
+    @Override
+    public JobExecutionStatus saveJobExecutionStatus(JobExecutionStatus status) {
+        Map rMap = ProtoUtils.protoToRethink(status);
+        return executeInsert("db-saveJobExecutionStatus",
+                r.table(TABLES.JOB_EXECUTIONS.name)
+                        .insert(rMap)
+                        .optArg("conflict", (id, oldDoc, newDoc) -> r.branch(
+                                oldDoc.hasFields("endTime"),
+                                newDoc.merge(
+                                        r.hashMap("state", oldDoc.g("state")).with("endTime", oldDoc.g("endTime"))
+                                ),
+                                newDoc
+                        )),
+                JobExecutionStatus.class);
+    }
+
+    @Override
+    public JobExecutionStatus getJobExecutionStatus(String jobExecutionId) {
+        Map<String, Object> response = executeRequest("db-getJobExecutionStatus",
+                r.table(TABLES.JOB_EXECUTIONS.name)
+                        .get(jobExecutionId)
+        );
+
+        return ProtoUtils.rethinkToProto(response, JobExecutionStatus.class);
     }
 
     @Override

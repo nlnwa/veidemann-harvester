@@ -153,6 +153,9 @@ public class DbInitializer {
         r.tableCreate(TABLES.EXECUTIONS.name).run(conn);
         r.table(TABLES.EXECUTIONS.name).indexCreate("startTime").run(conn);
 
+        r.tableCreate(TABLES.JOB_EXECUTIONS.name).run(conn);
+        r.table(TABLES.JOB_EXECUTIONS.name).indexCreate("startTime").run(conn);
+
         r.tableCreate(TABLES.SCREENSHOT.name).run(conn);
         r.table(TABLES.SCREENSHOT.name).indexCreate("executionId").run(conn);
 

@@ -47,6 +47,7 @@ import no.nb.nna.veidemann.api.MessagesProto.CrawlHostGroup;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
 import no.nb.nna.veidemann.api.MessagesProto.CrawledContent;
 import no.nb.nna.veidemann.api.MessagesProto.ExtractedText;
+import no.nb.nna.veidemann.api.MessagesProto.JobExecutionStatus;
 import no.nb.nna.veidemann.api.MessagesProto.PageLog;
 import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
 import no.nb.nna.veidemann.api.MessagesProto.Screenshot;
@@ -77,6 +78,10 @@ public interface DbAdapter extends AutoCloseable {
     PageLogListReply listPageLogs(PageLogListRequest request);
 
     ExtractedText addExtractedText(ExtractedText et);
+
+    JobExecutionStatus saveJobExecutionStatus(JobExecutionStatus status);
+
+    JobExecutionStatus getJobExecutionStatus(String jobExecutionId);
 
     CrawlExecutionStatus saveExecutionStatus(CrawlExecutionStatus status);
 

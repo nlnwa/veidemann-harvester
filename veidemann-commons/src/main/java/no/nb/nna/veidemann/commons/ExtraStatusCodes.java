@@ -20,7 +20,7 @@ import no.nb.nna.veidemann.api.MessagesProto;
 /**
  * Status codes in addition to those defined by http.
  *
- * This list is stolen from Heritrix
+ * This list is based on error codes from Heritrix
  */
 public enum ExtraStatusCodes {
     SUCCESSFUL_DNS(1, "Successful DNS lookup"),
@@ -66,7 +66,7 @@ public enum ExtraStatusCodes {
         return description;
     }
 
-    public static ExtraStatusCodes fromFetchError(MessagesProto.FetchErrorOrBuilder error) {
+    public static ExtraStatusCodes fromFetchError(MessagesProto.ErrorOrBuilder error) {
         for (ExtraStatusCodes v : values()) {
             if (v.getCode() == error.getCode()) {
                 return v;
@@ -75,12 +75,12 @@ public enum ExtraStatusCodes {
         throw new IllegalArgumentException("Unknown error code: " + error.getCode());
     }
 
-    public MessagesProto.FetchError toFetchError() {
-        return MessagesProto.FetchError.newBuilder().setCode(code).build();
+    public MessagesProto.Error toFetchError() {
+        return MessagesProto.Error.newBuilder().setCode(code).build();
     }
 
-    public MessagesProto.FetchError toFetchError(String message) {
-        return MessagesProto.FetchError.newBuilder().setCode(code).setMsg(message).build();
+    public MessagesProto.Error toFetchError(String message) {
+        return MessagesProto.Error.newBuilder().setCode(code).setMsg(message).build();
     }
 
 }

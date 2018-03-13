@@ -50,12 +50,15 @@ import no.nb.nna.veidemann.api.ControllerProto.RunCrawlReply;
 import no.nb.nna.veidemann.api.ControllerProto.RunCrawlRequest;
 import no.nb.nna.veidemann.api.ControllerProto.SeedListReply;
 import no.nb.nna.veidemann.api.ControllerProto.SeedListRequest;
+import no.nb.nna.veidemann.api.MessagesProto.JobExecutionStatus;
+import no.nb.nna.veidemann.api.MessagesProto.JobExecutionStatus.State;
 import no.nb.nna.veidemann.commons.auth.AllowedRoles;
 import no.nb.nna.veidemann.commons.auth.RolesContextKey;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.util.CrawlScopes;
 import no.nb.nna.veidemann.controller.scheduler.FrontierClient;
 import no.nb.nna.veidemann.controller.settings.Settings;
+import no.nb.nna.veidemann.db.ProtoUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -536,11 +539,17 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
             CrawlJob job = db.getCrawlJob(jobRequest);
             LOG.info("Job '{}' starting", job.getMeta().getName());
 
+            JobExecutionStatus jobExecutionStatus = db.saveJobExecutionStatus(JobExecutionStatus.newBuilder()
+                    .setJobId(job.getId())
+                    .setStartTime(ProtoUtils.getNowTs())
+                    .setState(State.RUNNING)
+                    .build());
+
             if (!request.getSeedId().isEmpty()) {
                 Seed seed = db.getSeed(GetRequest.newBuilder()
                         .setId(request.getSeedId())
                         .build());
-                runSeed(job, seed, reply);
+                runSeed(job, seed, jobExecutionStatus, reply);
             } else {
                 SeedListRequest seedRequest;
                 int page = 0;
@@ -554,7 +563,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
                 SeedListReply seedList = db.listSeeds(seedRequest);
                 while (seedList.getValueCount() > 0) {
                     for (Seed seed : seedList.getValueList()) {
-                        runSeed(job, seed, reply);
+                        runSeed(job, seed, jobExecutionStatus, reply);
                     }
                     seedRequest = seedRequest.toBuilder().setPage(++page).build();
                     seedList = db.listSeeds(seedRequest);
@@ -571,11 +580,11 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
         }
     }
 
-    private void runSeed(CrawlJob job, Seed seed, RunCrawlReply.Builder reply) {
+    private void runSeed(CrawlJob job, Seed seed, JobExecutionStatus jobExecutionStatus, RunCrawlReply.Builder reply) {
         if (!seed.getDisabled()) {
             if (LOG.isInfoEnabled()) {
                 LOG.info("Start harvest of: {}", seed.getMeta().getName());
-                reply.addSeedExecutionId(frontierClient.crawlSeed(job, seed).getId());
+                reply.addSeedExecutionId(frontierClient.crawlSeed(job, seed, jobExecutionStatus).getId());
             }
         }
     }

@@ -24,9 +24,12 @@ import no.nb.nna.veidemann.api.ControllerProto.SeedListRequest;
 import no.nb.nna.veidemann.api.MessagesProto.JobExecutionStatus;
 import no.nb.nna.veidemann.api.MessagesProto.JobExecutionStatus.State;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
+import no.nb.nna.veidemann.commons.util.ApiTools.ListReplyWalker;
 import no.nb.nna.veidemann.db.ProtoUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static no.nb.nna.veidemann.controller.JobExecutionUtil.crawlSeed;
 
 /**
  *
@@ -39,12 +42,9 @@ public class ScheduledCrawlJob extends Task {
 
     final DbAdapter db;
 
-    final FrontierClient frontierClient;
-
-    public ScheduledCrawlJob(DbAdapter db, FrontierClient frontierClient, CrawlJob job) {
+    public ScheduledCrawlJob(DbAdapter db, CrawlJob job) {
         this.db = db;
         this.job = job;
-        this.frontierClient = frontierClient;
     }
 
     @Override
@@ -57,34 +57,13 @@ public class ScheduledCrawlJob extends Task {
                 .setState(State.RUNNING)
                 .build());
 
-        SeedListRequest seedRequest;
-        int page = 0;
+        ListReplyWalker<SeedListRequest, Seed> walker = new ListReplyWalker<>();
+        SeedListRequest.Builder seedRequest = SeedListRequest.newBuilder().setCrawlJobId(job.getId());
 
-        seedRequest = SeedListRequest.newBuilder()
-                .setCrawlJobId(job.getId())
-                .setPageSize(100)
-                .setPage(page)
-                .build();
-
-        SeedListReply seedList = db.listSeeds(seedRequest);
-        while (seedList.getValueCount() > 0) {
-            for (Seed seed : seedList.getValueList()) {
-                runSeed(job, seed, jobExecutionStatus);
-            }
-            seedRequest = seedRequest.toBuilder().setPage(++page).build();
-            seedList = db.listSeeds(seedRequest);
-        }
+        walker.walk(seedRequest,
+                req -> db.listSeeds(req),
+                seed -> crawlSeed(job, seed, jobExecutionStatus));
 
         LOG.info("All seeds for job '{}' started", job.getMeta().getName());
-    }
-
-
-    private void runSeed(CrawlJob job, Seed seed, JobExecutionStatus jobExecutionStatus) {
-        if (!seed.getDisabled()) {
-            if (LOG.isInfoEnabled()) {
-                LOG.info("Start harvest of: {}", seed.getMeta().getName());
-                frontierClient.crawlSeed(job, seed, jobExecutionStatus).getId();
-            }
-        }
     }
 }

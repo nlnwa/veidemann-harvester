@@ -28,7 +28,6 @@ import no.nb.nna.veidemann.commons.auth.UserRoleMapper;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.opentracing.TracerFactory;
 import no.nb.nna.veidemann.controller.scheduler.CrawlJobScheduler;
-import no.nb.nna.veidemann.controller.scheduler.FrontierClient;
 import no.nb.nna.veidemann.controller.settings.Settings;
 import no.nb.nna.veidemann.db.RethinkDbAdapter;
 import org.slf4j.Logger;
@@ -57,18 +56,18 @@ public class Controller {
     /**
      * Start the service.
      * <p>
+     *
      * @return this instance
      */
     public Controller start() {
         try (DbAdapter db = new RethinkDbAdapter(SETTINGS.getDbHost(), SETTINGS.getDbPort(), SETTINGS.getDbName(),
                 SETTINGS.getDbUser(), SETTINGS.getDbPassword());
-             FrontierClient frontierClient = new FrontierClient(SETTINGS.getFrontierHost(), SETTINGS
-                        .getFrontierPort());
+             FrontierClient urlFrontierClient = new FrontierClient(SETTINGS.getFrontierHost(), SETTINGS
+                     .getFrontierPort(), "url");
 
-             ControllerApiServer apiServer = new ControllerApiServer(SETTINGS, db, frontierClient,
-                     getAuAuServerInterceptor(db)).start();
+             ControllerApiServer apiServer = new ControllerApiServer(SETTINGS, db, getAuAuServerInterceptor(db)).start();
 
-             CrawlJobScheduler scheduler = new CrawlJobScheduler(db, frontierClient).start();) {
+             CrawlJobScheduler scheduler = new CrawlJobScheduler(db).start();) {
 
             LOG.info("Veidemann Controller (v. {}) started", Controller.class.getPackage().getImplementationVersion());
 
@@ -88,6 +87,7 @@ public class Controller {
     /**
      * Get the settings object.
      * <p>
+     *
      * @return the settings
      */
     public static Settings getSettings() {

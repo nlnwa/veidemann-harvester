@@ -16,8 +16,17 @@
 
 package no.nb.nna.veidemann.commons.util;
 
+import com.google.protobuf.Message;
 import no.nb.nna.veidemann.api.ConfigProto;
+import no.nb.nna.veidemann.api.ConfigProto.Seed;
+import no.nb.nna.veidemann.api.ControllerProto.ListRequest;
+import no.nb.nna.veidemann.api.ControllerProto.SeedListReply;
+import no.nb.nna.veidemann.api.ControllerProto.SeedListRequest;
 import org.junit.Test;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Function;
 
 import static no.nb.nna.veidemann.commons.util.ApiTools.*;
 import static org.assertj.core.api.Assertions.*;
@@ -26,6 +35,15 @@ import static org.assertj.core.api.Assertions.*;
  *
  */
 public class ApiToolsTest {
+    @Test
+    public void testGetFirstLabelWithKey() {
+        ConfigProto.Meta meta = buildMeta("name", "descr",
+                buildLabel("aa", "bb"), buildLabel("cc", "dd"), buildLabel("aa", "ee"));
+
+        assertThat(ApiTools.getFirstLabelWithKey(meta, "aa")).isPresent().contains(buildLabel("aa", "bb"));
+        assertThat(ApiTools.getFirstLabelWithKey(meta, "cc")).isPresent().contains(buildLabel("cc", "dd"));
+        assertThat(ApiTools.getFirstLabelWithKey(meta, "bb")).isNotPresent();
+    }
 
     /**
      * Test of hasLabel method, of class ApiTools.
@@ -51,4 +69,50 @@ public class ApiToolsTest {
         assertThat(ApiTools.hasLabel(meta)).isFalse();
     }
 
+    @Test
+    public void testListReplyWalker() {
+        SeedListRequest.Builder request = SeedListRequest.newBuilder().setName("foo").setPageSize(5);
+
+        Function<SeedListRequest, Message> fetchFunc = r-> {
+            SeedListReply reply;
+            switch (r.getPage()) {
+                case 0:
+                    reply = SeedListReply.newBuilder()
+                            .addValue(Seed.newBuilder().setId("id1"))
+                            .addValue(Seed.newBuilder().setId("id2"))
+                            .addValue(Seed.newBuilder().setId("id3"))
+                            .build();
+                    break;
+                case 1:
+                    reply = SeedListReply.newBuilder()
+                            .addValue(Seed.newBuilder().setId("id4"))
+                            .addValue(Seed.newBuilder().setId("id5"))
+                            .build();
+                    break;
+                default:
+                    reply = SeedListReply.getDefaultInstance();
+            }
+            return reply;
+        };
+
+        List<String> values = new ArrayList<>();
+        ListReplyWalker<SeedListRequest, Seed> walker = new ListReplyWalker<>();
+
+        // Test with pageSize = 5
+        walker.walk(request,
+                fetchFunc,
+                v -> values.add(v.getId()));
+
+        assertThat(values).containsExactly("id1", "id2", "id3", "id4", "id5");
+        assertThat(request.getPageSize()).isEqualTo(5);
+
+        // Test with default pageSize (100)
+        request.setPageSize(0);
+        walker.walk(request,
+                fetchFunc,
+                v -> values.add(v.getId()));
+
+        assertThat(values).containsExactly("id1", "id2", "id3", "id4", "id5", "id1", "id2", "id3", "id4", "id5");
+        assertThat(request.getPageSize()).isEqualTo(100);
+    }
 }

@@ -23,6 +23,7 @@ import com.google.protobuf.util.Timestamps;
 import com.rethinkdb.RethinkDB;
 import com.rethinkdb.gen.ast.Insert;
 import com.rethinkdb.gen.ast.ReqlExpr;
+import com.rethinkdb.gen.ast.Update;
 import com.rethinkdb.gen.exc.ReqlError;
 import com.rethinkdb.model.OptArgs;
 import com.rethinkdb.net.Connection;
@@ -69,6 +70,12 @@ import no.nb.nna.veidemann.api.ReportProto.PageLogListRequest;
 import no.nb.nna.veidemann.api.ReportProto.ScreenshotListReply;
 import no.nb.nna.veidemann.api.ReportProto.ScreenshotListRequest;
 import no.nb.nna.veidemann.api.StatusProto;
+import no.nb.nna.veidemann.api.StatusProto.ExecutionsListReply;
+import no.nb.nna.veidemann.api.StatusProto.JobExecutionsListReply;
+import no.nb.nna.veidemann.api.StatusProto.ListExecutionsRequest;
+import no.nb.nna.veidemann.api.StatusProto.ListJobExecutionsRequest;
+import no.nb.nna.veidemann.api.StatusProto.RunningExecutionsListReply;
+import no.nb.nna.veidemann.api.StatusProto.RunningExecutionsRequest;
 import no.nb.nna.veidemann.commons.auth.EmailContextKey;
 import no.nb.nna.veidemann.commons.db.ChangeFeed;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
@@ -362,6 +369,26 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
+    public JobExecutionsListReply listJobExecutionStatus(ListJobExecutionsRequest request) {
+        JobExecutionsListRequestQueryBuilder queryBuilder = new JobExecutionsListRequestQueryBuilder(request);
+        return queryBuilder.executeList(this).build();
+    }
+
+    @Override
+    public JobExecutionStatus setJobExecutionStateAborted(String jobExecutionId) {
+        return executeUpdate("db-setJobExecutionStateAborted",
+                r.table(TABLES.JOB_EXECUTIONS.name)
+                        .get(jobExecutionId)
+                        .update(
+                                doc -> r.branch(
+                                        doc.hasFields("endTime"),
+                                        r.hashMap(),
+                                        r.hashMap("state", State.ABORTED_MANUAL.name()).with("endTime", r.now()))
+                        ),
+                JobExecutionStatus.class);
+    }
+
+    @Override
     public CrawlExecutionStatus saveExecutionStatus(CrawlExecutionStatus status) {
         Map rMap = ProtoUtils.protoToRethink(status);
         return executeInsert("db-saveExecutionStatus",
@@ -388,16 +415,23 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
-    public void setExecutionStateAborted(String executionId) {
-        executeRequest("db-setExecutionStateAborted",
-                r.table(TABLES.EXECUTIONS.name).get(executionId)
+    public ExecutionsListReply listExecutionStatus(ListExecutionsRequest request) {
+        CrawlExecutionsListRequestQueryBuilder queryBuilder = new CrawlExecutionsListRequestQueryBuilder(request);
+        return queryBuilder.executeList(this).build();
+    }
+
+    @Override
+    public CrawlExecutionStatus setExecutionStateAborted(String executionId) {
+        return executeUpdate("db-setExecutionStateAborted",
+                r.table(TABLES.EXECUTIONS.name)
+                        .get(executionId)
                         .update(
                                 doc -> r.branch(
                                         doc.hasFields("endTime"),
                                         r.hashMap(),
                                         r.hashMap("state", State.ABORTED_MANUAL.name()).with("endTime", r.now()))
-                        )
-        );
+                        ),
+                CrawlExecutionStatus.class);
     }
 
     @Override
@@ -506,7 +540,7 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
-    public ChangeFeed<StatusProto.ExecutionsListReply> getExecutionStatusStream(StatusProto.ExecutionsRequest request) {
+    public ChangeFeed<RunningExecutionsListReply> getExecutionStatusStream(RunningExecutionsRequest request) {
         int limit = request.getPageSize();
         if (limit == 0) {
             limit = 100;
@@ -529,29 +563,25 @@ public class RethinkDbAdapter implements DbAdapter {
                         .without("seedId")
         );
 
-        return new ChangeFeedBase<StatusProto.ExecutionsListReply>(res) {
-            StatusProto.ExecutionsListReply.Builder reply = StatusProto.ExecutionsListReply.newBuilder();
+        return new ChangeFeedBase<RunningExecutionsListReply>(res) {
+            RunningExecutionsListReply.Builder reply = RunningExecutionsListReply.newBuilder();
 
             @Override
-            protected Function<Map<String, Object>, StatusProto.ExecutionsListReply> mapper() {
-                return new Function<Map<String, Object>, StatusProto.ExecutionsListReply>() {
-                    @Override
-                    public StatusProto.ExecutionsListReply apply(Map<String, Object> t) {
-                        Long newOffset = (Long) t.remove("newOffset");
-                        Long oldOffset = (Long) t.remove("oldOffset");
-                        StatusProto.StatusDetail resp = ProtoUtils.rethinkToProto(t, StatusProto.StatusDetail.class);
-                        if (oldOffset != null) {
-                            reply.removeValue(oldOffset.intValue());
-                        }
-                        if (newOffset != null) {
-                            if (newOffset > reply.getValueCount()) {
-                                newOffset = (long) reply.getValueCount();
-                            }
-                            reply.addValue(newOffset.intValue(), resp);
-                        }
-                        return reply.build();
+            protected Function<Map<String, Object>, RunningExecutionsListReply> mapper() {
+                return t -> {
+                    Long newOffset = (Long) t.remove("newOffset");
+                    Long oldOffset = (Long) t.remove("oldOffset");
+                    StatusProto.StatusDetail resp = ProtoUtils.rethinkToProto(t, StatusProto.StatusDetail.class);
+                    if (oldOffset != null) {
+                        reply.removeValue(oldOffset.intValue());
                     }
-
+                    if (newOffset != null) {
+                        if (newOffset > reply.getValueCount()) {
+                            newOffset = (long) reply.getValueCount();
+                        }
+                        reply.addValue(newOffset.intValue(), resp);
+                    }
+                    return reply.build();
                 };
             }
 
@@ -848,6 +878,16 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     public <T extends Message> T executeInsert(String operationName, Insert qry, Class<T> type) {
+        qry = qry.optArg("return_changes", "always");
+
+        Map<String, Object> response = executeRequest(operationName, qry);
+        List<Map<String, Map>> changes = (List<Map<String, Map>>) response.get("changes");
+
+        Map newDoc = changes.get(0).get("new_val");
+        return ProtoUtils.rethinkToProto(newDoc, type);
+    }
+
+    public <T extends Message> T executeUpdate(String operationName, Update qry, Class<T> type) {
         qry = qry.optArg("return_changes", "always");
 
         Map<String, Object> response = executeRequest(operationName, qry);

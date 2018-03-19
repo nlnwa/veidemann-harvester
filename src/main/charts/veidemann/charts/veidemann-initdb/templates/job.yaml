@@ -1,0 +1,35 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ template "veidemann-initdb.fullname" . }}
+  labels:
+    app: veidemann
+    component: {{ template "veidemann-initdb.name" . }}
+    chart: {{ template "veidemann-initdb.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  template:
+    metadata:
+      name: {{ template "veidemann-initdb.fullname" . }}
+    spec:
+      restartPolicy: {{ .Values.image.restartPolicy | quote }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: DB_HOST
+              value: {{ .Values.config.db.host | quote }}
+            - name: DB_PORT
+              value: {{ .Values.config.db.port | quote }}
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.config.db.secretName }}
+                  key: username
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.config.db.secretName }}
+                  key: password

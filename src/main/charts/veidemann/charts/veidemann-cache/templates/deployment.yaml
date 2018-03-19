@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ template "veidemann-cache.fullname" . }}
+  labels:
+    app: veidemann
+    component: {{ template "veidemann-cache.name" . }}
+    chart: {{ template "veidemann-cache.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      component: {{ template "veidemann-cache.name" . }}
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        component: {{ template "veidemann-cache.name" . }}
+        release: {{ .Release.Name }}
+    spec:
+      volumes:
+        - name: workdir
+          emptyDir: {}
+        - name: dshm
+          emptyDir:
+            medium: Memory
+        - name: cache-certificate
+          secret:
+            secretName: {{ template "veidemann-cache.fullname" . }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 3128
+              protocol: TCP
+          env:
+            - name: DNS_SERVERS
+              value: {{ .Values.config.dnsServers | quote }}
+          volumeMounts:
+            - name: workdir
+              mountPath: /var/cache/squid
+            - name: cache-certificate
+              mountPath: "/ca-certificates"
+              readOnly: true
+          resources:
+{{ toYaml .Values.resources | indent 12 }}
+    {{- with .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.affinity }}
+      affinity:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.tolerations }}
+      tolerations:
+{{ toYaml . | indent 8 }}
+    {{- end }}

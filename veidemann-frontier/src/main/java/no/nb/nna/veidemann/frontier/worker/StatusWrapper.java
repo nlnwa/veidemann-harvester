@@ -18,6 +18,7 @@ package no.nb.nna.veidemann.frontier.worker;
 import com.google.protobuf.Timestamp;
 import no.nb.nna.veidemann.api.ConfigProto;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus;
+import no.nb.nna.veidemann.api.MessagesProto.Error;
 import no.nb.nna.veidemann.db.ProtoUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,6 +63,10 @@ public class StatusWrapper {
 
     public String getJobId() {
         return status.getJobId();
+    }
+
+    public String getJobExecutionId() {
+        return status.getJobExecutionId();
     }
 
     public Timestamp getStartTime() {
@@ -177,6 +182,16 @@ public class StatusWrapper {
 
     public StatusWrapper clearCurrentUri() {
         status.clearCurrentUri();
+        return this;
+    }
+
+    public StatusWrapper setError(Error error) {
+        status.setError(error);
+        return this;
+    }
+
+    public StatusWrapper setError(int code, String message) {
+        status.setError(Error.newBuilder().setCode(code).setMsg(message).build());
         return this;
     }
 }

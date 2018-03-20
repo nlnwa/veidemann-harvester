@@ -15,13 +15,11 @@
  */
 package no.nb.nna.veidemann.frontier.worker;
 
-import no.nb.nna.veidemann.api.ConfigProto.CrawlJob;
-import no.nb.nna.veidemann.api.ConfigProto.Seed;
-import no.nb.nna.veidemann.api.MessagesProto;
+import no.nb.nna.veidemann.api.FrontierProto.CrawlSeedRequest;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus;
+import no.nb.nna.veidemann.commons.ExtraStatusCodes;
 import no.nb.nna.veidemann.commons.client.DnsServiceClient;
 import no.nb.nna.veidemann.commons.client.RobotsServiceClient;
-import no.nb.nna.veidemann.db.ProtoUtils;
 import no.nb.nna.veidemann.db.RethinkDbAdapter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,26 +50,28 @@ public class Frontier implements AutoCloseable {
         this.queueWorker = new QueueWorker(this);
     }
 
-    public CrawlExecutionStatus scheduleSeed(final CrawlJob job, final Seed seed) {
+    public CrawlExecutionStatus scheduleSeed(CrawlSeedRequest request) {
         // Create execution
         StatusWrapper status = StatusWrapper.getStatusWrapper(CrawlExecutionStatus.newBuilder()
-                .setJobId(job.getId())
-                .setSeedId(seed.getId())
+                .setJobId(request.getJob().getId())
+                .setJobExecutionId(request.getJobExecutionId())
+                .setSeedId(request.getSeed().getId())
                 .setState(CrawlExecutionStatus.State.CREATED)
-                .setScope(seed.getScope()));
+                .setScope(request.getSeed().getScope()));
         status.saveStatus();
         LOG.debug("New crawl execution: " + status.getId());
 
-        String uri = seed.getMeta().getName();
+        String uri = request.getSeed().getMeta().getName();
 
         try {
             QueuedUriWrapper qUri = QueuedUriWrapper.getQueuedUriWrapper(this, uri);
             Preconditions
-                    .checkPreconditions(this, DbUtil.getInstance().getCrawlConfigForJob(job), status, qUri, 1L);
+                    .checkPreconditions(this, DbUtil.getInstance().getCrawlConfigForJob(request.getJob()), status, qUri, 1L);
             LOG.debug("Seed '{}' added to queue", qUri.getUri());
         } catch (URISyntaxException ex) {
             status.incrementDocumentsFailed()
                     .setEndState(CrawlExecutionStatus.State.FAILED)
+                    .setError(ExtraStatusCodes.ILLEGAL_URI.toFetchError(ex.toString()))
                     .saveStatus();
         }
 

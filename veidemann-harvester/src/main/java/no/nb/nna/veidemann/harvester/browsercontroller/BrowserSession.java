@@ -215,7 +215,7 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
                 }
             });
 
-            session.network().setExtraHTTPHeaders(ImmutableMap.of(EXECUTION_ID, queuedUri.getExecutionId())).run();
+            session.network().setExtraHTTPHeaders(ImmutableMap.of(EXECUTION_ID, queuedUri.getExecutionId(), JOB_EXECUTION_ID, queuedUri.getJobExecutionId())).run();
             session.page().navigate(queuedUri.getUri()).withReferrer(queuedUri.getReferrer()).withTransitionType("link").run();
         } catch (ExecutionException | TimeoutException ex) {
             throw new RuntimeException(ex);
@@ -232,6 +232,7 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
             crawlLogs.signalActivity();
             Map<String, Object> headers = intercepted.request().headers();
             headers.put(EXECUTION_ID, queuedUri.getExecutionId());
+            headers.put(JOB_EXECUTION_ID, queuedUri.getJobExecutionId());
 
             if (intercepted.authChallenge() != null) {
                 // TODO: Add option for filling in user/passwd

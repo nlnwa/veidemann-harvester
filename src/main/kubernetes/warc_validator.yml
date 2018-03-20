@@ -1,0 +1,39 @@
+# WARC Validator
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: veidemann-warc-validator
+  labels:
+    app: veidemann
+    component: warc-validator
+    tier: backend
+    role: warc-validator
+spec:
+  selector:
+    matchLabels:
+      app: veidemann
+      component: warc-validator
+      tier: backend
+      role: warc-validator
+  template:
+    metadata:
+      labels:
+        app: veidemann
+        component: warc-validator
+        tier: backend
+        role: warc-validator
+    spec:
+      containers:
+      - name: warc-validator
+        image: norsknettarkiv/veidemann-warc-validator:latest
+        imagePullPolicy: Always
+        volumeMounts:
+        - mountPath: /validwarcs
+          name: validwarcs
+        - mountPath: /warcs
+          name: warcs
+      volumes:
+      - name: validwarcs
+        emptyDir: {}
+      - name: warcs
+        emptyDir: {}

@@ -34,7 +34,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 public class IdTokenAuAuServerInterceptor implements AuAuServerInterceptor {
     private static final Logger LOG = LoggerFactory.getLogger(IdTokenAuAuServerInterceptor.class);
@@ -95,7 +94,10 @@ public class IdTokenAuAuServerInterceptor implements AuAuServerInterceptor {
                 call.close(Status.UNAUTHENTICATED, new Metadata());
                 return NOOP_LISTENER;
             } else {
-                return next.startCall(call, requestHeaders);
+                String email = (String) claims.getClaim("email");
+                Context contextWithEmailAndRoles = Context.current()
+                        .withValues(EmailContextKey.getKey(), email, RolesContextKey.getKey(), roles);
+                return Contexts.interceptCall(contextWithEmailAndRoles, call, requestHeaders, next);
             }
         }
 

@@ -50,14 +50,12 @@ import no.nb.nna.veidemann.api.ControllerProto.RunCrawlRequest;
 import no.nb.nna.veidemann.api.ControllerProto.SeedListReply;
 import no.nb.nna.veidemann.api.ControllerProto.SeedListRequest;
 import no.nb.nna.veidemann.api.MessagesProto.JobExecutionStatus;
-import no.nb.nna.veidemann.api.MessagesProto.JobExecutionStatus.State;
 import no.nb.nna.veidemann.commons.auth.AllowedRoles;
 import no.nb.nna.veidemann.commons.auth.RolesContextKey;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.util.ApiTools.ListReplyWalker;
 import no.nb.nna.veidemann.commons.util.CrawlScopes;
 import no.nb.nna.veidemann.controller.settings.Settings;
-import no.nb.nna.veidemann.db.ProtoUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -536,11 +534,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
             CrawlJob job = db.getCrawlJob(jobRequest);
             LOG.info("Job '{}' starting", job.getMeta().getName());
 
-            JobExecutionStatus jobExecutionStatus = db.saveJobExecutionStatus(JobExecutionStatus.newBuilder()
-                    .setJobId(job.getId())
-                    .setStartTime(ProtoUtils.getNowTs())
-                    .setState(State.RUNNING)
-                    .build());
+            JobExecutionStatus jobExecutionStatus = db.createJobExecutionStatus(job.getId());
 
             if (!request.getSeedId().isEmpty()) {
                 Seed seed = db.getSeed(GetRequest.newBuilder()

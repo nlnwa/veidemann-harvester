@@ -31,7 +31,13 @@ import no.nb.nna.veidemann.api.ReportProto.CrawlLogListReply;
 import no.nb.nna.veidemann.api.ReportProto.CrawlLogListRequest;
 import no.nb.nna.veidemann.api.ReportProto.PageLogListReply;
 import no.nb.nna.veidemann.api.ReportProto.PageLogListRequest;
+import no.nb.nna.veidemann.api.StatusGrpc;
+import no.nb.nna.veidemann.api.StatusProto.ExecutionId;
+import no.nb.nna.veidemann.api.StatusProto.ExecutionsListReply;
+import no.nb.nna.veidemann.api.StatusProto.ListExecutionsRequest;
 import no.nb.nna.veidemann.commons.VeidemannHeaderConstants;
+import no.nb.nna.veidemann.commons.util.ApiTools;
+import no.nb.nna.veidemann.commons.util.ApiTools.ListReplyWalker;
 import no.nb.nna.veidemann.db.ProtoUtils;
 import no.nb.nna.veidemann.db.RethinkDbAdapter;
 import org.junit.After;
@@ -62,6 +68,8 @@ public class SimpleCrawlIT implements VeidemannHeaderConstants {
 
     static ControllerGrpc.ControllerBlockingStub controllerClient;
 
+    static StatusGrpc.StatusBlockingStub statusClient;
+
     static ContentWriterGrpc.ContentWriterBlockingStub contentWriterClient;
 
     static RethinkDbAdapter db;
@@ -80,6 +88,8 @@ public class SimpleCrawlIT implements VeidemannHeaderConstants {
 
         controllerChannel = ManagedChannelBuilder.forAddress(controllerHost, controllerPort).usePlaintext(true).build();
         controllerClient = ControllerGrpc.newBlockingStub(controllerChannel).withWaitForReady();
+
+        statusClient = StatusGrpc.newBlockingStub(controllerChannel).withWaitForReady();
 
         contentWriterChannel = ManagedChannelBuilder.forAddress(contentWriterHost, contentWriterPort).usePlaintext(true)
                 .build();
@@ -211,8 +221,13 @@ public class SimpleCrawlIT implements VeidemannHeaderConstants {
 
         JobCompletion(ControllerProto.RunCrawlRequest request) {
             ControllerProto.RunCrawlReply crawlReply = controllerClient.runCrawl(request);
+            eIds = new ArrayList<>();
             executions = new HashMap<>();
-            eIds = new ArrayList<>(crawlReply.getSeedExecutionIdList());
+            ApiTools.ListReplyWalker<ListExecutionsRequest, CrawlExecutionStatus> w = new ListReplyWalker<>();
+            w.walk(ListExecutionsRequest.newBuilder().setJobExecutionId(crawlReply.getJobExecutionId()),
+                    r -> statusClient.listExecutions(r),
+                    s -> eIds.add(s.getId()));
+
         }
 
         @Override

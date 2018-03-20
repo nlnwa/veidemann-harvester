@@ -83,7 +83,7 @@ public interface DbAdapter extends AutoCloseable {
 
     ExtractedText addExtractedText(ExtractedText et);
 
-    JobExecutionStatus saveJobExecutionStatus(JobExecutionStatus status);
+    JobExecutionStatus createJobExecutionStatus(String jobId);
 
     JobExecutionStatus getJobExecutionStatus(String jobExecutionId);
 

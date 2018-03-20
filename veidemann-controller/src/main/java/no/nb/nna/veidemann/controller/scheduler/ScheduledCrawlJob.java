@@ -19,13 +19,10 @@ import it.sauronsoftware.cron4j.Task;
 import it.sauronsoftware.cron4j.TaskExecutionContext;
 import no.nb.nna.veidemann.api.ConfigProto.CrawlJob;
 import no.nb.nna.veidemann.api.ConfigProto.Seed;
-import no.nb.nna.veidemann.api.ControllerProto.SeedListReply;
 import no.nb.nna.veidemann.api.ControllerProto.SeedListRequest;
 import no.nb.nna.veidemann.api.MessagesProto.JobExecutionStatus;
-import no.nb.nna.veidemann.api.MessagesProto.JobExecutionStatus.State;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.util.ApiTools.ListReplyWalker;
-import no.nb.nna.veidemann.db.ProtoUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,11 +48,7 @@ public class ScheduledCrawlJob extends Task {
     public void execute(TaskExecutionContext context) throws RuntimeException {
         LOG.info("Job '{}' starting", job.getMeta().getName());
 
-        JobExecutionStatus jobExecutionStatus = db.saveJobExecutionStatus(JobExecutionStatus.newBuilder()
-                .setJobId(job.getId())
-                .setStartTime(ProtoUtils.getNowTs())
-                .setState(State.RUNNING)
-                .build());
+        JobExecutionStatus jobExecutionStatus = db.createJobExecutionStatus(job.getId());
 
         ListReplyWalker<SeedListRequest, Seed> walker = new ListReplyWalker<>();
         SeedListRequest.Builder seedRequest = SeedListRequest.newBuilder().setCrawlJobId(job.getId());

@@ -43,12 +43,9 @@ public class CrawlJobCollector implements TaskCollector {
 
     final ListRequest listRequest;
 
-    final FrontierClient frontierClient;
-
-    public CrawlJobCollector(DbAdapter db, FrontierClient frontierClient) {
+    public CrawlJobCollector(DbAdapter db) {
         this.db = db;
         this.listRequest = ListRequest.newBuilder().build();
-        this.frontierClient = frontierClient;
     }
 
     @Override
@@ -80,7 +77,7 @@ public class CrawlJobCollector implements TaskCollector {
                     }
 
                     SchedulingPattern pattern = new SchedulingPattern(schedule.getCronExpression());
-                    Task task = new ScheduledCrawlJob(db, frontierClient, job);
+                    Task task = new ScheduledCrawlJob(db, job);
                     tasks.add(pattern, task);
                 }
             }

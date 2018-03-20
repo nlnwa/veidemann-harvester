@@ -19,9 +19,8 @@ import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.opentracing.contrib.ServerTracingInterceptor;
 import io.opentracing.util.GlobalTracer;
-import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.auth.AuAuServerInterceptor;
-import no.nb.nna.veidemann.controller.scheduler.FrontierClient;
+import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.controller.settings.Settings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,13 +38,13 @@ public class ControllerApiServer implements AutoCloseable {
 
     private final Server server;
 
-    public ControllerApiServer(Settings settings, DbAdapter db, FrontierClient frontierClient,
+    public ControllerApiServer(Settings settings, DbAdapter db,
                                AuAuServerInterceptor auAuServerInterceptor) {
-        this(settings, ServerBuilder.forPort(settings.getApiPort()), db, frontierClient, auAuServerInterceptor);
+        this(settings, ServerBuilder.forPort(settings.getApiPort()), db, auAuServerInterceptor);
     }
 
     public ControllerApiServer(Settings settings, ServerBuilder<?> serverBuilder, DbAdapter db,
-                               FrontierClient frontierClient, AuAuServerInterceptor auAuServerInterceptor) {
+                               AuAuServerInterceptor auAuServerInterceptor) {
 
         ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor.Builder(GlobalTracer.get())
                 .withTracedAttributes(ServerTracingInterceptor.ServerRequestAttribute.CALL_ATTRIBUTES,
@@ -65,7 +64,7 @@ public class ControllerApiServer implements AutoCloseable {
 
         server = serverBuilder
                 .addService(tracingInterceptor.intercept(
-                        auAuServerInterceptor.intercept(new ControllerService(settings, db, frontierClient))))
+                        auAuServerInterceptor.intercept(new ControllerService(settings, db))))
                 .addService(tracingInterceptor.intercept(
                         auAuServerInterceptor.intercept(new StatusService(db))))
                 .addService(tracingInterceptor.intercept(

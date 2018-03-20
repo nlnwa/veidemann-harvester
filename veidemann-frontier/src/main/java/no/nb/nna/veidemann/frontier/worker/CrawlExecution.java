@@ -224,17 +224,17 @@ public class CrawlExecution {
             } else if (status.getState() == CrawlExecutionStatus.State.FETCHING) {
                 status.setState(CrawlExecutionStatus.State.SLEEPING);
             }
-            status.saveStatus();
 
             // Recheck if user aborted crawl while fetching last uri.
             if (isManualAbort()) {
-                // Save updated status
-                status.saveStatus();
                 delayMs = 0L;
             }
         } catch (Throwable t) {
             // An error here indicates problems with DB communication. No idea how to handle that yet.
             LOG.error("Error updating status after fetch: {}", t.toString(), t);
+        } finally {
+            // Save updated status
+            status.saveStatus();
         }
 
         try {
@@ -338,6 +338,9 @@ public class CrawlExecution {
             status.clearCurrentUri()
                     .incrementDocumentsDenied(DbUtil.getInstance().getDb().deleteQueuedUrisForExecution(status.getId()));
             frontier.getHarvesterClient().cleanupExecution(status.getId());
+
+            // Re-set end state to ensure end time is updated
+            status.setEndState(status.getState());
             return true;
         }
         return false;

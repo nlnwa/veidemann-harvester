@@ -47,6 +47,8 @@ import no.nb.nna.veidemann.api.MessagesProto.CrawlHostGroup;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
 import no.nb.nna.veidemann.api.MessagesProto.CrawledContent;
 import no.nb.nna.veidemann.api.MessagesProto.ExtractedText;
+import no.nb.nna.veidemann.api.MessagesProto.JobExecutionStatus;
+import no.nb.nna.veidemann.api.MessagesProto.JobExecutionStatus.State;
 import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
 import no.nb.nna.veidemann.api.MessagesProto.Screenshot;
 import no.nb.nna.veidemann.commons.db.FutureOptional;
@@ -994,5 +996,99 @@ public class RethinkDbAdapterIT {
 
         FutureOptional<QueuedUri> foqu = db.getNextQueuedUriToFetch(chg1);
         assertThat(foqu.isPresent()).isTrue();
+    }
+
+    @Test
+    public void testExecutions() {
+        JobExecutionStatus jes = db.createJobExecutionStatus("jobId");
+
+        try {
+            jes = db.getJobExecutionStatus(jes.getId());
+            assertThat(jes.getState()).isSameAs(State.RUNNING);
+            assertThat(jes.getExecutionsStateOrThrow("SLEEPING")).isEqualTo(0);
+            assertThat(jes.getExecutionsStateOrThrow("FINISHED")).isEqualTo(0);
+            assertThat(jes.getDocumentsCrawled()).isEqualTo(0);
+            assertThat(jes.getDocumentsFailed()).isEqualTo(0);
+            assertThat(jes.getUrisCrawled()).isEqualTo(0);
+            assertThat(jes.getBytesCrawled()).isEqualTo(0);
+
+            CrawlExecutionStatus ces1 = CrawlExecutionStatus.newBuilder()
+                    .setJobExecutionId(jes.getId())
+                    .setState(CrawlExecutionStatus.State.SLEEPING)
+                    .setStartTime(ProtoUtils.getNowTs())
+                    .setDocumentsCrawled(1)
+                    .setUrisCrawled(4)
+                    .setBytesCrawled(100)
+                    .build();
+            ces1 = db.saveExecutionStatus(ces1);
+
+            jes = db.getJobExecutionStatus(jes.getId());
+            assertThat(jes.getState()).isSameAs(State.RUNNING);
+            assertThat(jes.getExecutionsStateOrThrow("SLEEPING")).isEqualTo(1);
+            assertThat(jes.getExecutionsStateOrThrow("FINISHED")).isEqualTo(0);
+            assertThat(jes.getDocumentsCrawled()).isEqualTo(1);
+            assertThat(jes.getDocumentsFailed()).isEqualTo(0);
+            assertThat(jes.getUrisCrawled()).isEqualTo(4);
+            assertThat(jes.getBytesCrawled()).isEqualTo(100);
+
+            CrawlExecutionStatus ces2 = CrawlExecutionStatus.newBuilder()
+                    .setJobExecutionId(jes.getId())
+                    .setState(CrawlExecutionStatus.State.SLEEPING)
+                    .setStartTime(ProtoUtils.getNowTs())
+                    .setDocumentsCrawled(1)
+                    .setUrisCrawled(3)
+                    .setBytesCrawled(75)
+                    .build();
+            ces2 = db.saveExecutionStatus(ces2);
+
+            jes = db.getJobExecutionStatus(jes.getId());
+            assertThat(jes.getState()).isSameAs(State.RUNNING);
+            assertThat(jes.getExecutionsStateOrThrow("SLEEPING")).isEqualTo(2);
+            assertThat(jes.getExecutionsStateOrThrow("FINISHED")).isEqualTo(0);
+            assertThat(jes.getDocumentsCrawled()).isEqualTo(2);
+            assertThat(jes.getDocumentsFailed()).isEqualTo(0);
+            assertThat(jes.getUrisCrawled()).isEqualTo(7);
+            assertThat(jes.getBytesCrawled()).isEqualTo(175);
+
+            ces1 = ces1.toBuilder()
+                    .setState(CrawlExecutionStatus.State.FINISHED)
+                    .setEndTime(ProtoUtils.getNowTs())
+                    .setDocumentsCrawled(2)
+                    .setUrisCrawled(6)
+                    .setBytesCrawled(200)
+                    .build();
+            ces1 = db.saveExecutionStatus(ces1);
+
+            jes = db.getJobExecutionStatus(jes.getId());
+            assertThat(jes.getState()).isSameAs(State.RUNNING);
+            assertThat(jes.getExecutionsStateOrThrow("SLEEPING")).isEqualTo(1);
+            assertThat(jes.getExecutionsStateOrThrow("FINISHED")).isEqualTo(1);
+            assertThat(jes.getDocumentsCrawled()).isEqualTo(3);
+            assertThat(jes.getDocumentsFailed()).isEqualTo(0);
+            assertThat(jes.getUrisCrawled()).isEqualTo(9);
+            assertThat(jes.getBytesCrawled()).isEqualTo(275);
+
+            ces2 = ces2.toBuilder()
+                    .setState(CrawlExecutionStatus.State.FINISHED)
+                    .setEndTime(ProtoUtils.getNowTs())
+                    .setDocumentsCrawled(2)
+                    .setUrisCrawled(12)
+                    .setDocumentsFailed(2)
+                    .setBytesCrawled(100)
+                    .build();
+            ces2 = db.saveExecutionStatus(ces2);
+
+            jes = db.getJobExecutionStatus(jes.getId());
+            assertThat(jes.getState()).isSameAs(State.FINISHED);
+            assertThat(jes.getExecutionsStateOrThrow("SLEEPING")).isEqualTo(0);
+            assertThat(jes.getExecutionsStateOrThrow("FINISHED")).isEqualTo(2);
+            assertThat(jes.getDocumentsCrawled()).isEqualTo(4);
+            assertThat(jes.getDocumentsFailed()).isEqualTo(2);
+            assertThat(jes.getUrisCrawled()).isEqualTo(18);
+            assertThat(jes.getBytesCrawled()).isEqualTo(300);
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw e;
+        }
     }
 }

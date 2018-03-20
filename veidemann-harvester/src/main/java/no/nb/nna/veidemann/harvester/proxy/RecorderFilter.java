@@ -156,7 +156,6 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                 try (ActiveSpan span = GlobalTracer.get().makeActive(requestSpan)) {
                     // Fix headers before sending to final destination
                     request.headers().set("Accept-Encoding", "identity");
-//                    request.headers().remove(EXECUTION_ID);
 
                     // Store request
                     requestCollector.setHeaders(ContentCollector.createRequestPreamble(request), request.headers(), getContentWriterSession());
@@ -173,39 +172,6 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
         }
         return null;
     }
-
-//    @Override
-//    public HttpResponse proxyToServerRequest(HttpObject httpObject) {
-//        try {
-//            if (httpObject instanceof HttpRequest) {
-//                HttpRequest request = (HttpRequest) httpObject;
-//
-//                MDC.put("eid", executionId);
-//                MDC.put("uri", uri);
-//
-//                LOG.trace("Proxy sending request");
-//
-//                try (ActiveSpan span = GlobalTracer.get().makeActive(requestSpan)) {
-//                    // Fix headers before sending to final destination
-//                    request.headers().set("Accept-Encoding", "identity");
-//                    request.headers().remove(EXECUTION_ID);
-//
-//                    // Store request
-//                    requestCollector.setHeaders(ContentCollector.createRequestPreamble(request), request.headers(), getContentWriterSession());
-//                    LOG.debug("Proxy is sending request to final destination.");
-//                }
-//                return null;
-//            } else if (httpObject instanceof HttpContent) {
-//                HttpContent request = (HttpContent) httpObject;
-//                requestCollector.addPayload(request.content(), getContentWriterSession());
-//            } else {
-//                LOG.debug("Got something else than http request: {}", httpObject);
-//            }
-//        } catch (Throwable t) {
-//            LOG.error("Error handling request", t);
-//        }
-//        return null;
-//    }
 
     @Override
     public HttpObject serverToProxyResponse(HttpObject httpObject) {

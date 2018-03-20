@@ -100,7 +100,7 @@ public class ControllerServiceTest {
     public void testSaveEntity() throws InterruptedException {
         DbAdapter dbMock = mock(DbAdapter.class);
         AuAuServerInterceptor auau = new NoopAuAuServerInterceptor();
-        inProcessServer = new ControllerApiServer(settings, inProcessServerBuilder, dbMock, null, auau).start();
+        inProcessServer = new ControllerApiServer(settings, inProcessServerBuilder, dbMock, auau).start();
 
         CrawlEntity request = CrawlEntity.newBuilder()
                 .setMeta(ConfigProto.Meta.newBuilder()
@@ -161,7 +161,7 @@ public class ControllerServiceTest {
     public void testListCrawlEntities() throws InterruptedException {
         DbAdapter dbMock = mock(DbAdapter.class);
         AuAuServerInterceptor auau = new NoopAuAuServerInterceptor();
-        inProcessServer = new ControllerApiServer(settings, inProcessServerBuilder, dbMock, null, auau).start();
+        inProcessServer = new ControllerApiServer(settings, inProcessServerBuilder, dbMock, auau).start();
 
         ListRequest request = ListRequest.newBuilder().build();
         CrawlEntityListReply reply = CrawlEntityListReply.newBuilder().build();
@@ -216,7 +216,7 @@ public class ControllerServiceTest {
         IdTokenValidator idValidatorMock = mock(IdTokenValidator.class);
         UserRoleMapper roleMapperMock = mock(UserRoleMapper.class);
         AuAuServerInterceptor auau = new IdTokenAuAuServerInterceptor(roleMapperMock, idValidatorMock);
-        inProcessServer = new ControllerApiServer(settings, inProcessServerBuilder, dbMock, null, auau).start();
+        inProcessServer = new ControllerApiServer(settings, inProcessServerBuilder, dbMock, auau).start();
 
         when(dbMock.listCrawlEntities(ListRequest.getDefaultInstance()))
                 .thenReturn(CrawlEntityListReply.getDefaultInstance());

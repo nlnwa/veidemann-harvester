@@ -18,14 +18,23 @@ package no.nb.nna.veidemann.controller;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import no.nb.nna.veidemann.api.ConfigProto.Role;
+import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus;
+import no.nb.nna.veidemann.api.MessagesProto.JobExecutionStatus;
 import no.nb.nna.veidemann.api.StatusGrpc;
+import no.nb.nna.veidemann.api.StatusProto.ExecutionId;
 import no.nb.nna.veidemann.api.StatusProto.ExecutionsListReply;
-import no.nb.nna.veidemann.api.StatusProto.ExecutionsRequest;
+import no.nb.nna.veidemann.api.StatusProto.JobExecutionsListReply;
+import no.nb.nna.veidemann.api.StatusProto.ListExecutionsRequest;
+import no.nb.nna.veidemann.api.StatusProto.ListJobExecutionsRequest;
+import no.nb.nna.veidemann.api.StatusProto.RunningExecutionsListReply;
+import no.nb.nna.veidemann.api.StatusProto.RunningExecutionsRequest;
 import no.nb.nna.veidemann.commons.auth.AllowedRoles;
 import no.nb.nna.veidemann.commons.db.ChangeFeed;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static no.nb.nna.veidemann.controller.JobExecutionUtil.handleGet;
 
 /**
  *
@@ -42,22 +51,91 @@ public class StatusService extends StatusGrpc.StatusImplBase {
 
     @Override
     @AllowedRoles({Role.ADMIN, Role.CURATOR, Role.READONLY})
-    public void getRunningExecutions(ExecutionsRequest request, StreamObserver<ExecutionsListReply> respObserver) {
+    public void getRunningExecutions(RunningExecutionsRequest request, StreamObserver<RunningExecutionsListReply> responseObserver) {
         new Thread(new Runnable() {
             @Override
             public void run() {
                 // Initially send an empty state in case the change feed is empty
-                respObserver.onNext(ExecutionsListReply.getDefaultInstance());
-                try (ChangeFeed<ExecutionsListReply> c = db.getExecutionStatusStream(request);) {
-                    c.stream().forEach(o -> respObserver.onNext(o));
+                responseObserver.onNext(RunningExecutionsListReply.getDefaultInstance());
+                try (ChangeFeed<RunningExecutionsListReply> c = db.getExecutionStatusStream(request);) {
+                    c.stream().forEach(o -> responseObserver.onNext(o));
                 } catch (Exception ex) {
                     LOG.error(ex.getMessage(), ex);
                     Status status = Status.UNKNOWN.withDescription(ex.toString());
-                    respObserver.onError(status.asException());
+                    responseObserver.onError(status.asException());
                 }
             }
 
         }).start();
     }
 
+    @Override
+    @AllowedRoles({Role.READONLY, Role.CURATOR, Role.ADMIN})
+    public void getExecution(ExecutionId request, StreamObserver<CrawlExecutionStatus> responseObserver) {
+        handleGet(db.getExecutionStatus(request.getId()), responseObserver);
+    }
+
+    @Override
+    @AllowedRoles({Role.READONLY, Role.CURATOR, Role.ADMIN})
+    public void listExecutions(ListExecutionsRequest request, StreamObserver<ExecutionsListReply> responseObserver) {
+        try {
+            responseObserver.onNext(db.listExecutionStatus(request));
+            responseObserver.onCompleted();
+        } catch (Exception ex) {
+            LOG.error(ex.getMessage(), ex);
+            Status status = Status.UNKNOWN.withDescription(ex.toString());
+            responseObserver.onError(status.asException());
+        }
+    }
+
+    @Override
+    @AllowedRoles({Role.CURATOR, Role.ADMIN})
+    public void abortExecution(ExecutionId request, StreamObserver<CrawlExecutionStatus> responseObserver) {
+        try {
+            CrawlExecutionStatus status = db.setExecutionStateAborted(request.getId());
+
+            responseObserver.onNext(status);
+            responseObserver.onCompleted();
+        } catch (Exception e) {
+            LOG.error(e.getMessage(), e);
+            Status status = Status.UNKNOWN.withDescription(e.toString());
+            responseObserver.onError(status.asException());
+        }
+    }
+
+    @Override
+    @AllowedRoles({Role.READONLY, Role.CURATOR, Role.ADMIN})
+    public void getJobExecution(ExecutionId request, StreamObserver<JobExecutionStatus> responseObserver) {
+        handleGet(db.getJobExecutionStatus(request.getId()), responseObserver);
+    }
+
+    @Override
+    @AllowedRoles({Role.READONLY, Role.CURATOR, Role.ADMIN})
+    public void listJobExecutions(ListJobExecutionsRequest request, StreamObserver<JobExecutionsListReply> responseObserver) {
+        try {
+            responseObserver.onNext(db.listJobExecutionStatus(request));
+            responseObserver.onCompleted();
+        } catch (Exception ex) {
+            LOG.error(ex.getMessage(), ex);
+            Status status = Status.UNKNOWN.withDescription(ex.toString());
+            responseObserver.onError(status.asException());
+        }
+    }
+
+    @Override
+    @AllowedRoles({Role.CURATOR, Role.ADMIN})
+    public void abortJobExecution(ExecutionId request, StreamObserver<JobExecutionStatus> responseObserver) {
+        try {
+//            CrawlExecutionStatus status = db.setExecutionStateAborted(request.getId());
+
+            JobExecutionStatus status = db.setJobExecutionStateAborted(request.getId());
+
+            responseObserver.onNext(status);
+            responseObserver.onCompleted();
+        } catch (Exception e) {
+            LOG.error(e.getMessage(), e);
+            Status status = Status.UNKNOWN.withDescription(e.toString());
+            responseObserver.onError(status.asException());
+        }
+    }
 }

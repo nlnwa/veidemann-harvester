@@ -21,5 +21,6 @@ package no.nb.nna.veidemann.commons;
  */
 public interface VeidemannHeaderConstants {
     static final String EXECUTION_ID = "veidemann_eid";
+    static final String JOB_EXECUTION_ID = "veidemann_jeid";
     static final String MANUAL_EXID = "manual";
 }

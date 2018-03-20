@@ -20,9 +20,13 @@ import it.sauronsoftware.cron4j.TaskExecutionContext;
 import no.nb.nna.veidemann.api.ConfigProto.CrawlJob;
 import no.nb.nna.veidemann.api.ConfigProto.Seed;
 import no.nb.nna.veidemann.api.ControllerProto.SeedListRequest;
+import no.nb.nna.veidemann.api.MessagesProto.JobExecutionStatus;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
+import no.nb.nna.veidemann.commons.util.ApiTools.ListReplyWalker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static no.nb.nna.veidemann.controller.JobExecutionUtil.crawlSeed;
 
 /**
  *
@@ -35,30 +39,24 @@ public class ScheduledCrawlJob extends Task {
 
     final DbAdapter db;
 
-    final FrontierClient frontierClient;
-
-    public ScheduledCrawlJob(DbAdapter db, FrontierClient frontierClient, CrawlJob job) {
+    public ScheduledCrawlJob(DbAdapter db, CrawlJob job) {
         this.db = db;
         this.job = job;
-        this.frontierClient = frontierClient;
     }
 
     @Override
     public void execute(TaskExecutionContext context) throws RuntimeException {
         LOG.info("Job '{}' starting", job.getMeta().getName());
-        SeedListRequest request = SeedListRequest.newBuilder()
-                .setCrawlJobId(job.getId())
-                .build();
 
-        for (Seed seed : db.listSeeds(request).getValueList()) {
-            if (!seed.getDisabled()) {
-                if (LOG.isInfoEnabled()) {
-                    LOG.info("Start harvest of: {}", seed.getMeta().getName());
-                    frontierClient.crawlSeed(job, seed);
-                }
-            }
-        }
+        JobExecutionStatus jobExecutionStatus = db.createJobExecutionStatus(job.getId());
+
+        ListReplyWalker<SeedListRequest, Seed> walker = new ListReplyWalker<>();
+        SeedListRequest.Builder seedRequest = SeedListRequest.newBuilder().setCrawlJobId(job.getId());
+
+        walker.walk(seedRequest,
+                req -> db.listSeeds(req),
+                seed -> crawlSeed(job, seed, jobExecutionStatus));
+
         LOG.info("All seeds for job '{}' started", job.getMeta().getName());
     }
-
 }

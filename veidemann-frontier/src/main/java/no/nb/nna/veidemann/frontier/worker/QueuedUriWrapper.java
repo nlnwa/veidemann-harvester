@@ -136,11 +136,11 @@ public class QueuedUriWrapper {
         return qUri.hasError();
     }
 
-    MessagesProto.FetchError getError() {
+    MessagesProto.Error getError() {
         return qUri.getError();
     }
 
-    QueuedUriWrapper setError(MessagesProto.FetchError value) {
+    QueuedUriWrapper setError(MessagesProto.Error value) {
         qUri.setError(value);
         return this;
     }

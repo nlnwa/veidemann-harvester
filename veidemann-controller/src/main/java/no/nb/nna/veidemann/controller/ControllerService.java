@@ -31,7 +31,6 @@ import no.nb.nna.veidemann.api.ConfigProto.Role;
 import no.nb.nna.veidemann.api.ConfigProto.RoleMapping;
 import no.nb.nna.veidemann.api.ConfigProto.Seed;
 import no.nb.nna.veidemann.api.ControllerGrpc;
-import no.nb.nna.veidemann.api.ControllerProto.AbortCrawlRequest;
 import no.nb.nna.veidemann.api.ControllerProto.BrowserConfigListReply;
 import no.nb.nna.veidemann.api.ControllerProto.BrowserScriptListReply;
 import no.nb.nna.veidemann.api.ControllerProto.CrawlConfigListReply;
@@ -50,16 +49,20 @@ import no.nb.nna.veidemann.api.ControllerProto.RunCrawlReply;
 import no.nb.nna.veidemann.api.ControllerProto.RunCrawlRequest;
 import no.nb.nna.veidemann.api.ControllerProto.SeedListReply;
 import no.nb.nna.veidemann.api.ControllerProto.SeedListRequest;
+import no.nb.nna.veidemann.api.MessagesProto.JobExecutionStatus;
 import no.nb.nna.veidemann.commons.auth.AllowedRoles;
 import no.nb.nna.veidemann.commons.auth.RolesContextKey;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
+import no.nb.nna.veidemann.commons.util.ApiTools.ListReplyWalker;
 import no.nb.nna.veidemann.commons.util.CrawlScopes;
-import no.nb.nna.veidemann.controller.scheduler.FrontierClient;
 import no.nb.nna.veidemann.controller.settings.Settings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Collection;
+
+import static no.nb.nna.veidemann.controller.JobExecutionUtil.crawlSeed;
+import static no.nb.nna.veidemann.controller.JobExecutionUtil.handleGet;
 
 /**
  *
@@ -70,14 +73,11 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
 
     private final DbAdapter db;
 
-    private final FrontierClient frontierClient;
-
     private final Settings settings;
 
-    public ControllerService(Settings settings, DbAdapter db, FrontierClient frontierClient) {
+    public ControllerService(Settings settings, DbAdapter db) {
         this.settings = settings;
         this.db = db;
-        this.frontierClient = frontierClient;
     }
 
     @Override
@@ -161,7 +161,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     @Override
     @AllowedRoles({Role.READONLY, Role.CURATOR, Role.ADMIN})
     public void listCrawlScheduleConfigs(ListRequest request,
-            StreamObserver<CrawlScheduleConfigListReply> responseObserver) {
+                                         StreamObserver<CrawlScheduleConfigListReply> responseObserver) {
         try {
             responseObserver.onNext(db.listCrawlScheduleConfigs(request));
             responseObserver.onCompleted();
@@ -335,7 +335,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     @Override
     @AllowedRoles({Role.ADMIN})
     public void saveBrowserConfig(BrowserConfig request,
-            StreamObserver<BrowserConfig> responseObserver) {
+                                  StreamObserver<BrowserConfig> responseObserver) {
         try {
             responseObserver.onNext(db.saveBrowserConfig(request));
             responseObserver.onCompleted();
@@ -349,7 +349,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     @Override
     @AllowedRoles({Role.READONLY, Role.CURATOR, Role.ADMIN})
     public void listBrowserConfigs(ListRequest request,
-            StreamObserver<BrowserConfigListReply> responseObserver) {
+                                   StreamObserver<BrowserConfigListReply> responseObserver) {
         try {
             responseObserver.onNext(db.listBrowserConfigs(request));
             responseObserver.onCompleted();
@@ -427,7 +427,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     @Override
     @AllowedRoles({Role.READONLY, Role.CURATOR, Role.ADMIN})
     public void listBrowserScripts(ListRequest request,
-            StreamObserver<BrowserScriptListReply> responseObserver) {
+                                   StreamObserver<BrowserScriptListReply> responseObserver) {
         try {
             responseObserver.onNext(db.listBrowserScripts(request));
             responseObserver.onCompleted();
@@ -473,7 +473,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     @Override
     @AllowedRoles({Role.READONLY, Role.CURATOR, Role.ADMIN})
     public void listCrawlHostGroupConfigs(ListRequest request,
-            StreamObserver<CrawlHostGroupConfigListReply> responseObserver) {
+                                          StreamObserver<CrawlHostGroupConfigListReply> responseObserver) {
         try {
             responseObserver.onNext(db.listCrawlHostGroupConfigs(request));
             responseObserver.onCompleted();
@@ -527,8 +527,6 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     @AllowedRoles({Role.CURATOR, Role.ADMIN})
     public void runCrawl(RunCrawlRequest request, StreamObserver<RunCrawlReply> responseObserver) {
         try {
-            RunCrawlReply.Builder reply = RunCrawlReply.newBuilder();
-
             GetRequest jobRequest = GetRequest.newBuilder()
                     .setId(request.getJobId())
                     .build();
@@ -536,61 +534,30 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
             CrawlJob job = db.getCrawlJob(jobRequest);
             LOG.info("Job '{}' starting", job.getMeta().getName());
 
+            JobExecutionStatus jobExecutionStatus = db.createJobExecutionStatus(job.getId());
+
             if (!request.getSeedId().isEmpty()) {
                 Seed seed = db.getSeed(GetRequest.newBuilder()
                         .setId(request.getSeedId())
                         .build());
-                runSeed(job, seed, reply);
+                crawlSeed(job, seed, jobExecutionStatus);
             } else {
-                SeedListRequest seedRequest;
-                int page = 0;
+                ListReplyWalker<SeedListRequest, Seed> walker = new ListReplyWalker<>();
+                SeedListRequest.Builder seedRequest = SeedListRequest.newBuilder().setCrawlJobId(job.getId());
 
-                seedRequest = SeedListRequest.newBuilder()
-                        .setCrawlJobId(job.getId())
-                        .setPageSize(100)
-                        .setPage(page)
-                        .build();
-
-                SeedListReply seedList = db.listSeeds(seedRequest);
-                while (seedList.getValueCount() > 0) {
-                    for (Seed seed : seedList.getValueList()) {
-                        runSeed(job, seed, reply);
-                    }
-                    seedRequest = seedRequest.toBuilder().setPage(++page).build();
-                    seedList = db.listSeeds(seedRequest);
-                }
+                walker.walk(seedRequest,
+                        req -> db.listSeeds(req),
+                        seed -> crawlSeed(job, seed, jobExecutionStatus));
             }
             LOG.info("All seeds for job '{}' started", job.getMeta().getName());
 
-            responseObserver.onNext(reply.build());
+            RunCrawlReply reply = RunCrawlReply.newBuilder().setJobExecutionId(jobExecutionStatus.getId()).build();
+
+            responseObserver.onNext(reply);
             responseObserver.onCompleted();
         } catch (Exception ex) {
             LOG.error(ex.getMessage(), ex);
             Status status = Status.UNKNOWN.withDescription(ex.toString());
-            responseObserver.onError(status.asException());
-        }
-    }
-
-    private void runSeed(CrawlJob job, Seed seed, RunCrawlReply.Builder reply) {
-        if (!seed.getDisabled()) {
-            if (LOG.isInfoEnabled()) {
-                LOG.info("Start harvest of: {}", seed.getMeta().getName());
-                reply.addSeedExecutionId(frontierClient.crawlSeed(job, seed).getId());
-            }
-        }
-    }
-
-    @Override
-    @AllowedRoles({Role.CURATOR, Role.ADMIN})
-    public void abortCrawl(AbortCrawlRequest request, StreamObserver<Empty> responseObserver) {
-        try {
-            db.setExecutionStateAborted(request.getExecutionId());
-
-            responseObserver.onNext(Empty.getDefaultInstance());
-            responseObserver.onCompleted();
-        } catch (Exception e) {
-            LOG.error(e.getMessage(), e);
-            Status status = Status.UNKNOWN.withDescription(e.toString());
             responseObserver.onError(status.asException());
         }
     }
@@ -665,18 +632,4 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
         }
     }
 
-    private void handleGet(Object response, StreamObserver responseObserver) {
-        try {
-            if (response == null) {
-                Status status = Status.NOT_FOUND;
-                responseObserver.onError(status.asException());
-            }
-            responseObserver.onNext(response);
-            responseObserver.onCompleted();
-        } catch (Exception ex) {
-            LOG.error(ex.getMessage(), ex);
-            Status status = Status.UNKNOWN.withDescription(ex.toString());
-            responseObserver.onError(status.asException());
-        }
-    }
 }

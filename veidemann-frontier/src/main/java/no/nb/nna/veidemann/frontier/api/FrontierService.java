@@ -23,8 +23,8 @@ import io.opentracing.tag.Tags;
 import io.opentracing.util.GlobalTracer;
 import no.nb.nna.veidemann.api.FrontierGrpc;
 import no.nb.nna.veidemann.api.FrontierProto.CrawlSeedRequest;
-import no.nb.nna.veidemann.frontier.worker.Frontier;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus;
+import no.nb.nna.veidemann.frontier.worker.Frontier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,7 +50,7 @@ public class FrontierService extends FrontierGrpc.FrontierImplBase {
                 .withTag(Tags.SPAN_KIND.getKey(), Tags.SPAN_KIND_SERVER)
                 .withTag("uri", request.getSeed().getMeta().getName())
                 .startActive()) {
-            CrawlExecutionStatus reply = frontier.scheduleSeed(request.getJob(), request.getSeed());
+            CrawlExecutionStatus reply = frontier.scheduleSeed(request);
 
             respObserver.onNext(reply);
             respObserver.onCompleted();

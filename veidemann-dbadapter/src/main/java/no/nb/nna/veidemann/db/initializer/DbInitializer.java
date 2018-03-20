@@ -152,6 +152,15 @@ public class DbInitializer {
 
         r.tableCreate(TABLES.EXECUTIONS.name).run(conn);
         r.table(TABLES.EXECUTIONS.name).indexCreate("startTime").run(conn);
+        r.table(TABLES.EXECUTIONS.name).indexCreate("jobId").run(conn);
+        r.table(TABLES.EXECUTIONS.name).indexCreate("state").run(conn);
+        r.table(TABLES.EXECUTIONS.name).indexCreate("seedId").run(conn);
+        r.table(TABLES.EXECUTIONS.name).indexCreate("jobExecutionId").run(conn);
+
+        r.tableCreate(TABLES.JOB_EXECUTIONS.name).run(conn);
+        r.table(TABLES.JOB_EXECUTIONS.name).indexCreate("startTime").run(conn);
+        r.table(TABLES.JOB_EXECUTIONS.name).indexCreate("jobId").run(conn);
+        r.table(TABLES.JOB_EXECUTIONS.name).indexCreate("state").run(conn);
 
         r.tableCreate(TABLES.SCREENSHOT.name).run(conn);
         r.table(TABLES.SCREENSHOT.name).indexCreate("executionId").run(conn);
@@ -205,7 +214,8 @@ public class DbInitializer {
         r.table(TABLES.SCREENSHOT.name).indexWait("executionId").run(conn);
         r.table(TABLES.SEEDS.name).indexWait("jobId", "entityId").run(conn);
         r.table(TABLES.CRAWL_HOST_GROUP.name).indexWait("nextFetchTime").run(conn);
-        r.table(TABLES.EXECUTIONS.name).indexWait("startTime").run(conn);
+        r.table(TABLES.EXECUTIONS.name).indexWait("startTime", "jobId", "state", "seedId", "jobExecutionId").run(conn);
+        r.table(TABLES.JOB_EXECUTIONS.name).indexWait("startTime", "jobId", "state").run(conn);
     }
 
     private final void createMetaIndexes(TABLES... tables) {

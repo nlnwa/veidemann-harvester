@@ -47,6 +47,7 @@ import no.nb.nna.veidemann.api.MessagesProto.CrawlHostGroup;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
 import no.nb.nna.veidemann.api.MessagesProto.CrawledContent;
 import no.nb.nna.veidemann.api.MessagesProto.ExtractedText;
+import no.nb.nna.veidemann.api.MessagesProto.JobExecutionStatus;
 import no.nb.nna.veidemann.api.MessagesProto.PageLog;
 import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
 import no.nb.nna.veidemann.api.MessagesProto.Screenshot;
@@ -57,7 +58,11 @@ import no.nb.nna.veidemann.api.ReportProto.PageLogListRequest;
 import no.nb.nna.veidemann.api.ReportProto.ScreenshotListReply;
 import no.nb.nna.veidemann.api.ReportProto.ScreenshotListRequest;
 import no.nb.nna.veidemann.api.StatusProto.ExecutionsListReply;
-import no.nb.nna.veidemann.api.StatusProto.ExecutionsRequest;
+import no.nb.nna.veidemann.api.StatusProto.JobExecutionsListReply;
+import no.nb.nna.veidemann.api.StatusProto.ListExecutionsRequest;
+import no.nb.nna.veidemann.api.StatusProto.ListJobExecutionsRequest;
+import no.nb.nna.veidemann.api.StatusProto.RunningExecutionsListReply;
+import no.nb.nna.veidemann.api.StatusProto.RunningExecutionsRequest;
 
 import java.util.Optional;
 
@@ -78,9 +83,24 @@ public interface DbAdapter extends AutoCloseable {
 
     ExtractedText addExtractedText(ExtractedText et);
 
+    JobExecutionStatus createJobExecutionStatus(String jobId);
+
+    JobExecutionStatus getJobExecutionStatus(String jobExecutionId);
+
+    JobExecutionsListReply listJobExecutionStatus(ListJobExecutionsRequest request);
+
+    /**
+     * Update the state for a Job Execution to ABORTED_MANUAL.
+     *
+     * @param jobExecutionId id of the job execution to update
+     */
+    JobExecutionStatus setJobExecutionStateAborted(String jobExecutionId);
+
     CrawlExecutionStatus saveExecutionStatus(CrawlExecutionStatus status);
 
     CrawlExecutionStatus getExecutionStatus(String executionId);
+
+    ExecutionsListReply listExecutionStatus(ListExecutionsRequest request);
 
     /**
      * Update the state for a Crawl Execution to ABORTED_MANUAL.
@@ -89,7 +109,7 @@ public interface DbAdapter extends AutoCloseable {
      *
      * @param executionId id of the execution to update
      */
-    void setExecutionStateAborted(String executionId);
+    CrawlExecutionStatus setExecutionStateAborted(String executionId);
 
     QueuedUri saveQueuedUri(QueuedUri qu);
 
@@ -197,7 +217,7 @@ public interface DbAdapter extends AutoCloseable {
 
     LogLevels saveLogConfig(LogLevels logLevels);
 
-    ChangeFeed<ExecutionsListReply> getExecutionStatusStream(ExecutionsRequest request);
+    ChangeFeed<RunningExecutionsListReply> getExecutionStatusStream(RunningExecutionsRequest request);
 
     RoleMappingsListReply listRoleMappings(RoleMappingsListRequest request);
 

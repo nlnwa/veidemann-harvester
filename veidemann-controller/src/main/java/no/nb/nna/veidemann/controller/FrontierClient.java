@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package no.nb.nna.veidemann.controller.scheduler;
+package no.nb.nna.veidemann.controller;
 
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
@@ -27,6 +27,7 @@ import no.nb.nna.veidemann.api.FrontierGrpc.FrontierBlockingStub;
 import no.nb.nna.veidemann.api.FrontierGrpc.FrontierStub;
 import no.nb.nna.veidemann.api.FrontierProto.CrawlSeedRequest;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus;
+import no.nb.nna.veidemann.api.MessagesProto.JobExecutionStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,24 +46,26 @@ public class FrontierClient implements AutoCloseable {
 
     private final FrontierStub asyncStub;
 
-    public FrontierClient(final String host, final int port) {
-        this(ManagedChannelBuilder.forAddress(host, port).usePlaintext(true));
+    public FrontierClient(final String host, final int port, String supportedSeedType) {
+        this(ManagedChannelBuilder.forAddress(host, port).usePlaintext(true), supportedSeedType);
         LOG.info("Harvester client pointing to " + host + ":" + port);
     }
 
-    public FrontierClient(ManagedChannelBuilder<?> channelBuilder) {
+    public FrontierClient(ManagedChannelBuilder<?> channelBuilder, String supportedSeedType) {
         LOG.info("Setting up harvester client");
         ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor.Builder(GlobalTracer.get()).build();
         channel = channelBuilder.intercept(tracingInterceptor).build();
         blockingStub = FrontierGrpc.newBlockingStub(channel);
         asyncStub = FrontierGrpc.newStub(channel);
+        JobExecutionUtil.addFrontierClient(supportedSeedType, this);
     }
 
-    public CrawlExecutionStatus crawlSeed(CrawlJob crawlJob, Seed seed) {
+    public CrawlExecutionStatus crawlSeed(CrawlJob crawlJob, Seed seed, JobExecutionStatus jobExecution) {
         try {
             CrawlSeedRequest request = CrawlSeedRequest.newBuilder()
                     .setJob(crawlJob)
                     .setSeed(seed)
+                    .setJobExecutionId(jobExecution.getId())
                     .build();
             return blockingStub.crawlSeed(request);
         } catch (StatusRuntimeException ex) {

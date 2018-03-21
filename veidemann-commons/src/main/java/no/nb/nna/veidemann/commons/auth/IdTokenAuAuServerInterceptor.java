@@ -94,9 +94,8 @@ public class IdTokenAuAuServerInterceptor implements AuAuServerInterceptor {
                 call.close(Status.UNAUTHENTICATED, new Metadata());
                 return NOOP_LISTENER;
             } else {
-                String email = (String) claims.getClaim("email");
                 Context contextWithEmailAndRoles = Context.current()
-                        .withValues(EmailContextKey.getKey(), email, RolesContextKey.getKey(), roles);
+                        .withValue(RolesContextKey.getKey(), roles);
                 return Contexts.interceptCall(contextWithEmailAndRoles, call, requestHeaders, next);
             }
         }

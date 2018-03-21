@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ template "veidemann-warcvalidator.fullname" . }}
+  labels:
+    app: veidemann
+    component: {{ template "veidemann-warcvalidator.name" . }}
+    chart: {{ template "veidemann-warcvalidator.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      component: {{ template "veidemann-warcvalidator.name" . }}
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        component: {{ template "veidemann-warcvalidator.name" . }}
+        release: {{ .Release.Name }}
+    spec:
+      volumes:
+        - name: warcs
+        {{- if .Values.config.persistence }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.config.persistence.name }}
+        {{- else }}
+          emptyDir: {}
+        {{- end }}
+        - name: validwarcs
+        {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.persistence.name }}
+        {{- else }}
+          emptyDir: {}
+        {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          volumeMounts:
+            - mountPath: /validwarcs
+              name: validwarcs
+            - mountPath: /warcs
+              name: warcs
+          resources:
+{{ toYaml .Values.resources | indent 12 }}
+    {{- with .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.affinity }}
+      affinity:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.tolerations }}
+      tolerations:
+{{ toYaml . | indent 8 }}
+    {{- end }}

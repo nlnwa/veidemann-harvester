@@ -1,0 +1,2 @@
+Veidemann warc validator operates only on volumes and has no services
+

@@ -1,0 +1,12 @@
+# Veidemann app for Kubernetes
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: {{ template "veidemann.fullname" . }}
+  labels:
+    app: {{ template "veidemann.name" . }}
+    chart: {{ template "veidemann.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+data:
+{{ toYaml .Values.config | indent 2 }}

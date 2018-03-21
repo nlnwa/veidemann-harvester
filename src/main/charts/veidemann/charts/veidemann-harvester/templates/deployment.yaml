@@ -1,0 +1,126 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ template "veidemann-harvester.fullname" . }}
+  labels:
+    app: veidemann
+    component: {{ template "veidemann-harvester.name" . }}
+    chart: {{ template "veidemann-harvester.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      component: {{ template "veidemann-harvester.name" . }}
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        component: {{ template "veidemann-harvester.name" . }}
+        release: {{ .Release.Name }}
+    spec:
+      volumes:
+        - name: workdir
+          emptyDir: {}
+        - name: log4j-config
+          configMap:
+            name: {{ .Release.Name }}-veidemann
+            items:
+            - key: log4j2.xml
+              path: log4j2.xml
+        - name: dshm
+          emptyDir:
+            medium: Memory
+        - name: cache-certificate
+          secret:
+            secretName: {{ .Release.Name }}-veidemann-cache
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+{{ toYaml .Values.ports | indent 12 }}
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            - name: BROWSER_HOST
+              value: {{ .Values.config.browser.host | quote }}
+            - name: BROWSER_PORT
+              value: {{ .Values.config.browser.port | quote }}
+            - name: DB_HOST
+              value: {{ .Values.config.db.host | quote }}
+            - name: DB_PORT
+              value: {{ .Values.config.db.port | quote }}
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.config.db.secretName }}
+                  key: username
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.config.db.secretName }}
+                  key: password
+            - name: CONTENT_WRITER_HOST
+              value: {{ .Values.config.contentWriter.host | quote }}
+            - name: CONTENT_WRITER_PORT
+              value: {{ .Values.config.contentWriter.port | quote }}
+            - name: DNS_RESOLVER_HOST
+              value: {{ .Values.config.dnsResolver.host | quote }}
+            - name: DNS_RESOLVER_PORT
+              value: {{ .Values.config.dnsResolver.port | quote }}
+            - name: CACHE_HOST
+              value: "{{ .Release.Name }}-{{ .Values.config.cache.host }}"
+            - name: JAEGER_AGENT_HOST
+              value: {{ .Values.config.jaeger.agent.host | quote }}
+            - name: JAEGER_AGENT_PORT
+              value: {{ .Values.config.jaeger.agent.port | quote }}
+            - name: JAEGER_SAMPLER_TYPE
+              value: {{ .Values.config.jaeger.sampler.type | quote }}
+            - name: JAEGER_SAMPLER_PARAM
+              value: {{ .Values.config.jaeger.sampler.param | quote }}
+          volumeMounts:
+            - mountPath: /workdir
+              name: workdir
+            - name: log4j-config
+              mountPath: /veidemann/config/log4j2.xml
+              subPath: log4j2.xml
+            - name: cache-certificate
+              mountPath: "/ca-certificates"
+              readOnly: true
+          resources:
+{{ toYaml .Values.resources | indent 12 }}
+
+        # Browser container
+        - name: {{ .Chart.Name }}-browser
+          image: "{{ .Values.browser.image.repository }}:{{ .Values.browser.image.tag }}"
+          imagePullPolicy: {{ .Values.browser.image.pullPolicy }}
+          ports:
+{{ toYaml .Values.browser.ports | indent 12 }}
+          env:
+          - name: CHROME_OPTS
+            value: {{ .Values.browser.config.chromeOpts | quote }}
+          livenessProbe:
+{{ toYaml .Values.browser.livenessProbe | indent 12 }}
+          volumeMounts:
+            - mountPath: /data
+              name: workdir
+            - mountPath: /dev/shm
+              name: dshm
+          resources:
+{{ toYaml .Values.browser.resources | indent 12 }}
+    {{- with .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.affinity }}
+      affinity:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.tolerations }}
+      tolerations:
+{{ toYaml . | indent 8 }}
+    {{- end }}

@@ -1,0 +1,19 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: {{ template "veidemann-admin.fullname" . }}
+  labels:
+    app: {{ template "veidemann-admin.name" . }}
+    chart: {{ template "veidemann-admin.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+data:
+  environment.json: |-
+    {
+      "auth": {
+        "issuer": {{ .Values.config.issuer | quote }},
+        "requireHttps": true,
+        "clientId": "veidemann-gui",
+        "scope": "openid profile email groups offline_access audience:server:client_id:veidemann-api"
+      }
+    }

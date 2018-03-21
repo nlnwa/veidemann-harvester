@@ -1,0 +1,130 @@
+# Default values for linkerd.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+image:
+  repository: buoyantio/linkerd
+  tag: 1.3.5
+  pullPolicy: IfNotPresent
+
+service:
+  # Type of service to use for linkerd
+  type: ClusterIP
+  ports:
+    outgoing:
+      port: 4140
+      targetPort: outgoing
+      protocol: TCP
+    incoming:
+      port: 4141
+      targetPort: incoming
+      protocol: TCP
+    admin:
+      port: 9990
+      targetPort: admin
+      protocol: TCP
+  annotations: {}
+    #  prometheus.io/scrape: true
+    #  prometheus.io/probe: true
+    #  prometheus.io/path: /admin/metrics/prometheus
+    #  prometheus.io/port: "9990"
+
+ports:
+  - name: incoming
+    containerPort: 4141
+  - name: outgoing
+    containerPort: 4140
+    hostPort: 4140
+  - name: admin
+    containerPort: 9990
+    hostPort: 9990
+
+daemonSet:
+  hostNetwork: false
+  #  Use "ClusterFirstWithHostNet" if hostNetwork is true
+  dnsPolicy: ClusterFirst
+  annotations: {}
+  # iam.amazonaws.com/role: linkerd
+
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  #  limits:
+  #    cpu: 500m
+  #    memory: 512Mi
+  #  requests:
+  #    cpu: 0
+  #    memory: 512Mi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+ingress:
+  enabled: false
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  path: /
+  hosts:
+    - chart-example.local
+  tls: []
+  #  - secretName: chart-example-tls
+  #    hosts:
+  #      - chart-example.local
+
+livenessProbe:
+  httpGet:
+    path: /admin
+    port: 9990
+  initialDelaySeconds: 30
+  periodSeconds: 15
+
+rbac:
+  # Specifies whether RBAC resources should be created
+  create: true
+
+serviceAccount:
+  # Specifies whether a ServiceAccount should be created
+  create: true
+  # The name of the ServiceAccount to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name:
+
+kubectl:
+  image:
+    repository: buoyantio/kubectl
+    tag: v1.8.5
+    pullPolicy: IfNotPresent
+  resources: {}
+  # limits:
+  #  cpu: 100m
+  #  memory: 128Mi
+  # requests:
+  #  cpu: 100m
+  #  memory: 128Mi
+
+# tls for linkerd routers
+#
+# secret must exist in the namespace where linkerd is deployed
+tls: {}
+# secretName: chart-example-tls
+
+# Options only relevant for the default configuration
+# Not applicable if the config is overrided below
+dtab:
+  discoveryPortName: http
+
+# Override linkerd configuration (config.yaml)
+#
+# A default configuration is located inside the ConfigMap which uses the values
+# in the linkerd map above to route requests
+#
+# Allows to overrides the linkerd configuration
+config:

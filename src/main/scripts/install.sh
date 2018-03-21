@@ -23,14 +23,21 @@ function promptProceed {
     fi
 }
 
+function preInstall {
+    # Add incubator helm repo
+    helm repo add incubator https://kubernetes-charts-incubator.storage.googleapis.com/
+
+    # Update dependencies
+    helm dep up --skip-refresh $CHART
+}
+
 function installMinikube {
     set -x
 
     # Install tiller on the server and wait for tiller to be ready
     helm init --wait
 
-    # Update dependencies
-    helm dep up --skip-refresh $CHART
+    preInstall
 
     # Install
     (MINIKUBE_IP=$(minikube ip) envsubst '${MINIKUBE_IP}' < $VALUES) | helm upgrade $RELEASE $CHART --install --namespace $NAMESPACE --values -
@@ -39,8 +46,7 @@ function installMinikube {
 function installProd {
     set -x
 
-    # Update dependencies
-    helm dep up --skip-refresh $CHART
+    preInstall
 
     helm upgrade $RELEASE $CHART --install --namespace $NAMESPACE --values $VALUES "$@"
 }

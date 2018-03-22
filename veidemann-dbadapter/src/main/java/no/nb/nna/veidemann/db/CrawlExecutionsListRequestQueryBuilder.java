@@ -28,7 +28,7 @@ import static no.nb.nna.veidemann.db.RethinkDbAdapter.r;
 public class CrawlExecutionsListRequestQueryBuilder extends ConfigListQueryBuilder<ListExecutionsRequest> {
 
     public CrawlExecutionsListRequestQueryBuilder(ListExecutionsRequest request) {
-        super(request, TABLES.EXECUTIONS);
+        super(request, TABLES.EXECUTIONS, false);
         setPaging(request.getPageSize(), request.getPage());
 
         if (request.getIdCount() > 0) {

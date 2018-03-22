@@ -28,7 +28,7 @@ import static no.nb.nna.veidemann.db.RethinkDbAdapter.r;
 public class JobExecutionsListRequestQueryBuilder extends ConfigListQueryBuilder<ListJobExecutionsRequest> {
 
     public JobExecutionsListRequestQueryBuilder(ListJobExecutionsRequest request) {
-        super(request, TABLES.EXECUTIONS);
+        super(request, TABLES.JOB_EXECUTIONS, false);
         setPaging(request.getPageSize(), request.getPage());
 
         if (request.getIdCount() > 0) {

@@ -46,17 +46,19 @@ public class ScheduledCrawlJob extends Task {
 
     @Override
     public void execute(TaskExecutionContext context) throws RuntimeException {
-        LOG.info("Job '{}' starting", job.getMeta().getName());
-
-        JobExecutionStatus jobExecutionStatus = db.createJobExecutionStatus(job.getId());
+        LOG.debug("Job '{}' starting", job.getMeta().getName());
 
         ListReplyWalker<SeedListRequest, Seed> walker = new ListReplyWalker<>();
         SeedListRequest.Builder seedRequest = SeedListRequest.newBuilder().setCrawlJobId(job.getId());
 
-        walker.walk(seedRequest,
-                req -> db.listSeeds(req),
-                seed -> crawlSeed(job, seed, jobExecutionStatus));
+        if (db.listSeeds(seedRequest.build()).getCount() > 0) {
+            JobExecutionStatus jobExecutionStatus = db.createJobExecutionStatus(job.getId());
 
-        LOG.info("All seeds for job '{}' started", job.getMeta().getName());
+            walker.walk(seedRequest,
+                    req -> db.listSeeds(req),
+                    seed -> crawlSeed(job, seed, jobExecutionStatus));
+
+            LOG.info("All seeds for job '{}' started", job.getMeta().getName());
+        }
     }
 }

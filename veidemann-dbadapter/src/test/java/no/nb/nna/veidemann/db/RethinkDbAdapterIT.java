@@ -1090,12 +1090,18 @@ public class RethinkDbAdapterIT {
         assertThat(jes.getUrisCrawled()).isEqualTo(18);
         assertThat(jes.getBytesCrawled()).isEqualTo(300);
 
-        // Check list functions
+        // Check crawl executions list functions
         ExecutionsListReply eList = db.listExecutionStatus(ListExecutionsRequest.getDefaultInstance());
         assertThat(eList.getCount()).isEqualTo(2);
         assertThat(eList.getValueCount()).isEqualTo(2);
         assertThat(eList.getValueList()).containsExactlyInAnyOrder(ces1, ces2);
 
+        eList = db.listExecutionStatus(ListExecutionsRequest.newBuilder().addId(ces2.getId()).build());
+        assertThat(eList.getCount()).isEqualTo(1);
+        assertThat(eList.getValueCount()).isEqualTo(1);
+        assertThat(eList.getValueList()).containsExactlyInAnyOrder(ces2);
+
+        // Check job executions list functions
         JobExecutionsListReply jList = db.listJobExecutionStatus(ListJobExecutionsRequest.getDefaultInstance());
         assertThat(jList.getCount()).isEqualTo(1);
         assertThat(jList.getValueCount()).isEqualTo(1);

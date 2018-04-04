@@ -100,7 +100,7 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
 
         final String qry = "(?i)" + name;
 
-        LOG.warn("Adding name query: {qry={}}", qry);
+        LOG.debug("Adding name query: {qry={}}", qry);
 
         if (orderByName) {
             addQuery(r.table(table.name)
@@ -131,7 +131,7 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
                 value = q.substring(sepIdx + 1).toLowerCase();
             }
 
-            LOG.warn("Adding selector: {key={}, value={}}", key, value);
+            LOG.debug("Adding selector: {key={}, value={}}", key, value);
 
             if (!key.isEmpty() && !value.isEmpty() && !value.endsWith("*")) {
                 // Exact match

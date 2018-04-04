@@ -25,6 +25,7 @@ import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.opentracing.TracerFactory;
 import no.nb.nna.veidemann.contentexplorer.settings.Settings;
 import no.nb.nna.veidemann.db.RethinkDbAdapter;
+import no.nb.nna.veidemann.db.RethinkDbConnection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,8 +59,8 @@ public class ContentExplorer {
      */
     public ContentExplorer start() {
         try {
-            DbAdapter db = new RethinkDbAdapter(SETTINGS.getDbHost(), SETTINGS.getDbPort(), SETTINGS.getDbName(),
-                    SETTINGS.getDbUser(), SETTINGS.getDbPassword());
+            RethinkDbConnection conn = RethinkDbConnection.configure(SETTINGS);
+            DbAdapter db = new RethinkDbAdapter();
             ApiServer apiServer = new ApiServer(db, new File(SETTINGS.getWarcDir()));
 
             LOG.info("Veidemann Content Explorer (v. {}) started",

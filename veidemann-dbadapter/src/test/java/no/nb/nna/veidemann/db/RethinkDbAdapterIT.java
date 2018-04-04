@@ -57,6 +57,7 @@ import no.nb.nna.veidemann.api.StatusProto.ListExecutionsRequest;
 import no.nb.nna.veidemann.api.StatusProto.ListJobExecutionsRequest;
 import no.nb.nna.veidemann.commons.db.FutureOptional;
 import no.nb.nna.veidemann.commons.util.ApiTools;
+import no.nb.nna.veidemann.db.initializer.DbInitializer;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -81,6 +82,8 @@ public class RethinkDbAdapterIT {
 
     public static RethinkDbAdapter db;
 
+    static RethinkDB r = RethinkDB.r;
+
     public RethinkDbAdapterIT() {
     }
 
@@ -88,7 +91,20 @@ public class RethinkDbAdapterIT {
     public static void init() {
         String dbHost = System.getProperty("db.host");
         int dbPort = Integer.parseInt(System.getProperty("db.port"));
-        db = new RethinkDbAdapter(dbHost, dbPort, "veidemann", "admin", "");
+        if (!RethinkDbConnection.isConfigured()) {
+            RethinkDbConnection.configure(dbHost, dbPort, "veidemann", "admin", "");
+        }
+
+        try {
+            RethinkDbConnection.getInstance().exec(r.dbDrop("veidemann"));
+        } catch (DbException e) {
+            if (!e.getMessage().matches("Database .* does not exist.")) {
+                throw e;
+            }
+        }
+        new DbInitializer().initialize();
+
+        db = new RethinkDbAdapter();
     }
 
     @AfterClass
@@ -100,7 +116,6 @@ public class RethinkDbAdapterIT {
 
     @Before
     public void cleanDb() {
-        RethinkDB r = RethinkDB.r;
         for (RethinkDbAdapter.TABLES table : RethinkDbAdapter.TABLES.values()) {
             if (table != RethinkDbAdapter.TABLES.SYSTEM) {
                 db.executeRequest("delete", r.table(table.name).delete());

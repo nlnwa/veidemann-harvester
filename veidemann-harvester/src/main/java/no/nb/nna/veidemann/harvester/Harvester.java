@@ -24,6 +24,7 @@ import no.nb.nna.veidemann.commons.client.DnsServiceClient;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.opentracing.TracerFactory;
 import no.nb.nna.veidemann.db.RethinkDbAdapter;
+import no.nb.nna.veidemann.db.RethinkDbConnection;
 import no.nb.nna.veidemann.harvester.api.HarvesterApiServer;
 import no.nb.nna.veidemann.harvester.browsercontroller.BrowserController;
 import no.nb.nna.veidemann.harvester.proxy.DnsServiceHostResolver;
@@ -66,8 +67,9 @@ public class Harvester {
     public Harvester start() {
         BrowserSessionRegistry sessionRegistry = new BrowserSessionRegistry();
 
-        try (DbAdapter db = new RethinkDbAdapter(SETTINGS.getDbHost(), SETTINGS.getDbPort(), SETTINGS.getDbName(),
-                SETTINGS.getDbUser(), SETTINGS.getDbPassword());
+        try (RethinkDbConnection conn = RethinkDbConnection.configure(SETTINGS);
+
+             DbAdapter db = new RethinkDbAdapter();
 
              DnsServiceClient dnsServiceClient = new DnsServiceClient(
                      SETTINGS.getDnsResolverHost(), SETTINGS.getDnsResolverPort());

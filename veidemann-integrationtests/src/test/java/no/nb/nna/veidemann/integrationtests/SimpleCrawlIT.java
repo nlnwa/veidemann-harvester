@@ -40,6 +40,7 @@ import no.nb.nna.veidemann.commons.util.ApiTools;
 import no.nb.nna.veidemann.commons.util.ApiTools.ListReplyWalker;
 import no.nb.nna.veidemann.db.ProtoUtils;
 import no.nb.nna.veidemann.db.RethinkDbAdapter;
+import no.nb.nna.veidemann.db.RethinkDbConnection;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -95,7 +96,10 @@ public class SimpleCrawlIT implements VeidemannHeaderConstants {
                 .build();
         contentWriterClient = ContentWriterGrpc.newBlockingStub(contentWriterChannel).withWaitForReady();
 
-        db = new RethinkDbAdapter(dbHost, dbPort, "veidemann", "admin", "");
+        if (!RethinkDbConnection.isConfigured()) {
+            RethinkDbConnection.configure(dbHost, dbPort, "veidemann", "admin", "");
+        }
+        db = new RethinkDbAdapter();
     }
 
     @AfterClass

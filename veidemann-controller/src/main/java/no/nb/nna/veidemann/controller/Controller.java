@@ -30,6 +30,7 @@ import no.nb.nna.veidemann.commons.opentracing.TracerFactory;
 import no.nb.nna.veidemann.controller.scheduler.CrawlJobScheduler;
 import no.nb.nna.veidemann.controller.settings.Settings;
 import no.nb.nna.veidemann.db.RethinkDbAdapter;
+import no.nb.nna.veidemann.db.RethinkDbConnection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,8 +61,8 @@ public class Controller {
      * @return this instance
      */
     public Controller start() {
-        try (DbAdapter db = new RethinkDbAdapter(SETTINGS.getDbHost(), SETTINGS.getDbPort(), SETTINGS.getDbName(),
-                SETTINGS.getDbUser(), SETTINGS.getDbPassword());
+        try (RethinkDbConnection conn = RethinkDbConnection.configure(SETTINGS);
+             DbAdapter db = new RethinkDbAdapter();
              FrontierClient urlFrontierClient = new FrontierClient(SETTINGS.getFrontierHost(), SETTINGS
                      .getFrontierPort(), "url");
 

@@ -26,7 +26,6 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.fail;
 
 /**
  * Integration tests for ConfigListQueryBuilder.
@@ -56,12 +55,6 @@ public class ConfigListQueryBuilderTestIT {
             }
         }
         new DbInitializer().initialize();
-
-//        for (RethinkDbAdapter.TABLES table : RethinkDbAdapter.TABLES.values()) {
-//            if (table != RethinkDbAdapter.TABLES.SYSTEM) {
-//                db.executeRequest("delete", r.table(table.name).delete());
-//            }
-//        }
 
         e1 = db.saveCrawlEntity(CrawlEntity.newBuilder()
                 .setMeta(Meta.newBuilder()

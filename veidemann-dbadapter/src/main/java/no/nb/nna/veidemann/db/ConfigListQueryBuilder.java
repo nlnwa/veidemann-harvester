@@ -52,9 +52,16 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
 
     final RethinkDbAdapter.TABLES table;
 
-    public ConfigListQueryBuilder(T request, RethinkDbAdapter.TABLES table) {
+    private final boolean orderByName;
+
+    public ConfigListQueryBuilder(T request, RethinkDbAdapter.TABLES table, boolean orderByName) {
         this.request = Objects.requireNonNull(request, "The request cannot be null");
         this.table = Objects.requireNonNull(table);
+        this.orderByName = orderByName;
+    }
+
+    public ConfigListQueryBuilder(T request, RethinkDbAdapter.TABLES table) {
+        this(request, table, true);
     }
 
     /**
@@ -93,11 +100,16 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
 
         final String qry = "(?i)" + name;
 
-        LOG.warn("Adding name query: {qry={}}", qry);
+        LOG.debug("Adding name query: {qry={}}", qry);
 
-        addQuery(r.table(table.name)
-                .orderBy().optArg("index", "name")
-                .filter(doc -> doc.g("meta").g("name").match(qry)));
+        if (orderByName) {
+            addQuery(r.table(table.name)
+                    .orderBy().optArg("index", "name")
+                    .filter(doc -> doc.g("meta").g("name").match(qry)));
+        } else {
+            addQuery(r.table(table.name)
+                    .filter(doc -> doc.g("meta").g("name").match(qry)));
+        }
     }
 
     /**
@@ -119,7 +131,7 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
                 value = q.substring(sepIdx + 1).toLowerCase();
             }
 
-            LOG.warn("Adding selector: {key={}, value={}}", key, value);
+            LOG.debug("Adding selector: {key={}, value={}}", key, value);
 
             if (!key.isEmpty() && !value.isEmpty() && !value.endsWith("*")) {
                 // Exact match
@@ -176,7 +188,11 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
 
     void addFilter(ReqlFunction1... filter) {
         if (listQry == null) {
-            listQry = r.table(table.name).orderBy().optArg("index", "name");
+            if (orderByName) {
+                listQry = r.table(table.name).orderBy().optArg("index", "name");
+            } else {
+                listQry = r.table(table.name);
+            }
         }
 
         Arrays.stream(filter).forEach(f -> {
@@ -233,7 +249,11 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
 
     public long executeCount(RethinkDbAdapter db) {
         if (listQry == null) {
-            listQry = r.table(table.name).orderBy().optArg("index", "name");
+            if (orderByName) {
+                listQry = r.table(table.name).orderBy().optArg("index", "name");
+            } else {
+                listQry = r.table(table.name);
+            }
         }
 
         return db.executeRequest("db-countConfigObjects", listQry.count());
@@ -241,7 +261,11 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
 
     public <R extends Message.Builder> R executeList(RethinkDbAdapter db, R resultBuilder) {
         if (listQry == null) {
-            listQry = r.table(table.name).orderBy().optArg("index", "name");
+            if (orderByName) {
+                listQry = r.table(table.name).orderBy().optArg("index", "name");
+            } else {
+                listQry = r.table(table.name);
+            }
         }
 
         ReqlExpr qry = listQry.skip(page * pageSize).limit(pageSize);

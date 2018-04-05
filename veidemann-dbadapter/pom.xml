@@ -104,29 +104,29 @@
                                                 </wait>
                                             </run>
                                         </image>
-                                        <image>
-                                            <name>norsknettarkiv/${initializer.image.name}</name>
-                                            <alias>db-initializer</alias>
-                                            <run>
-                                                <network>
-                                                    <mode>custom</mode>
-                                                    <name>db-test-net</name>
-                                                </network>
-                                                <dependsOn>
-                                                    <container>db</container>
-                                                </dependsOn>
-                                                <env>
-                                                    <DB_HOST>db</DB_HOST>
-                                                </env>
-                                                <log>
-                                                    <enabled>true</enabled>
-                                                </log>
-                                                <wait>
-                                                    <log>DB initialized</log>
-                                                    <time>60000</time>
-                                                </wait>
-                                            </run>
-                                        </image>
+                                        <!--<image>-->
+                                            <!--<name>norsknettarkiv/${initializer.image.name}</name>-->
+                                            <!--<alias>db-initializer</alias>-->
+                                            <!--<run>-->
+                                                <!--<network>-->
+                                                    <!--<mode>custom</mode>-->
+                                                    <!--<name>db-test-net</name>-->
+                                                <!--</network>-->
+                                                <!--<dependsOn>-->
+                                                    <!--<container>db</container>-->
+                                                <!--</dependsOn>-->
+                                                <!--<env>-->
+                                                    <!--<DB_HOST>db</DB_HOST>-->
+                                                <!--</env>-->
+                                                <!--<log>-->
+                                                    <!--<enabled>true</enabled>-->
+                                                <!--</log>-->
+                                                <!--<wait>-->
+                                                    <!--<log>DB initialized</log>-->
+                                                    <!--<time>60000</time>-->
+                                                <!--</wait>-->
+                                            <!--</run>-->
+                                        <!--</image>-->
                                     </images>
                                 </configuration>
                             </execution>

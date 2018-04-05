@@ -23,6 +23,7 @@ import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.client.ContentWriterClient;
 import no.nb.nna.veidemann.commons.opentracing.TracerFactory;
 import no.nb.nna.veidemann.db.RethinkDbAdapter;
+import no.nb.nna.veidemann.db.RethinkDbConnection;
 import no.nb.nna.veidemann.dnsresolver.settings.Settings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,12 +54,11 @@ public class DnsServiceServer {
      * @return this instance
      */
     public DnsServiceServer start() {
-        try (
-                DbAdapter db = new RethinkDbAdapter(SETTINGS.getDbHost(), SETTINGS.getDbPort(), SETTINGS.getDbName(),
-                        SETTINGS.getDbUser(), SETTINGS.getDbPassword());
-                ContentWriterClient contentWriterClient = new ContentWriterClient(
+        try (RethinkDbConnection conn = RethinkDbConnection.configure(SETTINGS);
+             DbAdapter db = new RethinkDbAdapter();
+             ContentWriterClient contentWriterClient = new ContentWriterClient(
                         SETTINGS.getContentWriterHost(), SETTINGS.getContentWriterPort());
-                DnsServiceApiServer apiServer = new DnsServiceApiServer(
+             DnsServiceApiServer apiServer = new DnsServiceApiServer(
                         SETTINGS.getApiPort(), new DnsLookup(db, contentWriterClient, SETTINGS.getDnsServers()))
                         .start();) {
 

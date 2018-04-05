@@ -27,6 +27,7 @@ import no.nb.nna.veidemann.contentwriter.settings.Settings;
 import no.nb.nna.veidemann.contentwriter.text.TextExtractor;
 import no.nb.nna.veidemann.contentwriter.warc.WarcWriterPool;
 import no.nb.nna.veidemann.db.RethinkDbAdapter;
+import no.nb.nna.veidemann.db.RethinkDbConnection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,8 +61,10 @@ public class ContentWriter {
      * @return this instance
      */
     public ContentWriter start() {
-        try (DbAdapter db = new RethinkDbAdapter(SETTINGS.getDbHost(), SETTINGS.getDbPort(), SETTINGS.getDbName(),
-                SETTINGS.getDbUser(), SETTINGS.getDbPassword());
+        try (RethinkDbConnection conn = RethinkDbConnection.configure(SETTINGS);
+
+             DbAdapter db = new RethinkDbAdapter();
+
              WarcWriterPool warcWriterPool = new WarcWriterPool(
                      SETTINGS.getFilePrefix(),
                      new File(SETTINGS.getWarcDir()),

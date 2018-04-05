@@ -15,35 +15,16 @@
  */
 package no.nb.nna.veidemann.db.initializer;
 
-import com.google.protobuf.Message;
 import com.rethinkdb.RethinkDB;
-import com.rethinkdb.gen.exc.ReqlDriverError;
-import com.rethinkdb.net.Connection;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigBeanFactory;
 import com.typesafe.config.ConfigFactory;
-import no.nb.nna.veidemann.api.ConfigProto.BrowserConfig;
-import no.nb.nna.veidemann.api.ConfigProto.BrowserScript;
-import no.nb.nna.veidemann.api.ConfigProto.CrawlConfig;
-import no.nb.nna.veidemann.api.ConfigProto.CrawlJob;
-import no.nb.nna.veidemann.api.ConfigProto.CrawlScheduleConfig;
-import no.nb.nna.veidemann.api.ConfigProto.PolitenessConfig;
-import no.nb.nna.veidemann.api.ConfigProto.RoleMapping;
-import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.opentracing.TracerFactory;
-import no.nb.nna.veidemann.db.ProtoUtils;
-import no.nb.nna.veidemann.db.RethinkDbAdapter;
+import no.nb.nna.veidemann.db.DbException;
 import no.nb.nna.veidemann.db.RethinkDbAdapter.TABLES;
+import no.nb.nna.veidemann.db.RethinkDbConnection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.yaml.snakeyaml.Yaml;
-
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.UncheckedIOException;
-import java.util.Map;
-import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
 
 /**
  *
@@ -56,7 +37,7 @@ public class DbInitializer {
 
     static final RethinkDB r = RethinkDB.r;
 
-    final Connection conn;
+    final RethinkDbConnection conn;
 
     static {
         Config config = ConfigFactory.load();
@@ -68,224 +49,43 @@ public class DbInitializer {
 
     public DbInitializer() {
         System.out.println("Connecting to: " + SETTINGS.getDbHost() + ":" + SETTINGS.getDbPort());
-        conn = connect();
-    }
-
-    private Connection connect() {
-        Connection c = null;
-        int attempts = 0;
-        while (c == null) {
-            attempts++;
-            try {
-                c = r.connection()
-                        .hostname(SETTINGS.getDbHost())
-                        .port(SETTINGS.getDbPort())
-                        .db(SETTINGS.getDbName())
-                        .user(SETTINGS.getDbUser(), SETTINGS.getDbPassword())
-                        .connect();
-            } catch (ReqlDriverError e) {
-                System.err.println(e.getMessage());
-                if (attempts < 30) {
-                    try {
-                        Thread.sleep(1000);
-                    } catch (InterruptedException ex) {
-                        throw new RuntimeException(ex);
-                    }
-                } else {
-                    System.err.println("Too many connection attempts, giving up");
-                    throw e;
-                }
-            }
+        if (!RethinkDbConnection.isConfigured()) {
+            RethinkDbConnection.configure(SETTINGS);
         }
-        return c;
+        conn = RethinkDbConnection.getInstance();
     }
 
     public void initialize() {
         try {
-            if (!(boolean) r.dbList().contains(SETTINGS.getDbName()).run(conn)) {
-                System.out.println("Creating database: " + SETTINGS.getDbName());
-                createDb();
-                System.out.println("Populating database with default data");
-                populateDb();
+            if (!(boolean) conn.exec(r.dbList().contains(SETTINGS.getDbName()))) {
+                // No existing database, creating a new one
+                LOG.info("Creating database: " + SETTINGS.getDbName());
+                new CreateNewDb(SETTINGS.getDbName()).run();
+                LOG.info("Populating database with default data");
+                new PopulateDbWithDefaultData().run();
             } else {
-                System.out.println("Database found, nothing to initialize");
+                String version = conn.exec(r.table(TABLES.SYSTEM.name).get("db_version").g("db_version"));
+                if (CreateNewDb.DB_VERSION.equals(version)) {
+                    LOG.info("Database found and is newest version: {}", version);
+                } else {
+                    LOG.info("Database with version {} found, upgrading", version);
+                    upgrade(version);
+                }
             }
         } finally {
             conn.close();
         }
-        System.out.println("DB initialized");
+        LOG.info("DB initialized");
     }
 
-    private final void createDb() {
-        r.dbCreate(SETTINGS.getDbName()).run(conn);
-
-        r.tableCreate(TABLES.SYSTEM.name).run(conn);
-        r.table(TABLES.SYSTEM.name).insert(r.hashMap("id", "db_version").with("db_version", "0.1")).run(conn);
-        r.table(TABLES.SYSTEM.name).insert(r.hashMap("id", "log_levels")
-                .with("logLevel",
-                        r.array(r.hashMap("logger", "no.nb.nna.veidemann").with("level", "INFO"))
-                )).run(conn);
-
-        r.tableCreate(TABLES.CRAWL_LOG.name).optArg("primary_key", "warcId").run(conn);
-        r.table(TABLES.CRAWL_LOG.name)
-                .indexCreate("surt_time", row -> r.array(row.g("surt"), row.g("timeStamp")))
-                .run(conn);
-        r.table(TABLES.CRAWL_LOG.name).indexCreate("executionId").run(conn);
-
-        r.tableCreate(TABLES.PAGE_LOG.name).optArg("primary_key", "warcId").run(conn);
-        r.table(TABLES.PAGE_LOG.name).indexCreate("executionId").run(conn);
-
-        r.tableCreate(TABLES.CRAWLED_CONTENT.name).optArg("primary_key", "digest").run(conn);
-
-        r.tableCreate(TABLES.EXTRACTED_TEXT.name).optArg("primary_key", "warcId").run(conn);
-
-        r.tableCreate(TABLES.BROWSER_SCRIPTS.name).run(conn);
-
-        r.tableCreate(TABLES.URI_QUEUE.name).run(conn);
-        r.table(TABLES.URI_QUEUE.name).indexCreate("surt").run(conn);
-        r.table(TABLES.URI_QUEUE.name).indexCreate("executionId").run(conn);
-        r.table(TABLES.URI_QUEUE.name).indexCreate("crawlHostGroupKey_sequence_earliestFetch",
-                uri -> r.array(uri.g("crawlHostGroupId"),
-                        uri.g("politenessId"),
-                        uri.g("sequence"),
-                        uri.g("earliestFetchTimeStamp"))).run(conn);
-
-        r.tableCreate(TABLES.EXECUTIONS.name).run(conn);
-        r.table(TABLES.EXECUTIONS.name).indexCreate("startTime").run(conn);
-        r.table(TABLES.EXECUTIONS.name).indexCreate("jobId").run(conn);
-        r.table(TABLES.EXECUTIONS.name).indexCreate("state").run(conn);
-        r.table(TABLES.EXECUTIONS.name).indexCreate("seedId").run(conn);
-        r.table(TABLES.EXECUTIONS.name).indexCreate("jobExecutionId").run(conn);
-
-        r.tableCreate(TABLES.JOB_EXECUTIONS.name).run(conn);
-        r.table(TABLES.JOB_EXECUTIONS.name).indexCreate("startTime").run(conn);
-        r.table(TABLES.JOB_EXECUTIONS.name).indexCreate("jobId").run(conn);
-        r.table(TABLES.JOB_EXECUTIONS.name).indexCreate("state").run(conn);
-
-        r.tableCreate(TABLES.SCREENSHOT.name).run(conn);
-        r.table(TABLES.SCREENSHOT.name).indexCreate("executionId").run(conn);
-
-        r.tableCreate(TABLES.CRAWL_ENTITIES.name).run(conn);
-
-        r.tableCreate(TABLES.SEEDS.name).run(conn);
-        r.table(TABLES.SEEDS.name).indexCreate("jobId").optArg("multi", true).run(conn);
-        r.table(TABLES.SEEDS.name).indexCreate("entityId").run(conn);
-
-        r.tableCreate(TABLES.CRAWL_JOBS.name).run(conn);
-
-        r.tableCreate(TABLES.CRAWL_CONFIGS.name).run(conn);
-
-        r.tableCreate(TABLES.CRAWL_SCHEDULE_CONFIGS.name).run(conn);
-
-        r.tableCreate(TABLES.BROWSER_CONFIGS.name).run(conn);
-
-        r.tableCreate(TABLES.POLITENESS_CONFIGS.name).run(conn);
-
-        r.tableCreate(TABLES.CRAWL_HOST_GROUP_CONFIGS.name).run(conn);
-
-        r.tableCreate(TABLES.CRAWL_HOST_GROUP.name).run(conn);
-        r.table(TABLES.CRAWL_HOST_GROUP.name).indexCreate("nextFetchTime").run(conn);
-
-        r.tableCreate(TABLES.ALREADY_CRAWLED_CACHE.name)
-                .optArg("durability", "soft")
-                .optArg("shards", 3)
-                .optArg("replicas", 1)
-                .run(conn);
-
-        r.tableCreate(TABLES.ROLE_MAPPINGS.name).run(conn);
-
-        createMetaIndexes(
-                TABLES.BROWSER_SCRIPTS,
-                TABLES.CRAWL_ENTITIES,
-                TABLES.SEEDS,
-                TABLES.CRAWL_JOBS,
-                TABLES.CRAWL_CONFIGS,
-                TABLES.CRAWL_SCHEDULE_CONFIGS,
-                TABLES.BROWSER_CONFIGS,
-                TABLES.POLITENESS_CONFIGS,
-                TABLES.CRAWL_HOST_GROUP_CONFIGS
-        );
-
-        r.table(TABLES.URI_QUEUE.name)
-                .indexWait("surt", "executionId", "crawlHostGroupKey_sequence_earliestFetch")
-                .run(conn);
-        r.table(TABLES.CRAWL_LOG.name).indexWait("surt_time", "executionId").run(conn);
-        r.table(TABLES.PAGE_LOG.name).indexWait("executionId").run(conn);
-        r.table(TABLES.SCREENSHOT.name).indexWait("executionId").run(conn);
-        r.table(TABLES.SEEDS.name).indexWait("jobId", "entityId").run(conn);
-        r.table(TABLES.CRAWL_HOST_GROUP.name).indexWait("nextFetchTime").run(conn);
-        r.table(TABLES.EXECUTIONS.name).indexWait("startTime", "jobId", "state", "seedId", "jobExecutionId").run(conn);
-        r.table(TABLES.JOB_EXECUTIONS.name).indexWait("startTime", "jobId", "state").run(conn);
-    }
-
-    private final void createMetaIndexes(TABLES... tables) {
-        for (TABLES table : tables) {
-            r.table(table.name).indexCreate("name", row -> row.g("meta").g("name").downcase()).run(conn);
-            r.table(table.name)
-                    .indexCreate("label",
-                            row -> row.g("meta").g("label").map(
-                                    label -> r.array(label.g("key").downcase(), label.g("value").downcase())))
-                    .optArg("multi", true)
-                    .run(conn);
-            r.table(table.name)
-                    .indexCreate("label_value",
-                            row -> row.g("meta").g("label").map(
-                                    label -> label.g("value").downcase()))
-                    .optArg("multi", true)
-                    .run(conn);
+    private void upgrade(String fromVersion) {
+        switch (fromVersion) {
+            case "0.1":
+                new Upgrade0_1To0_2(SETTINGS.getDbName()).run();
+                break;
+            default:
+                throw new DbException("Unknown database version '" + fromVersion + "', unable to upgrade");
         }
-        for (TABLES table : tables) {
-            r.table(table.name).indexWait("name", "label", "label_value").run(conn);
-        }
-    }
-
-    private final void populateDb() {
-        DbAdapter db = new RethinkDbAdapter(conn);
-        try {
-            try (InputStream in = getClass().getClassLoader()
-                    .getResourceAsStream("default_objects/schedule-configs.yaml")) {
-                readYamlFile(in, CrawlScheduleConfig.class)
-                        .forEach(o -> db.saveCrawlScheduleConfig(o));
-            }
-            try (InputStream in = getClass().getClassLoader()
-                    .getResourceAsStream("default_objects/politeness-configs.yaml")) {
-                readYamlFile(in, PolitenessConfig.class)
-                        .forEach(o -> db.savePolitenessConfig(o));
-            }
-            try (InputStream in = getClass().getClassLoader()
-                    .getResourceAsStream("default_objects/browser-configs.yaml")) {
-                readYamlFile(in, BrowserConfig.class)
-                        .forEach(o -> db.saveBrowserConfig(o));
-            }
-            try (InputStream in = getClass().getClassLoader()
-                    .getResourceAsStream("default_objects/crawl-configs.yaml")) {
-                readYamlFile(in, CrawlConfig.class)
-                        .forEach(o -> db.saveCrawlConfig(o));
-            }
-            try (InputStream in = getClass().getClassLoader()
-                    .getResourceAsStream("default_objects/browser-scripts.yaml")) {
-                readYamlFile(in, BrowserScript.class)
-                        .forEach(o -> db.saveBrowserScript(o));
-            }
-            try (InputStream in = getClass().getClassLoader()
-                    .getResourceAsStream("default_objects/crawl-jobs.yaml")) {
-                readYamlFile(in, CrawlJob.class)
-                        .forEach(o -> db.saveCrawlJob(o));
-            }
-            try (InputStream in = getClass().getClassLoader()
-                    .getResourceAsStream("default_objects/rolemappings.yaml")) {
-                readYamlFile(in, RoleMapping.class)
-                        .forEach(o -> db.saveRoleMapping(o));
-            }
-        } catch (IOException ex) {
-            throw new UncheckedIOException(ex);
-        }
-    }
-
-    <T extends Message> Stream<T> readYamlFile(InputStream in, Class<T> type) {
-        Yaml yaml = new Yaml();
-        return StreamSupport.stream(yaml.loadAll(in).spliterator(), false)
-                .map(o -> ProtoUtils.rethinkToProto((Map) o, type));
     }
 
 }

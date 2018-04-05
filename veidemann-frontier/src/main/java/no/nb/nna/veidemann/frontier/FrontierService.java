@@ -24,6 +24,7 @@ import no.nb.nna.veidemann.commons.client.RobotsServiceClient;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.opentracing.TracerFactory;
 import no.nb.nna.veidemann.db.RethinkDbAdapter;
+import no.nb.nna.veidemann.db.RethinkDbConnection;
 import no.nb.nna.veidemann.frontier.api.FrontierApiServer;
 import no.nb.nna.veidemann.frontier.settings.Settings;
 import no.nb.nna.veidemann.frontier.worker.Frontier;
@@ -61,8 +62,9 @@ public class FrontierService {
      * @return this instance
      */
     public FrontierService start() {
-        try (DbAdapter db = new RethinkDbAdapter(SETTINGS.getDbHost(), SETTINGS.getDbPort(), SETTINGS.getDbName(),
-                SETTINGS.getDbUser(), SETTINGS.getDbPassword());
+        try (RethinkDbConnection conn = RethinkDbConnection.configure(SETTINGS);
+             DbAdapter db = new RethinkDbAdapter();
+
              HarvesterClient harvesterClient = new HarvesterClient(
                      SETTINGS.getHarvesterHost(), SETTINGS.getHarvesterPort())
                      .withMaxWaitForExhaustedHarvesterMs(SETTINGS.getMaxWaitForExhaustedHarvester());

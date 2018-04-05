@@ -16,6 +16,7 @@
 package no.nb.nna.veidemann.db;
 
 import com.google.protobuf.Descriptors;
+import com.google.protobuf.Descriptors.FieldDescriptor;
 import com.google.protobuf.Empty;
 import com.google.protobuf.Message;
 import com.google.protobuf.Timestamp;
@@ -24,10 +25,7 @@ import com.rethinkdb.RethinkDB;
 import com.rethinkdb.gen.ast.Insert;
 import com.rethinkdb.gen.ast.ReqlExpr;
 import com.rethinkdb.gen.ast.Update;
-import com.rethinkdb.gen.exc.ReqlError;
 import com.rethinkdb.model.MapObject;
-import com.rethinkdb.model.OptArgs;
-import com.rethinkdb.net.Connection;
 import com.rethinkdb.net.Cursor;
 import no.nb.nna.veidemann.api.ConfigProto.BrowserConfig;
 import no.nb.nna.veidemann.api.ConfigProto.BrowserScript;
@@ -82,7 +80,6 @@ import no.nb.nna.veidemann.commons.auth.EmailContextKey;
 import no.nb.nna.veidemann.commons.db.ChangeFeed;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.db.FutureOptional;
-import no.nb.nna.veidemann.db.opentracing.ConnectionTracingInterceptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -90,7 +87,6 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 
 /**
@@ -136,14 +132,7 @@ public class RethinkDbAdapter implements DbAdapter {
 
     static final RethinkDB r = RethinkDB.r;
 
-    final Connection conn;
-
-    public RethinkDbAdapter(String dbHost, int dbPort, String dbName, String dbUser, String dbPassword) {
-        this(r.connection().hostname(dbHost).port(dbPort).db(dbName).user(dbUser, dbPassword).connect());
-    }
-
-    public RethinkDbAdapter(Connection conn) {
-        this.conn = new ConnectionTracingInterceptor(conn, true);
+    public RethinkDbAdapter() {
     }
 
     @Override
@@ -216,7 +205,7 @@ public class RethinkDbAdapter implements DbAdapter {
 
     @Override
     public BrowserScript saveBrowserScript(BrowserScript script) {
-        return saveConfigMessage(script, TABLES.BROWSER_SCRIPTS);
+        return saveMessage(script, TABLES.BROWSER_SCRIPTS);
     }
 
     @Override
@@ -238,7 +227,7 @@ public class RethinkDbAdapter implements DbAdapter {
 
     @Override
     public CrawlHostGroupConfig saveCrawlHostGroupConfig(CrawlHostGroupConfig crawlHostGroupConfig) {
-        return saveConfigMessage(crawlHostGroupConfig, TABLES.CRAWL_HOST_GROUP_CONFIGS);
+        return saveMessage(crawlHostGroupConfig, TABLES.CRAWL_HOST_GROUP_CONFIGS);
     }
 
     @Override
@@ -680,7 +669,7 @@ public class RethinkDbAdapter implements DbAdapter {
 
     @Override
     public CrawlEntity saveCrawlEntity(CrawlEntity entity) {
-        return saveConfigMessage(entity, TABLES.CRAWL_ENTITIES);
+        return saveMessage(entity, TABLES.CRAWL_ENTITIES);
     }
 
     @Override
@@ -708,7 +697,7 @@ public class RethinkDbAdapter implements DbAdapter {
 
     @Override
     public Seed saveSeed(Seed seed) {
-        return saveConfigMessage(seed, TABLES.SEEDS);
+        return saveMessage(seed, TABLES.SEEDS);
     }
 
     @Override
@@ -733,7 +722,7 @@ public class RethinkDbAdapter implements DbAdapter {
             throw new IllegalArgumentException("A crawl config is required for crawl jobs");
         }
 
-        return saveConfigMessage(crawlJob, TABLES.CRAWL_JOBS);
+        return saveMessage(crawlJob, TABLES.CRAWL_JOBS);
     }
 
     @Override
@@ -755,7 +744,7 @@ public class RethinkDbAdapter implements DbAdapter {
 
     @Override
     public CrawlConfig saveCrawlConfig(CrawlConfig crawlConfig) {
-        return saveConfigMessage(crawlConfig, TABLES.CRAWL_CONFIGS);
+        return saveMessage(crawlConfig, TABLES.CRAWL_CONFIGS);
     }
 
     @Override
@@ -777,7 +766,7 @@ public class RethinkDbAdapter implements DbAdapter {
 
     @Override
     public CrawlScheduleConfig saveCrawlScheduleConfig(CrawlScheduleConfig crawlScheduleConfig) {
-        return saveConfigMessage(crawlScheduleConfig, TABLES.CRAWL_SCHEDULE_CONFIGS);
+        return saveMessage(crawlScheduleConfig, TABLES.CRAWL_SCHEDULE_CONFIGS);
     }
 
     @Override
@@ -799,7 +788,7 @@ public class RethinkDbAdapter implements DbAdapter {
 
     @Override
     public PolitenessConfig savePolitenessConfig(PolitenessConfig politenessConfig) {
-        return saveConfigMessage(politenessConfig, TABLES.POLITENESS_CONFIGS);
+        return saveMessage(politenessConfig, TABLES.POLITENESS_CONFIGS);
     }
 
     @Override
@@ -821,7 +810,7 @@ public class RethinkDbAdapter implements DbAdapter {
 
     @Override
     public BrowserConfig saveBrowserConfig(BrowserConfig browserConfig) {
-        return saveConfigMessage(browserConfig, TABLES.BROWSER_CONFIGS);
+        return saveMessage(browserConfig, TABLES.BROWSER_CONFIGS);
     }
 
     @Override
@@ -875,33 +864,6 @@ public class RethinkDbAdapter implements DbAdapter {
         );
     }
 
-    public <T extends Message> T saveConfigMessage(T msg, TABLES table) {
-        Map rMap = ProtoUtils.protoToRethink(msg);
-
-        // Check that name is set if this is a new object
-        if (!rMap.containsKey("id") && (!rMap.containsKey("meta") || !((Map) rMap.get("meta")).containsKey("name"))) {
-            throw new IllegalArgumentException("Trying to store a new " + msg.getClass().getSimpleName()
-                    + " object, but meta.name is not set.");
-        }
-
-        rMap.put("meta", updateMeta((Map) rMap.get("meta")));
-
-        return executeInsert("db-save" + msg.getClass().getSimpleName(),
-                r.table(table.name)
-                        .insert(rMap)
-                        // A rethink function which copies created and createby from old doc,
-                        // and copies name if not existent in new doc
-                        .optArg("conflict", (id, old_doc, new_doc) -> new_doc.merge(
-                                r.hashMap("meta", r.hashMap()
-                                        .with("name", r.branch(new_doc.g("meta").hasFields("name"),
-                                                new_doc.g("meta").g("name"), old_doc.g("meta").g("name")))
-                                        .with("created", old_doc.g("meta").g("created"))
-                                        .with("createdBy", old_doc.g("meta").g("createdBy"))
-                                ))),
-                (Class<T>) msg.getClass()
-        );
-    }
-
     public <T extends Message> T getMessage(GetRequest req, Class<T> type, TABLES table) {
         Map<String, Object> response = executeRequest("db-get" + type.getSimpleName(),
                 r.table(table.name)
@@ -916,15 +878,40 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     public <T extends Message> T saveMessage(T msg, TABLES table) {
+        FieldDescriptor metaField = msg.getDescriptorForType().findFieldByName("meta");
         Map rMap = ProtoUtils.protoToRethink(msg);
-        return executeInsert("db-save" + msg.getClass().getSimpleName(),
-                r.table(table.name)
-                        .insert(rMap)
-                        // A rethink function which copies created and createby from old doc,
-                        // and copies name if not existent in new doc
-                        .optArg("conflict", "replace"),
-                (Class<T>) msg.getClass()
-        );
+
+        if (metaField == null) {
+            return executeInsert("db-save" + msg.getClass().getSimpleName(),
+                    r.table(table.name)
+                            .insert(rMap)
+                            .optArg("conflict", "replace"),
+                    (Class<T>) msg.getClass()
+            );
+        } else {
+            // Check that name is set if this is a new object
+            if (!rMap.containsKey("id") && (!rMap.containsKey("meta") || !((Map) rMap.get("meta")).containsKey("name"))) {
+                throw new IllegalArgumentException("Trying to store a new " + msg.getClass().getSimpleName()
+                        + " object, but meta.name is not set.");
+            }
+
+            rMap.put("meta", updateMeta((Map) rMap.get("meta")));
+
+            return executeInsert("db-save" + msg.getClass().getSimpleName(),
+                    r.table(table.name)
+                            .insert(rMap)
+                            // A rethink function which copies created and createby from old doc,
+                            // and copies name if not existent in new doc
+                            .optArg("conflict", (id, old_doc, new_doc) -> new_doc.merge(
+                                    r.hashMap("meta", r.hashMap()
+                                            .with("name", r.branch(new_doc.g("meta").hasFields("name"),
+                                                    new_doc.g("meta").g("name"), old_doc.g("meta").g("name")))
+                                            .with("created", old_doc.g("meta").g("created"))
+                                            .with("createdBy", old_doc.g("meta").g("createdBy"))
+                                    ))),
+                    (Class<T>) msg.getClass()
+            );
+        }
     }
 
     public <T extends Message> Empty deleteConfigMessage(T entity, TABLES table) {
@@ -963,17 +950,19 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     public <T extends Message> T executeInsert(String operationName, Insert qry, Class<T> type) {
-        qry = qry.optArg("return_changes", "always");
-
-        Map<String, Object> response = executeRequest(operationName, qry);
-        List<Map<String, Map>> changes = (List<Map<String, Map>>) response.get("changes");
-
-        Map newDoc = changes.get(0).get("new_val");
-        return ProtoUtils.rethinkToProto(newDoc, type);
+        return executeInsertOrUpdate(operationName, qry, type);
     }
 
     public <T extends Message> T executeUpdate(String operationName, Update qry, Class<T> type) {
-        qry = qry.optArg("return_changes", "always");
+        return executeInsertOrUpdate(operationName, qry, type);
+    }
+
+    private <T extends Message> T executeInsertOrUpdate(String operationName, ReqlExpr qry, Class<T> type) {
+        if (qry instanceof Insert) {
+            qry = ((Insert) qry).optArg("return_changes", "always");
+        } else if (qry instanceof Update) {
+            qry = ((Update) qry).optArg("return_changes", "always");
+        }
 
         Map<String, Object> response = executeRequest(operationName, qry);
         List<Map<String, Map>> changes = (List<Map<String, Map>>) response.get("changes");
@@ -983,33 +972,12 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     public <T> T executeRequest(String operationName, ReqlExpr qry) {
-        synchronized (this) {
-            if (!conn.isOpen()) {
-                try {
-                    conn.connect();
-                } catch (TimeoutException ex) {
-                    throw new RuntimeException("Timed out waiting for connection");
-                }
-            }
-        }
-
-        try {
-            OptArgs globalOpts = OptArgs.of(ConnectionTracingInterceptor.OPERATION_NAME_KEY, operationName);
-            T result = qry.run(conn, globalOpts);
-            if (result instanceof Map
-                    && ((Map) result).containsKey("errors")
-                    && !((Map) result).get("errors").equals(0L)) {
-                throw new DbException((String) ((Map) result).get("first_error"));
-            }
-            return result;
-        } catch (ReqlError e) {
-            throw new DbException(e.getMessage(), e);
-        }
+        return RethinkDbConnection.getInstance().exec(operationName, qry);
     }
 
     @Override
     public void close() {
-        conn.close();
+        RethinkDbConnection.getInstance().close();
     }
 
     /**

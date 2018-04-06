@@ -471,7 +471,7 @@ public class RethinkDbAdapter implements DbAdapter {
                 }
 
                 executeRequest("db-saveJobExecutionStatus",
-                        r.table(TABLES.JOB_EXECUTIONS.name).update(ProtoUtils.protoToRethink(jesBuilder)));
+                        r.table(TABLES.JOB_EXECUTIONS.name).get(jesBuilder.getId()).update(ProtoUtils.protoToRethink(jesBuilder)));
             }
         }
 

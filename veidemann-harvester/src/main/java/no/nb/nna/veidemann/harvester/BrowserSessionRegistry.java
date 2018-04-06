@@ -15,7 +15,6 @@
  */
 package no.nb.nna.veidemann.harvester;
 
-import no.nb.nna.veidemann.commons.VeidemannHeaderConstants;
 import no.nb.nna.veidemann.harvester.browsercontroller.BrowserSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,7 +26,7 @@ import java.util.Objects;
 /**
  * Registry which allows both BrowserController and Proxy to access information about a request.
  */
-public class BrowserSessionRegistry implements VeidemannHeaderConstants {
+public class BrowserSessionRegistry {
     private static final Logger LOG = LoggerFactory.getLogger(BrowserSessionRegistry.class);
 
     Map<String, BrowserSession> executionIdToSession = new HashMap<>();
@@ -54,4 +53,11 @@ public class BrowserSessionRegistry implements VeidemannHeaderConstants {
         return executionIdToSession.remove(session.getExecutionId());
     }
 
+    public boolean isEmpty() {
+        return executionIdToSession.isEmpty();
+    }
+
+    public int size() {
+        return executionIdToSession.size();
+    }
 }

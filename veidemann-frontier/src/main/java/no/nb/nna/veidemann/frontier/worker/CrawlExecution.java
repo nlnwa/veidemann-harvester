@@ -78,7 +78,7 @@ public class CrawlExecution {
         CrawlJob job = DbUtil.getInstance().getDb().getCrawlJob(jobRequest);
 
         try {
-            this.qUri = QueuedUriWrapper.getQueuedUriWrapper(frontier, qUri).clearError();
+            this.qUri = QueuedUriWrapper.getQueuedUriWrapper(qUri).clearError();
         } catch (URISyntaxException ex) {
             throw new RuntimeException(ex);
         }
@@ -255,7 +255,7 @@ public class CrawlExecution {
 
         for (QueuedUri outlink : outlinks) {
             try {
-                QueuedUriWrapper outUri = QueuedUriWrapper.getQueuedUriWrapper(frontier, outlink);
+                QueuedUriWrapper outUri = QueuedUriWrapper.getQueuedUriWrapper(outlink);
 
                 if (shouldInclude(outUri)) {
                     Preconditions.checkPreconditions(frontier, crawlConfig, status, outUri, nextSequenceNum);

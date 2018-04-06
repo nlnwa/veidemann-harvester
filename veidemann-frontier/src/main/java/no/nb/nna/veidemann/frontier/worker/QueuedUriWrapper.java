@@ -41,7 +41,7 @@ public class QueuedUriWrapper {
 
     private Uri surt;
 
-    private QueuedUriWrapper(Frontier frontier, QueuedUriOrBuilder uri) throws URISyntaxException {
+    private QueuedUriWrapper(QueuedUriOrBuilder uri) throws URISyntaxException {
         if (uri instanceof QueuedUri.Builder) {
             qUri = (QueuedUri.Builder) uri;
         } else {
@@ -52,15 +52,36 @@ public class QueuedUriWrapper {
         }
     }
 
-    public static QueuedUriWrapper getQueuedUriWrapper(Frontier frontier, QueuedUri qUri) throws URISyntaxException {
-        return new QueuedUriWrapper(frontier, qUri);
+    public static QueuedUriWrapper getQueuedUriWrapper(QueuedUri qUri) throws URISyntaxException {
+        return new QueuedUriWrapper(qUri);
     }
 
-    public static QueuedUriWrapper getQueuedUriWrapper(Frontier frontier, String uri) throws URISyntaxException {
-        return new QueuedUriWrapper(frontier, QueuedUri.newBuilder().setUri(uri));
+    public static QueuedUriWrapper getQueuedUriWrapper(String uri, String jobExecutionId, String executionId)
+            throws URISyntaxException {
+        return new QueuedUriWrapper(QueuedUri.newBuilder()
+                .setUri(uri)
+                .setJobExecutionId(jobExecutionId)
+                .setExecutionId(executionId)
+        );
     }
 
     public QueuedUriWrapper addUriToQueue() {
+        if (qUri.getUri().isEmpty()) {
+            String msg = "Trying to queue a uri with empty uri string";
+            LOG.error(msg);
+            throw new IllegalStateException(msg);
+        }
+        if (qUri.getJobExecutionId().isEmpty()) {
+            String msg = "Uri is missing job execution id. Uri: " + qUri.getUri();
+            LOG.error(msg);
+            throw new IllegalStateException(msg);
+        }
+        if (qUri.getExecutionId().isEmpty()) {
+            String msg = "Uri is missing execution id. Uri: " + qUri.getUri();
+            LOG.error(msg);
+            throw new IllegalStateException(msg);
+        }
+
         qUri = DbUtil.getInstance().getDb().saveQueuedUri(qUri.build()).toBuilder();
         return this;
     }
@@ -108,6 +129,15 @@ public class QueuedUriWrapper {
 
     QueuedUriWrapper setExecutionId(String id) {
         qUri.setExecutionId(id);
+        return this;
+    }
+
+    public String getJobExecutionId() {
+        return qUri.getJobExecutionId();
+    }
+
+    QueuedUriWrapper setJobExecutionId(String id) {
+        qUri.setJobExecutionId(id);
         return this;
     }
 

@@ -158,8 +158,8 @@ public class CrawlExecutionValidator {
     }
 
     private void init() {
-        crawlLogs = db.listCrawlLogs(CrawlLogListRequest.getDefaultInstance()).getValueList();
-        pageLogs = db.listPageLogs(PageLogListRequest.getDefaultInstance()).getValueList();
+        crawlLogs = db.listCrawlLogs(CrawlLogListRequest.newBuilder().setPageSize(500).build()).getValueList();
+        pageLogs = db.listPageLogs(PageLogListRequest.newBuilder().setPageSize(500).build()).getValueList();
         warcRecords = new HashMap<>();
 
         WarcInspector.getWarcFiles().getRecordStream()

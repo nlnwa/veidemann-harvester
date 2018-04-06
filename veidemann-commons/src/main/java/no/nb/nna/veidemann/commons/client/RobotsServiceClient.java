@@ -60,6 +60,7 @@ public class RobotsServiceClient implements AutoCloseable {
     public boolean isAllowed(QueuedUri queuedUri, String userAgent, PolitenessConfig politeness) {
         try {
             RobotsEvaluatorProto.IsAllowedRequest request = RobotsEvaluatorProto.IsAllowedRequest.newBuilder()
+                    .setJobExecutionId(queuedUri.getJobExecutionId())
                     .setExecutionId(queuedUri.getExecutionId())
                     .setUri(queuedUri.getUri())
                     .setUserAgent(userAgent)

@@ -137,7 +137,7 @@ public class BrowserControllerIT {
             try (RecordingProxy proxy = new RecordingProxy(tmpDir, proxyPort, db, contentWriterClient,
                     new TestHostResolver(), sessionRegistry, "", 0);
 
-                 BrowserController controller = new BrowserController(browserHost, browserPort, db,
+                 BrowserController controller = new BrowserController(browserHost, browserPort, 5, db,
                          sessionRegistry);) {
 
                 HarvesterProto.HarvestPageReply result = controller.render(queuedUri, config);

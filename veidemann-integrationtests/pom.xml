@@ -10,6 +10,7 @@
     <packaging>jar</packaging>
 
     <properties>
+        <veidemann.cache.version>v0.1.0-alpha7</veidemann.cache.version>
         <test.dns.server>testsites</test.dns.server>
         <!--<test.dns.server>8.8.8.8</test.dns.server>-->
     </properties>
@@ -87,7 +88,7 @@
                             <removeVolumes>true</removeVolumes>
                             <autoCreateCustomNetworks>true</autoCreateCustomNetworks>
                             <verbose>false</verbose>
-                            <startParallel>false</startParallel>
+                            <startParallel>true</startParallel>
 
                             <volumes>
                                 <volume>
@@ -143,12 +144,7 @@
                                             <enabled>true</enabled>
                                         </log>
                                         <wait>
-                                            <tcp>
-                                                <mode>mapped</mode>
-                                                <ports>
-                                                    <port>28015</port>
-                                                </ports>
-                                            </tcp>
+                                            <log>Server ready.*</log>
                                             <time>20000</time>
                                         </wait>
                                     </run>
@@ -206,12 +202,7 @@
                                             <enabled>true</enabled>
                                         </log>
                                         <wait>
-                                            <tcp>
-                                                <mode>mapped</mode>
-                                                <ports>
-                                                    <port>9222</port>
-                                                </ports>
-                                            </tcp>
+                                            <log>DevTools listening on.*</log>
                                             <time>20000</time>
                                         </wait>
                                     </run>
@@ -261,19 +252,13 @@
                                             <enabled>true</enabled>
                                         </log>
                                         <wait>
-                                            <tcp>
-                                                <mode>mapped</mode>
-                                                <ports>
-                                                    <port>9090</port>
-                                                </ports>
-                                            </tcp>
-                                            <log>Veidemann Harvester .* started</log>
+                                            <log>Veidemann harvester .* started</log>
                                             <time>20000</time>
                                         </wait>
                                     </run>
                                 </image>
                                 <image>
-                                    <name>norsknettarkiv/veidemann-cache</name>
+                                    <name>norsknettarkiv/veidemann-cache:${veidemann.cache.version}</name>
                                     <alias>cache</alias>
                                     <run>
                                         <network>
@@ -307,18 +292,17 @@
                                             <enabled>false</enabled>
                                         </log>
                                         <dependsOn>
-                                            <container>db-initializer</container>
                                             <container>testsites</container>
                                         </dependsOn>
-                                        <!--<wait>-->
-                                            <!--<tcp>-->
-                                                <!--<mode>mapped</mode>-->
-                                                <!--<ports>-->
-                                                    <!--<port>80</port>-->
-                                                <!--</ports>-->
-                                            <!--</tcp>-->
-                                            <!--<time>20000</time>-->
-                                        <!--</wait>-->
+                                        <wait>
+                                            <tcp>
+                                                <mode>mapped</mode>
+                                                <ports>
+                                                    <port>3128</port>
+                                                </ports>
+                                            </tcp>
+                                            <time>20000</time>
+                                        </wait>
                                     </run>
                                 </image>
                                 <image>
@@ -351,12 +335,7 @@
                                             <enabled>true</enabled>
                                         </log>
                                         <wait>
-                                            <tcp>
-                                                <mode>mapped</mode>
-                                                <ports>
-                                                    <port>8080</port>
-                                                </ports>
-                                            </tcp>
+                                            <log>Veidemann Content Writer .* started</log>
                                             <time>20000</time>
                                         </wait>
                                     </run>
@@ -390,12 +369,7 @@
                                             <enabled>true</enabled>
                                         </log>
                                         <wait>
-                                            <tcp>
-                                                <mode>mapped</mode>
-                                                <ports>
-                                                    <port>8081</port>
-                                                </ports>
-                                            </tcp>
+                                            <log>Veidemann Content Explorer .* started</log>
                                             <time>20000</time>
                                         </wait>
                                     </run>
@@ -428,12 +402,6 @@
                                             <enabled>true</enabled>
                                         </log>
                                         <wait>
-                                            <tcp>
-                                                <mode>mapped</mode>
-                                                <ports>
-                                                    <port>7700</port>
-                                                </ports>
-                                            </tcp>
                                             <log>Veidemann Frontier .* started</log>
                                             <time>20000</time>
                                         </wait>
@@ -469,12 +437,6 @@
                                             <enabled>true</enabled>
                                         </log>
                                         <wait>
-                                            <tcp>
-                                                <mode>mapped</mode>
-                                                <ports>
-                                                    <port>50051</port>
-                                                </ports>
-                                            </tcp>
                                             <log>Veidemann Controller .* started</log>
                                             <time>20000</time>
                                         </wait>
@@ -506,12 +468,7 @@
                                             <enabled>true</enabled>
                                         </log>
                                         <wait>
-                                            <tcp>
-                                                <mode>mapped</mode>
-                                                <ports>
-                                                    <port>50052</port>
-                                                </ports>
-                                            </tcp>
+                                            <log>Veidemann Dns Service .* started</log>
                                             <time>20000</time>
                                         </wait>
                                     </run>
@@ -539,12 +496,7 @@
                                             <enabled>true</enabled>
                                         </log>
                                         <wait>
-                                            <tcp>
-                                                <mode>mapped</mode>
-                                                <ports>
-                                                    <port>50053</port>
-                                                </ports>
-                                            </tcp>
+                                            <log>Veidemann Robots Evaluator .* started</log>
                                             <time>20000</time>
                                         </wait>
                                     </run>

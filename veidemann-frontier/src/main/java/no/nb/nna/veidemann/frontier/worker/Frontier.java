@@ -64,7 +64,7 @@ public class Frontier implements AutoCloseable {
         String uri = request.getSeed().getMeta().getName();
 
         try {
-            QueuedUriWrapper qUri = QueuedUriWrapper.getQueuedUriWrapper(this, uri);
+            QueuedUriWrapper qUri = QueuedUriWrapper.getQueuedUriWrapper(uri, request.getJobExecutionId(), status.getId());
             Preconditions
                     .checkPreconditions(this, DbUtil.getInstance().getCrawlConfigForJob(request.getJob()), status, qUri, 1L);
             LOG.debug("Seed '{}' added to queue", qUri.getUri());

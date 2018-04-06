@@ -20,3 +20,4 @@ target/
 *.iml
 .idea
 /src/main/kubernetes-auau/configmap.yml
+!/.mvn/extensions.xml

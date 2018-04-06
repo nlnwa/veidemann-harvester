@@ -58,13 +58,18 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
 
     private final Map<String, BrowserScript> scriptCache = new HashMap<>();
 
-    public BrowserController(final String chromeHost, final int chromePort, final DbAdapter db,
-                             final BrowserSessionRegistry sessionRegistry) {
+    private final long minTimeBetweenNewSessions = 1000;
+
+    private long lastOpenedSessionTimeStamp;
+
+    public BrowserController(final String chromeHost, final int chromePort, final int maxOpenSessions,
+                             final DbAdapter db, final BrowserSessionRegistry sessionRegistry) {
         DbHelper.getInstance().configure(db);
 
+        LOG.info("Connecting browser at {}:{}", chromeHost, chromePort);
         ChromeDebugProtocolConfig chromeDebugProtocolConfig = new ChromeDebugProtocolConfig(chromeHost, chromePort)
                 .withTracer(GlobalTracer.get())
-                .withMaxOpenSessions(1)
+                .withMaxOpenSessions(maxOpenSessions)
                 .withProtocolTimeoutMs(10000)
                 .withWorkerThreads(32);
 
@@ -74,6 +79,8 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
 
     public HarvestPageReply render(QueuedUri queuedUri, CrawlConfig config)
             throws ExecutionException, IOException, TimeoutException {
+
+        throttleNewSessions();
 
         Span span = GlobalTracer.get()
                 .buildSpan("render")
@@ -192,4 +199,21 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
         chrome.close();
     }
 
+
+    private void throttleNewSessions() {
+        if (sessionRegistry.isEmpty()) {
+            lastOpenedSessionTimeStamp = 0;
+            return;
+        }
+
+        long timeSinceLastOpenedSession = System.currentTimeMillis() - lastOpenedSessionTimeStamp;
+        if (timeSinceLastOpenedSession <= minTimeBetweenNewSessions) {
+            try {
+                Thread.sleep(minTimeBetweenNewSessions - timeSinceLastOpenedSession);
+            } catch (InterruptedException e) {
+                LOG.info("Interrupted", e);
+            }
+        }
+        lastOpenedSessionTimeStamp = System.currentTimeMillis();
+    }
 }

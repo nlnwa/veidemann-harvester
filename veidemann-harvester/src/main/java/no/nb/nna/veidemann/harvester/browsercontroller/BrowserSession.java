@@ -137,6 +137,10 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
         LOG.debug("Browser session configured");
     }
 
+    public String getJobExecutionId() {
+        return queuedUri.getJobExecutionId();
+    }
+
     public String getExecutionId() {
         return queuedUri.getExecutionId();
     }
@@ -364,6 +368,7 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
                             for (int i = 0; i < links.length; i++) {
                                 if (!uriRequests.getInitialRequest().getUrl().equals(links[i])) {
                                     outlinks.add(MessagesProto.QueuedUri.newBuilder()
+                                            .setJobExecutionId(getJobExecutionId())
                                             .setExecutionId(getExecutionId())
                                             .setUri(links[i])
                                             .setReferrer(uriRequests.getRootRequest().getUrl())

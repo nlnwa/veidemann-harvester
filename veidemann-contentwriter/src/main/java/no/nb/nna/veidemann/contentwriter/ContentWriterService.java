@@ -119,7 +119,7 @@ public class ContentWriterService extends ContentWriterGrpc.ContentWriterImplBas
                     case CANCEL:
                         canceled = true;
                         String cancelReason = value.getCancel();
-                        LOG.info("Request cancelled before WARC record written. Reason {}", cancelReason);
+                        LOG.debug("Request cancelled before WARC record written. Reason {}", cancelReason);
                         for (ContentBuffer cb : contentBuffers.values()) {
                             cb.close();
                         }

@@ -1019,19 +1019,20 @@ public class RethinkDbAdapterIT {
 
     @Test
     public void testExecutions() {
-        JobExecutionStatus jes = db.createJobExecutionStatus("jobId");
+        JobExecutionStatus jes1 = db.createJobExecutionStatus("jobId1");
+        JobExecutionStatus jes2 = db.createJobExecutionStatus("jobId2");
 
-        jes = db.getJobExecutionStatus(jes.getId());
-        assertThat(jes.getState()).isSameAs(State.RUNNING);
-        assertThat(jes.getExecutionsStateOrThrow("SLEEPING")).isEqualTo(0);
-        assertThat(jes.getExecutionsStateOrThrow("FINISHED")).isEqualTo(0);
-        assertThat(jes.getDocumentsCrawled()).isEqualTo(0);
-        assertThat(jes.getDocumentsFailed()).isEqualTo(0);
-        assertThat(jes.getUrisCrawled()).isEqualTo(0);
-        assertThat(jes.getBytesCrawled()).isEqualTo(0);
+        jes1 = db.getJobExecutionStatus(jes1.getId());
+        assertThat(jes1.getState()).isSameAs(State.RUNNING);
+        assertThat(jes1.getExecutionsStateOrThrow("SLEEPING")).isEqualTo(0);
+        assertThat(jes1.getExecutionsStateOrThrow("FINISHED")).isEqualTo(0);
+        assertThat(jes1.getDocumentsCrawled()).isEqualTo(0);
+        assertThat(jes1.getDocumentsFailed()).isEqualTo(0);
+        assertThat(jes1.getUrisCrawled()).isEqualTo(0);
+        assertThat(jes1.getBytesCrawled()).isEqualTo(0);
 
         CrawlExecutionStatus ces1 = CrawlExecutionStatus.newBuilder()
-                .setJobExecutionId(jes.getId())
+                .setJobExecutionId(jes1.getId())
                 .setState(CrawlExecutionStatus.State.SLEEPING)
                 .setStartTime(ProtoUtils.getNowTs())
                 .setDocumentsCrawled(1)
@@ -1040,17 +1041,17 @@ public class RethinkDbAdapterIT {
                 .build();
         ces1 = db.saveExecutionStatus(ces1);
 
-        jes = db.getJobExecutionStatus(jes.getId());
-        assertThat(jes.getState()).isSameAs(State.RUNNING);
-        assertThat(jes.getExecutionsStateOrThrow("SLEEPING")).isEqualTo(1);
-        assertThat(jes.getExecutionsStateOrThrow("FINISHED")).isEqualTo(0);
-        assertThat(jes.getDocumentsCrawled()).isEqualTo(1);
-        assertThat(jes.getDocumentsFailed()).isEqualTo(0);
-        assertThat(jes.getUrisCrawled()).isEqualTo(4);
-        assertThat(jes.getBytesCrawled()).isEqualTo(100);
+        jes1 = db.getJobExecutionStatus(jes1.getId());
+        assertThat(jes1.getState()).isSameAs(State.RUNNING);
+        assertThat(jes1.getExecutionsStateOrThrow("SLEEPING")).isEqualTo(1);
+        assertThat(jes1.getExecutionsStateOrThrow("FINISHED")).isEqualTo(0);
+        assertThat(jes1.getDocumentsCrawled()).isEqualTo(1);
+        assertThat(jes1.getDocumentsFailed()).isEqualTo(0);
+        assertThat(jes1.getUrisCrawled()).isEqualTo(4);
+        assertThat(jes1.getBytesCrawled()).isEqualTo(100);
 
         CrawlExecutionStatus ces2 = CrawlExecutionStatus.newBuilder()
-                .setJobExecutionId(jes.getId())
+                .setJobExecutionId(jes1.getId())
                 .setState(CrawlExecutionStatus.State.SLEEPING)
                 .setStartTime(ProtoUtils.getNowTs())
                 .setDocumentsCrawled(1)
@@ -1059,14 +1060,14 @@ public class RethinkDbAdapterIT {
                 .build();
         ces2 = db.saveExecutionStatus(ces2);
 
-        jes = db.getJobExecutionStatus(jes.getId());
-        assertThat(jes.getState()).isSameAs(State.RUNNING);
-        assertThat(jes.getExecutionsStateOrThrow("SLEEPING")).isEqualTo(2);
-        assertThat(jes.getExecutionsStateOrThrow("FINISHED")).isEqualTo(0);
-        assertThat(jes.getDocumentsCrawled()).isEqualTo(2);
-        assertThat(jes.getDocumentsFailed()).isEqualTo(0);
-        assertThat(jes.getUrisCrawled()).isEqualTo(7);
-        assertThat(jes.getBytesCrawled()).isEqualTo(175);
+        jes1 = db.getJobExecutionStatus(jes1.getId());
+        assertThat(jes1.getState()).isSameAs(State.RUNNING);
+        assertThat(jes1.getExecutionsStateOrThrow("SLEEPING")).isEqualTo(2);
+        assertThat(jes1.getExecutionsStateOrThrow("FINISHED")).isEqualTo(0);
+        assertThat(jes1.getDocumentsCrawled()).isEqualTo(2);
+        assertThat(jes1.getDocumentsFailed()).isEqualTo(0);
+        assertThat(jes1.getUrisCrawled()).isEqualTo(7);
+        assertThat(jes1.getBytesCrawled()).isEqualTo(175);
 
         ces1 = ces1.toBuilder()
                 .setState(CrawlExecutionStatus.State.FINISHED)
@@ -1077,14 +1078,14 @@ public class RethinkDbAdapterIT {
                 .build();
         ces1 = db.saveExecutionStatus(ces1);
 
-        jes = db.getJobExecutionStatus(jes.getId());
-        assertThat(jes.getState()).isSameAs(State.RUNNING);
-        assertThat(jes.getExecutionsStateOrThrow("SLEEPING")).isEqualTo(1);
-        assertThat(jes.getExecutionsStateOrThrow("FINISHED")).isEqualTo(1);
-        assertThat(jes.getDocumentsCrawled()).isEqualTo(3);
-        assertThat(jes.getDocumentsFailed()).isEqualTo(0);
-        assertThat(jes.getUrisCrawled()).isEqualTo(9);
-        assertThat(jes.getBytesCrawled()).isEqualTo(275);
+        jes1 = db.getJobExecutionStatus(jes1.getId());
+        assertThat(jes1.getState()).isSameAs(State.RUNNING);
+        assertThat(jes1.getExecutionsStateOrThrow("SLEEPING")).isEqualTo(1);
+        assertThat(jes1.getExecutionsStateOrThrow("FINISHED")).isEqualTo(1);
+        assertThat(jes1.getDocumentsCrawled()).isEqualTo(3);
+        assertThat(jes1.getDocumentsFailed()).isEqualTo(0);
+        assertThat(jes1.getUrisCrawled()).isEqualTo(9);
+        assertThat(jes1.getBytesCrawled()).isEqualTo(275);
 
         ces2 = ces2.toBuilder()
                 .setState(CrawlExecutionStatus.State.FINISHED)
@@ -1096,14 +1097,14 @@ public class RethinkDbAdapterIT {
                 .build();
         ces2 = db.saveExecutionStatus(ces2);
 
-        jes = db.getJobExecutionStatus(jes.getId());
-        assertThat(jes.getState()).isSameAs(State.FINISHED);
-        assertThat(jes.getExecutionsStateOrThrow("SLEEPING")).isEqualTo(0);
-        assertThat(jes.getExecutionsStateOrThrow("FINISHED")).isEqualTo(2);
-        assertThat(jes.getDocumentsCrawled()).isEqualTo(4);
-        assertThat(jes.getDocumentsFailed()).isEqualTo(2);
-        assertThat(jes.getUrisCrawled()).isEqualTo(18);
-        assertThat(jes.getBytesCrawled()).isEqualTo(300);
+        jes1 = db.getJobExecutionStatus(jes1.getId());
+        assertThat(jes1.getState()).isSameAs(State.FINISHED);
+        assertThat(jes1.getExecutionsStateOrThrow("SLEEPING")).isEqualTo(0);
+        assertThat(jes1.getExecutionsStateOrThrow("FINISHED")).isEqualTo(2);
+        assertThat(jes1.getDocumentsCrawled()).isEqualTo(4);
+        assertThat(jes1.getDocumentsFailed()).isEqualTo(2);
+        assertThat(jes1.getUrisCrawled()).isEqualTo(18);
+        assertThat(jes1.getBytesCrawled()).isEqualTo(300);
 
         // Check crawl executions list functions
         ExecutionsListReply eList = db.listExecutionStatus(ListExecutionsRequest.getDefaultInstance());
@@ -1118,8 +1119,8 @@ public class RethinkDbAdapterIT {
 
         // Check job executions list functions
         JobExecutionsListReply jList = db.listJobExecutionStatus(ListJobExecutionsRequest.getDefaultInstance());
-        assertThat(jList.getCount()).isEqualTo(1);
-        assertThat(jList.getValueCount()).isEqualTo(1);
-        assertThat(jList.getValueList()).containsExactlyInAnyOrder(jes);
+        assertThat(jList.getCount()).isEqualTo(2);
+        assertThat(jList.getValueCount()).isEqualTo(2);
+        assertThat(jList.getValueList()).containsExactlyInAnyOrder(jes1, jes2);
     }
 }

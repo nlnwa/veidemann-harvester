@@ -133,8 +133,14 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                 HttpRequest request = (HttpRequest) httpObject;
 
                 executionId = request.headers().get(EXECUTION_ID);
-                if (executionId == null) {
+                if (executionId == null || executionId.isEmpty()) {
                     LOG.error("Missing executionId for {}", uri);
+                    return new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_GATEWAY);
+                }
+
+                String jobExecutionId = request.headers().get(JOB_EXECUTION_ID);
+                if (jobExecutionId == null || jobExecutionId.isEmpty()) {
+                    LOG.error("Missing jobExecutionId for {}", uri);
                     return new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_GATEWAY);
                 }
 

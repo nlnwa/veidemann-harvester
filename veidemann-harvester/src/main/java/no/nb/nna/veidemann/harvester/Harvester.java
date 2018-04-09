@@ -75,7 +75,7 @@ public class Harvester {
                      SETTINGS.getDnsResolverHost(), SETTINGS.getDnsResolverPort());
 
              BrowserController controller = new BrowserController(
-                     SETTINGS.getBrowserHost(), SETTINGS.getBrowserPort(), db, sessionRegistry);
+                     SETTINGS.getBrowserHost(), SETTINGS.getBrowserPort(), SETTINGS.getMaxOpenSessions(), db, sessionRegistry);
 
              ContentWriterClient contentWriterClient = new ContentWriterClient(
                      SETTINGS.getContentWriterHost(), SETTINGS.getContentWriterPort());

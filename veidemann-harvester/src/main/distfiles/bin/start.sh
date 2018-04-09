@@ -5,6 +5,9 @@ if [ -n "$CACHE_HOST" ]; then
     echo "Adding cache route to ${CACHE_HOST} (${CACHE_IP})"
 fi
 
+# IP address is needed in test environment
+BROWSER_HOST=$(nslookup ${BROWSER_HOST} | grep "Address 1" | cut -f3 -d' ')
+
 su-exec root update-ca-certificates
 
 mkdir -p /workdir/certificates

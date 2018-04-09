@@ -34,6 +34,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static no.nb.nna.veidemann.commons.VeidemannHeaderConstants.EXECUTION_ID;
+import static no.nb.nna.veidemann.commons.VeidemannHeaderConstants.JOB_EXECUTION_ID;
 
 /**
  *
@@ -83,6 +84,7 @@ public class RobotsCache {
                         Request request = new Request.Builder()
                                 .url(url)
                                 .addHeader(EXECUTION_ID, key.executionId)
+                                .addHeader(JOB_EXECUTION_ID, key.jobExecutionId)
                                 .build();
 
                         try (Response response = client.newCall(request).execute();) {
@@ -102,8 +104,8 @@ public class RobotsCache {
                 .build();
     }
 
-    public RobotsTxt get(final Uri uri, final int ttlSeconds, final String executionId) {
-        return cache.get(new CacheKey(uri, ttlSeconds, executionId));
+    public RobotsTxt get(final Uri uri, final int ttlSeconds, final String executionId, final String jobExecutionId) {
+        return cache.get(new CacheKey(uri, ttlSeconds, executionId, jobExecutionId));
     }
 
     public static final class CacheKey {
@@ -118,12 +120,15 @@ public class RobotsCache {
 
         private final String executionId;
 
-        public CacheKey(final Uri uri, final int ttlSeconds, final String executionId) {
+        private final String jobExecutionId;
+
+        public CacheKey(final Uri uri, final int ttlSeconds, final String executionId, final String jobExecutionId) {
             this.protocol = uri.getScheme();
             this.domain = uri.getHost();
             this.port = uri.getDecodedPort();
             this.ttlSeconds = ttlSeconds;
             this.executionId = executionId;
+            this.jobExecutionId = jobExecutionId;
         }
 
         public String getDomain() {

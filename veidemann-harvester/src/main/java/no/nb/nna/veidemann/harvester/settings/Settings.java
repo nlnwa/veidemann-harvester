@@ -45,6 +45,8 @@ public class Settings extends CommonSettings {
 
     private int dnsResolverPort;
 
+    private int maxOpenSessions;
+
     public int getProxyPort() {
         return proxyPort;
     }
@@ -131,5 +133,13 @@ public class Settings extends CommonSettings {
 
     public void setCachePort(int cachePort) {
         this.cachePort = cachePort;
+    }
+
+    public int getMaxOpenSessions() {
+        return maxOpenSessions;
+    }
+
+    public void setMaxOpenSessions(int maxOpenSessions) {
+        this.maxOpenSessions = maxOpenSessions;
     }
 }

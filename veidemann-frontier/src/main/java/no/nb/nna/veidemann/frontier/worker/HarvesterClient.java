@@ -34,6 +34,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
+import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -107,9 +108,11 @@ public class HarvesterClient implements AutoCloseable {
                             LOG.info("Harvester was exhausted for {}ms giving up", (System.currentTimeMillis() - start));
                             result.completeExceptionally(t);
                         } else {
-                            LOG.debug("Harvester was exhausted, will retry in one second: {}", ex.getStatus());
+                            Random rnd = new Random();
+                            long retryDelay = 500L + rnd.nextInt(1000);
+                            LOG.info("Harvester was exhausted, will retry in {} milliseconds: {}", retryDelay, ex.getStatus());
                             try {
-                                Thread.sleep(1000);
+                                Thread.sleep(retryDelay);
                                 innerFetchPage(request, result, start);
                             } catch (InterruptedException e) {
                                 LOG.error("RPC was interrupted", e);

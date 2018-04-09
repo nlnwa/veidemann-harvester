@@ -50,7 +50,7 @@ public class RobotsService extends RobotsEvaluatorGrpc.RobotsEvaluatorImplBase {
 
             switch (request.getPoliteness().getRobotsPolicy()) {
                 case OBEY_ROBOTS:
-                    allowed = cache.get(uri, ttlSeconds, request.getExecutionId())
+                    allowed = cache.get(uri, ttlSeconds, request.getExecutionId(), request.getJobExecutionId())
                             .isAllowed(request.getUserAgent(), uri);
                     break;
                 case IGNORE_ROBOTS:

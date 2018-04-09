@@ -311,6 +311,8 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                         if (contentWriterSession != null && contentWriterSession.isOpen()) {
                             contentWriterSession.cancel("Got error while writing response metadata");
                         }
+                        crawlLog.setError(ExtraStatusCodes.RUNTIME_EXCEPTION.toFetchError(ex.toString()));
+                        writeCrawlLog(crawlLog);
                         return ProxyUtils.createFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_GATEWAY);
                     }
 

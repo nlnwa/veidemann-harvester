@@ -180,6 +180,11 @@ public class ContentWriterService extends ContentWriterGrpc.ContentWriterImplBas
                                     recordMeta.getBlockDigest(), contentBuffer.getBlockDigest());
                             throw Status.INVALID_ARGUMENT.withDescription("Block digest mismatch").asException();
                         }
+
+                        if (writeRequestMeta.getIpAddress().isEmpty()) {
+                            LOG.error("Missing IP-address");
+                            throw Status.INVALID_ARGUMENT.withDescription("Missing IP-address").asException();
+                        }
                     } catch (StatusException ex) {
                         responseObserver.onError(ex);
                         return;

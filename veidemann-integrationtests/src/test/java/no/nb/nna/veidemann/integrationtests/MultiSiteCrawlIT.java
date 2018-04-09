@@ -106,7 +106,7 @@ public class MultiSiteCrawlIT extends CrawlTestBase implements VeidemannHeaderCo
 
         // The goal is to get as low as 25 when we cache 404, 302, etc
         // assertThat(WarcInspector.getWarcFiles().getRecordCount()).isEqualTo(25L);
-        assertThat(WarcInspector.getWarcFiles().getRecordCount()).isBetween(119L, 123L);
+        assertThat(WarcInspector.getWarcFiles().getRecordCount()).isBetween(117L, 123L);
 
         // TODO: check these values instead of just printing
         System.out.println("\nCRAWL LOG");
@@ -115,7 +115,7 @@ public class MultiSiteCrawlIT extends CrawlTestBase implements VeidemannHeaderCo
 
         // The goal is to get as low as 14 when we cache 404, 302, etc
         // assertThat(crawlLog.getCount()).isEqualTo(14L);
-        assertThat(crawlLog.getCount()).isEqualTo(63L);
+        assertThat(crawlLog.getCount()).isBetween(61L, 63L);
         assertThat(pageLog.getCount()).isEqualTo(18L);
 
         new CrawlExecutionValidator(db).validate();

@@ -19,7 +19,6 @@ import no.nb.nna.veidemann.api.ContentWriterProto.WriteRequestMeta;
 import no.nb.nna.veidemann.contentwriter.Util;
 import no.nb.nna.veidemann.db.ProtoUtils;
 import org.jwat.warc.WarcFileNaming;
-import org.jwat.warc.WarcFileNamingDefault;
 import org.jwat.warc.WarcFileWriter;
 import org.jwat.warc.WarcFileWriterConfig;
 import org.jwat.warc.WarcRecord;
@@ -53,7 +52,7 @@ public class SingleWarcWriter implements AutoCloseable {
 
     public URI writeWarcHeader(String warcId, final WriteRequestMeta request,
                                final WriteRequestMeta.RecordMeta recordMeta, final List<String> allRecordIds)
-            throws UncheckedIOException {
+            throws IOException {
 
         try {
             boolean newFile = warcFileWriter.nextWriter();
@@ -94,7 +93,7 @@ public class SingleWarcWriter implements AutoCloseable {
 
             for (String otherId : allRecordIds) {
                 if (!otherId.equals(warcId)) {
-                    record.header.addHeader(FN_WARC_CONCURRENT_TO, otherId);
+                    record.header.addHeader(FN_WARC_CONCURRENT_TO, Util.formatIdentifierAsUrn(otherId));
                 }
             }
 
@@ -102,7 +101,7 @@ public class SingleWarcWriter implements AutoCloseable {
 
             return new URI("warcfile:" + finalFileName + ":" + currentFile.length());
         } catch (IOException ex) {
-            throw new UncheckedIOException(ex);
+            throw ex;
         } catch (Exception ex) {
             throw new RuntimeException(ex);
         }

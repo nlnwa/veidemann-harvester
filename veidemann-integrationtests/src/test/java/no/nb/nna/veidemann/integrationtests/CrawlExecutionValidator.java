@@ -64,15 +64,16 @@ public class CrawlExecutionValidator {
         warcRecords.values().stream()
                 .filter(w -> (("response".equals(w.header.warcTypeStr)) || ("revisit".equals(w.header.warcTypeStr)) || ("resource".equals(w.header.warcTypeStr))))
                 .forEach(wid -> {
-                    assertThat(crawlLogs.stream().map(c -> c.getWarcId()))
-                            .as("Missing crawllog entry for WARC record %s, record type %s, target %s",
-                                    wid.header.warcRecordIdStr, wid.header.warcTypeStr, wid.header.warcTargetUriStr)
-                            .contains(wid.header.warcRecordIdStr.substring(10, wid.header.warcRecordIdStr.lastIndexOf(">")));
-
+                    String warcId = stripWarcId(wid.header.warcRecordIdStr);
                     String refersTo = stripWarcId(wid.header.warcRefersToStr);
                     List<String> concurrentTo = wid.header.warcConcurrentToList.stream()
                             .map(c -> stripWarcId(c.warcConcurrentToStr))
                             .collect(Collectors.toList());
+
+                    assertThat(crawlLogs.stream().map(c -> c.getWarcId()))
+                            .as("Missing crawllog entry for WARC record %s, record type %s, target %s",
+                                    wid.header.warcRecordIdStr, wid.header.warcTypeStr, wid.header.warcTargetUriStr)
+                            .contains(warcId);
                     if (!refersTo.isEmpty()) {
                         assertThat(crawlLogs.stream().map(c -> c.getWarcId()))
                                 .as("Missing crawllog entry for WARC record %s's warcRefersTo %s", wid, refersTo)
@@ -80,9 +81,17 @@ public class CrawlExecutionValidator {
                         assertThat(warcRecords.keySet().stream())
                                 .as("Missing referred WARC record for WARC record %s's warcRefersTo %s", wid, refersTo)
                                 .contains(refersTo);
+                        assertThat(refersTo)
+                                .as("Warc record '%s' refers to itself", warcId)
+                                .isNotEqualTo(warcId);
+                    }
+                    if (!concurrentTo.isEmpty()) {
                         assertThat(warcRecords.keySet().stream())
                                 .as("Missing referred WARC record for WARC record %s's concurrentTo %s", wid, concurrentTo)
                                 .containsAll(concurrentTo);
+                        assertThat(concurrentTo)
+                                .as("Warc record '%s' is concurrent to itself", warcId)
+                                .doesNotContain(warcId);
                     }
                 });
     }

@@ -41,8 +41,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import static io.netty.handler.codec.http.HttpConstants.CR;
@@ -182,6 +180,11 @@ public class ContentWriterService extends ContentWriterGrpc.ContentWriterImplBas
                                     recordMeta.getBlockDigest(), contentBuffer.getBlockDigest());
                             throw Status.INVALID_ARGUMENT.withDescription("Block digest mismatch").asException();
                         }
+
+                        if (writeRequestMeta.getIpAddress().isEmpty()) {
+                            LOG.error("Missing IP-address");
+                            throw Status.INVALID_ARGUMENT.withDescription("Missing IP-address").asException();
+                        }
                     } catch (StatusException ex) {
                         responseObserver.onError(ex);
                         return;
@@ -190,7 +193,7 @@ public class ContentWriterService extends ContentWriterGrpc.ContentWriterImplBas
 
                 // Write
                 List<String> allRecordIds = contentBuffers.values().stream()
-                        .map(cb -> Util.formatIdentifierAsUrn(cb.getWarcId()))
+                        .map(cb -> cb.getWarcId())
                         .collect(Collectors.toList());
 
                 try (WarcWriterPool.PooledWarcWriter pooledWarcWriter = warcWriterPool.borrow()) {
@@ -294,36 +297,43 @@ public class ContentWriterService extends ContentWriterGrpc.ContentWriterImplBas
     private URI writeRecord(final WarcWriterPool.PooledWarcWriter pooledWarcWriter,
                             final ContentBuffer contentBuffer, final WriteRequestMeta request,
                             final WriteRequestMeta.RecordMeta recordMeta, final List<String> allRecordIds)
-            throws StatusException, InterruptedException, ExecutionException, TimeoutException {
+            throws StatusException {
 
         long size = 0L;
 
         SingleWarcWriter warcWriter = pooledWarcWriter.getWarcWriter();
+        URI ref;
 
-        URI ref = warcWriter.writeWarcHeader(contentBuffer.getWarcId(), request, recordMeta, allRecordIds);
+        try {
+            ref = warcWriter.writeWarcHeader(contentBuffer.getWarcId(), request, recordMeta, allRecordIds);
 
-        if (contentBuffer.hasHeader()) {
-            size += warcWriter.addPayload(contentBuffer.getHeader().newInput());
-        }
-
-        if (contentBuffer.hasPayload()) {
-            // If both headers and payload are present, add separator
             if (contentBuffer.hasHeader()) {
-                size += warcWriter.addPayload(CRLF);
+                size += warcWriter.addPayload(contentBuffer.getHeader().newInput());
             }
 
-            long payloadSize = warcWriter.addPayload(contentBuffer.getPayload().newInput());
-            if (recordMeta.getType() == RecordType.RESPONSE) {
-                try {
-                    textExtractor.analyze(contentBuffer.getWarcId(), request.getTargetUri(), recordMeta.getPayloadContentType(),
-                            request.getStatusCode(), contentBuffer.getPayload().newInput(), db);
-                } catch (Exception ex) {
-                    LOG.error("Failed extracting text");
+            if (contentBuffer.hasPayload()) {
+                // If both headers and payload are present, add separator
+                if (contentBuffer.hasHeader()) {
+                    size += warcWriter.addPayload(CRLF);
                 }
-            }
 
-            LOG.debug("Payload of size {}b written for {}", payloadSize, request.getTargetUri());
-            size += payloadSize;
+                long payloadSize = warcWriter.addPayload(contentBuffer.getPayload().newInput());
+                if (recordMeta.getType() == RecordType.RESPONSE) {
+                    try {
+                        textExtractor.analyze(contentBuffer.getWarcId(), request.getTargetUri(), recordMeta.getPayloadContentType(),
+                                request.getStatusCode(), contentBuffer.getPayload().newInput(), db);
+                    } catch (Exception ex) {
+                        LOG.error("Failed extracting text");
+                    }
+                }
+
+                LOG.debug("Payload of size {}b written for {}", payloadSize, request.getTargetUri());
+                size += payloadSize;
+            }
+        } catch (IOException ex) {
+            Status status = Status.UNKNOWN.withDescription(ex.toString());
+            LOG.error(ex.getMessage(), ex);
+            throw status.asException();
         }
 
         try {

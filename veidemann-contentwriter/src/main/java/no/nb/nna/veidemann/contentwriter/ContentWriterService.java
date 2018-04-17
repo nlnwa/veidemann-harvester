@@ -216,7 +216,8 @@ public class ContentWriterService extends ContentWriterGrpc.ContentWriterImplBas
                                     .setWarcId(contentBuffer.getWarcId())
                                     .setStorageRef(ref.toString())
                                     .setBlockDigest(contentBuffer.getBlockDigest())
-                                    .setPayloadDigest(contentBuffer.getPayloadDigest());
+                                    .setPayloadDigest(contentBuffer.getPayloadDigest())
+                                    .setWarcRefersTo(recordMeta.getWarcRefersTo());
 
                             reply.getMetaBuilder().putRecordMeta(responseMeta.getRecordNum(), responseMeta.build());
                         } catch (StatusException ex) {

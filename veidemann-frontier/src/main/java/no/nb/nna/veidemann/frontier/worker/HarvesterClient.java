@@ -26,7 +26,6 @@ import no.nb.nna.veidemann.api.ConfigProto.CrawlConfig;
 import no.nb.nna.veidemann.api.HarvesterGrpc;
 import no.nb.nna.veidemann.api.HarvesterGrpc.HarvesterBlockingStub;
 import no.nb.nna.veidemann.api.HarvesterGrpc.HarvesterStub;
-import no.nb.nna.veidemann.api.HarvesterProto.CleanupExecutionRequest;
 import no.nb.nna.veidemann.api.HarvesterProto.HarvestPageReply;
 import no.nb.nna.veidemann.api.HarvesterProto.HarvestPageRequest;
 import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
@@ -35,8 +34,13 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.Random;
+import java.util.Spliterator;
+import java.util.Spliterators.AbstractSpliterator;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 /**
  *
@@ -71,7 +75,7 @@ public class HarvesterClient implements AutoCloseable {
         return this;
     }
 
-    public CompletableFuture<HarvestPageReply> fetchPage(QueuedUri qUri, CrawlConfig config) {
+    public CompletableFuture<FetchResponse> fetchPage(QueuedUri qUri, CrawlConfig config) {
         if (qUri.getExecutionId().isEmpty()) {
             throw new IllegalArgumentException("A queued URI must have the execution ID set.");
         }
@@ -81,7 +85,7 @@ public class HarvesterClient implements AutoCloseable {
                 .setCrawlConfig(config)
                 .build();
 
-        CompletableFuture<HarvestPageReply> result = new CompletableFuture<>();
+        CompletableFuture<FetchResponse> result = new CompletableFuture<>();
 
         long start = System.currentTimeMillis();
 
@@ -90,13 +94,27 @@ public class HarvesterClient implements AutoCloseable {
         return result;
     }
 
-    private void innerFetchPage(HarvestPageRequest request, CompletableFuture<HarvestPageReply> result, long start) {
+    private void innerFetchPage(HarvestPageRequest request, CompletableFuture<FetchResponse> result, long start) {
         asyncStub.harvestPage(request, new StreamObserver<HarvestPageReply>() {
-            HarvestPageReply reply;
+            HarvesterResponseSpliterator outlinks;
 
             @Override
             public void onNext(HarvestPageReply value) {
-                reply = value;
+                if (outlinks == null) {
+                    outlinks = new HarvesterResponseSpliterator();
+                    FetchResponse reply = new FetchResponse()
+                            .withUriCount(value.getUriCount())
+                            .withBytesDownloaded(value.getBytesDownloaded())
+                            .withOutlinks(outlinks);
+                    result.complete(reply);
+                } else {
+                    try {
+                        outlinks.addQueuedUri(value.getOutlink());
+                    } catch (InterruptedException e) {
+                        LOG.info(e.toString(), e);
+                        onCompleted();
+                    }
+                }
             }
 
             @Override
@@ -120,29 +138,24 @@ public class HarvesterClient implements AutoCloseable {
                             }
                         }
                     } else {
-                        LOG.error("RPC failed: " + ex.getStatus(), ex);
+                        LOG.error("RPC failed: {}", ex.getStatus(), ex);
                         result.completeExceptionally(t);
                     }
+                } else {
+                    LOG.error("RPC failed: {}", t.toString(), t);
+                    result.completeExceptionally(t);
                 }
             }
 
             @Override
             public void onCompleted() {
-                result.complete(reply);
+                try {
+                    outlinks.addQueuedUri(QueuedUri.getDefaultInstance());
+                } catch (InterruptedException e) {
+                    LOG.info(e.toString(), e);
+                }
             }
         });
-    }
-
-    public void cleanupExecution(String executionId) {
-        try {
-            CleanupExecutionRequest request = CleanupExecutionRequest.newBuilder()
-                    .setExecutionId(executionId)
-                    .build();
-            blockingStub.cleanupExecution(request);
-        } catch (StatusRuntimeException ex) {
-            LOG.error("RPC failed: " + ex.getStatus(), ex);
-            throw ex;
-        }
     }
 
     @Override
@@ -154,4 +167,31 @@ public class HarvesterClient implements AutoCloseable {
         }
     }
 
+    class HarvesterResponseSpliterator extends AbstractSpliterator<QueuedUri> {
+        private BlockingQueue<QueuedUri> outlinkQueue = new LinkedBlockingQueue<>();
+
+        protected HarvesterResponseSpliterator() {
+            super(Long.MAX_VALUE, IMMUTABLE | ORDERED);
+        }
+
+        @Override
+        public boolean tryAdvance(Consumer<? super QueuedUri> consumer) {
+            try {
+                QueuedUri qUri = outlinkQueue.take();
+                if (qUri.getUri().isEmpty()) {
+                    return false;
+                } else {
+                    consumer.accept(qUri);
+                    return true;
+                }
+            } catch (InterruptedException e) {
+                LOG.info(e.toString(), e);
+                return false;
+            }
+        }
+
+        void addQueuedUri(QueuedUri qUri) throws InterruptedException {
+            outlinkQueue.put(qUri);
+        }
+    }
 }

@@ -19,8 +19,6 @@ import no.nb.nna.veidemann.api.ConfigProto;
 import no.nb.nna.veidemann.api.ConfigProto.CrawlJob;
 import no.nb.nna.veidemann.api.ConfigProto.CrawlLimitsConfig;
 import no.nb.nna.veidemann.api.ControllerProto;
-import no.nb.nna.veidemann.api.ReportProto.CrawlLogListReply;
-import no.nb.nna.veidemann.api.ReportProto.CrawlLogListRequest;
 import no.nb.nna.veidemann.api.ReportProto.PageLogListReply;
 import no.nb.nna.veidemann.api.ReportProto.PageLogListRequest;
 import no.nb.nna.veidemann.commons.VeidemannHeaderConstants;
@@ -51,7 +49,6 @@ public class SimpleCrawlIT extends CrawlTestBase implements VeidemannHeaderConst
         entity = controllerClient.saveEntity(entity);
         ConfigProto.Seed seed = ConfigProto.Seed.newBuilder()
                 .setMeta(ConfigProto.Meta.newBuilder().setName("http://a1.com"))
-//                .setMeta(ConfigProto.Meta.newBuilder().setName("https://www.nb.no"))
                 .setEntityId(entity.getId())
                 .addJobId(jobId)
                 .build();
@@ -69,7 +66,6 @@ public class SimpleCrawlIT extends CrawlTestBase implements VeidemannHeaderConst
         WarcInspector.getWarcFiles().getRecordStream().forEach(r -> System.out.println(r.header.warcTypeStr + " -- "
                 + r.header.warcTargetUriStr + ", ip: " + r.header.warcIpAddress));
 
-        CrawlLogListReply crawlLog = db.listCrawlLogs(CrawlLogListRequest.newBuilder().setPageSize(500).build());
         PageLogListReply pageLog = db.listPageLogs(PageLogListRequest.getDefaultInstance());
 
         System.out.println("\nPAGE LOG");
@@ -78,24 +74,16 @@ public class SimpleCrawlIT extends CrawlTestBase implements VeidemannHeaderConst
             p.getResourceList().forEach(r -> System.out.println("  - " + r.getUri() + ", cache: " + r.getFromCache()));
         });
 
-        // The goal is to get as low as 25 when we cache 404, 302, etc
-        // assertThat(WarcInspector.getWarcFiles().getRecordCount()).isEqualTo(25L);
-        assertThat(WarcInspector.getWarcFiles().getRecordCount()).isEqualTo(40L);
-
-        // TODO: check these values instead of just printing
-        System.out.println("\nCRAWL LOG");
-        crawlLog.getValueList().forEach(r -> System.out.println(r.getRequestedUri() + " -- " + r.getStatusCode()
-                + " -- " + r.getContentType() + " -- " + r.getRecordType() + " -- " + r.getReferrer() + ", ip: " + r.getIpAddress()));
-
-        // The goal is to get as low as 14 when we cache 404, 302, etc
-        // assertThat(crawlLog.getCount()).isEqualTo(14L);
-        assertThat(crawlLog.getCount()).isEqualTo(20L);
         assertThat(pageLog.getCount()).isEqualTo(6L);
 
-        new CrawlExecutionValidator(db).validate();
+        // The goal is to get as low as 14 when we cache 404, 302, etc
+        new CrawlExecutionValidator(db)
+                .validate()
+                .checkCrawlLogCount("response", 5)
+                .checkCrawlLogCount("revisit", 15)
+                .checkCrawlLogCount("dns", 0);
 
         System.out.println("Job execution result:\n" + JobCompletion.executeJob(statusClient, request).get());
-        crawlLog = db.listCrawlLogs(CrawlLogListRequest.newBuilder().setPageSize(500).build());
         pageLog = db.listPageLogs(PageLogListRequest.getDefaultInstance());
 
         System.out.println("\nPAGE LOG");
@@ -104,16 +92,11 @@ public class SimpleCrawlIT extends CrawlTestBase implements VeidemannHeaderConst
             p.getResourceList().forEach(r -> System.out.println("  - " + r.getUri() + ", cache: " + r.getFromCache()));
         });
 
-        // TODO: check these values instead of just printing
-        System.out.println("---------------");
-        crawlLog.getValueList().forEach(r -> System.out.println(r.getRequestedUri() + " -- " + r.getStatusCode()
-                + " -- " + r.getContentType() + " -- " + r.getRecordType() + " -- " + r.getReferrer()));
-
-        // The goal is to get as low as 24 when we cache 404, 302, etc
-        // assertThat(crawlLog.getCount()).isEqualTo(24);
-        assertThat(crawlLog.getCount()).isEqualTo(40);
-
-        new CrawlExecutionValidator(db).validate();
+        new CrawlExecutionValidator(db)
+                .validate()
+                .checkCrawlLogCount("response", 5)
+                .checkCrawlLogCount("revisit", 35)
+                .checkCrawlLogCount("dns", 0);
     }
 
 }

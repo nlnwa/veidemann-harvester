@@ -38,11 +38,14 @@ import org.mockito.invocation.InvocationOnMock;
 import org.netpreserve.commons.uri.UriConfigs;
 
 import java.io.File;
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Optional;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
 
 import static org.assertj.core.api.Assertions.fail;
 import static org.mockito.Mockito.any;
@@ -140,25 +143,29 @@ public class BrowserControllerIT {
                  BrowserController controller = new BrowserController(browserHost, browserPort, 5, db,
                          sessionRegistry);) {
 
-                HarvesterProto.HarvestPageReply result = controller.render(queuedUri, config);
+                RenderResult result = controller.render(queuedUri, config);
                 int pagesHarvested = 1;
-                int totalPages = result.getOutlinksCount() + 1;
-                for (QueuedUri qu : result.getOutlinksList()) {
+//                int totalPages = result.getOutlinksCount() + 1;
+                result.getOutlinks().forEach(qu -> {
                     String surt = UriConfigs.SURT_KEY.buildUri(qu.getUri()).toString();
-                    if (!surt.startsWith("(no,nb,")) {
-                        System.out.println("OOS: " + surt + " --- " + qu.getUri());
-                        totalPages--;
-                        continue;
-                    }
+//                    if (!surt.startsWith("(no,nb,")) {
+//                        System.out.println("OOS: " + surt + " --- " + qu.getUri());
+//                        totalPages--;
+//                        continue;
+//                    }
 
-                    pagesHarvested++;
-                    System.out.println("URI " + pagesHarvested + " of " + totalPages + ": " + qu.getUri());
-                    Thread.sleep(1000);
-                    HarvesterProto.HarvestPageReply result2 = controller.render(qu, config);
-                    if (pagesHarvested > 1) {
-                        break;
+//                    pagesHarvested++;
+//                    System.out.println("URI " + pagesHarvested + " of " + totalPages + ": " + qu.getUri());
+                    try {
+                        Thread.sleep(1000);
+                        RenderResult result2 = controller.render(qu, config);
+                    } catch (Exception e) {
+                        e.printStackTrace();
                     }
-                }
+//                    if (pagesHarvested > 1) {
+//                        break;
+//                    }
+                });
 
 //                System.out.println("=========*\n" + result);
                 // TODO review the generated test code and remove the default call to fail.

@@ -70,7 +70,7 @@ public abstract class CrawlTestBase {
         db = new RethinkDbAdapter();
 
         LogLevels.Builder logLevels = controllerClient.getLogConfig(Empty.getDefaultInstance()).toBuilder();
-        logLevels.addLogLevelBuilder().setLogger("no.nb.nna.veidemann").setLevel(Level.INFO);
+        logLevels.addLogLevelBuilder().setLogger("no.nb.nna.veidemann.frontier").setLevel(Level.INFO);
         controllerClient.saveLogConfig(logLevels.build());
     }
 

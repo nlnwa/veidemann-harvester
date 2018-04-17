@@ -85,7 +85,7 @@ public class Harvester {
                      SETTINGS.getProxyPort(), db, contentWriterClient,
                      new DnsServiceHostResolver(dnsServiceClient), sessionRegistry, SETTINGS.getCacheHost(), SETTINGS.getCachePort());
 
-             HarvesterApiServer apiServer = new HarvesterApiServer(controller, proxy).start();) {
+             HarvesterApiServer apiServer = new HarvesterApiServer(controller).start();) {
 
             LOG.info("Veidemann harvester (v. {}) started", Harvester.class.getPackage().getImplementationVersion());
             apiServer.blockUntilShutdown();

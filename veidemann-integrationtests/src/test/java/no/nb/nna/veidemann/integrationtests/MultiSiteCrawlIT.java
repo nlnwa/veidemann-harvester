@@ -21,8 +21,6 @@ import no.nb.nna.veidemann.api.ConfigProto.CrawlJob;
 import no.nb.nna.veidemann.api.ConfigProto.CrawlLimitsConfig;
 import no.nb.nna.veidemann.api.ConfigProto.PolitenessConfig;
 import no.nb.nna.veidemann.api.ControllerProto;
-import no.nb.nna.veidemann.api.ReportProto.CrawlLogListReply;
-import no.nb.nna.veidemann.api.ReportProto.CrawlLogListRequest;
 import no.nb.nna.veidemann.api.ReportProto.PageLogListReply;
 import no.nb.nna.veidemann.api.ReportProto.PageLogListRequest;
 import no.nb.nna.veidemann.commons.VeidemannHeaderConstants;
@@ -83,9 +81,17 @@ public class MultiSiteCrawlIT extends CrawlTestBase implements VeidemannHeaderCo
                 .addJobId(jobId)
                 .build());
 
+        ConfigProto.CrawlEntity entity3 = controllerClient.saveEntity(
+                ConfigProto.CrawlEntity.newBuilder().setMeta(ConfigProto.Meta.newBuilder()
+                        .setName("Test entity 3")).build());
+        ConfigProto.Seed invalidSeed = controllerClient.saveSeed(ConfigProto.Seed.newBuilder()
+                .setMeta(ConfigProto.Meta.newBuilder().setName("https://www.toll.no/ // etat under finansdepartementet"))
+                .setEntityId(entity3.getId())
+                .addJobId(jobId)
+                .build());
+
         ControllerProto.RunCrawlRequest request = ControllerProto.RunCrawlRequest.newBuilder()
                 .setJobId(jobId)
-//                .setSeedId(seed1.getId())
                 .build();
 
         System.out.println("Job execution result:\n" + JobCompletion.executeJob(statusClient, request).get());
@@ -95,7 +101,6 @@ public class MultiSiteCrawlIT extends CrawlTestBase implements VeidemannHeaderCo
         WarcInspector.getWarcFiles().getRecordStream().forEach(r -> System.out.println(r.header.warcTypeStr + " -- "
                 + r.header.warcTargetUriStr + ", ip: " + r.header.warcIpAddress));
 
-        CrawlLogListReply crawlLog = db.listCrawlLogs(CrawlLogListRequest.newBuilder().setPageSize(500).build());
         PageLogListReply pageLog = db.listPageLogs(PageLogListRequest.getDefaultInstance());
 
         System.out.println("\nPAGE LOG");
@@ -104,24 +109,15 @@ public class MultiSiteCrawlIT extends CrawlTestBase implements VeidemannHeaderCo
             p.getResourceList().forEach(r -> System.out.println("  - " + r.getUri() + ", cache: " + r.getFromCache()));
         });
 
-        // The goal is to get as low as 25 when we cache 404, 302, etc
-        // assertThat(WarcInspector.getWarcFiles().getRecordCount()).isEqualTo(25L);
-        assertThat(WarcInspector.getWarcFiles().getRecordCount()).isBetween(117L, 123L);
-
-        // TODO: check these values instead of just printing
-        System.out.println("\nCRAWL LOG");
-        crawlLog.getValueList().forEach(r -> System.out.println(r.getRequestedUri() + " -- " + r.getStatusCode()
-                + " -- " + r.getContentType() + " -- " + r.getRecordType() + " -- " + r.getReferrer() + ", ip: " + r.getIpAddress()));
-
-        // The goal is to get as low as 14 when we cache 404, 302, etc
-        // assertThat(crawlLog.getCount()).isEqualTo(14L);
-        assertThat(crawlLog.getCount()).isBetween(61L, 63L);
         assertThat(pageLog.getCount()).isEqualTo(18L);
 
-        new CrawlExecutionValidator(db).validate();
+        new CrawlExecutionValidator(db)
+                .validate()
+                .checkCrawlLogCount("response", 8)
+                .checkCrawlLogCount("revisit", 51)
+                .checkCrawlLogCount("dns", 6);
 
         System.out.println("Job execution result:\n" + JobCompletion.executeJob(statusClient, request).get());
-        crawlLog = db.listCrawlLogs(CrawlLogListRequest.newBuilder().setPageSize(500).build());
         pageLog = db.listPageLogs(PageLogListRequest.getDefaultInstance());
 
         System.out.println("\nPAGE LOG");
@@ -130,16 +126,11 @@ public class MultiSiteCrawlIT extends CrawlTestBase implements VeidemannHeaderCo
             p.getResourceList().forEach(r -> System.out.println("  - " + r.getUri() + ", cache: " + r.getFromCache()));
         });
 
-        // TODO: check these values instead of just printing
-        System.out.println("---------------");
-        crawlLog.getValueList().forEach(r -> System.out.println(r.getRequestedUri() + " -- " + r.getStatusCode()
-                + " -- " + r.getContentType() + " -- " + r.getRecordType() + " -- " + r.getReferrer()));
-
-        // The goal is to get as low as 24 when we cache 404, 302, etc
-        // assertThat(crawlLog.getCount()).isEqualTo(24);
-        assertThat(crawlLog.getCount()).isBetween(118L, 121L);
-
-        new CrawlExecutionValidator(db).validate();
+        new CrawlExecutionValidator(db)
+                .validate()
+                .checkCrawlLogCount("response", 8)
+                .checkCrawlLogCount("revisit", 107)
+                .checkCrawlLogCount("dns", 6);
     }
 
 }

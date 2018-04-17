@@ -15,18 +15,17 @@
  */
 package no.nb.nna.veidemann.harvester.api;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
-
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.opentracing.contrib.ServerTracingInterceptor;
 import io.opentracing.util.GlobalTracer;
 import no.nb.nna.veidemann.harvester.Harvester;
 import no.nb.nna.veidemann.harvester.browsercontroller.BrowserController;
-import no.nb.nna.veidemann.harvester.proxy.RecordingProxy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.io.UncheckedIOException;
 
 /**
  * The external service REST API.
@@ -40,7 +39,7 @@ public class HarvesterApiServer implements AutoCloseable {
     /**
      * Construct a new REST API server.
      */
-    public HarvesterApiServer(BrowserController controller, RecordingProxy proxy) {
+    public HarvesterApiServer(BrowserController controller) {
         final int port = Harvester.getSettings().getApiPort();
         LOG.info("Starting API server listening on port {}.", port);
 
@@ -50,7 +49,7 @@ public class HarvesterApiServer implements AutoCloseable {
                 .build();
 
         server = ServerBuilder.forPort(port).addService(
-                tracingInterceptor.intercept(new HarvesterService(controller, proxy))).build();
+                tracingInterceptor.intercept(new HarvesterService(controller))).build();
     }
 
     @Override

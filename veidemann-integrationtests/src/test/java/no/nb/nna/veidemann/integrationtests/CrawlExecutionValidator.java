@@ -1,8 +1,6 @@
 package no.nb.nna.veidemann.integrationtests;
 
-import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
 import no.nb.nna.veidemann.api.MessagesProto.PageLog;
-import no.nb.nna.veidemann.api.ReportProto.CrawlLogListRequest;
 import no.nb.nna.veidemann.api.ReportProto.PageLogListRequest;
 import no.nb.nna.veidemann.db.RethinkDbAdapter;
 import org.jwat.common.HttpHeader;
@@ -21,7 +19,7 @@ import static org.assertj.core.api.Assertions.fail;
 public class CrawlExecutionValidator {
     final RethinkDbAdapter db;
 
-    List<CrawlLog> crawlLogs;
+    CrawlLogHelper crawlLogs;
     List<PageLog> pageLogs;
     Map<String, WarcRecord> warcRecords;
 
@@ -29,25 +27,35 @@ public class CrawlExecutionValidator {
         this.db = db;
     }
 
-    public void validate() {
+    public CrawlExecutionValidator validate() {
         init();
 
+        crawlLogs.checkCount();
         checkConsistency();
         checkValidWarc();
         checkChecksum();
         checkIp();
+
+        return this;
+    }
+
+    public CrawlExecutionValidator checkCrawlLogCount(String type, int expectedSize) {
+        assertThat(crawlLogs.getTypeCount(type))
+                .as("Wrong number of crawl log records of type %s", type)
+                .isEqualTo(expectedSize);
+        return this;
     }
 
     private void checkConsistency() {
-        crawlLogs.forEach(cl -> {
+        crawlLogs.getCrawlLog().forEach(cl -> {
             assertThat(warcRecords.keySet())
                     .as("Missing WARC record for crawllog entry %s with uri: %s",
                             cl.getWarcId(), cl.getRequestedUri())
                     .contains(cl.getWarcId());
             if (!cl.getWarcRefersTo().isEmpty()) {
-                assertThat(crawlLogs.stream().map(c -> c.getWarcId()))
+                assertThat(crawlLogs.getCrawlLogEntry(cl.getWarcRefersTo()))
                         .as("Missing crawllog entry for record %s's warcRefersTo", cl)
-                        .contains(cl.getWarcRefersTo());
+                        .isNotNull();
             }
         });
         pageLogs.forEach(pl -> {
@@ -70,14 +78,14 @@ public class CrawlExecutionValidator {
                             .map(c -> stripWarcId(c.warcConcurrentToStr))
                             .collect(Collectors.toList());
 
-                    assertThat(crawlLogs.stream().map(c -> c.getWarcId()))
+                    assertThat(crawlLogs.getCrawlLogEntry(warcId))
                             .as("Missing crawllog entry for WARC record %s, record type %s, target %s",
                                     wid.header.warcRecordIdStr, wid.header.warcTypeStr, wid.header.warcTargetUriStr)
-                            .contains(warcId);
+                            .isNotNull();
                     if (!refersTo.isEmpty()) {
-                        assertThat(crawlLogs.stream().map(c -> c.getWarcId()))
+                        assertThat(crawlLogs.getCrawlLogEntry(refersTo))
                                 .as("Missing crawllog entry for WARC record %s's warcRefersTo %s", wid, refersTo)
-                                .contains(refersTo);
+                                .isNotNull();
                         assertThat(warcRecords.keySet().stream())
                                 .as("Missing referred WARC record for WARC record %s's warcRefersTo %s", wid, refersTo)
                                 .contains(refersTo);
@@ -97,7 +105,7 @@ public class CrawlExecutionValidator {
     }
 
     private void checkIp() {
-        crawlLogs.forEach(cl -> {
+        crawlLogs.getCrawlLog().forEach(cl -> {
             assertThat(cl.getIpAddress())
                     .as("Ip address for crawllog entry %s was empty", cl.getWarcId())
                     .isNotEmpty();
@@ -112,7 +120,7 @@ public class CrawlExecutionValidator {
     }
 
     private void checkChecksum() {
-        crawlLogs.forEach(cl -> {
+        crawlLogs.getCrawlLog().forEach(cl -> {
             assertThat(cl.getBlockDigest())
                     .as("Block digest for crawllog entry %s (uri:%s) was empty",
                             cl.getWarcId(), cl.getRequestedUri())
@@ -163,11 +171,38 @@ public class CrawlExecutionValidator {
             assertThat(r.isCompliant())
                     .as("Record is not compliant. Uri: %s, type: %s", r.header.warcTargetUriStr, r.header.warcTypeStr)
                     .isTrue();
+
+            String refersTo = stripWarcId(r.header.warcRefersToStr);
+            List<String> concurrentTo = r.header.warcConcurrentToList.stream()
+                    .map(c -> stripWarcId(c.warcConcurrentToStr))
+                    .collect(Collectors.toList());
+            switch (r.header.warcTypeStr) {
+                case "request":
+                    assertThat(refersTo).isEmpty();
+                    break;
+                case "response":
+                    assertThat(refersTo).isEmpty();
+                    break;
+                case "revisit":
+                    assertThat(refersTo).isNotEmpty();
+                    break;
+                case "resource":
+                    assertThat(refersTo).isEmpty();
+                    break;
+                case "metadata":
+                    break;
+                case "warcinfo":
+                    assertThat(refersTo).isEmpty();
+                    assertThat(concurrentTo).isEmpty();
+                    break;
+                default:
+                    fail("No tests for record of type '%s'", r.header.warcTypeStr);
+            }
         });
     }
 
     private void init() {
-        crawlLogs = db.listCrawlLogs(CrawlLogListRequest.newBuilder().setPageSize(500).build()).getValueList();
+        crawlLogs = new CrawlLogHelper(db);
         pageLogs = db.listPageLogs(PageLogListRequest.newBuilder().setPageSize(500).build()).getValueList();
         warcRecords = new HashMap<>();
 

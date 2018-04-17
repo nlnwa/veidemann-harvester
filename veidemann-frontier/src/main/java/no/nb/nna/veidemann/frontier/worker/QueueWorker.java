@@ -21,9 +21,6 @@ import no.nb.nna.veidemann.db.DbException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.ReentrantLock;
-
 /**
  *
  */
@@ -35,12 +32,6 @@ public class QueueWorker {
 
     private final Frontier frontier;
 
-    private boolean isThreadsExhausted;
-
-    private final ReentrantLock threadsExhaustedLock = new ReentrantLock();
-
-    private final Condition availableThread = threadsExhaustedLock.newCondition();
-
     private final Thread queueWatcher;
 
     public QueueWorker(Frontier frontier) {
@@ -49,28 +40,12 @@ public class QueueWorker {
         this.queueWatcher.start();
     }
 
-    public void waitForReadyThread() {
-        threadsExhaustedLock.lock();
-        try {
-            while (isThreadsExhausted) {
-                availableThread.await();
-            }
-        } catch (InterruptedException ie) {
-            Thread.currentThread().interrupt();
-        } finally {
-            threadsExhaustedLock.unlock();
-        }
-    }
-
     private class QueueWatcher implements Runnable {
 
         @Override
         public void run() {
             while (true) {
                 try {
-                    LOG.trace("Waiting for ready thread");
-                    waitForReadyThread();
-
                     LOG.trace("Waiting for next execution to be ready");
                     CrawlExecution exe = getNextToFetch();
 

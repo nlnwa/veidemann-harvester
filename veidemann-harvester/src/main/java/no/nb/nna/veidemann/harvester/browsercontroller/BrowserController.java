@@ -24,7 +24,6 @@ import no.nb.nna.veidemann.api.ConfigProto.BrowserScript;
 import no.nb.nna.veidemann.api.ConfigProto.CrawlConfig;
 import no.nb.nna.veidemann.api.ControllerProto;
 import no.nb.nna.veidemann.api.ControllerProto.ListRequest;
-import no.nb.nna.veidemann.api.HarvesterProto.HarvestPageReply;
 import no.nb.nna.veidemann.api.MessagesProto.PageLog;
 import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
 import no.nb.nna.veidemann.chrome.client.ChromeDebugProtocol;
@@ -77,7 +76,7 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
         this.sessionRegistry = sessionRegistry;
     }
 
-    public HarvestPageReply render(QueuedUri queuedUri, CrawlConfig config)
+    public RenderResult render(QueuedUri queuedUri, CrawlConfig config)
             throws ExecutionException, IOException, TimeoutException {
 
         throttleNewSessions();
@@ -90,7 +89,7 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
                 .withTag("uri", queuedUri.getUri())
                 .startManual();
 
-        HarvestPageReply.Builder resultBuilder = HarvestPageReply.newBuilder();
+        RenderResult result = new RenderResult();
 
         MDC.put("eid", queuedUri.getExecutionId());
         MDC.put("uri", queuedUri.getUri());
@@ -111,19 +110,10 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
                     session.saveScreenshot();
                 }
 
-//                System.out.println("LINKS >>>>>>");
-//                for (PageDomain.FrameResource fs : session.page.getResourceTree().get().frameTree.resources) {
-//                    System.out.println("T: " + fs);
-//                    if ("Script".equals(fs.type)) {
-//                        System.out.println(">: " + fs.toString());
-//                    }
-//                }
-//                System.out.println("<<<<<<");
                 LOG.debug("Extract outlinks");
-
                 try {
                     List<BrowserScript> scripts = getScripts(browserConfig);
-                    resultBuilder.addAllOutlinks(session.extractOutlinks(scripts));
+                    result.withOutlinks(session.extractOutlinks(scripts));
                 } catch (Throwable t) {
                     LOG.error("Failed extracting outlinks", t);
                 }
@@ -148,7 +138,7 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
                 }
 
                 session.getUriRequests().getPageLogResources().forEach(r -> pageLog.addResource(r));
-                resultBuilder.getOutlinksOrBuilderList().forEach(o -> pageLog.addOutlink(o.getUri()));
+                result.getOutlinks().forEach(o -> pageLog.addOutlink(o.getUri()));
                 DbHelper.getInstance().getDb().savePageLog(pageLog.build());
             } catch (Throwable t) {
                 LOG.error("Failed writing pagelog", t);
@@ -161,12 +151,11 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
             span.finish();
         }
 
-        resultBuilder.setBytesDownloaded(session.getUriRequests().getBytesDownloaded());
-        resultBuilder.setUriCount(session.getUriRequests().getUriDownloadedCount());
+        result.withBytesDownloaded(session.getUriRequests().getBytesDownloaded())
+                .withUriCount(session.getUriRequests().getUriDownloadedCount());
 
-        LOG.trace("======== PAGELOAD RESULT ========\n{}", resultBuilder.build());
         MDC.clear();
-        return resultBuilder.build();
+        return result;
     }
 
     private List<BrowserScript> getScripts(BrowserConfig browserConfig) {

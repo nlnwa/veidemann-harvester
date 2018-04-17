@@ -15,18 +15,16 @@
  */
 package no.nb.nna.veidemann.harvester.api;
 
-import com.google.protobuf.Empty;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import no.nb.nna.veidemann.api.HarvesterGrpc;
-import no.nb.nna.veidemann.api.HarvesterProto.CleanupExecutionRequest;
 import no.nb.nna.veidemann.api.HarvesterProto.HarvestPageReply;
 import no.nb.nna.veidemann.api.HarvesterProto.HarvestPageRequest;
 import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
 import no.nb.nna.veidemann.chrome.client.ClientClosedException;
 import no.nb.nna.veidemann.chrome.client.MaxActiveSessionsExceededException;
 import no.nb.nna.veidemann.harvester.browsercontroller.BrowserController;
-import no.nb.nna.veidemann.harvester.proxy.RecordingProxy;
+import no.nb.nna.veidemann.harvester.browsercontroller.RenderResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -40,11 +38,8 @@ public class HarvesterService extends HarvesterGrpc.HarvesterImplBase {
 
     private final BrowserController controller;
 
-    private final RecordingProxy proxy;
-
-    public HarvesterService(BrowserController controller, RecordingProxy proxy) {
+    public HarvesterService(BrowserController controller) {
         this.controller = controller;
-        this.proxy = proxy;
     }
 
     @Override
@@ -54,9 +49,18 @@ public class HarvesterService extends HarvesterGrpc.HarvesterImplBase {
         MDC.put("uri", fetchUri.getUri());
 
         try {
-            HarvestPageReply reply = controller.render(fetchUri, request.getCrawlConfig());
+            RenderResult result = controller.render(fetchUri, request.getCrawlConfig());
 
+            HarvestPageReply reply = HarvestPageReply.newBuilder()
+                    .setBytesDownloaded(result.getBytesDownloaded())
+                    .setUriCount(result.getUriCount())
+                    .build();
             respObserver.onNext(reply);
+
+            result.getOutlinks().forEach(ol -> {
+                respObserver.onNext(HarvestPageReply.newBuilder().setOutlink(ol).build());
+            });
+
             respObserver.onCompleted();
         } catch (ClientClosedException ex) {
             LOG.error("Chrome client can't contact chrome, shutting down", ex);
@@ -72,12 +76,6 @@ public class HarvesterService extends HarvesterGrpc.HarvesterImplBase {
             Status status = Status.UNKNOWN.withDescription(ex.toString());
             respObserver.onError(status.asException());
         }
-    }
-
-    @Override
-    public void cleanupExecution(CleanupExecutionRequest request, StreamObserver<Empty> responseObserver) {
-        responseObserver.onNext(Empty.getDefaultInstance());
-        responseObserver.onCompleted();
     }
 
 }

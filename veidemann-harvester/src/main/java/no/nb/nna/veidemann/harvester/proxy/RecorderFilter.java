@@ -79,6 +79,8 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
 
     private final DbAdapter db;
 
+    private String jobExecutionId;
+
     private String executionId;
 
     private Timestamp fetchTimeStamp;
@@ -138,7 +140,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                     return new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_GATEWAY);
                 }
 
-                String jobExecutionId = request.headers().get(JOB_EXECUTION_ID);
+                jobExecutionId = request.headers().get(JOB_EXECUTION_ID);
                 if (jobExecutionId == null || jobExecutionId.isEmpty()) {
                     LOG.error("Missing jobExecutionId for {}", uri);
                     return new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_GATEWAY);
@@ -301,7 +303,9 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                                 .setBlockDigest(responseRecordMeta.getBlockDigest())
                                 .setPayloadDigest(responseRecordMeta.getPayloadDigest())
                                 .setFetchTimeMs(Durations.toMillis(fetchDuration))
-                                .setSize(responseCollector.getSize());
+                                .setSize(responseCollector.getSize())
+                                .setWarcRefersTo(responseRecordMeta.getWarcRefersTo())
+                                .setJobExecutionId(jobExecutionId);
 
                         writeCrawlLog(crawlLog);
 

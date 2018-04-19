@@ -43,7 +43,7 @@
         <chrome.version>67.0.3386.1</chrome.version>
         <docker.java.image>openjdk:8-jdk-alpine</docker.java.image>
 
-        <veidemann.api.version>0.1.6</veidemann.api.version>
+        <veidemann.api.version>0.1.7</veidemann.api.version>
 
         <log4j.version>2.7</log4j.version>
         <org.jwat.version>1.0.4</org.jwat.version>
@@ -53,8 +53,8 @@
         <io.opentracing.version>0.30.0</io.opentracing.version>
         <io.opentracing.brave.version>0.20.0</io.opentracing.brave.version>
         <com.uber.jaeger.version>0.21.0</com.uber.jaeger.version>
-        <io.grpc.version>1.9.1</io.grpc.version>
-        <io.grpc.protoc-gen-grpc-java.version>1.10.0</io.grpc.protoc-gen-grpc-java.version>
+        <io.grpc.version>1.11.0</io.grpc.version>
+        <io.grpc.protoc-gen-grpc-java.version>1.11.0</io.grpc.protoc-gen-grpc-java.version>
         <com.google.protobuf.protoc.version>3.5.1</com.google.protobuf.protoc.version>
         <io.zipkin.reporter.version>0.10.0</io.zipkin.reporter.version>
         <io.zipkin.brave.version>4.3.4</io.zipkin.brave.version>

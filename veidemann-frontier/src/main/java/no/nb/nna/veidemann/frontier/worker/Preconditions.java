@@ -15,18 +15,18 @@
  */
 package no.nb.nna.veidemann.frontier.worker;
 
-import java.net.UnknownHostException;
-import java.util.List;
-
 import no.nb.nna.veidemann.api.ConfigProto.BrowserConfig;
+import no.nb.nna.veidemann.api.ConfigProto.CrawlConfig;
+import no.nb.nna.veidemann.api.ConfigProto.CrawlHostGroupConfig;
 import no.nb.nna.veidemann.api.ConfigProto.PolitenessConfig;
 import no.nb.nna.veidemann.api.ConfigProto.PolitenessConfig.RobotsPolicy;
 import no.nb.nna.veidemann.api.ControllerProto;
 import no.nb.nna.veidemann.commons.ExtraStatusCodes;
-import no.nb.nna.veidemann.api.ConfigProto.CrawlConfig;
-import no.nb.nna.veidemann.api.ConfigProto.CrawlHostGroupConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.net.UnknownHostException;
+import java.util.List;
 
 /**
  *
@@ -41,14 +41,15 @@ public class Preconditions {
     }
 
     public static boolean checkPreconditions(Frontier frontier, CrawlConfig config, StatusWrapper status,
-            QueuedUriWrapper qUri, long sequence) {
+                                             QueuedUriWrapper qUri, long sequence) {
 
         PolitenessConfig politeness = DbUtil.getInstance().getPolitenessConfigForCrawlConfig(config);
         BrowserConfig browserConfig = DbUtil.getInstance().getBrowserConfigForCrawlConfig(config);
 
         qUri.setExecutionId(status.getId())
                 .setPolitenessId(config.getPolitenessId())
-                .setSequence(sequence);
+                .setSequence(sequence)
+                .setJobExecutionId(status.getJobExecutionId());
 
         if (!checkRobots(frontier, browserConfig.getUserAgent(), politeness, qUri)) {
             status.incrementDocumentsDenied(1L);
@@ -115,8 +116,8 @@ public class Preconditions {
                     ex);
 
             qUri.setError(ExtraStatusCodes.FAILED_DNS.toFetchError(ex.toString()))
-                .setEarliestFetchDelaySeconds(politeness.getRetryDelaySeconds())
-                .incrementRetries();
+                    .setEarliestFetchDelaySeconds(politeness.getRetryDelaySeconds())
+                    .incrementRetries();
         }
     }
 

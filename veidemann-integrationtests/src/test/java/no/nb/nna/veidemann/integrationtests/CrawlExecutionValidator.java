@@ -1,7 +1,24 @@
+/*
+ * Copyright 2018 National Library of Norway.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package no.nb.nna.veidemann.integrationtests;
 
+import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
 import no.nb.nna.veidemann.api.MessagesProto.PageLog;
 import no.nb.nna.veidemann.api.ReportProto.PageLogListRequest;
+import no.nb.nna.veidemann.commons.ExtraStatusCodes;
 import no.nb.nna.veidemann.db.RethinkDbAdapter;
 import org.jwat.common.HttpHeader;
 import org.jwat.warc.WarcRecord;
@@ -20,6 +37,7 @@ public class CrawlExecutionValidator {
     final RethinkDbAdapter db;
 
     CrawlLogHelper crawlLogs;
+    CrawlExecutionsHelper crawlExecutions;
     List<PageLog> pageLogs;
     Map<String, WarcRecord> warcRecords;
 
@@ -30,7 +48,6 @@ public class CrawlExecutionValidator {
     public CrawlExecutionValidator validate() {
         init();
 
-        crawlLogs.checkCount();
         checkConsistency();
         checkValidWarc();
         checkChecksum();
@@ -46,18 +63,27 @@ public class CrawlExecutionValidator {
         return this;
     }
 
+    public CrawlExecutionValidator checkPageLogCount(int expectedSize) {
+        assertThat(pageLogs.size())
+                .as("Wrong number of page log records")
+                .isEqualTo(expectedSize);
+        return this;
+    }
+
     private void checkConsistency() {
-        crawlLogs.getCrawlLog().forEach(cl -> {
-            assertThat(warcRecords.keySet())
-                    .as("Missing WARC record for crawllog entry %s with uri: %s",
-                            cl.getWarcId(), cl.getRequestedUri())
-                    .contains(cl.getWarcId());
-            if (!cl.getWarcRefersTo().isEmpty()) {
-                assertThat(crawlLogs.getCrawlLogEntry(cl.getWarcRefersTo()))
-                        .as("Missing crawllog entry for record %s's warcRefersTo", cl)
-                        .isNotNull();
-            }
-        });
+        crawlLogs.getCrawlLog().stream()
+                .filter(cl -> cl.getStatusCode() != ExtraStatusCodes.RETRY_LIMIT_REACHED.getCode())
+                .forEach(cl -> {
+                    assertThat(warcRecords.keySet())
+                            .as("Missing WARC record for crawllog entry %s with uri: %s",
+                                    cl.getWarcId(), cl.getRequestedUri())
+                            .contains(cl.getWarcId());
+                    if (!cl.getWarcRefersTo().isEmpty()) {
+                        assertThat(crawlLogs.getCrawlLogEntry(cl.getWarcRefersTo()))
+                                .as("Missing crawllog entry for record %s's warcRefersTo", cl)
+                                .isNotNull();
+                    }
+                });
         pageLogs.forEach(pl -> {
             assertThat(warcRecords.keySet())
                     .as("Missing WARC record for pagelog entry %s", pl.getWarcId())
@@ -102,14 +128,28 @@ public class CrawlExecutionValidator {
                                 .doesNotContain(warcId);
                     }
                 });
+        crawlExecutions.getCrawlExecutionStatus().forEach(ces -> {
+            System.out.println(CrawlExecutionsHelper.formatCrawlExecution(ces));
+            List<CrawlLog> logs = crawlLogs.getCrawlLogsByExecutionId(ces.getId());
+            assertThat(logs.stream().filter(cl -> cl.getStatusCode() != ExtraStatusCodes.RETRY_LIMIT_REACHED.getCode()).count())
+                    .as("Mismatch between CrawlExecutionStatus.getDocumentsCrawled and CrawlLog count")
+                    .isEqualTo((int) ces.getUrisCrawled());
+
+            long summarizedSize = logs.stream().collect(Collectors.summingLong(v -> v.getSize()));
+            assertThat(summarizedSize)
+                    .as("Mismatch between CrawlExecutionStatus.getBytesCrawled and sum CrawlLogs size")
+                    .isEqualTo(ces.getBytesCrawled());
+        });
     }
 
     private void checkIp() {
-        crawlLogs.getCrawlLog().forEach(cl -> {
-            assertThat(cl.getIpAddress())
-                    .as("Ip address for crawllog entry %s was empty", cl.getWarcId())
-                    .isNotEmpty();
-        });
+        crawlLogs.getCrawlLog().stream()
+                .filter(cl -> cl.getStatusCode() != ExtraStatusCodes.RETRY_LIMIT_REACHED.getCode())
+                .forEach(cl -> {
+                    assertThat(cl.getIpAddress())
+                            .as("Ip address for crawllog entry %s was empty", cl.getWarcId())
+                            .isNotEmpty();
+                });
         warcRecords.values().stream()
                 .filter(w -> ((!"metadata".equals(w.header.warcTypeStr)) && (!"warcinfo".equals(w.header.warcTypeStr))))
                 .forEach(w -> {
@@ -120,16 +160,18 @@ public class CrawlExecutionValidator {
     }
 
     private void checkChecksum() {
-        crawlLogs.getCrawlLog().forEach(cl -> {
-            assertThat(cl.getBlockDigest())
-                    .as("Block digest for crawllog entry %s (uri:%s) was empty",
-                            cl.getWarcId(), cl.getRequestedUri())
-                    .isNotEmpty();
-            assertThat(cl.getPayloadDigest())
-                    .as("Payload digest for crawllog entry %s (uri:%s) was empty",
-                            cl.getWarcId(), cl.getRequestedUri())
-                    .isNotEmpty();
-        });
+        crawlLogs.getCrawlLog().stream()
+                .filter(cl -> cl.getStatusCode() != ExtraStatusCodes.RETRY_LIMIT_REACHED.getCode())
+                .forEach(cl -> {
+                    assertThat(cl.getBlockDigest())
+                            .as("Block digest for crawllog entry %s (uri:%s) was empty",
+                                    cl.getWarcId(), cl.getRequestedUri())
+                            .isNotEmpty();
+                    assertThat(cl.getPayloadDigest())
+                            .as("Payload digest for crawllog entry %s (uri:%s) was empty",
+                                    cl.getWarcId(), cl.getRequestedUri())
+                            .isNotEmpty();
+                });
         warcRecords.values().stream()
                 .filter(w -> ((!"metadata".equals(w.header.warcTypeStr)) && (!"warcinfo".equals(w.header.warcTypeStr))))
                 .forEach(w -> {
@@ -204,6 +246,7 @@ public class CrawlExecutionValidator {
     private void init() {
         crawlLogs = new CrawlLogHelper(db);
         pageLogs = db.listPageLogs(PageLogListRequest.newBuilder().setPageSize(500).build()).getValueList();
+        crawlExecutions = new CrawlExecutionsHelper(db);
         warcRecords = new HashMap<>();
 
         WarcInspector.getWarcFiles().getRecordStream()

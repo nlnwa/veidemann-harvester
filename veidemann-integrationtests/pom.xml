@@ -230,6 +230,7 @@
                                             <container>testsites</container>
                                             <container>robots</container>
                                             <container>dnsresolver</container>
+                                            <container>frontier</container>
                                         </dependsOn>
                                         <volumes>
                                             <bind>
@@ -242,6 +243,7 @@
                                         <env>
                                             <BROWSER_HOST>browser</BROWSER_HOST>
                                             <DB_HOST>db</DB_HOST>
+                                            <FRONTIER_HOST>frontier</FRONTIER_HOST>
                                             <CONTENT_WRITER_HOST>contentwriter</CONTENT_WRITER_HOST>
                                             <CONTENT_WRITER_PORT>8080</CONTENT_WRITER_PORT>
                                             <DNS_RESOLVER_HOST>dnsresolver</DNS_RESOLVER_HOST>
@@ -388,11 +390,9 @@
                                         </ports>
                                         <dependsOn>
                                             <container>db-initializer</container>
-                                            <container>harvester</container>
                                         </dependsOn>
                                         <env>
                                             <DB_HOST>db</DB_HOST>
-                                            <HARVESTER_HOST>harvester</HARVESTER_HOST>
                                             <ROBOTS_EVALUATOR_PORT>50053</ROBOTS_EVALUATOR_PORT>
                                             <ROBOTS_EVALUATOR_HOST>robots</ROBOTS_EVALUATOR_HOST>
                                             <DNS_RESOLVER_HOST>dnsresolver</DNS_RESOLVER_HOST>
@@ -426,7 +426,6 @@
                                             <container>frontier</container>
                                             <container>browser</container>
                                             <container>contentwriter</container>
-                                            <container>harvester</container>
                                             <container>testsites</container>
                                         </dependsOn>
                                         <env>

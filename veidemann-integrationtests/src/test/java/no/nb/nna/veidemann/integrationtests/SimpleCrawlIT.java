@@ -19,14 +19,10 @@ import no.nb.nna.veidemann.api.ConfigProto;
 import no.nb.nna.veidemann.api.ConfigProto.CrawlJob;
 import no.nb.nna.veidemann.api.ConfigProto.CrawlLimitsConfig;
 import no.nb.nna.veidemann.api.ControllerProto;
-import no.nb.nna.veidemann.api.ReportProto.PageLogListReply;
-import no.nb.nna.veidemann.api.ReportProto.PageLogListRequest;
 import no.nb.nna.veidemann.commons.VeidemannHeaderConstants;
 import org.junit.Test;
 
 import java.util.concurrent.ExecutionException;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  *
@@ -66,37 +62,22 @@ public class SimpleCrawlIT extends CrawlTestBase implements VeidemannHeaderConst
         WarcInspector.getWarcFiles().getRecordStream().forEach(r -> System.out.println(r.header.warcTypeStr + " -- "
                 + r.header.warcTargetUriStr + ", ip: " + r.header.warcIpAddress));
 
-        PageLogListReply pageLog = db.listPageLogs(PageLogListRequest.getDefaultInstance());
-
-        System.out.println("\nPAGE LOG");
-        pageLog.getValueList().forEach(p -> {
-            System.out.println(p.getUri() + ", eid: " + p.getExecutionId());
-            p.getResourceList().forEach(r -> System.out.println("  - " + r.getUri() + ", cache: " + r.getFromCache()));
-        });
-
-        assertThat(pageLog.getCount()).isEqualTo(6L);
-
         // The goal is to get as low as 14 when we cache 404, 302, etc
         new CrawlExecutionValidator(db)
                 .validate()
                 .checkCrawlLogCount("response", 5)
                 .checkCrawlLogCount("revisit", 15)
-                .checkCrawlLogCount("dns", 0);
+                .checkCrawlLogCount("dns", 0)
+                .checkPageLogCount(6);
 
         System.out.println("Job execution result:\n" + JobCompletion.executeJob(statusClient, request).get());
-        pageLog = db.listPageLogs(PageLogListRequest.getDefaultInstance());
-
-        System.out.println("\nPAGE LOG");
-        pageLog.getValueList().forEach(p -> {
-            System.out.println(p.getUri() + ", eid: " + p.getExecutionId());
-            p.getResourceList().forEach(r -> System.out.println("  - " + r.getUri() + ", cache: " + r.getFromCache()));
-        });
 
         new CrawlExecutionValidator(db)
                 .validate()
                 .checkCrawlLogCount("response", 5)
                 .checkCrawlLogCount("revisit", 35)
-                .checkCrawlLogCount("dns", 0);
+                .checkCrawlLogCount("dns", 0)
+                .checkPageLogCount(12);
     }
 
 }

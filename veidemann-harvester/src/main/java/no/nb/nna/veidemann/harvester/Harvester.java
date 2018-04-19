@@ -25,7 +25,6 @@ import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.opentracing.TracerFactory;
 import no.nb.nna.veidemann.db.RethinkDbAdapter;
 import no.nb.nna.veidemann.db.RethinkDbConnection;
-import no.nb.nna.veidemann.harvester.api.HarvesterApiServer;
 import no.nb.nna.veidemann.harvester.browsercontroller.BrowserController;
 import no.nb.nna.veidemann.harvester.proxy.DnsServiceHostResolver;
 import no.nb.nna.veidemann.harvester.proxy.RecordingProxy;
@@ -51,6 +50,8 @@ public class Harvester {
 
         TracerFactory.init("Harvester");
     }
+
+    private boolean shouldRun = true;
 
     /**
      * Create a new Harvester service.
@@ -85,10 +86,16 @@ public class Harvester {
                      SETTINGS.getProxyPort(), db, contentWriterClient,
                      new DnsServiceHostResolver(dnsServiceClient), sessionRegistry, SETTINGS.getCacheHost(), SETTINGS.getCachePort());
 
-             HarvesterApiServer apiServer = new HarvesterApiServer(controller).start();) {
+             FrontierClient frontierClient = new FrontierClient(controller, SETTINGS.getFrontierHost(), SETTINGS.getFrontierPort(), SETTINGS.getMaxOpenSessions());
+        ) {
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> shouldRun = false));
 
             LOG.info("Veidemann harvester (v. {}) started", Harvester.class.getPackage().getImplementationVersion());
-            apiServer.blockUntilShutdown();
+            while (shouldRun) {
+                frontierClient.requestNextPage();
+                // Ensure that the browser gets a little time to settle after a new session is opened
+                Thread.sleep(2000);
+            }
         } catch (ConfigException ex) {
             System.err.println("Configuration error: " + ex.getLocalizedMessage());
             System.exit(1);

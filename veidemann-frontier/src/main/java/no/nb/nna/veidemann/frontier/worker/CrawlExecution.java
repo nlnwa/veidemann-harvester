@@ -23,6 +23,8 @@ import no.nb.nna.veidemann.api.ConfigProto.CrawlJob;
 import no.nb.nna.veidemann.api.ConfigProto.CrawlLimitsConfig;
 import no.nb.nna.veidemann.api.ConfigProto.PolitenessConfig;
 import no.nb.nna.veidemann.api.ControllerProto;
+import no.nb.nna.veidemann.api.FrontierProto.PageHarvest.Metrics;
+import no.nb.nna.veidemann.api.FrontierProto.PageHarvestSpec;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlHostGroup;
 import no.nb.nna.veidemann.api.MessagesProto.Error;
@@ -34,9 +36,7 @@ import org.slf4j.MDC;
 
 import java.net.URISyntaxException;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.stream.Stream;
 
 /**
  *
@@ -60,6 +60,8 @@ public class CrawlExecution {
     private final CrawlHostGroup crawlHostGroup;
 
     private long delayMs = 0L;
+
+    private long fetchStart;
 
     private long fetchTimeMs = 0L;
 
@@ -102,19 +104,8 @@ public class CrawlExecution {
         return crawlHostGroup;
     }
 
-    public QueuedUriWrapper getqUri() {
+    public QueuedUriWrapper getUri() {
         return qUri;
-    }
-
-    /**
-     * Execute crawling of the queued Uri.
-     */
-    public void execute() {
-        if (preFetch()) {
-            fetch();
-        } else {
-            postFetchFinally();
-        }
     }
 
     /**
@@ -123,7 +114,7 @@ public class CrawlExecution {
      *
      * @return true if we should do the fetch
      */
-    private boolean preFetch() {
+    public PageHarvestSpec preFetch() {
         MDC.put("eid", qUri.getExecutionId());
         MDC.put("uri", qUri.getUri());
 
@@ -142,54 +133,47 @@ public class CrawlExecution {
             DbUtil.getInstance().getDb().deleteQueuedUri(qUri.getQueuedUri());
 
             if (isManualAbort() || LimitsCheck.isLimitReached(frontier, limits, status, qUri)) {
-                delayMs = 0L;
-                return false;
+                delayMs = -1L;
+                return null;
             } else {
-                return true;
+                LOG.info("Fetching " + qUri.getUri());
+                fetchStart = System.currentTimeMillis();
+                return PageHarvestSpec.newBuilder()
+                        .setQueuedUri(qUri.getQueuedUri())
+                        .setCrawlConfig(crawlConfig)
+                        .build();
             }
         } catch (Throwable t) {
             // Errors should be handled elsewhere. Exception here indicates a bug.
-            LOG.error(t.toString(), t);
-            return false;
+            LOG.error("Possible bug: {}", t.toString(), t);
+            delayMs = -1L;
+            return null;
         }
-    }
-
-    private void fetch() {
-        LOG.info("Fetching " + qUri.getUri());
-
-        final long fetchStart = System.currentTimeMillis();
-
-        frontier.getHarvesterClient().fetchPage(qUri.getQueuedUri(), crawlConfig)
-                .thenAcceptAsync(r -> {
-                    postFetchSuccess(r, fetchStart);
-                })
-                .exceptionally(t -> {
-                    postFetchFailure(t);
-                    return null;
-                })
-                .whenCompleteAsync((r, t) -> {
-                    calculateDelay();
-                    postFetchFinally();
-                });
     }
 
     /**
      * Do post processing after a successful fetch.
      */
-    private void postFetchSuccess(FetchResponse harvestReply, long fetchStart) {
+    public void postFetchSuccess(Metrics metrics) {
         MDC.put("eid", qUri.getExecutionId());
         MDC.put("uri", qUri.getUri());
 
-        long fetchEnd = System.currentTimeMillis();
-        fetchTimeMs = fetchEnd - fetchStart;
-
-        Stream<QueuedUri> outlinks = harvestReply.getOutlinks();
-
         status.incrementDocumentsCrawled()
-                .incrementBytesCrawled(harvestReply.getBytesDownloaded())
-                .incrementUrisCrawled(harvestReply.getUriCount());
+                .incrementBytesCrawled(metrics.getBytesDownloaded())
+                .incrementUrisCrawled(metrics.getUriCount());
+    }
 
-        queueOutlinks(outlinks);
+    /**
+     * Do post proccessing after a failed fetch.
+     *
+     * @param error the Error causing the failure
+     */
+    public void postFetchFailure(Error error) {
+        MDC.put("eid", qUri.getExecutionId());
+        MDC.put("uri", qUri.getUri());
+
+        LOG.info("Failed fetch of {}: {}", qUri.getUri(), error);
+        retryUri(qUri, error);
     }
 
     /**
@@ -197,12 +181,12 @@ public class CrawlExecution {
      *
      * @param t the exception thrown
      */
-    private void postFetchFailure(Throwable t) {
+    public void postFetchFailure(Throwable t) {
         MDC.put("eid", qUri.getExecutionId());
         MDC.put("uri", qUri.getUri());
 
         LOG.info("Failed fetch of {}", qUri.getUri(), t);
-        retryUri(qUri, t);
+        retryUri(qUri, ExtraStatusCodes.RUNTIME_EXCEPTION.toFetchError(t.toString()));
     }
 
     /**
@@ -210,9 +194,14 @@ public class CrawlExecution {
      * </p>
      * This should be run regardless of if we fetched anything or if the fetch failed in any way.
      */
-    private void postFetchFinally() {
+    public void postFetchFinally() {
         MDC.put("eid", qUri.getExecutionId());
         MDC.put("uri", qUri.getUri());
+
+        long fetchEnd = System.currentTimeMillis();
+        fetchTimeMs = fetchEnd - fetchStart;
+        calculateDelay();
+
         try {
             if (qUri.hasError() && qUri.getDiscoveryPath().isEmpty()) {
                 // Seed failed; mark crawl as failed
@@ -245,26 +234,17 @@ public class CrawlExecution {
         span.finish();
     }
 
-    void queueOutlinks(Stream<QueuedUri> outlinks) {
-        AtomicBoolean noOutlinks = new AtomicBoolean(true);
+    public void queueOutlink(QueuedUri outlink) {
+        try {
+            QueuedUriWrapper outUri = QueuedUriWrapper.getQueuedUriWrapper(outlink);
 
-        outlinks.forEach(outlink -> {
-            try {
-                noOutlinks.set(false);
-                QueuedUriWrapper outUri = QueuedUriWrapper.getQueuedUriWrapper(outlink);
-
-                if (shouldInclude(outUri)) {
-                    Preconditions.checkPreconditions(frontier, crawlConfig, status, outUri, getNextSequenceNum());
-                    LOG.debug("Found new URI: {}, queueing.", outUri.getSurt());
-                }
-            } catch (URISyntaxException ex) {
-                status.incrementDocumentsFailed();
-                LOG.info("Illegal URI {}", ex);
+            if (shouldInclude(outUri)) {
+                Preconditions.checkPreconditions(frontier, crawlConfig, status, outUri, getNextSequenceNum());
+                LOG.debug("Found new URI: {}, queueing.", outUri.getSurt());
             }
-        });
-
-        if (noOutlinks.get()) {
-            LOG.debug("No outlinks from {}", qUri.getSurt());
+        } catch (URISyntaxException ex) {
+            status.incrementDocumentsFailed();
+            LOG.info("Illegal URI {}", ex);
         }
     }
 
@@ -286,6 +266,11 @@ public class CrawlExecution {
     }
 
     private void calculateDelay() {
+        if (delayMs == -1) {
+            delayMs = 0L;
+            return;
+        }
+
         float delayFactor = politenessConfig.getDelayFactor();
         long minTimeBetweenPageLoadMs = politenessConfig.getMinTimeBetweenPageLoadMs();
         long maxTimeBetweenPageLoadMs = politenessConfig.getMaxTimeBetweenPageLoadMs();
@@ -315,12 +300,12 @@ public class CrawlExecution {
         }
     }
 
-    private void retryUri(QueuedUriWrapper qUri, Throwable t) {
+    private void retryUri(QueuedUriWrapper qUri, Error error) {
 
         LOG.info("Failed fetching ({}) at attempt #{}", qUri, qUri.getRetries());
         qUri.incrementRetries()
                 .setEarliestFetchDelaySeconds(politenessConfig.getRetryDelaySeconds())
-                .setError(ExtraStatusCodes.RUNTIME_EXCEPTION.toFetchError(t.toString()));
+                .setError(error);
 
         Preconditions.checkPreconditions(frontier, crawlConfig, status, qUri, qUri.getQueuedUri().getSequence());
     }

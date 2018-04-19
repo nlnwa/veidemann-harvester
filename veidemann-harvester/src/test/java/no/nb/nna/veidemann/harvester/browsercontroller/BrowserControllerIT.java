@@ -21,11 +21,9 @@ import no.nb.nna.veidemann.api.ContentWriterProto;
 import no.nb.nna.veidemann.api.ContentWriterProto.RecordType;
 import no.nb.nna.veidemann.api.ContentWriterProto.WriteResponseMeta;
 import no.nb.nna.veidemann.api.ControllerProto;
-import no.nb.nna.veidemann.api.HarvesterProto;
 import no.nb.nna.veidemann.api.MessagesProto;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
 import no.nb.nna.veidemann.api.MessagesProto.PageLog;
-import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
 import no.nb.nna.veidemann.commons.client.ContentWriterClient;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.util.ApiTools;
@@ -38,14 +36,11 @@ import org.mockito.invocation.InvocationOnMock;
 import org.netpreserve.commons.uri.UriConfigs;
 
 import java.io.File;
-import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Optional;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeoutException;
 
 import static org.assertj.core.api.Assertions.fail;
 import static org.mockito.Mockito.any;

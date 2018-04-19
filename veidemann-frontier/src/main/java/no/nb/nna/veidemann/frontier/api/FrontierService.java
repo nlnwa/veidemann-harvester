@@ -23,7 +23,10 @@ import io.opentracing.tag.Tags;
 import io.opentracing.util.GlobalTracer;
 import no.nb.nna.veidemann.api.FrontierGrpc;
 import no.nb.nna.veidemann.api.FrontierProto.CrawlSeedRequest;
+import no.nb.nna.veidemann.api.FrontierProto.PageHarvest;
+import no.nb.nna.veidemann.api.FrontierProto.PageHarvestSpec;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus;
+import no.nb.nna.veidemann.frontier.worker.CrawlExecution;
 import no.nb.nna.veidemann.frontier.worker.Frontier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,7 +45,7 @@ public class FrontierService extends FrontierGrpc.FrontierImplBase {
     }
 
     @Override
-    public void crawlSeed(CrawlSeedRequest request, StreamObserver<CrawlExecutionStatus> respObserver) {
+    public void crawlSeed(CrawlSeedRequest request, StreamObserver<CrawlExecutionStatus> responseObserver) {
         try (ActiveSpan span = GlobalTracer.get()
                 .buildSpan("scheduleSeed")
                 .asChildOf(OpenTracingContextKey.activeSpan())
@@ -52,13 +55,62 @@ public class FrontierService extends FrontierGrpc.FrontierImplBase {
                 .startActive()) {
             CrawlExecutionStatus reply = frontier.scheduleSeed(request);
 
-            respObserver.onNext(reply);
-            respObserver.onCompleted();
+            responseObserver.onNext(reply);
+            responseObserver.onCompleted();
         } catch (Exception e) {
             LOG.error(e.getMessage(), e);
             Status status = Status.UNKNOWN.withDescription(e.toString());
-            respObserver.onError(status.asException());
+            responseObserver.onError(status.asException());
         }
     }
 
+    @Override
+    public StreamObserver<PageHarvest> getNextPage(StreamObserver<PageHarvestSpec> responseObserver) {
+        return new StreamObserver<PageHarvest>() {
+            CrawlExecution exe;
+
+            @Override
+            public void onNext(PageHarvest value) {
+                switch (value.getMsgCase()) {
+                    case REQUESTNEXTPAGE:
+                        try {
+                            PageHarvestSpec pageHarvestSpec = null;
+                            while (pageHarvestSpec == null) {
+                                exe = frontier.getNextPageToFetch();
+                                pageHarvestSpec = exe.preFetch();
+                                if (pageHarvestSpec == null) {
+                                    exe.postFetchFinally();
+                                }
+                            }
+                            responseObserver.onNext(pageHarvestSpec);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                            Status status = Status.UNKNOWN.withDescription(e.toString());
+                            responseObserver.onError(status.asException());
+                        }
+                        break;
+                    case METRICS:
+                        exe.postFetchSuccess(value.getMetrics());
+                        break;
+                    case OUTLINK:
+                        exe.queueOutlink(value.getOutlink());
+                        break;
+                    case ERROR:
+                        exe.postFetchFailure(value.getError());
+                        break;
+                }
+            }
+
+            @Override
+            public void onError(Throwable t) {
+                exe.postFetchFailure(t);
+                exe.postFetchFinally();
+            }
+
+            @Override
+            public void onCompleted() {
+                exe.postFetchFinally();
+            }
+        };
+    }
 }

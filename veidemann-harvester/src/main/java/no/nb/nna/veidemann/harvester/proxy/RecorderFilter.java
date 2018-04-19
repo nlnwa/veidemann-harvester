@@ -304,8 +304,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                                 .setPayloadDigest(responseRecordMeta.getPayloadDigest())
                                 .setFetchTimeMs(Durations.toMillis(fetchDuration))
                                 .setSize(responseCollector.getSize())
-                                .setWarcRefersTo(responseRecordMeta.getWarcRefersTo())
-                                .setJobExecutionId(jobExecutionId);
+                                .setWarcRefersTo(responseRecordMeta.getWarcRefersTo());
 
                         writeCrawlLog(crawlLog);
 
@@ -416,6 +415,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
         CrawlLog.Builder crawlLog = CrawlLog.newBuilder()
                 .setTimeStamp(now)
                 .setExecutionId(executionId)
+                .setJobExecutionId(jobExecutionId)
                 .setRequestedUri(uri)
                 .setSurt(surtUri.toString())
                 .setFetchTimeStamp(fetchTimeStamp)

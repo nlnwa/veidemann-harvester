@@ -175,6 +175,14 @@ public class RethinkDbAdapter implements DbAdapter {
 
     @Override
     public CrawlLog saveCrawlLog(CrawlLog cl) {
+        if (!"text/dns".equals(cl.getContentType())) {
+            if (cl.getJobExecutionId().isEmpty()) {
+                LOG.error("Missing JobExecutionId in CrawlLog: {}", cl, new IllegalStateException());
+            }
+            if (cl.getExecutionId().isEmpty()) {
+                LOG.error("Missing ExecutionId in CrawlLog: {}", cl, new IllegalStateException());
+            }
+        }
         if (!cl.hasTimeStamp()) {
             cl = cl.toBuilder().setTimeStamp(ProtoUtils.getNowTs()).build();
         }
@@ -409,6 +417,10 @@ public class RethinkDbAdapter implements DbAdapter {
 
     @Override
     public CrawlExecutionStatus saveExecutionStatus(CrawlExecutionStatus status) {
+        if (status.getJobExecutionId().isEmpty()) {
+            LOG.error("Missing JobExecutionId in CrawlExecutionStatus: {}", status, new IllegalStateException());
+        }
+
         Map rMap = ProtoUtils.protoToRethink(status);
 
         // Update the CrawlExecutionStatus, but keep the endTime if it is set

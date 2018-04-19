@@ -28,7 +28,6 @@ import no.nb.nna.veidemann.db.RethinkDbConnection;
 import no.nb.nna.veidemann.frontier.api.FrontierApiServer;
 import no.nb.nna.veidemann.frontier.settings.Settings;
 import no.nb.nna.veidemann.frontier.worker.Frontier;
-import no.nb.nna.veidemann.frontier.worker.HarvesterClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,17 +64,13 @@ public class FrontierService {
         try (RethinkDbConnection conn = RethinkDbConnection.configure(SETTINGS);
              DbAdapter db = new RethinkDbAdapter();
 
-             HarvesterClient harvesterClient = new HarvesterClient(
-                     SETTINGS.getHarvesterHost(), SETTINGS.getHarvesterPort())
-                     .withMaxWaitForExhaustedHarvesterMs(SETTINGS.getMaxWaitForExhaustedHarvester());
-
              RobotsServiceClient robotsServiceClient = new RobotsServiceClient(
                      SETTINGS.getRobotsEvaluatorHost(), SETTINGS.getRobotsEvaluatorPort());
 
              DnsServiceClient dnsServiceClient = new DnsServiceClient(
                      SETTINGS.getDnsResolverHost(), SETTINGS.getDnsResolverPort());
 
-             Frontier frontier = new Frontier((RethinkDbAdapter) db, harvesterClient, robotsServiceClient, dnsServiceClient);
+             Frontier frontier = new Frontier((RethinkDbAdapter) db, robotsServiceClient, dnsServiceClient);
              FrontierApiServer apiServer = new FrontierApiServer(SETTINGS.getApiPort(), frontier).start();) {
 
             LOG.info("Veidemann Frontier (v. {}) started",

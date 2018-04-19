@@ -32,102 +32,67 @@ public class QueueWorker {
 
     private final Frontier frontier;
 
-    private final Thread queueWatcher;
-
     public QueueWorker(Frontier frontier) {
         this.frontier = frontier;
-        this.queueWatcher = new Thread(new QueueWatcher());
-        this.queueWatcher.start();
     }
 
-    private class QueueWatcher implements Runnable {
+    /**
+     * Get the next Uri to fetch.
+     * <p>
+     * Waits until there is something to fetch.
+     * <p>
+     * The returned FutureOptional has three possible states:
+     * <ul>
+     * <li>{@link FutureOptional#isPresent()} returns true: There is a Uri ready for harvesting
+     * <li>{@link FutureOptional#isMaybeInFuture()} returns true: There are one or more Uris in the queue, but it is
+     * not ready for harvesting yet
+     * <li>{@link FutureOptional#isEmpty()} returns true: No more non-busy CrawlHostGroups are found or there are no
+     * more Uris linked to the group.
+     *
+     * @return
+     */
+    public CrawlExecution getNextToFetch() throws InterruptedException {
+        long sleep = 0L;
 
-        @Override
-        public void run() {
-            while (true) {
-                try {
-                    LOG.trace("Waiting for next execution to be ready");
-                    CrawlExecution exe = getNextToFetch();
-
-                    processExecution(exe);
-                } catch (Throwable t) {
-                    LOG.error(t.toString(), t);
-                    throw new RuntimeException(t);
-                }
-            }
-        }
-
-        private void processExecution(CrawlExecution exe) {
+        while (true) {
             try {
-                // Execute fetch
-                LOG.debug("Running next fetch of exexcution: {}", exe.getId());
-                exe.execute();
-                LOG.debug("End of Link crawl");
-            } catch (Throwable t) {
-                LOG.error(t.toString(), t);
-                throw new RuntimeException(t);
-            }
-        }
+                FutureOptional<MessagesProto.CrawlHostGroup> crawlHostGroup = DbUtil.getInstance().getDb()
+                        .borrowFirstReadyCrawlHostGroup();
+                LOG.trace("Borrow Crawl Host Group: {}", crawlHostGroup);
 
-        /**
-         * Get the next Uri to fetch.
-         * <p>
-         * Waits until there is something to fetch.
-         * <p>
-         * The returned FutureOptional has three possible states:
-         * <ul>
-         * <li>{@link FutureOptional#isPresent()} returns true: There is a Uri ready for harvesting
-         * <li>{@link FutureOptional#isMaybeInFuture()} returns true: There are one or more Uris in the queue, but it is
-         * not ready for harvesting yet
-         * <li>{@link FutureOptional#isEmpty()} returns true: No more non-busy CrawlHostGroups are found or there are no
-         * more Uris linked to the group.
-         *
-         * @return
-         */
-        private CrawlExecution getNextToFetch() throws InterruptedException {
-            long sleep = 0L;
+                if (crawlHostGroup.isMaybeInFuture()) {
+                    // A CrawlHostGroup suitable for execution in the future was found, wait until it is ready.
+                    LOG.trace("Crawl Host Group not ready yet, delaying: {}", crawlHostGroup.getDelayMs());
+                    sleep = crawlHostGroup.getDelayMs();
+                } else if (crawlHostGroup.isPresent()) {
+                    FutureOptional<MessagesProto.QueuedUri> foqu = DbUtil.getInstance().getDb()
+                            .getNextQueuedUriToFetch(crawlHostGroup.get());
 
-            while (true) {
-                try {
-                    FutureOptional<MessagesProto.CrawlHostGroup> crawlHostGroup = DbUtil.getInstance().getDb()
-                            .borrowFirstReadyCrawlHostGroup();
-                    LOG.trace("Borrow Crawl Host Group: {}", crawlHostGroup);
-
-                    if (crawlHostGroup.isMaybeInFuture()) {
-                        // A CrawlHostGroup suitable for execution in the future was found, wait until it is ready.
-                        LOG.trace("Crawl Host Group not ready yet, delaying: {}", crawlHostGroup.getDelayMs());
-                        sleep = crawlHostGroup.getDelayMs();
-                    } else if (crawlHostGroup.isPresent()) {
-                        FutureOptional<MessagesProto.QueuedUri> foqu = DbUtil.getInstance().getDb()
-                                .getNextQueuedUriToFetch(crawlHostGroup.get());
-
-                        if (foqu.isPresent()) {
-                            // A fetchabel URI was found, return it
-                            LOG.debug("Found Queued URI: >>{}<<", foqu.get());
-                            return new CrawlExecution(foqu.get(), crawlHostGroup.get(), frontier);
-                        } else if (foqu.isMaybeInFuture()) {
-                            // A URI was found, but isn't fetchable yet. Wait for it
-                            LOG.debug("Queued URI might be available at: {}", foqu.getWhen());
-                            sleep = (foqu.getDelayMs());
-                        } else {
-                            // No URI found for this CrawlHostGroup. Wait for RESCHEDULE_DELAY and try again.
-                            LOG.trace("No Queued URI found waiting {}ms before retry", RESCHEDULE_DELAY);
-                            sleep = RESCHEDULE_DELAY;
-                        }
-                        DbUtil.getInstance().getDb().releaseCrawlHostGroup(crawlHostGroup.get(), sleep);
+                    if (foqu.isPresent()) {
+                        // A fetchabel URI was found, return it
+                        LOG.debug("Found Queued URI: >>{}<<", foqu.get());
+                        return new CrawlExecution(foqu.get(), crawlHostGroup.get(), frontier);
+                    } else if (foqu.isMaybeInFuture()) {
+                        // A URI was found, but isn't fetchable yet. Wait for it
+                        LOG.debug("Queued URI might be available at: {}", foqu.getWhen());
+                        sleep = (foqu.getDelayMs());
                     } else {
-                        // No CrawlHostGroup ready. Wait a moment and try again
+                        // No URI found for this CrawlHostGroup. Wait for RESCHEDULE_DELAY and try again.
+                        LOG.trace("No Queued URI found waiting {}ms before retry", RESCHEDULE_DELAY);
                         sleep = RESCHEDULE_DELAY;
                     }
-                } catch (DbException e) {
-                    LOG.error("Caught an DB exception. Might be a temporary condition try again after {}ms",
-                            RESCHEDULE_DELAY, e);
+                    DbUtil.getInstance().getDb().releaseCrawlHostGroup(crawlHostGroup.get(), sleep);
+                } else {
+                    // No CrawlHostGroup ready. Wait a moment and try again
                     sleep = RESCHEDULE_DELAY;
                 }
-
-                Thread.sleep(sleep);
+            } catch (DbException e) {
+                LOG.error("Caught an DB exception. Might be a temporary condition try again after {}ms",
+                        RESCHEDULE_DELAY, e);
+                sleep = RESCHEDULE_DELAY;
             }
-        }
 
+            Thread.sleep(sleep);
+        }
     }
 }

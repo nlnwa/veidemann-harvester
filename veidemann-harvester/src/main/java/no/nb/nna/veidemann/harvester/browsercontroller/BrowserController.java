@@ -16,7 +16,6 @@
 package no.nb.nna.veidemann.harvester.browsercontroller;
 
 import io.opentracing.Span;
-import io.opentracing.contrib.OpenTracingContextKey;
 import io.opentracing.tag.Tags;
 import io.opentracing.util.GlobalTracer;
 import no.nb.nna.veidemann.api.ConfigProto.BrowserConfig;
@@ -28,6 +27,7 @@ import no.nb.nna.veidemann.api.MessagesProto.PageLog;
 import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
 import no.nb.nna.veidemann.chrome.client.ChromeDebugProtocol;
 import no.nb.nna.veidemann.chrome.client.ChromeDebugProtocolConfig;
+import no.nb.nna.veidemann.commons.ExtraStatusCodes;
 import no.nb.nna.veidemann.commons.VeidemannHeaderConstants;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.db.DbHelper;
@@ -57,10 +57,6 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
 
     private final Map<String, BrowserScript> scriptCache = new HashMap<>();
 
-    private final long minTimeBetweenNewSessions = 1000;
-
-    private long lastOpenedSessionTimeStamp;
-
     public BrowserController(final String chromeHost, final int chromePort, final int maxOpenSessions,
                              final DbAdapter db, final BrowserSessionRegistry sessionRegistry) {
         DbHelper.getInstance().configure(db);
@@ -79,11 +75,9 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
     public RenderResult render(QueuedUri queuedUri, CrawlConfig config)
             throws ExecutionException, IOException, TimeoutException {
 
-        throttleNewSessions();
-
         Span span = GlobalTracer.get()
                 .buildSpan("render")
-                .asChildOf(OpenTracingContextKey.activeSpan())
+//                .asChildOf(OpenTracingContextKey.activeSpan())
                 .withTag(Tags.COMPONENT.getKey(), "BrowserController")
                 .withTag("executionId", queuedUri.getExecutionId())
                 .withTag("uri", queuedUri.getUri())
@@ -143,16 +137,20 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
             } catch (Throwable t) {
                 LOG.error("Failed writing pagelog", t);
             }
+
+            result.withBytesDownloaded(session.getUriRequests().getBytesDownloaded())
+                    .withUriCount(session.getUriRequests().getUriDownloadedCount());
         } catch (Throwable t) {
             LOG.error("Failed loading page", t);
+            result.withError(ExtraStatusCodes.RUNTIME_EXCEPTION.toFetchError(t.toString()));
         } finally {
             session.close();
             sessionRegistry.remove(session);
             span.finish();
         }
 
-        result.withBytesDownloaded(session.getUriRequests().getBytesDownloaded())
-                .withUriCount(session.getUriRequests().getUriDownloadedCount());
+//        result.withBytesDownloaded(session.getUriRequests().getBytesDownloaded())
+//                .withUriCount(session.getUriRequests().getUriDownloadedCount());
 
         MDC.clear();
         return result;
@@ -188,21 +186,4 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
         chrome.close();
     }
 
-
-    private void throttleNewSessions() {
-        if (sessionRegistry.isEmpty()) {
-            lastOpenedSessionTimeStamp = 0;
-            return;
-        }
-
-        long timeSinceLastOpenedSession = System.currentTimeMillis() - lastOpenedSessionTimeStamp;
-        if (timeSinceLastOpenedSession <= minTimeBetweenNewSessions) {
-            try {
-                Thread.sleep(minTimeBetweenNewSessions - timeSinceLastOpenedSession);
-            } catch (InterruptedException e) {
-                LOG.info("Interrupted", e);
-            }
-        }
-        lastOpenedSessionTimeStamp = System.currentTimeMillis();
-    }
 }

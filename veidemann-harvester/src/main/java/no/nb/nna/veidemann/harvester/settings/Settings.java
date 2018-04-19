@@ -25,7 +25,9 @@ public class Settings extends CommonSettings {
 
     private int proxyPort;
 
-    private int apiPort;
+    private String frontierHost;
+
+    private int frontierPort;
 
     private String browserHost;
 
@@ -55,12 +57,20 @@ public class Settings extends CommonSettings {
         this.proxyPort = proxyPort;
     }
 
-    public int getApiPort() {
-        return apiPort;
+    public String getFrontierHost() {
+        return frontierHost;
     }
 
-    public void setApiPort(int apiPort) {
-        this.apiPort = apiPort;
+    public void setFrontierHost(String frontierHost) {
+        this.frontierHost = frontierHost;
+    }
+
+    public int getFrontierPort() {
+        return frontierPort;
+    }
+
+    public void setFrontierPort(int frontierPort) {
+        this.frontierPort = frontierPort;
     }
 
     public String getWorkDir() {

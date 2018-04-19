@@ -21,15 +21,11 @@ import no.nb.nna.veidemann.api.ConfigProto.CrawlJob;
 import no.nb.nna.veidemann.api.ConfigProto.CrawlLimitsConfig;
 import no.nb.nna.veidemann.api.ConfigProto.PolitenessConfig;
 import no.nb.nna.veidemann.api.ControllerProto;
-import no.nb.nna.veidemann.api.ReportProto.PageLogListReply;
-import no.nb.nna.veidemann.api.ReportProto.PageLogListRequest;
 import no.nb.nna.veidemann.commons.VeidemannHeaderConstants;
 import no.nb.nna.veidemann.commons.db.DbHelper;
 import org.junit.Test;
 
 import java.util.concurrent.ExecutionException;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  *
@@ -48,7 +44,8 @@ public class MultiSiteCrawlIT extends CrawlTestBase implements VeidemannHeaderCo
 
         PolitenessConfig politeness = dbh.getPolitenessConfigForCrawlConfig(crawlConfig).toBuilder()
                 .setMaxTimeBetweenPageLoadMs(100)
-                .setDelayFactor(.1f)
+                .setMinTimeBetweenPageLoadMs(1)
+                .setDelayFactor(.01f)
                 .setRetryDelaySeconds(1)
                 .build();
         politeness = controllerClient.savePolitenessConfig(politeness);
@@ -90,6 +87,15 @@ public class MultiSiteCrawlIT extends CrawlTestBase implements VeidemannHeaderCo
                 .addJobId(jobId)
                 .build());
 
+        ConfigProto.CrawlEntity entity4 = controllerClient.saveEntity(
+                ConfigProto.CrawlEntity.newBuilder().setMeta(ConfigProto.Meta.newBuilder()
+                        .setName("Test entity 4")).build());
+        ConfigProto.Seed notFoundSeed = controllerClient.saveSeed(ConfigProto.Seed.newBuilder()
+                .setMeta(ConfigProto.Meta.newBuilder().setName("http://static.com/not-found.gif"))
+                .setEntityId(entity4.getId())
+                .addJobId(jobId)
+                .build());
+
         ControllerProto.RunCrawlRequest request = ControllerProto.RunCrawlRequest.newBuilder()
                 .setJobId(jobId)
                 .build();
@@ -101,36 +107,21 @@ public class MultiSiteCrawlIT extends CrawlTestBase implements VeidemannHeaderCo
         WarcInspector.getWarcFiles().getRecordStream().forEach(r -> System.out.println(r.header.warcTypeStr + " -- "
                 + r.header.warcTargetUriStr + ", ip: " + r.header.warcIpAddress));
 
-        PageLogListReply pageLog = db.listPageLogs(PageLogListRequest.getDefaultInstance());
-
-        System.out.println("\nPAGE LOG");
-        pageLog.getValueList().forEach(p -> {
-            System.out.println(p.getUri() + ", eid: " + p.getExecutionId());
-            p.getResourceList().forEach(r -> System.out.println("  - " + r.getUri() + ", cache: " + r.getFromCache()));
-        });
-
-        assertThat(pageLog.getCount()).isEqualTo(18L);
-
         new CrawlExecutionValidator(db)
                 .validate()
                 .checkCrawlLogCount("response", 8)
-                .checkCrawlLogCount("revisit", 51)
-                .checkCrawlLogCount("dns", 6);
+                .checkCrawlLogCount("revisit", 50)
+                .checkCrawlLogCount("dns", 6)
+                .checkPageLogCount(19);
 
         System.out.println("Job execution result:\n" + JobCompletion.executeJob(statusClient, request).get());
-        pageLog = db.listPageLogs(PageLogListRequest.getDefaultInstance());
-
-        System.out.println("\nPAGE LOG");
-        pageLog.getValueList().forEach(p -> {
-            System.out.println(p.getUri() + ", eid: " + p.getExecutionId());
-            p.getResourceList().forEach(r -> System.out.println("  - " + r.getUri() + ", cache: " + r.getFromCache()));
-        });
 
         new CrawlExecutionValidator(db)
                 .validate()
-                .checkCrawlLogCount("response", 8)
+                .checkCrawlLogCount("response", 9)
                 .checkCrawlLogCount("revisit", 107)
-                .checkCrawlLogCount("dns", 6);
+                .checkCrawlLogCount("dns", 6)
+                .checkPageLogCount(38);
     }
 
 }

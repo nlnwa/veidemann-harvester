@@ -17,8 +17,6 @@ package no.nb.nna.veidemann.frontier.settings;
 
 import no.nb.nna.veidemann.commons.settings.CommonSettings;
 
-import java.time.Duration;
-
 /**
  * Configuration settings for Veidemann Frontier.
  */
@@ -28,10 +26,6 @@ public class Settings extends CommonSettings {
 
     private String workDir;
 
-    private String harvesterHost;
-
-    private int harvesterPort;
-
     private String robotsEvaluatorHost;
 
     private int robotsEvaluatorPort;
@@ -39,8 +33,6 @@ public class Settings extends CommonSettings {
     private String dnsResolverHost;
 
     private int dnsResolverPort;
-
-    private Duration maxWaitForExhaustedHarvester;
 
     public int getApiPort() {
         return apiPort;
@@ -56,22 +48,6 @@ public class Settings extends CommonSettings {
 
     public void setWorkDir(String workDir) {
         this.workDir = workDir;
-    }
-
-    public String getHarvesterHost() {
-        return harvesterHost;
-    }
-
-    public void setHarvesterHost(String harvesterHost) {
-        this.harvesterHost = harvesterHost;
-    }
-
-    public int getHarvesterPort() {
-        return harvesterPort;
-    }
-
-    public void setHarvesterPort(int harvesterPort) {
-        this.harvesterPort = harvesterPort;
     }
 
     public String getRobotsEvaluatorHost() {
@@ -104,13 +80,5 @@ public class Settings extends CommonSettings {
 
     public void setDnsResolverPort(int dnsResolverPort) {
         this.dnsResolverPort = dnsResolverPort;
-    }
-
-    public Duration getMaxWaitForExhaustedHarvester() {
-        return maxWaitForExhaustedHarvester;
-    }
-
-    public void setMaxWaitForExhaustedHarvester(Duration maxWaitForExhaustedHarvester) {
-        this.maxWaitForExhaustedHarvester = maxWaitForExhaustedHarvester;
     }
 }

@@ -15,6 +15,7 @@
  */
 package no.nb.nna.veidemann.harvester.browsercontroller;
 
+import no.nb.nna.veidemann.api.MessagesProto.Error;
 import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
 
 import java.util.List;
@@ -24,6 +25,7 @@ public class RenderResult {
     private long bytesDownloaded;
     private int uriCount;
     private List<QueuedUri> outlinks;
+    private Error error;
 
     public long getBytesDownloaded() {
         return bytesDownloaded;
@@ -52,6 +54,19 @@ public class RenderResult {
 
     public RenderResult withOutlinks(List<QueuedUri> outlinks) {
         this.outlinks = outlinks;
+        return this;
+    }
+
+    public Error getError() {
+        return error;
+    }
+
+    public boolean hasError() {
+        return error != null;
+    }
+
+    public RenderResult withError(Error error) {
+        this.error = error;
         return this;
     }
 }

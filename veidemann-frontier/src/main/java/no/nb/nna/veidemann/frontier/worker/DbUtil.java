@@ -42,6 +42,7 @@ public class DbUtil extends DbHelper {
     public void writeLog(QueuedUriWrapper qUri, int statusCode) {
         MessagesProto.CrawlLog crawlLog = MessagesProto.CrawlLog.newBuilder()
                 .setRequestedUri(qUri.getUri())
+                .setJobExecutionId(qUri.getJobExecutionId())
                 .setExecutionId(qUri.getExecutionId())
                 .setDiscoveryPath(qUri.getDiscoveryPath())
                 .setReferrer(qUri.getReferrer())

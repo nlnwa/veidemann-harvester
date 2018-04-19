@@ -33,18 +33,15 @@ public class Frontier implements AutoCloseable {
 
     private static final Logger LOG = LoggerFactory.getLogger(Frontier.class);
 
-    private final HarvesterClient harvesterClient;
-
     private final RobotsServiceClient robotsServiceClient;
 
     private final DnsServiceClient dnsServiceClient;
 
     private final QueueWorker queueWorker;
 
-    public Frontier(RethinkDbAdapter db, HarvesterClient harvesterClient, RobotsServiceClient robotsServiceClient, DnsServiceClient dnsServiceClient) {
+    public Frontier(RethinkDbAdapter db, RobotsServiceClient robotsServiceClient, DnsServiceClient dnsServiceClient) {
         DbUtil.getInstance().configure(db);
 
-        this.harvesterClient = harvesterClient;
         this.robotsServiceClient = robotsServiceClient;
         this.dnsServiceClient = dnsServiceClient;
         this.queueWorker = new QueueWorker(this);
@@ -78,8 +75,8 @@ public class Frontier implements AutoCloseable {
         return status.getCrawlExecutionStatus();
     }
 
-    public HarvesterClient getHarvesterClient() {
-        return harvesterClient;
+    public CrawlExecution getNextPageToFetch() throws InterruptedException {
+        return queueWorker.getNextToFetch();
     }
 
     public RobotsServiceClient getRobotsServiceClient() {

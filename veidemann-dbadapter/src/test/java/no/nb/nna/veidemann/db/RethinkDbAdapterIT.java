@@ -470,6 +470,8 @@ public class RethinkDbAdapterIT {
     public void testSaveCrawlLog() {
         CrawlLog cl = CrawlLog.newBuilder()
                 .setContentType("text/plain")
+                .setJobExecutionId("jeid")
+                .setExecutionId("eid")
                 .build();
         CrawlLog result = db.saveCrawlLog(cl);
         assertThat(result.getContentType()).isEqualTo("text/plain");

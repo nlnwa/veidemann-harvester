@@ -16,18 +16,15 @@
 package no.nb.nna.veidemann.commons.util;
 
 import com.google.protobuf.Descriptors.FieldDescriptor;
-import com.google.protobuf.Descriptors.FieldDescriptor.JavaType;
 import com.google.protobuf.GeneratedMessageV3.Builder;
 import com.google.protobuf.Message;
 import no.nb.nna.veidemann.api.ConfigProto.Label;
 import no.nb.nna.veidemann.api.ConfigProto.Meta;
-import no.nb.nna.veidemann.api.ControllerProto.SeedListReply;
 
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
-import java.util.function.Function;
 
 /**
  *
@@ -117,7 +114,7 @@ public class ApiTools {
          * @param fetchFunc      a function taking a request and returning a result set
          * @param consumer       the function to be applied to all elements of the result
          */
-        public void walk(Builder requestBuilder, Function<R, ? extends Message> fetchFunc, Consumer<V> consumer) {
+        public void walk(Builder requestBuilder, CheckedFunction<R, ? extends Message> fetchFunc, Consumer<V> consumer) {
             FieldDescriptor pageField = requestBuilder.getDescriptorForType().findFieldByName("page");
             FieldDescriptor pageSizeField = requestBuilder.getDescriptorForType().findFieldByName("page_size");
 
@@ -133,7 +130,12 @@ public class ApiTools {
 
             R request = (R) requestBuilder.setField(pageField, page).build();
 
-            Message resultSet = fetchFunc.apply(request);
+            Message resultSet = null;
+            try {
+                resultSet = fetchFunc.apply(request);
+            } catch (Exception e) {
+                throw new RuntimeException("Fetch func failed");
+            }
             FieldDescriptor resultValuesField = resultSet.getDescriptorForType().findFieldByName("value");
 
             if (resultValuesField == null || !resultValuesField.isRepeated()) {
@@ -147,9 +149,18 @@ public class ApiTools {
                     consumer.accept(obj);
                 }
                 request = (R) requestBuilder.setField(pageField, ++page).build();
-                resultSet = fetchFunc.apply(request);
+                try {
+                    resultSet = fetchFunc.apply(request);
+                } catch (Exception e) {
+                    throw new RuntimeException("Fetch func failed");
+                }
                 resultValues = (List) resultSet.getField(resultValuesField);
             }
+        }
+
+        @FunctionalInterface
+        public interface CheckedFunction<T, R> {
+            R apply(T t) throws Exception;
         }
     }
 }

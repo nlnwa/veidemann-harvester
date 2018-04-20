@@ -1,6 +1,7 @@
 package no.nb.nna.veidemann.frontier.worker;
 
 import no.nb.nna.veidemann.api.MessagesProto;
+import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbHelper;
 import no.nb.nna.veidemann.db.ProtoUtils;
 
@@ -35,11 +36,11 @@ public class DbUtil extends DbHelper {
      *
      * @param qUri the uri with failed precondition
      */
-    public void writeLog(QueuedUriWrapper qUri) {
+    public void writeLog(QueuedUriWrapper qUri) throws DbException {
         writeLog(qUri, qUri.getError().getCode());
     }
 
-    public void writeLog(QueuedUriWrapper qUri, int statusCode) {
+    public void writeLog(QueuedUriWrapper qUri, int statusCode) throws DbException {
         MessagesProto.CrawlLog crawlLog = MessagesProto.CrawlLog.newBuilder()
                 .setRequestedUri(qUri.getUri())
                 .setJobExecutionId(qUri.getJobExecutionId())

@@ -21,6 +21,8 @@ import com.rethinkdb.gen.exc.ReqlDriverError;
 import com.rethinkdb.gen.exc.ReqlError;
 import com.rethinkdb.model.OptArgs;
 import com.rethinkdb.net.Connection;
+import no.nb.nna.veidemann.commons.db.DbConnectionException;
+import no.nb.nna.veidemann.commons.db.DbQueryException;
 import no.nb.nna.veidemann.commons.settings.CommonSettings;
 import no.nb.nna.veidemann.db.opentracing.ConnectionTracingInterceptor;
 import org.slf4j.Logger;
@@ -38,7 +40,8 @@ public class RethinkDbConnection implements AutoCloseable {
 
     private static RethinkDbConnection instance;
 
-    private RethinkDbConnection(String dbHost, int dbPort, String dbName, String dbUser, String dbPassword, int reConnectAttempts) {
+    private RethinkDbConnection(String dbHost, int dbPort, String dbName, String dbUser, String dbPassword,
+                                int reConnectAttempts) throws DbConnectionException {
         this.conn = connect(dbHost, dbPort, dbName, dbUser, dbPassword, reConnectAttempts);
     }
 
@@ -58,9 +61,9 @@ public class RethinkDbConnection implements AutoCloseable {
      * Configure the singleton RethinkDbConnection.
      * <p/>
      * The RethinkDbConnection must configured before any usage.
-     *
      */
-    public static RethinkDbConnection configure(String dbHost, int dbPort, String dbName, String dbUser, String dbPassword) {
+    public static RethinkDbConnection configure(String dbHost, int dbPort, String dbName, String dbUser,
+                                                String dbPassword) throws DbConnectionException {
         if (instance != null) {
             throw new IllegalStateException("Connection is already configured");
         }
@@ -75,25 +78,26 @@ public class RethinkDbConnection implements AutoCloseable {
      *
      * @param settings a {@link CommonSettings} object with connection parameters
      */
-    public static RethinkDbConnection configure(CommonSettings settings) {
-        return configure(settings.getDbHost(), settings.getDbPort(), settings.getDbName(), settings.getDbUser(), settings.getDbPassword());
+    public static RethinkDbConnection configure(CommonSettings settings) throws DbConnectionException {
+        return configure(settings.getDbHost(), settings.getDbPort(), settings.getDbName(), settings.getDbUser(),
+                settings.getDbPassword());
     }
 
     public static boolean isConfigured() {
         return instance != null;
     }
 
-    public <T> T exec(ReqlExpr qry) {
+    public <T> T exec(ReqlExpr qry) throws DbConnectionException, DbQueryException {
         return exec("db-query", qry);
     }
 
-    public <T> T exec(String operationName, ReqlExpr qry) {
+    public <T> T exec(String operationName, ReqlExpr qry) throws DbConnectionException, DbQueryException {
         synchronized (this) {
             if (!conn.isOpen()) {
                 try {
                     conn.connect();
                 } catch (TimeoutException ex) {
-                    throw new RuntimeException("Timed out waiting for connection");
+                    throw new DbConnectionException("Timed out waiting for connection", ex);
                 }
             }
         }
@@ -104,11 +108,11 @@ public class RethinkDbConnection implements AutoCloseable {
             if (result instanceof Map
                     && ((Map) result).containsKey("errors")
                     && !((Map) result).get("errors").equals(0L)) {
-                throw new DbException((String) ((Map) result).get("first_error"));
+                throw new DbQueryException((String) ((Map) result).get("first_error"));
             }
             return result;
         } catch (ReqlError e) {
-            throw new DbException(e.getMessage(), e);
+            throw new DbQueryException(e.getMessage(), e);
         }
     }
 
@@ -117,7 +121,8 @@ public class RethinkDbConnection implements AutoCloseable {
         conn.close();
     }
 
-    private Connection connect(String dbHost, int dbPort, String dbName, String dbUser, String dbPassword, int reConnectAttempts) {
+    private Connection connect(String dbHost, int dbPort, String dbName, String dbUser, String dbPassword,
+                               int reConnectAttempts) throws DbConnectionException {
         Connection c = null;
         int attempts = 0;
         while (c == null) {
@@ -139,7 +144,7 @@ public class RethinkDbConnection implements AutoCloseable {
                     }
                 } else {
                     LOG.error("Too many connection attempts, giving up");
-                    throw e;
+                    throw new DbConnectionException("Too many connection attempts", e);
                 }
             }
         }

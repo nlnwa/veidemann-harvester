@@ -17,9 +17,11 @@ package no.nb.nna.veidemann.frontier.worker;
 
 import no.nb.nna.veidemann.api.FrontierProto.CrawlSeedRequest;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus;
+import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus.State;
 import no.nb.nna.veidemann.commons.ExtraStatusCodes;
 import no.nb.nna.veidemann.commons.client.DnsServiceClient;
 import no.nb.nna.veidemann.commons.client.RobotsServiceClient;
+import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.db.RethinkDbAdapter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,7 +49,7 @@ public class Frontier implements AutoCloseable {
         this.queueWorker = new QueueWorker(this);
     }
 
-    public CrawlExecutionStatus scheduleSeed(CrawlSeedRequest request) {
+    public CrawlExecutionStatus scheduleSeed(CrawlSeedRequest request) throws DbException {
         // Create execution
         StatusWrapper status = StatusWrapper.getStatusWrapper(CrawlExecutionStatus.newBuilder()
                 .setJobId(request.getJob().getId())
@@ -62,15 +64,25 @@ public class Frontier implements AutoCloseable {
 
         try {
             QueuedUriWrapper qUri = QueuedUriWrapper.getQueuedUriWrapper(uri, request.getJobExecutionId(), status.getId());
-            Preconditions
-                    .checkPreconditions(this, DbUtil.getInstance().getCrawlConfigForJob(request.getJob()), status, qUri, 1L);
-            LOG.debug("Seed '{}' added to queue", qUri.getUri());
+            boolean isAllowed = Preconditions.checkPreconditions(this,
+                    DbUtil.getInstance().getCrawlConfigForJob(request.getJob()), status, qUri, 1L);
+            if (isAllowed) {
+                LOG.debug("Seed '{}' added to queue", qUri.getUri());
+            } else {
+                LOG.info("Seed '{}' not queueable. Cause: {}", qUri.getUri(), qUri.getError());
+                status.setEndState(State.FINISHED)
+                        .setError(qUri.getError());
+            }
         } catch (URISyntaxException ex) {
             status.incrementDocumentsFailed()
                     .setEndState(CrawlExecutionStatus.State.FAILED)
-                    .setError(ExtraStatusCodes.ILLEGAL_URI.toFetchError(ex.toString()))
-                    .saveStatus();
+                    .setError(ExtraStatusCodes.ILLEGAL_URI.toFetchError(ex.toString()));
+        } catch (Exception ex) {
+            status.incrementDocumentsFailed()
+                    .setEndState(CrawlExecutionStatus.State.FAILED)
+                    .setError(ExtraStatusCodes.RUNTIME_EXCEPTION.toFetchError(ex.toString()));
         }
+        status.saveStatus();
 
         return status.getCrawlExecutionStatus();
     }

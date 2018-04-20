@@ -57,7 +57,7 @@ public class DbHelper {
      * @param job the job for which to get the CrawlConfig
      * @return the CrawlConfig associated with the CrawlJob
      */
-    public CrawlConfig getCrawlConfigForJob(CrawlJob job) {
+    public CrawlConfig getCrawlConfigForJob(CrawlJob job) throws DbException {
         return dbAdapter.getCrawlConfig(GetRequest.newBuilder().setId(job.getCrawlConfigId()).build());
     }
 
@@ -67,7 +67,7 @@ public class DbHelper {
      * @param config the CrawlConfig for which to get the PolitenessConfig
      * @return the PolitenessConfig associated with the CrawlConfig
      */
-    public PolitenessConfig getPolitenessConfigForCrawlConfig(CrawlConfig config) {
+    public PolitenessConfig getPolitenessConfigForCrawlConfig(CrawlConfig config) throws DbException {
         return dbAdapter.getPolitenessConfig(GetRequest.newBuilder().setId(config.getPolitenessId()).build());
     }
 
@@ -77,7 +77,7 @@ public class DbHelper {
      * @param config the CrawlConfig for which to get the BrowserConfig
      * @return the BrowserConfig associated with the CrawlConfig
      */
-    public BrowserConfig getBrowserConfigForCrawlConfig(CrawlConfig config) {
+    public BrowserConfig getBrowserConfigForCrawlConfig(CrawlConfig config) throws DbException {
         return dbAdapter.getBrowserConfig(GetRequest.newBuilder().setId(config.getBrowserConfigId()).build());
     }
 }

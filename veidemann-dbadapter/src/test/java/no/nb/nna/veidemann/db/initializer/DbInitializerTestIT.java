@@ -16,7 +16,7 @@
 package no.nb.nna.veidemann.db.initializer;
 
 import com.rethinkdb.RethinkDB;
-import no.nb.nna.veidemann.db.DbException;
+import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.db.RethinkDbAdapter;
 import no.nb.nna.veidemann.db.RethinkDbAdapter.TABLES;
 import no.nb.nna.veidemann.db.RethinkDbConnection;
@@ -56,7 +56,7 @@ public class DbInitializerTestIT {
     }
 
     @Test
-    public void initialize() {
+    public void initialize() throws DbException {
         new CreateDbV0_1("veidemann").run();
         new DbInitializer().initialize();
         String version = RethinkDbConnection.getInstance().exec(RethinkDB.r.table(TABLES.SYSTEM.name).get("db_version").g("db_version"));

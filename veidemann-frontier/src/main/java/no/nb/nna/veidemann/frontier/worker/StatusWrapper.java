@@ -19,6 +19,7 @@ import com.google.protobuf.Timestamp;
 import no.nb.nna.veidemann.api.ConfigProto;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus;
 import no.nb.nna.veidemann.api.MessagesProto.Error;
+import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.db.ProtoUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,7 +41,7 @@ public class StatusWrapper {
         this.status = status;
     }
 
-    public static StatusWrapper getStatusWrapper(String executionId) {
+    public static StatusWrapper getStatusWrapper(String executionId) throws DbException {
         return new StatusWrapper(DbUtil.getInstance().getDb().getExecutionStatus(executionId));
     }
 
@@ -52,7 +53,7 @@ public class StatusWrapper {
         return new StatusWrapper(status);
     }
 
-    public StatusWrapper saveStatus() {
+    public StatusWrapper saveStatus() throws DbException {
         status = DbUtil.getInstance().getDb().saveExecutionStatus(status.build()).toBuilder();
         return this;
     }

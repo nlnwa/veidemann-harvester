@@ -24,6 +24,7 @@ import no.nb.nna.veidemann.api.ConfigProto.CrawlScheduleConfig;
 import no.nb.nna.veidemann.api.ControllerProto.GetRequest;
 import no.nb.nna.veidemann.api.ControllerProto.ListRequest;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
+import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.db.ProtoUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,34 +54,44 @@ public class CrawlJobCollector implements TaskCollector {
         TaskTable tasks = new TaskTable();
         Map<String, CrawlScheduleConfig> schedules = new HashMap<>();
 
-        for (CrawlJob job : db.listCrawlJobs(listRequest).getValueList()) {
-            // Check if job is disabled
-            if (!job.getDisabled()) {
-                CrawlScheduleConfig schedule = schedules.computeIfAbsent(job.getScheduleId(),
-                        k -> {
-                            if (k.isEmpty()) {
-                                return CrawlScheduleConfig.getDefaultInstance();
-                            } else {
-                                return db.getCrawlScheduleConfig(GetRequest.newBuilder().setId(k).build());
-                            }
-                        });
+        try {
+            for (CrawlJob job : db.listCrawlJobs(listRequest).getValueList()) {
+                // Check if job is disabled
+                if (!job.getDisabled()) {
+                    CrawlScheduleConfig schedule = schedules.computeIfAbsent(job.getScheduleId(),
+                            k -> {
+                                if (k.isEmpty()) {
+                                    return CrawlScheduleConfig.getDefaultInstance();
+                                } else {
+                                    try {
+                                        return db.getCrawlScheduleConfig(GetRequest.newBuilder().setId(k).build());
+                                    } catch (DbException e) {
+                                        LOG.error("Failed getting tasks for scheduler", e);
+                                        throw new RuntimeException(e);
+                                    }
+                                }
+                            });
 
-                // Check if job is valid for current date
-                OffsetDateTime now = ProtoUtils.getNowOdt();
-                if (!schedule.getCronExpression().isEmpty()
-                        && (!schedule.hasValidFrom() || ProtoUtils.tsToOdt(schedule.getValidFrom()).isBefore(now))
-                        && (!schedule.hasValidTo() || ProtoUtils.tsToOdt(schedule.getValidTo()).isAfter(now))) {
+                    // Check if job is valid for current date
+                    OffsetDateTime now = ProtoUtils.getNowOdt();
+                    if (!schedule.getCronExpression().isEmpty()
+                            && (!schedule.hasValidFrom() || ProtoUtils.tsToOdt(schedule.getValidFrom()).isBefore(now))
+                            && (!schedule.hasValidTo() || ProtoUtils.tsToOdt(schedule.getValidTo()).isAfter(now))) {
 
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug("Read Job: '{}' with cron expression '{}'",
-                                job.getMeta().getName(), schedule.getCronExpression());
+                        if (LOG.isDebugEnabled()) {
+                            LOG.debug("Read Job: '{}' with cron expression '{}'",
+                                    job.getMeta().getName(), schedule.getCronExpression());
+                        }
+
+                        SchedulingPattern pattern = new SchedulingPattern(schedule.getCronExpression());
+                        Task task = new ScheduledCrawlJob(db, job);
+                        tasks.add(pattern, task);
                     }
-
-                    SchedulingPattern pattern = new SchedulingPattern(schedule.getCronExpression());
-                    Task task = new ScheduledCrawlJob(db, job);
-                    tasks.add(pattern, task);
                 }
             }
+        } catch (DbException e) {
+            LOG.error("Failed getting tasks for scheduler", e);
+            throw new RuntimeException(e);
         }
 
         return tasks;

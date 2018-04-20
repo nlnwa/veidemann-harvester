@@ -19,17 +19,18 @@ package no.nb.nna.veidemann.commons.util;
 import com.google.protobuf.Message;
 import no.nb.nna.veidemann.api.ConfigProto;
 import no.nb.nna.veidemann.api.ConfigProto.Seed;
-import no.nb.nna.veidemann.api.ControllerProto.ListRequest;
 import no.nb.nna.veidemann.api.ControllerProto.SeedListReply;
 import no.nb.nna.veidemann.api.ControllerProto.SeedListRequest;
+import no.nb.nna.veidemann.commons.util.ApiTools.ListReplyWalker.CheckedFunction;
 import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Function;
 
-import static no.nb.nna.veidemann.commons.util.ApiTools.*;
-import static org.assertj.core.api.Assertions.*;
+import static no.nb.nna.veidemann.commons.util.ApiTools.ListReplyWalker;
+import static no.nb.nna.veidemann.commons.util.ApiTools.buildLabel;
+import static no.nb.nna.veidemann.commons.util.ApiTools.buildMeta;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  *
@@ -73,7 +74,7 @@ public class ApiToolsTest {
     public void testListReplyWalker() {
         SeedListRequest.Builder request = SeedListRequest.newBuilder().setName("foo").setPageSize(5);
 
-        Function<SeedListRequest, Message> fetchFunc = r-> {
+        CheckedFunction<SeedListRequest, Message> fetchFunc = r -> {
             SeedListReply reply;
             switch (r.getPage()) {
                 case 0:

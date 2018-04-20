@@ -22,6 +22,7 @@ import com.typesafe.config.ConfigBeanFactory;
 import com.typesafe.config.ConfigException;
 import com.typesafe.config.ConfigFactory;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
+import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.opentracing.TracerFactory;
 import no.nb.nna.veidemann.contentwriter.settings.Settings;
 import no.nb.nna.veidemann.contentwriter.text.TextExtractor;
@@ -85,7 +86,7 @@ public class ContentWriter {
             } catch (InterruptedException ex) {
                 // Interrupted, shut down
             }
-        } catch (ConfigException ex) {
+        } catch (ConfigException | DbException ex) {
             System.err.println("Configuration error: " + ex.getLocalizedMessage());
             System.exit(1);
         }

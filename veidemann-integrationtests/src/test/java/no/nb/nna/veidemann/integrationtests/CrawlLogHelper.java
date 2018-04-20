@@ -19,6 +19,7 @@ import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
 import no.nb.nna.veidemann.api.ReportProto.CrawlLogListReply;
 import no.nb.nna.veidemann.api.ReportProto.CrawlLogListRequest;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
+import no.nb.nna.veidemann.commons.db.DbException;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -35,7 +36,7 @@ public class CrawlLogHelper {
     final Map<String, List<CrawlLog>> crawlLogsByJobEid = new HashMap();
     int reportedCount;
 
-    public CrawlLogHelper(DbAdapter db) {
+    public CrawlLogHelper(DbAdapter db) throws DbException {
         crawlLogListReply = db.listCrawlLogs(CrawlLogListRequest.newBuilder().setPageSize(500).build());
         reportedCount = (int) crawlLogListReply.getCount();
         crawlLogListReply.getValueList().forEach(c -> addCrawlLog(c));
@@ -56,25 +57,13 @@ public class CrawlLogHelper {
                     .isNotEmpty();
         }
 
-        List<CrawlLog> typeList = crawlLogsByType.get(type);
-        if (typeList == null) {
-            typeList = new ArrayList<>();
-            crawlLogsByType.put(type, typeList);
-        }
+        List<CrawlLog> typeList = crawlLogsByType.computeIfAbsent(type, k -> new ArrayList<>());
         typeList.add(crawlLog);
 
-        List<CrawlLog> eidList = crawlLogsByEid.get(crawlLog.getExecutionId());
-        if (eidList == null) {
-            eidList = new ArrayList<>();
-            crawlLogsByEid.put(crawlLog.getExecutionId(), eidList);
-        }
+        List<CrawlLog> eidList = crawlLogsByEid.computeIfAbsent(crawlLog.getExecutionId(), k -> new ArrayList<>());
         eidList.add(crawlLog);
 
-        List<CrawlLog> jobEidList = crawlLogsByJobEid.get(crawlLog.getJobExecutionId());
-        if (jobEidList == null) {
-            jobEidList = new ArrayList<>();
-            crawlLogsByJobEid.put(crawlLog.getJobExecutionId(), jobEidList);
-        }
+        List<CrawlLog> jobEidList = crawlLogsByJobEid.computeIfAbsent(crawlLog.getJobExecutionId(), k -> new ArrayList<>());
         jobEidList.add(crawlLog);
     }
 

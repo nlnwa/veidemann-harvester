@@ -40,6 +40,7 @@ import no.nb.nna.veidemann.commons.VeidemannHeaderConstants;
 import no.nb.nna.veidemann.commons.client.ContentWriterClient;
 import no.nb.nna.veidemann.commons.client.ContentWriterClient.ContentWriterSession;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
+import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.db.ProtoUtils;
 import no.nb.nna.veidemann.harvester.BrowserSessionRegistry;
 import no.nb.nna.veidemann.harvester.browsercontroller.BrowserSession;
@@ -399,7 +400,11 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
     private void writeCrawlLog(CrawlLog.Builder crawlLog) {
         if (uri.endsWith("robots.txt")) {
             crawlLog.setDiscoveryPath("P");
-            db.saveCrawlLog(crawlLog.build());
+            try {
+                db.saveCrawlLog(crawlLog.build());
+            } catch (DbException e) {
+                LOG.warn("Could not write crawl log for robots.txt entry", e);
+            }
         } else if (browserSession != null) {
             crawlLogEntry.setCrawlLog(crawlLog);
         } else {

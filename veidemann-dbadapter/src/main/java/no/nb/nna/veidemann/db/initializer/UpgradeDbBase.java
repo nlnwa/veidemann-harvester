@@ -16,6 +16,10 @@
 package no.nb.nna.veidemann.db.initializer;
 
 import com.rethinkdb.RethinkDB;
+import no.nb.nna.veidemann.commons.db.DbConnectionException;
+import no.nb.nna.veidemann.commons.db.DbException;
+import no.nb.nna.veidemann.commons.db.DbQueryException;
+import no.nb.nna.veidemann.commons.db.DbUpgradeException;
 import no.nb.nna.veidemann.db.RethinkDbAdapter.TABLES;
 import no.nb.nna.veidemann.db.RethinkDbConnection;
 import org.slf4j.Logger;
@@ -39,16 +43,20 @@ public abstract class UpgradeDbBase implements Runnable {
         LOG.info("Upgrading from {} to {}", fromVersion(), toVersion());
 
         conn = RethinkDbConnection.getInstance();
-        String version = conn.exec(r.table(TABLES.SYSTEM.name).get("db_version").g("db_version"));
-        if (!fromVersion().equals(version)) {
-            throw new IllegalStateException("Expected db to be version " + fromVersion() + ", but was " + version);
-        }
+        try {
+            String version = conn.exec(r.table(TABLES.SYSTEM.name).get("db_version").g("db_version"));
+            if (!fromVersion().equals(version)) {
+                throw new DbUpgradeException("Expected db to be version " + fromVersion() + ", but was " + version);
+            }
 
-        upgrade();
-        conn.exec(r.table(TABLES.SYSTEM.name).get("db_version").update(r.hashMap("db_version", toVersion())));
+            upgrade();
+            conn.exec(r.table(TABLES.SYSTEM.name).get("db_version").update(r.hashMap("db_version", toVersion())));
+        } catch (DbException e) {
+            throw new RuntimeException(e);
+        }
     }
 
-    abstract void upgrade();
+    abstract void upgrade() throws DbQueryException, DbConnectionException;
 
     abstract String fromVersion();
 

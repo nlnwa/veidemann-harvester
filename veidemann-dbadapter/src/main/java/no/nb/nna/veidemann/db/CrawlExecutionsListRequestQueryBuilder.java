@@ -18,6 +18,7 @@ package no.nb.nna.veidemann.db;
 
 import no.nb.nna.veidemann.api.StatusProto.ExecutionsListReply;
 import no.nb.nna.veidemann.api.StatusProto.ListExecutionsRequest;
+import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.db.RethinkDbAdapter.TABLES;
 
 import static no.nb.nna.veidemann.db.RethinkDbAdapter.r;
@@ -52,7 +53,7 @@ public class CrawlExecutionsListRequestQueryBuilder extends ConfigListQueryBuild
         }
     }
 
-    public ExecutionsListReply.Builder executeList(RethinkDbAdapter db) {
+    public ExecutionsListReply.Builder executeList(RethinkDbAdapter db) throws DbException {
         return executeList(db, ExecutionsListReply.newBuilder());
     }
 

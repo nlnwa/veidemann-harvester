@@ -79,6 +79,7 @@ import no.nb.nna.veidemann.api.StatusProto.RunningExecutionsRequest;
 import no.nb.nna.veidemann.commons.auth.EmailContextKey;
 import no.nb.nna.veidemann.commons.db.ChangeFeed;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
+import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.FutureOptional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -136,7 +137,7 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
-    public Optional<CrawledContent> hasCrawledContent(CrawledContent cc) {
+    public Optional<CrawledContent> hasCrawledContent(CrawledContent cc) throws DbException {
         ensureContainsValue(cc, "digest");
         ensureContainsValue(cc, "warc_id");
 
@@ -155,12 +156,12 @@ public class RethinkDbAdapter implements DbAdapter {
         }
     }
 
-    public void deleteCrawledContent(String digest) {
+    public void deleteCrawledContent(String digest) throws DbException {
         executeRequest("db-deleteCrawledContent", r.table(TABLES.CRAWLED_CONTENT.name).get(digest).delete());
     }
 
     @Override
-    public ExtractedText addExtractedText(ExtractedText et) {
+    public ExtractedText addExtractedText(ExtractedText et) throws DbException {
         ensureContainsValue(et, "warc_id");
         ensureContainsValue(et, "text");
 
@@ -174,7 +175,7 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
-    public CrawlLog saveCrawlLog(CrawlLog cl) {
+    public CrawlLog saveCrawlLog(CrawlLog cl) throws DbException {
         if (!"text/dns".equals(cl.getContentType())) {
             if (cl.getJobExecutionId().isEmpty()) {
                 LOG.error("Missing JobExecutionId in CrawlLog: {}", cl, new IllegalStateException());
@@ -190,67 +191,67 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
-    public CrawlLogListReply listCrawlLogs(CrawlLogListRequest request) {
+    public CrawlLogListReply listCrawlLogs(CrawlLogListRequest request) throws DbException {
         CrawlLogListRequestQueryBuilder queryBuilder = new CrawlLogListRequestQueryBuilder(request);
         return queryBuilder.executeList(this).build();
     }
 
     @Override
-    public PageLog savePageLog(PageLog pageLog) {
+    public PageLog savePageLog(PageLog pageLog) throws DbException {
         return saveMessage(pageLog, TABLES.PAGE_LOG);
     }
 
     @Override
-    public PageLogListReply listPageLogs(PageLogListRequest request) {
+    public PageLogListReply listPageLogs(PageLogListRequest request) throws DbException {
         PageLogListRequestQueryBuilder queryBuilder = new PageLogListRequestQueryBuilder(request);
         return queryBuilder.executeList(this).build();
     }
 
     @Override
-    public BrowserScript getBrowserScript(GetRequest req) {
+    public BrowserScript getBrowserScript(GetRequest req) throws DbException {
         return getMessage(req, BrowserScript.class, TABLES.BROWSER_SCRIPTS);
     }
 
     @Override
-    public BrowserScript saveBrowserScript(BrowserScript script) {
+    public BrowserScript saveBrowserScript(BrowserScript script) throws DbException {
         return saveMessage(script, TABLES.BROWSER_SCRIPTS);
     }
 
     @Override
-    public Empty deleteBrowserScript(BrowserScript script) {
+    public Empty deleteBrowserScript(BrowserScript script) throws DbException {
         checkDependencies(script, TABLES.BROWSER_CONFIGS, BrowserConfig.getDefaultInstance(), "script_id");
         return deleteConfigMessage(script, TABLES.BROWSER_SCRIPTS);
     }
 
     @Override
-    public BrowserScriptListReply listBrowserScripts(ListRequest request) {
+    public BrowserScriptListReply listBrowserScripts(ListRequest request) throws DbException {
         ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, TABLES.BROWSER_SCRIPTS);
         return queryBuilder.executeList(this, BrowserScriptListReply.newBuilder()).build();
     }
 
     @Override
-    public CrawlHostGroupConfig getCrawlHostGroupConfig(GetRequest req) {
+    public CrawlHostGroupConfig getCrawlHostGroupConfig(GetRequest req) throws DbException {
         return getMessage(req, CrawlHostGroupConfig.class, TABLES.CRAWL_HOST_GROUP_CONFIGS);
     }
 
     @Override
-    public CrawlHostGroupConfig saveCrawlHostGroupConfig(CrawlHostGroupConfig crawlHostGroupConfig) {
+    public CrawlHostGroupConfig saveCrawlHostGroupConfig(CrawlHostGroupConfig crawlHostGroupConfig) throws DbException {
         return saveMessage(crawlHostGroupConfig, TABLES.CRAWL_HOST_GROUP_CONFIGS);
     }
 
     @Override
-    public Empty deleteCrawlHostGroupConfig(CrawlHostGroupConfig crawlHostGroupConfig) {
+    public Empty deleteCrawlHostGroupConfig(CrawlHostGroupConfig crawlHostGroupConfig) throws DbException {
         return deleteConfigMessage(crawlHostGroupConfig, TABLES.CRAWL_HOST_GROUP_CONFIGS);
     }
 
     @Override
-    public CrawlHostGroupConfigListReply listCrawlHostGroupConfigs(ListRequest request) {
+    public CrawlHostGroupConfigListReply listCrawlHostGroupConfigs(ListRequest request) throws DbException {
         ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, TABLES.CRAWL_HOST_GROUP_CONFIGS);
         return queryBuilder.executeList(this, CrawlHostGroupConfigListReply.newBuilder()).build();
     }
 
     @Override
-    public CrawlHostGroup getOrCreateCrawlHostGroup(String crawlHostGroupId, String politenessId) {
+    public CrawlHostGroup getOrCreateCrawlHostGroup(String crawlHostGroupId, String politenessId) throws DbException {
         List key = r.array(crawlHostGroupId, politenessId);
         Map<String, Object> response = executeRequest("db-getOrCreateCrawlHostGroup",
                 r.table(TABLES.CRAWL_HOST_GROUP.name)
@@ -272,7 +273,7 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
-    public FutureOptional<CrawlHostGroup> borrowFirstReadyCrawlHostGroup() {
+    public FutureOptional<CrawlHostGroup> borrowFirstReadyCrawlHostGroup() throws DbException {
         Map<String, Object> response = executeRequest("db-borrowFirstReadyCrawlHostGroup",
                 r.table(TABLES.CRAWL_HOST_GROUP.name)
                         .orderBy().optArg("index", "nextFetchTime")
@@ -322,16 +323,38 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
-    public CrawlHostGroup releaseCrawlHostGroup(CrawlHostGroup crawlHostGroup, long nextFetchDelayMs) {
+    public CrawlHostGroup releaseCrawlHostGroup(CrawlHostGroup crawlHostGroup, long nextFetchDelayMs) throws DbException {
         List key = r.array(crawlHostGroup.getId(), crawlHostGroup.getPolitenessId());
         double nextFetchDelayS = nextFetchDelayMs / 1000.0;
 
-        Map<String, Object> response = executeRequest("db-releaseCrawlHostGroup",
-                r.table(TABLES.CRAWL_HOST_GROUP.name)
-                        .get(key)
-                        .update(r.hashMap("busy", false).with("nextFetchTime", r.now().add(nextFetchDelayS)))
-                        .optArg("return_changes", "always")
-        );
+        // This db update is so important that we retry it a couple of times if it fails.
+        Map<String, Object> response = null;
+        int maxAttempts = 3;
+        int attempts = 0;
+        boolean success = false;
+        while (!success) {
+            try {
+                response = executeRequest("db-releaseCrawlHostGroup",
+                        r.table(TABLES.CRAWL_HOST_GROUP.name)
+                                .get(key)
+                                .update(r.hashMap("busy", false).with("nextFetchTime", r.now().add(nextFetchDelayS)))
+                                .optArg("return_changes", "always")
+                );
+                success = true;
+            } catch (DbException e) {
+                attempts++;
+                if (attempts >= maxAttempts) {
+                    LOG.error("Could not release crawl host group", e);
+                    throw e;
+                }
+                // Wait a little in hope that DB had a temporary outage.
+                try {
+                    Thread.sleep(2000L);
+                } catch (InterruptedException e1) {
+                    throw new RuntimeException(e);
+                }
+            }
+        }
 
         Map resultDoc = ((List<Map<String, Map>>) response.get("changes")).get(0).get("new_val");
 
@@ -346,7 +369,7 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
-    public JobExecutionStatus createJobExecutionStatus(String jobId) {
+    public JobExecutionStatus createJobExecutionStatus(String jobId) throws DbException {
         Map rMap = ProtoUtils.protoToRethink(JobExecutionStatus.newBuilder()
                 .setJobId(jobId)
                 .setStartTime(ProtoUtils.getNowTs())
@@ -366,7 +389,7 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
-    public JobExecutionStatus getJobExecutionStatus(String jobExecutionId) {
+    public JobExecutionStatus getJobExecutionStatus(String jobExecutionId) throws DbException {
         JobExecutionStatus jes = ProtoUtils.rethinkToProto(executeRequest("db-getJobExecutionStatus",
                 r.table(TABLES.JOB_EXECUTIONS.name)
                         .get(jobExecutionId)
@@ -396,13 +419,13 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
-    public JobExecutionsListReply listJobExecutionStatus(ListJobExecutionsRequest request) {
+    public JobExecutionsListReply listJobExecutionStatus(ListJobExecutionsRequest request) throws DbException {
         JobExecutionsListRequestQueryBuilder queryBuilder = new JobExecutionsListRequestQueryBuilder(request);
         return queryBuilder.executeList(this).build();
     }
 
     @Override
-    public JobExecutionStatus setJobExecutionStateAborted(String jobExecutionId) {
+    public JobExecutionStatus setJobExecutionStateAborted(String jobExecutionId) throws DbException {
         return executeUpdate("db-setJobExecutionStateAborted",
                 r.table(TABLES.JOB_EXECUTIONS.name)
                         .get(jobExecutionId)
@@ -416,7 +439,7 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
-    public CrawlExecutionStatus saveExecutionStatus(CrawlExecutionStatus status) {
+    public CrawlExecutionStatus saveExecutionStatus(CrawlExecutionStatus status) throws DbException {
         if (status.getJobExecutionId().isEmpty()) {
             LOG.error("Missing JobExecutionId in CrawlExecutionStatus: {}", status, new IllegalStateException());
         }
@@ -491,7 +514,7 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
-    public CrawlExecutionStatus getExecutionStatus(String executionId) {
+    public CrawlExecutionStatus getExecutionStatus(String executionId) throws DbException {
         Map<String, Object> response = executeRequest("db-getExecutionStatus",
                 r.table(TABLES.EXECUTIONS.name)
                         .get(executionId)
@@ -501,13 +524,13 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
-    public ExecutionsListReply listExecutionStatus(ListExecutionsRequest request) {
+    public ExecutionsListReply listExecutionStatus(ListExecutionsRequest request) throws DbException {
         CrawlExecutionsListRequestQueryBuilder queryBuilder = new CrawlExecutionsListRequestQueryBuilder(request);
         return queryBuilder.executeList(this).build();
     }
 
     @Override
-    public CrawlExecutionStatus setExecutionStateAborted(String executionId) {
+    public CrawlExecutionStatus setExecutionStateAborted(String executionId) throws DbException {
         return executeUpdate("db-setExecutionStateAborted",
                 r.table(TABLES.EXECUTIONS.name)
                         .get(executionId)
@@ -521,7 +544,7 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
-    public QueuedUri saveQueuedUri(QueuedUri qu) {
+    public QueuedUri saveQueuedUri(QueuedUri qu) throws DbException {
         if (!qu.hasEarliestFetchTimeStamp()) {
             qu = qu.toBuilder().setEarliestFetchTimeStamp(ProtoUtils.getNowTs()).build();
         }
@@ -529,12 +552,12 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
-    public void deleteQueuedUri(QueuedUri qu) {
+    public void deleteQueuedUri(QueuedUri qu) throws DbException {
         deleteConfigMessage(qu, TABLES.URI_QUEUE);
     }
 
     @Override
-    public long deleteQueuedUrisForExecution(String executionId) {
+    public long deleteQueuedUrisForExecution(String executionId) throws DbException {
         return executeRequest("db-deleteQueuedUrisForExecution",
                 r.table(TABLES.URI_QUEUE.name)
                         .getAll(executionId).optArg("index", "executionId")
@@ -543,7 +566,7 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
-    public long queuedUriCount(String executionId) {
+    public long queuedUriCount(String executionId) throws DbException {
         return executeRequest("db-queuedUriCount",
                 r.table(TABLES.URI_QUEUE.name)
                         .getAll(executionId).optArg("index", "executionId")
@@ -552,7 +575,7 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
-    public boolean uriNotIncludedInQueue(QueuedUri qu, Timestamp since) {
+    public boolean uriNotIncludedInQueue(QueuedUri qu, Timestamp since) throws DbException {
         return executeRequest("db-uriNotIncludedInQueue",
                 r.table(RethinkDbAdapter.TABLES.CRAWL_LOG.name)
                         .between(
@@ -567,7 +590,7 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
-    public FutureOptional<QueuedUri> getNextQueuedUriToFetch(CrawlHostGroup crawlHostGroup) {
+    public FutureOptional<QueuedUri> getNextQueuedUriToFetch(CrawlHostGroup crawlHostGroup) throws DbException {
         List fromKey = r.array(
                 crawlHostGroup.getId(),
                 crawlHostGroup.getPolitenessId(),
@@ -601,7 +624,7 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
-    public Screenshot saveScreenshot(Screenshot s) {
+    public Screenshot saveScreenshot(Screenshot s) throws DbException {
         Map rMap = ProtoUtils.protoToRethink(s);
 
         Map<String, Object> response = executeRequest("db-addScreenshot",
@@ -615,18 +638,18 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
-    public ScreenshotListReply listScreenshots(ScreenshotListRequest request) {
+    public ScreenshotListReply listScreenshots(ScreenshotListRequest request) throws DbException {
         ScreenshotListRequestQueryBuilder queryBuilder = new ScreenshotListRequestQueryBuilder(request);
         return queryBuilder.executeList(this).build();
     }
 
     @Override
-    public Empty deleteScreenshot(Screenshot screenshot) {
+    public Empty deleteScreenshot(Screenshot screenshot) throws DbException {
         return deleteConfigMessage(screenshot, TABLES.SCREENSHOT);
     }
 
     @Override
-    public ChangeFeed<RunningExecutionsListReply> getExecutionStatusStream(RunningExecutionsRequest request) {
+    public ChangeFeed<RunningExecutionsListReply> getExecutionStatusStream(RunningExecutionsRequest request) throws DbException {
         int limit = request.getPageSize();
         if (limit == 0) {
             limit = 100;
@@ -675,61 +698,61 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
-    public CrawlEntity getCrawlEntity(GetRequest req) {
+    public CrawlEntity getCrawlEntity(GetRequest req) throws DbException {
         return getMessage(req, CrawlEntity.class, TABLES.CRAWL_ENTITIES);
     }
 
     @Override
-    public CrawlEntity saveCrawlEntity(CrawlEntity entity) {
+    public CrawlEntity saveCrawlEntity(CrawlEntity entity) throws DbException {
         return saveMessage(entity, TABLES.CRAWL_ENTITIES);
     }
 
     @Override
-    public Empty deleteCrawlEntity(CrawlEntity entity) {
+    public Empty deleteCrawlEntity(CrawlEntity entity) throws DbException {
         checkDependencies(entity, TABLES.SEEDS, Seed.getDefaultInstance(), "entity_id");
         return deleteConfigMessage(entity, TABLES.CRAWL_ENTITIES);
     }
 
     @Override
-    public CrawlEntityListReply listCrawlEntities(ListRequest request) {
+    public CrawlEntityListReply listCrawlEntities(ListRequest request) throws DbException {
         ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, TABLES.CRAWL_ENTITIES);
         return queryBuilder.executeList(this, CrawlEntityListReply.newBuilder()).build();
     }
 
     @Override
-    public Seed getSeed(GetRequest req) {
+    public Seed getSeed(GetRequest req) throws DbException {
         return getMessage(req, Seed.class, TABLES.SEEDS);
     }
 
     @Override
-    public SeedListReply listSeeds(SeedListRequest request) {
+    public SeedListReply listSeeds(SeedListRequest request) throws DbException {
         SeedListRequestQueryBuilder queryBuilder = new SeedListRequestQueryBuilder(request);
         return queryBuilder.executeList(this).build();
     }
 
     @Override
-    public Seed saveSeed(Seed seed) {
+    public Seed saveSeed(Seed seed) throws DbException {
         return saveMessage(seed, TABLES.SEEDS);
     }
 
     @Override
-    public Empty deleteSeed(Seed seed) {
+    public Empty deleteSeed(Seed seed) throws DbException {
         return deleteConfigMessage(seed, TABLES.SEEDS);
     }
 
     @Override
-    public CrawlJob getCrawlJob(GetRequest req) {
+    public CrawlJob getCrawlJob(GetRequest req) throws DbException {
         return getMessage(req, CrawlJob.class, TABLES.CRAWL_JOBS);
     }
 
     @Override
-    public CrawlJobListReply listCrawlJobs(ListRequest request) {
+    public CrawlJobListReply listCrawlJobs(ListRequest request) throws DbException {
         ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, TABLES.CRAWL_JOBS);
         return queryBuilder.executeList(this, CrawlJobListReply.newBuilder()).build();
     }
 
     @Override
-    public CrawlJob saveCrawlJob(CrawlJob crawlJob) {
+    public CrawlJob saveCrawlJob(CrawlJob crawlJob) throws DbException {
         if (crawlJob.getCrawlConfigId().isEmpty()) {
             throw new IllegalArgumentException("A crawl config is required for crawl jobs");
         }
@@ -738,107 +761,107 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
-    public Empty deleteCrawlJob(CrawlJob crawlJob) {
+    public Empty deleteCrawlJob(CrawlJob crawlJob) throws DbException {
         checkDependencies(crawlJob, TABLES.SEEDS, Seed.getDefaultInstance(), "job_id");
         return deleteConfigMessage(crawlJob, TABLES.CRAWL_JOBS);
     }
 
     @Override
-    public CrawlConfig getCrawlConfig(GetRequest req) {
+    public CrawlConfig getCrawlConfig(GetRequest req) throws DbException {
         return getMessage(req, CrawlConfig.class, TABLES.CRAWL_CONFIGS);
     }
 
     @Override
-    public CrawlConfigListReply listCrawlConfigs(ListRequest request) {
+    public CrawlConfigListReply listCrawlConfigs(ListRequest request) throws DbException {
         ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, TABLES.CRAWL_CONFIGS);
         return queryBuilder.executeList(this, CrawlConfigListReply.newBuilder()).build();
     }
 
     @Override
-    public CrawlConfig saveCrawlConfig(CrawlConfig crawlConfig) {
+    public CrawlConfig saveCrawlConfig(CrawlConfig crawlConfig) throws DbException {
         return saveMessage(crawlConfig, TABLES.CRAWL_CONFIGS);
     }
 
     @Override
-    public Empty deleteCrawlConfig(CrawlConfig crawlConfig) {
+    public Empty deleteCrawlConfig(CrawlConfig crawlConfig) throws DbException {
         checkDependencies(crawlConfig, TABLES.CRAWL_JOBS, CrawlJob.getDefaultInstance(), "crawl_config_id");
         return deleteConfigMessage(crawlConfig, TABLES.CRAWL_CONFIGS);
     }
 
     @Override
-    public CrawlScheduleConfig getCrawlScheduleConfig(GetRequest req) {
+    public CrawlScheduleConfig getCrawlScheduleConfig(GetRequest req) throws DbException {
         return getMessage(req, CrawlScheduleConfig.class, TABLES.CRAWL_SCHEDULE_CONFIGS);
     }
 
     @Override
-    public CrawlScheduleConfigListReply listCrawlScheduleConfigs(ListRequest request) {
+    public CrawlScheduleConfigListReply listCrawlScheduleConfigs(ListRequest request) throws DbException {
         ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, TABLES.CRAWL_SCHEDULE_CONFIGS);
         return queryBuilder.executeList(this, CrawlScheduleConfigListReply.newBuilder()).build();
     }
 
     @Override
-    public CrawlScheduleConfig saveCrawlScheduleConfig(CrawlScheduleConfig crawlScheduleConfig) {
+    public CrawlScheduleConfig saveCrawlScheduleConfig(CrawlScheduleConfig crawlScheduleConfig) throws DbException {
         return saveMessage(crawlScheduleConfig, TABLES.CRAWL_SCHEDULE_CONFIGS);
     }
 
     @Override
-    public Empty deleteCrawlScheduleConfig(CrawlScheduleConfig crawlScheduleConfig) {
+    public Empty deleteCrawlScheduleConfig(CrawlScheduleConfig crawlScheduleConfig) throws DbException {
         checkDependencies(crawlScheduleConfig, TABLES.CRAWL_JOBS, CrawlJob.getDefaultInstance(), "schedule_id");
         return deleteConfigMessage(crawlScheduleConfig, TABLES.CRAWL_SCHEDULE_CONFIGS);
     }
 
     @Override
-    public PolitenessConfig getPolitenessConfig(GetRequest req) {
+    public PolitenessConfig getPolitenessConfig(GetRequest req) throws DbException {
         return getMessage(req, PolitenessConfig.class, TABLES.POLITENESS_CONFIGS);
     }
 
     @Override
-    public PolitenessConfigListReply listPolitenessConfigs(ListRequest request) {
+    public PolitenessConfigListReply listPolitenessConfigs(ListRequest request) throws DbException {
         ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, TABLES.POLITENESS_CONFIGS);
         return queryBuilder.executeList(this, PolitenessConfigListReply.newBuilder()).build();
     }
 
     @Override
-    public PolitenessConfig savePolitenessConfig(PolitenessConfig politenessConfig) {
+    public PolitenessConfig savePolitenessConfig(PolitenessConfig politenessConfig) throws DbException {
         return saveMessage(politenessConfig, TABLES.POLITENESS_CONFIGS);
     }
 
     @Override
-    public Empty deletePolitenessConfig(PolitenessConfig politenessConfig) {
+    public Empty deletePolitenessConfig(PolitenessConfig politenessConfig) throws DbException {
         checkDependencies(politenessConfig, TABLES.CRAWL_CONFIGS, CrawlConfig.getDefaultInstance(), "politeness_id");
         return deleteConfigMessage(politenessConfig, TABLES.POLITENESS_CONFIGS);
     }
 
     @Override
-    public BrowserConfig getBrowserConfig(GetRequest req) {
+    public BrowserConfig getBrowserConfig(GetRequest req) throws DbException {
         return getMessage(req, BrowserConfig.class, TABLES.BROWSER_CONFIGS);
     }
 
     @Override
-    public BrowserConfigListReply listBrowserConfigs(ListRequest request) {
+    public BrowserConfigListReply listBrowserConfigs(ListRequest request) throws DbException {
         ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, TABLES.BROWSER_CONFIGS);
         return queryBuilder.executeList(this, BrowserConfigListReply.newBuilder()).build();
     }
 
     @Override
-    public BrowserConfig saveBrowserConfig(BrowserConfig browserConfig) {
+    public BrowserConfig saveBrowserConfig(BrowserConfig browserConfig) throws DbException {
         return saveMessage(browserConfig, TABLES.BROWSER_CONFIGS);
     }
 
     @Override
-    public Empty deleteBrowserConfig(BrowserConfig browserConfig) {
+    public Empty deleteBrowserConfig(BrowserConfig browserConfig) throws DbException {
         checkDependencies(browserConfig, TABLES.CRAWL_CONFIGS, CrawlConfig.getDefaultInstance(), "browser_config_id");
         return deleteConfigMessage(browserConfig, TABLES.BROWSER_CONFIGS);
     }
 
     @Override
-    public RoleMappingsListReply listRoleMappings(RoleMappingsListRequest request) {
+    public RoleMappingsListReply listRoleMappings(RoleMappingsListRequest request) throws DbException {
         RoleMappingsListRequestQueryBuilder queryBuilder = new RoleMappingsListRequestQueryBuilder(request);
         return queryBuilder.executeList(this).build();
     }
 
     @Override
-    public RoleMapping saveRoleMapping(RoleMapping roleMapping) {
+    public RoleMapping saveRoleMapping(RoleMapping roleMapping) throws DbException {
         Map<String, Object> doc = ProtoUtils.protoToRethink(roleMapping);
         return executeInsert("save-rolemapping",
                 r.table(TABLES.ROLE_MAPPINGS.name)
@@ -849,12 +872,12 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
-    public Empty deleteRoleMapping(RoleMapping roleMapping) {
+    public Empty deleteRoleMapping(RoleMapping roleMapping) throws DbException {
         return deleteConfigMessage(roleMapping, TABLES.ROLE_MAPPINGS);
     }
 
     @Override
-    public LogLevels getLogConfig() {
+    public LogLevels getLogConfig() throws DbException {
         Map<String, Object> response = executeRequest("get-logconfig",
                 r.table(RethinkDbAdapter.TABLES.SYSTEM.name)
                         .get("log_levels")
@@ -865,7 +888,7 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
-    public LogLevels saveLogConfig(LogLevels logLevels) {
+    public LogLevels saveLogConfig(LogLevels logLevels) throws DbException {
         Map<String, Object> doc = ProtoUtils.protoToRethink(logLevels);
         doc.put("id", "log_levels");
         return executeInsert("save-logconfig",
@@ -876,7 +899,7 @@ public class RethinkDbAdapter implements DbAdapter {
         );
     }
 
-    public <T extends Message> T getMessage(GetRequest req, Class<T> type, TABLES table) {
+    public <T extends Message> T getMessage(GetRequest req, Class<T> type, TABLES table) throws DbException {
         Map<String, Object> response = executeRequest("db-get" + type.getSimpleName(),
                 r.table(table.name)
                         .get(req.getId())
@@ -889,7 +912,7 @@ public class RethinkDbAdapter implements DbAdapter {
         return ProtoUtils.rethinkToProto(response, type);
     }
 
-    public <T extends Message> T saveMessage(T msg, TABLES table) {
+    public <T extends Message> T saveMessage(T msg, TABLES table) throws DbException {
         FieldDescriptor metaField = msg.getDescriptorForType().findFieldByName("meta");
         Map rMap = ProtoUtils.protoToRethink(msg);
 
@@ -926,7 +949,7 @@ public class RethinkDbAdapter implements DbAdapter {
         }
     }
 
-    public <T extends Message> Empty deleteConfigMessage(T entity, TABLES table) {
+    public <T extends Message> Empty deleteConfigMessage(T entity, TABLES table) throws DbException {
         Descriptors.FieldDescriptor idDescriptor = entity.getDescriptorForType().findFieldByName("id");
 
         executeRequest("db-delete" + entity.getClass().getSimpleName(),
@@ -961,15 +984,15 @@ public class RethinkDbAdapter implements DbAdapter {
         return meta;
     }
 
-    public <T extends Message> T executeInsert(String operationName, Insert qry, Class<T> type) {
+    public <T extends Message> T executeInsert(String operationName, Insert qry, Class<T> type) throws DbException {
         return executeInsertOrUpdate(operationName, qry, type);
     }
 
-    public <T extends Message> T executeUpdate(String operationName, Update qry, Class<T> type) {
+    public <T extends Message> T executeUpdate(String operationName, Update qry, Class<T> type) throws DbException {
         return executeInsertOrUpdate(operationName, qry, type);
     }
 
-    private <T extends Message> T executeInsertOrUpdate(String operationName, ReqlExpr qry, Class<T> type) {
+    private <T extends Message> T executeInsertOrUpdate(String operationName, ReqlExpr qry, Class<T> type) throws DbException {
         if (qry instanceof Insert) {
             qry = ((Insert) qry).optArg("return_changes", "always");
         } else if (qry instanceof Update) {
@@ -983,7 +1006,7 @@ public class RethinkDbAdapter implements DbAdapter {
         return ProtoUtils.rethinkToProto(newDoc, type);
     }
 
-    public <T> T executeRequest(String operationName, ReqlExpr qry) {
+    public <T> T executeRequest(String operationName, ReqlExpr qry) throws DbException {
         return RethinkDbConnection.getInstance().exec(operationName, qry);
     }
 
@@ -1004,7 +1027,7 @@ public class RethinkDbAdapter implements DbAdapter {
      * @throws IllegalStateException if there are dependencies.
      */
     private void checkDependencies(Message messageToCheck, TABLES dependentTable,
-                                   Message dependentMessage, String dependentFieldName) {
+                                   Message dependentMessage, String dependentFieldName) throws DbException {
 
         Descriptors.FieldDescriptor messageIdField = messageToCheck.getDescriptorForType().findFieldByName("id");
         Descriptors.FieldDescriptor dependentField = dependentMessage.getDescriptorForType()
@@ -1032,7 +1055,7 @@ public class RethinkDbAdapter implements DbAdapter {
         }
     }
 
-    private Map summarizeJobExecutionStats(String jobExecutionId) {
+    private Map summarizeJobExecutionStats(String jobExecutionId) throws DbException {
         String[] EXECUTIONS_STAT_FIELDS = new String[] {"documentsCrawled", "documentsDenied",
                 "documentsFailed", "documentsOutOfScope", "documentsRetried", "urisCrawled", "bytesCrawled"};
 

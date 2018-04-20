@@ -26,6 +26,7 @@ import no.nb.nna.veidemann.commons.auth.IdTokenValidator;
 import no.nb.nna.veidemann.commons.auth.NoopAuAuServerInterceptor;
 import no.nb.nna.veidemann.commons.auth.UserRoleMapper;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
+import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.opentracing.TracerFactory;
 import no.nb.nna.veidemann.controller.scheduler.CrawlJobScheduler;
 import no.nb.nna.veidemann.controller.settings.Settings;
@@ -77,8 +78,8 @@ public class Controller {
             } catch (InterruptedException ex) {
                 // Interrupted, shut down
             }
-        } catch (ConfigException ex) {
-            System.err.println("Configuration error: " + ex.getLocalizedMessage());
+        } catch (ConfigException | DbException ex) {
+            LOG.error("Configuration error: {}", ex.getLocalizedMessage());
             System.exit(1);
         }
 

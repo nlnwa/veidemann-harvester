@@ -19,8 +19,10 @@ import com.rethinkdb.RethinkDB;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigBeanFactory;
 import com.typesafe.config.ConfigFactory;
+import no.nb.nna.veidemann.commons.db.DbConnectionException;
+import no.nb.nna.veidemann.commons.db.DbQueryException;
+import no.nb.nna.veidemann.commons.db.DbUpgradeException;
 import no.nb.nna.veidemann.commons.opentracing.TracerFactory;
-import no.nb.nna.veidemann.db.DbException;
 import no.nb.nna.veidemann.db.RethinkDbAdapter.TABLES;
 import no.nb.nna.veidemann.db.RethinkDbConnection;
 import org.slf4j.Logger;
@@ -47,7 +49,7 @@ public class DbInitializer {
         TracerFactory.init("DbInitializer");
     }
 
-    public DbInitializer() {
+    public DbInitializer() throws DbConnectionException {
         System.out.println("Connecting to: " + SETTINGS.getDbHost() + ":" + SETTINGS.getDbPort());
         if (!RethinkDbConnection.isConfigured()) {
             RethinkDbConnection.configure(SETTINGS);
@@ -55,7 +57,7 @@ public class DbInitializer {
         conn = RethinkDbConnection.getInstance();
     }
 
-    public void initialize() {
+    public void initialize() throws DbUpgradeException, DbQueryException, DbConnectionException {
         try {
             if (!(boolean) conn.exec(r.dbList().contains(SETTINGS.getDbName()))) {
                 // No existing database, creating a new one
@@ -78,13 +80,13 @@ public class DbInitializer {
         LOG.info("DB initialized");
     }
 
-    private void upgrade(String fromVersion) {
+    private void upgrade(String fromVersion) throws DbUpgradeException {
         switch (fromVersion) {
             case "0.1":
                 new Upgrade0_1To0_2(SETTINGS.getDbName()).run();
                 break;
             default:
-                throw new DbException("Unknown database version '" + fromVersion + "', unable to upgrade");
+                throw new DbUpgradeException("Unknown database version '" + fromVersion + "', unable to upgrade");
         }
     }
 

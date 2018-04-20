@@ -21,6 +21,7 @@ import com.typesafe.config.ConfigException;
 import com.typesafe.config.ConfigFactory;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.client.ContentWriterClient;
+import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.opentracing.TracerFactory;
 import no.nb.nna.veidemann.db.RethinkDbAdapter;
 import no.nb.nna.veidemann.db.RethinkDbConnection;
@@ -70,8 +71,8 @@ public class DnsServiceServer {
             } catch (InterruptedException ex) {
                 // Interrupted, shut down
             }
-        } catch (ConfigException ex) {
-            System.err.println("Configuration error: " + ex.getLocalizedMessage());
+        } catch (ConfigException | DbException ex) {
+            LOG.error("Configuration error: {}", ex.getLocalizedMessage());
             System.exit(1);
         }
 

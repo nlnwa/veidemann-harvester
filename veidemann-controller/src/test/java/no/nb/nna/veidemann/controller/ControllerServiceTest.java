@@ -27,30 +27,29 @@ import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
 import io.grpc.stub.StreamObserver;
 import net.minidev.json.JSONArray;
+import no.nb.nna.veidemann.api.ConfigProto;
+import no.nb.nna.veidemann.api.ConfigProto.CrawlEntity;
+import no.nb.nna.veidemann.api.ConfigProto.Role;
 import no.nb.nna.veidemann.api.ControllerGrpc;
 import no.nb.nna.veidemann.api.ControllerProto.CrawlEntityListReply;
 import no.nb.nna.veidemann.api.ControllerProto.ListRequest;
-import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.auth.AuAuServerInterceptor;
 import no.nb.nna.veidemann.commons.auth.EmailContextKey;
 import no.nb.nna.veidemann.commons.auth.IdTokenAuAuServerInterceptor;
 import no.nb.nna.veidemann.commons.auth.IdTokenValidator;
 import no.nb.nna.veidemann.commons.auth.NoopAuAuServerInterceptor;
 import no.nb.nna.veidemann.commons.auth.UserRoleMapper;
+import no.nb.nna.veidemann.commons.db.DbAdapter;
+import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.controller.settings.Settings;
 import no.nb.nna.veidemann.db.ProtoUtils;
-import no.nb.nna.veidemann.api.ConfigProto;
-import no.nb.nna.veidemann.api.ConfigProto.CrawlEntity;
-import no.nb.nna.veidemann.api.ConfigProto.Role;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
-import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
-import java.io.IOException;
 import java.time.OffsetDateTime;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
@@ -58,7 +57,14 @@ import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.anyCollection;
+import static org.mockito.Mockito.anyList;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
 
 /**
  *
@@ -83,7 +89,7 @@ public class ControllerServiceTest {
     public ExpectedException thrown = ExpectedException.none();
 
     @Before
-    public void beforeEachTest() throws InstantiationException, IllegalAccessException, IOException {
+    public void beforeEachTest() {
         inProcessServerBuilder = InProcessServerBuilder.forName(uniqueServerName).directExecutor();
         inProcessChannel = InProcessChannelBuilder.forName(uniqueServerName).directExecutor().build();
         blockingStub = ControllerGrpc.newBlockingStub(inProcessChannel);
@@ -97,7 +103,7 @@ public class ControllerServiceTest {
     }
 
     @Test
-    public void testSaveEntity() throws InterruptedException {
+    public void testSaveEntity() throws InterruptedException, DbException {
         DbAdapter dbMock = mock(DbAdapter.class);
         AuAuServerInterceptor auau = new NoopAuAuServerInterceptor();
         inProcessServer = new ControllerApiServer(settings, inProcessServerBuilder, dbMock, auau).start();
@@ -158,7 +164,7 @@ public class ControllerServiceTest {
     }
 
     @Test
-    public void testListCrawlEntities() throws InterruptedException {
+    public void testListCrawlEntities() throws InterruptedException, DbException {
         DbAdapter dbMock = mock(DbAdapter.class);
         AuAuServerInterceptor auau = new NoopAuAuServerInterceptor();
         inProcessServer = new ControllerApiServer(settings, inProcessServerBuilder, dbMock, auau).start();
@@ -197,7 +203,7 @@ public class ControllerServiceTest {
     }
 
     @Test
-    public void testAuthorization() {
+    public void testAuthorization() throws DbException {
         CallCredentials cred = new CallCredentials() {
             @Override
             public void applyRequestMetadata(MethodDescriptor<?, ?> method, Attributes attrs, Executor appExecutor, MetadataApplier applier) {
@@ -221,13 +227,10 @@ public class ControllerServiceTest {
         when(dbMock.listCrawlEntities(ListRequest.getDefaultInstance()))
                 .thenReturn(CrawlEntityListReply.getDefaultInstance());
         when(dbMock.saveCrawlEntity(CrawlEntity.getDefaultInstance()))
-                .thenAnswer(new Answer<CrawlEntity>() {
-            @Override
-            public CrawlEntity answer(InvocationOnMock invocation) throws Throwable {
-                assertThat(EmailContextKey.email()).isEqualTo("user@example.com");
-                return CrawlEntity.getDefaultInstance();
-            }
-        });
+                .thenAnswer((Answer<CrawlEntity>) invocation -> {
+                    assertThat(EmailContextKey.email()).isEqualTo("user@example.com");
+                    return CrawlEntity.getDefaultInstance();
+                });
         when(idValidatorMock.verifyIdToken("token1"))
                 .thenReturn(new JWTClaimsSet.Builder()
                         .claim("email", "user@example.com")

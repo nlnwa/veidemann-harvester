@@ -16,6 +16,7 @@
 package no.nb.nna.veidemann.frontier.worker;
 
 import com.google.protobuf.util.Timestamps;
+import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.db.ProtoUtils;
 import no.nb.nna.veidemann.api.ConfigProto;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus.State;
@@ -61,7 +62,7 @@ public class LimitsCheck {
      * @return true if crawl should be stopped
      */
     public static boolean isLimitReached(Frontier frontier, ConfigProto.CrawlLimitsConfig limits, StatusWrapper status,
-            QueuedUriWrapper qUri) {
+            QueuedUriWrapper qUri) throws DbException {
 
         if (limits.getMaxBytes() > 0 && status.getBytesCrawled() > limits.getMaxBytes()) {
             switch (status.getState()) {

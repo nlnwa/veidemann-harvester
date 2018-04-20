@@ -24,6 +24,7 @@ import no.nb.nna.veidemann.api.ConfigProto.CrawlScheduleConfig;
 import no.nb.nna.veidemann.api.ConfigProto.PolitenessConfig;
 import no.nb.nna.veidemann.api.ConfigProto.RoleMapping;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
+import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.db.ProtoUtils;
 import no.nb.nna.veidemann.db.RethinkDbAdapter;
 import org.yaml.snakeyaml.Yaml;
@@ -47,37 +48,79 @@ public class PopulateDbWithDefaultData implements Runnable {
             try (InputStream in = getClass().getClassLoader()
                     .getResourceAsStream("default_objects/schedule-configs.yaml")) {
                 readYamlFile(in, CrawlScheduleConfig.class)
-                        .forEach(o -> db.saveCrawlScheduleConfig(o));
+                        .forEach(o -> {
+                            try {
+                                db.saveCrawlScheduleConfig(o);
+                            } catch (DbException e) {
+                                throw new RuntimeException(e);
+                            }
+                        });
             }
             try (InputStream in = getClass().getClassLoader()
                     .getResourceAsStream("default_objects/politeness-configs.yaml")) {
                 readYamlFile(in, PolitenessConfig.class)
-                        .forEach(o -> db.savePolitenessConfig(o));
+                        .forEach(o -> {
+                            try {
+                                db.savePolitenessConfig(o);
+                            } catch (DbException e) {
+                                throw new RuntimeException(e);
+                            }
+                        });
             }
             try (InputStream in = getClass().getClassLoader()
                     .getResourceAsStream("default_objects/browser-configs.yaml")) {
                 readYamlFile(in, BrowserConfig.class)
-                        .forEach(o -> db.saveBrowserConfig(o));
+                        .forEach(o -> {
+                            try {
+                                db.saveBrowserConfig(o);
+                            } catch (DbException e) {
+                                throw new RuntimeException(e);
+                            }
+                        });
             }
             try (InputStream in = getClass().getClassLoader()
                     .getResourceAsStream("default_objects/crawl-configs.yaml")) {
                 readYamlFile(in, CrawlConfig.class)
-                        .forEach(o -> db.saveCrawlConfig(o));
+                        .forEach(o -> {
+                            try {
+                                db.saveCrawlConfig(o);
+                            } catch (DbException e) {
+                                throw new RuntimeException(e);
+                            }
+                        });
             }
             try (InputStream in = getClass().getClassLoader()
                     .getResourceAsStream("default_objects/browser-scripts.yaml")) {
                 readYamlFile(in, BrowserScript.class)
-                        .forEach(o -> db.saveBrowserScript(o));
+                        .forEach(o -> {
+                            try {
+                                db.saveBrowserScript(o);
+                            } catch (DbException e) {
+                                throw new RuntimeException(e);
+                            }
+                        });
             }
             try (InputStream in = getClass().getClassLoader()
                     .getResourceAsStream("default_objects/crawl-jobs.yaml")) {
                 readYamlFile(in, CrawlJob.class)
-                        .forEach(o -> db.saveCrawlJob(o));
+                        .forEach(o -> {
+                            try {
+                                db.saveCrawlJob(o);
+                            } catch (DbException e) {
+                                throw new RuntimeException(e);
+                            }
+                        });
             }
             try (InputStream in = getClass().getClassLoader()
                     .getResourceAsStream("default_objects/rolemappings.yaml")) {
                 readYamlFile(in, RoleMapping.class)
-                        .forEach(o -> db.saveRoleMapping(o));
+                        .forEach(o -> {
+                            try {
+                                db.saveRoleMapping(o);
+                            } catch (DbException e) {
+                                throw new RuntimeException(e);
+                            }
+                        });
             }
         } catch (IOException ex) {
             throw new UncheckedIOException(ex);

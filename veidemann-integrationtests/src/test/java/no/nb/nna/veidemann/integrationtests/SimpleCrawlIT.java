@@ -20,6 +20,7 @@ import no.nb.nna.veidemann.api.ConfigProto.CrawlJob;
 import no.nb.nna.veidemann.api.ConfigProto.CrawlLimitsConfig;
 import no.nb.nna.veidemann.api.ControllerProto;
 import no.nb.nna.veidemann.commons.VeidemannHeaderConstants;
+import no.nb.nna.veidemann.commons.db.DbException;
 import org.junit.Test;
 
 import java.util.concurrent.ExecutionException;
@@ -30,7 +31,7 @@ import java.util.concurrent.ExecutionException;
 public class SimpleCrawlIT extends CrawlTestBase implements VeidemannHeaderConstants {
 
     @Test
-    public void testHarvest() throws InterruptedException, ExecutionException {
+    public void testHarvest() throws InterruptedException, ExecutionException, DbException {
         CrawlJob job = controllerClient.listCrawlJobs(ControllerProto.ListRequest.newBuilder()
                 .setName("unscheduled").build())
                 .getValue(0);

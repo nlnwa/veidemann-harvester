@@ -21,6 +21,7 @@ import com.rethinkdb.gen.ast.ReqlExpr;
 import com.rethinkdb.gen.ast.ReqlFunction1;
 import com.rethinkdb.net.Cursor;
 import no.nb.nna.veidemann.api.ReportProto.Filter;
+import no.nb.nna.veidemann.commons.db.DbException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -247,7 +248,7 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
         return request;
     }
 
-    public long executeCount(RethinkDbAdapter db) {
+    public long executeCount(RethinkDbAdapter db) throws DbException {
         if (listQry == null) {
             if (orderByName) {
                 listQry = r.table(table.name).orderBy().optArg("index", "name");
@@ -259,7 +260,7 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
         return db.executeRequest("db-countConfigObjects", listQry.count());
     }
 
-    public <R extends Message.Builder> R executeList(RethinkDbAdapter db, R resultBuilder) {
+    public <R extends Message.Builder> R executeList(RethinkDbAdapter db, R resultBuilder) throws DbException {
         if (listQry == null) {
             if (orderByName) {
                 listQry = r.table(table.name).orderBy().optArg("index", "name");

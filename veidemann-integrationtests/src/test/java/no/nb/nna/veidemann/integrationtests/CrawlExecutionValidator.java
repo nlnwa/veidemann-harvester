@@ -19,6 +19,7 @@ import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
 import no.nb.nna.veidemann.api.MessagesProto.PageLog;
 import no.nb.nna.veidemann.api.ReportProto.PageLogListRequest;
 import no.nb.nna.veidemann.commons.ExtraStatusCodes;
+import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.db.RethinkDbAdapter;
 import org.jwat.common.HttpHeader;
 import org.jwat.warc.WarcRecord;
@@ -45,7 +46,7 @@ public class CrawlExecutionValidator {
         this.db = db;
     }
 
-    public CrawlExecutionValidator validate() {
+    public CrawlExecutionValidator validate() throws DbException {
         init();
 
         checkConsistency();
@@ -243,7 +244,7 @@ public class CrawlExecutionValidator {
         });
     }
 
-    private void init() {
+    private void init() throws DbException {
         crawlLogs = new CrawlLogHelper(db);
         pageLogs = db.listPageLogs(PageLogListRequest.newBuilder().setPageSize(500).build()).getValueList();
         crawlExecutions = new CrawlExecutionsHelper(db);

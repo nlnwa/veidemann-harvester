@@ -55,6 +55,7 @@ import no.nb.nna.veidemann.api.StatusProto.ExecutionsListReply;
 import no.nb.nna.veidemann.api.StatusProto.JobExecutionsListReply;
 import no.nb.nna.veidemann.api.StatusProto.ListExecutionsRequest;
 import no.nb.nna.veidemann.api.StatusProto.ListJobExecutionsRequest;
+import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.FutureOptional;
 import no.nb.nna.veidemann.commons.util.ApiTools;
 import no.nb.nna.veidemann.db.initializer.DbInitializer;
@@ -88,7 +89,7 @@ public class RethinkDbAdapterIT {
     }
 
     @BeforeClass
-    public static void init() {
+    public static void init() throws DbException {
         String dbHost = System.getProperty("db.host");
         int dbPort = Integer.parseInt(System.getProperty("db.port"));
         if (!RethinkDbConnection.isConfigured()) {
@@ -115,7 +116,7 @@ public class RethinkDbAdapterIT {
     }
 
     @Before
-    public void cleanDb() {
+    public void cleanDb() throws DbException {
         for (RethinkDbAdapter.TABLES table : RethinkDbAdapter.TABLES.values()) {
             if (table != RethinkDbAdapter.TABLES.SYSTEM) {
                 db.executeRequest("delete", r.table(table.name).delete());
@@ -127,7 +128,7 @@ public class RethinkDbAdapterIT {
      * Test of saveCrawlEntity method, of class RethinkDbAdapter.
      */
     @Test
-    public void testSaveCrawlEntity() throws InvalidProtocolBufferException {
+    public void testSaveCrawlEntity() throws InvalidProtocolBufferException, DbException {
         CrawlEntity entity = CrawlEntity.newBuilder()
                 .setMeta(Meta.newBuilder()
                         .setName("Nasjonalbiblioteket")
@@ -221,7 +222,7 @@ public class RethinkDbAdapterIT {
      * Test of listCrawlEntities method, of class RethinkDbAdapter.
      */
     @Test
-    public void testListCrawlEntities() throws InvalidProtocolBufferException {
+    public void testListCrawlEntities() throws InvalidProtocolBufferException, DbException {
         Label freqDaily = Label.newBuilder().setKey("frequency").setValue("Daily").build();
         Label freqHourly = Label.newBuilder().setKey("frequency").setValue("Hourly").build();
         Label orgCulture = Label.newBuilder().setKey("orgType").setValue("Culture").build();
@@ -343,7 +344,7 @@ public class RethinkDbAdapterIT {
      * Test of deleteCrawlEntity method, of class RethinkDbAdapter.
      */
     @Test
-    public void testDeleteCrawlEntity() {
+    public void testDeleteCrawlEntity() throws DbException {
         CrawlEntity entity1 = CrawlEntity.newBuilder()
                 .setMeta(Meta.newBuilder()
                         .setName("Nasjonalbiblioteket")
@@ -389,7 +390,7 @@ public class RethinkDbAdapterIT {
      * Test of isDuplicateContent method, of class RethinkDbAdapter.
      */
     @Test
-    public void testhasCrawledContent() {
+    public void testhasCrawledContent() throws DbException {
         CrawledContent cc1 = CrawledContent.newBuilder()
                 .setDigest("testIsDuplicateContent")
                 .setWarcId("warc-id1")
@@ -426,7 +427,7 @@ public class RethinkDbAdapterIT {
      * Test of deleteCrawledContent method, of class RethinkDbAdapter.
      */
     @Test
-    public void testDeleteCrawledContent() {
+    public void testDeleteCrawledContent() throws DbException {
         CrawledContent cc = CrawledContent.newBuilder()
                 .setDigest("testDeleteCrawledContent")
                 .setWarcId("warc-id")
@@ -441,7 +442,7 @@ public class RethinkDbAdapterIT {
      * Test of addExtractedText method, of class RethinkDbAdapter.
      */
     @Test
-    public void testAddExtractedText() {
+    public void testAddExtractedText() throws DbException {
         ExtractedText et1 = ExtractedText.newBuilder()
                 .setWarcId("testAddExtractedText")
                 .setText("text")
@@ -467,7 +468,7 @@ public class RethinkDbAdapterIT {
      * Test of addCrawlLog method, of class RethinkDbAdapter.
      */
     @Test
-    public void testSaveCrawlLog() {
+    public void testSaveCrawlLog() throws DbException {
         CrawlLog cl = CrawlLog.newBuilder()
                 .setContentType("text/plain")
                 .setJobExecutionId("jeid")
@@ -482,7 +483,7 @@ public class RethinkDbAdapterIT {
      * Test of saveBrowserScript method, of class RethinkDbAdapter.
      */
     @Test
-    public void testSaveBrowserScript() {
+    public void testSaveBrowserScript() throws DbException {
         BrowserScript script = BrowserScript.newBuilder()
                 .setMeta(ApiTools.buildMeta("test.js", "description", ApiTools.buildLabel("type", "login")))
                 .setScript("code")
@@ -495,7 +496,7 @@ public class RethinkDbAdapterIT {
     }
 
     @Test
-    public void testSaveListAndDeleteRoleMapping() {
+    public void testSaveListAndDeleteRoleMapping() throws DbException {
         RoleMapping rm = RoleMapping.newBuilder()
                 .setEmail("test")
                 .addRole(Role.ADMIN).build();
@@ -522,7 +523,7 @@ public class RethinkDbAdapterIT {
      * Test of getBrowserScripts method, of class RethinkDbAdapter.
      */
     @Test
-    public void testListBrowserScripts() {
+    public void testListBrowserScripts() throws DbException {
         BrowserScript script1 = BrowserScript.newBuilder()
                 .setMeta(ApiTools.buildMeta("test.js", "description", ApiTools.buildLabel("type", "login")))
                 .setScript("code")
@@ -564,7 +565,7 @@ public class RethinkDbAdapterIT {
      */
     @Test
     @Ignore
-    public void testSaveExecutionStatus() {
+    public void testSaveExecutionStatus() throws DbException {
         System.out.println("addExecutionStatus");
         CrawlExecutionStatus status = null;
         RethinkDbAdapter instance = null;
@@ -580,7 +581,7 @@ public class RethinkDbAdapterIT {
      */
     @Test
     @Ignore
-    public void testSaveQueuedUri() {
+    public void testSaveQueuedUri() throws DbException {
         System.out.println("addQueuedUri");
         QueuedUri qu = null;
         RethinkDbAdapter instance = null;
@@ -596,7 +597,7 @@ public class RethinkDbAdapterIT {
      */
     @Test
     @Ignore
-    public void testAddScreenshot() {
+    public void testAddScreenshot() throws DbException {
         System.out.println("addScreenshot");
         Screenshot s = null;
         RethinkDbAdapter instance = null;
@@ -611,7 +612,7 @@ public class RethinkDbAdapterIT {
      * Test of listSeeds method, of class RethinkDbAdapter.
      */
     @Test
-    public void testSaveAndListSeeds() {
+    public void testSaveAndListSeeds() throws DbException {
         CrawlEntity entity1 = db.saveCrawlEntity(CrawlEntity.newBuilder()
                 .setMeta(Meta.newBuilder()
                         .setName("Nasjonalbiblioteket")
@@ -664,7 +665,7 @@ public class RethinkDbAdapterIT {
      */
     @Test
     @Ignore
-    public void testDeleteSeed() {
+    public void testDeleteSeed() throws DbException {
         System.out.println("deleteSeed");
         ConfigProto.Seed seed = null;
         RethinkDbAdapter instance = null;
@@ -679,7 +680,7 @@ public class RethinkDbAdapterIT {
      * Test of saveCrawlJob method, of class RethinkDbAdapter.
      */
     @Test
-    public void testSaveAndListCrawlJob() {
+    public void testSaveAndListCrawlJob() throws DbException {
         CrawlScheduleConfig schedule = db.saveCrawlScheduleConfig(ConfigProto.CrawlScheduleConfig.newBuilder()
                 .setCronExpression("* * * * *")
                 .setMeta(Meta.newBuilder().setName("Every minute")).build());
@@ -765,7 +766,7 @@ public class RethinkDbAdapterIT {
      * Test of deleteCrawlJob method, of class RethinkDbAdapter.
      */
     @Test
-    public void testDeleteCrawlJob() {
+    public void testDeleteCrawlJob() throws DbException {
         CrawlConfig crawlConfig = db.saveCrawlConfig(CrawlConfig.newBuilder()
                 .setMeta(Meta.newBuilder().setName("Test crawl config")).build());
 
@@ -802,7 +803,7 @@ public class RethinkDbAdapterIT {
      */
     @Test
     @Ignore
-    public void testListCrawlConfigs() {
+    public void testListCrawlConfigs() throws DbException {
         System.out.println("listCrawlConfigs");
         ListRequest request = null;
         RethinkDbAdapter instance = null;
@@ -818,7 +819,7 @@ public class RethinkDbAdapterIT {
      */
     @Test
     @Ignore
-    public void testSaveCrawlConfig() {
+    public void testSaveCrawlConfig() throws DbException {
         System.out.println("saveCrawlConfig");
         ConfigProto.CrawlConfig crawlConfig = null;
         RethinkDbAdapter instance = null;
@@ -834,7 +835,7 @@ public class RethinkDbAdapterIT {
      */
     @Test
     @Ignore
-    public void testDeleteCrawlConfig() {
+    public void testDeleteCrawlConfig() throws DbException {
         System.out.println("deleteCrawlConfig");
         ConfigProto.CrawlConfig crawlConfig = null;
         RethinkDbAdapter instance = null;
@@ -850,7 +851,7 @@ public class RethinkDbAdapterIT {
      */
     @Test
     @Ignore
-    public void testListCrawlScheduleConfigs() {
+    public void testListCrawlScheduleConfigs() throws DbException {
         System.out.println("listCrawlScheduleConfigs");
         ListRequest request = null;
         RethinkDbAdapter instance = null;
@@ -866,7 +867,7 @@ public class RethinkDbAdapterIT {
      */
     @Test
     @Ignore
-    public void testSaveCrawlScheduleConfig() {
+    public void testSaveCrawlScheduleConfig() throws DbException {
         System.out.println("saveCrawlScheduleConfig");
         ConfigProto.CrawlScheduleConfig crawlScheduleConfig = null;
         RethinkDbAdapter instance = null;
@@ -881,7 +882,7 @@ public class RethinkDbAdapterIT {
      * Test of deleteCrawlScheduleConfig method, of class RethinkDbAdapter.
      */
     @Test
-    public void testDeleteCrawlScheduleConfig() {
+    public void testDeleteCrawlScheduleConfig() throws DbException {
         CrawlScheduleConfig scheduleConfig = CrawlScheduleConfig.newBuilder()
                 .setCronExpression("* * * * *")
                 .setMeta(Meta.newBuilder().setName("Every minute"))
@@ -917,7 +918,7 @@ public class RethinkDbAdapterIT {
     }
 
     @Test
-    public void testSaveAndGetLogConfig() {
+    public void testSaveAndGetLogConfig() throws DbException {
         LogLevel l1 = LogLevel.newBuilder().setLogger("no.nb.nna").setLevel(LogLevels.Level.INFO).build();
         LogLevel l2 = LogLevel.newBuilder().setLogger("org.apache").setLevel(LogLevels.Level.FATAL).build();
         LogLevels logLevels = LogLevels.newBuilder().addLogLevel(l1).addLogLevel(l2).build();
@@ -931,7 +932,7 @@ public class RethinkDbAdapterIT {
     }
 
     @Test
-    public void testGetOrCreateCrawlHostGroup() {
+    public void testGetOrCreateCrawlHostGroup() throws DbException {
         CrawlHostGroup chg1 = db.getOrCreateCrawlHostGroup("crawlHostGroupId", "politenessId");
         CrawlHostGroup chg2 = db.getOrCreateCrawlHostGroup("crawlHostGroupId", "politenessId");
         CrawlHostGroup chg3 = db.getOrCreateCrawlHostGroup("xxx", "politenessId");
@@ -940,7 +941,7 @@ public class RethinkDbAdapterIT {
     }
 
     @Test
-    public void testBorrowFirstReadyCrawlHostGroup() {
+    public void testBorrowFirstReadyCrawlHostGroup() throws DbException {
         CrawlHostGroup chg1 = db.getOrCreateCrawlHostGroup("crawlHostGroupId", "politenessId");
         CrawlHostGroup chg2 = db.getOrCreateCrawlHostGroup("xxx", "politenessId");
 
@@ -962,7 +963,7 @@ public class RethinkDbAdapterIT {
     }
 
     @Test
-    public void testReleaseCrawlHostGroup() throws InterruptedException {
+    public void testReleaseCrawlHostGroup() throws InterruptedException, DbException {
         CrawlHostGroup chg1 = db.getOrCreateCrawlHostGroup("crawlHostGroupId", "politenessId");
         CrawlHostGroup chg2 = db.getOrCreateCrawlHostGroup("xxx", "politenessId");
         FutureOptional<CrawlHostGroup> b1 = db.borrowFirstReadyCrawlHostGroup();
@@ -1002,7 +1003,7 @@ public class RethinkDbAdapterIT {
     }
 
     @Test
-    public void testGetNextQueuedUriToFetch() {
+    public void testGetNextQueuedUriToFetch() throws DbException {
         QueuedUri qUri = QueuedUri.newBuilder()
                 .setUri("http://www.foo.bar")
                 .setIp("127.0.0.1")
@@ -1020,7 +1021,7 @@ public class RethinkDbAdapterIT {
     }
 
     @Test
-    public void testExecutions() {
+    public void testExecutions() throws DbException {
         JobExecutionStatus jes1 = db.createJobExecutionStatus("jobId1");
         JobExecutionStatus jes2 = db.createJobExecutionStatus("jobId2");
 

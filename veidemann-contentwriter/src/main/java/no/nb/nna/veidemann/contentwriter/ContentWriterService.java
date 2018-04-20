@@ -27,6 +27,7 @@ import no.nb.nna.veidemann.api.ContentWriterProto.WriteRequestMeta;
 import no.nb.nna.veidemann.api.ContentWriterProto.WriteResponseMeta;
 import no.nb.nna.veidemann.api.MessagesProto;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
+import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.contentwriter.text.TextExtractor;
 import no.nb.nna.veidemann.contentwriter.warc.SingleWarcWriter;
 import no.nb.nna.veidemann.contentwriter.warc.WarcWriterPool;
@@ -272,11 +273,17 @@ public class ContentWriterService extends ContentWriterGrpc.ContentWriterImplBas
 
     private WriteRequestMeta.RecordMeta detectRevisit(final ContentBuffer contentBuffer,
                                                       final WriteRequestMeta.RecordMeta recordMeta) {
-        Optional<MessagesProto.CrawledContent> isDuplicate = db
-                .hasCrawledContent(MessagesProto.CrawledContent.newBuilder()
-                        .setDigest(contentBuffer.getPayloadDigest())
-                        .setWarcId(contentBuffer.getWarcId())
-                        .build());
+        Optional<MessagesProto.CrawledContent> isDuplicate = null;
+        try {
+            isDuplicate = db
+                    .hasCrawledContent(MessagesProto.CrawledContent.newBuilder()
+                            .setDigest(contentBuffer.getPayloadDigest())
+                            .setWarcId(contentBuffer.getWarcId())
+                            .build());
+        } catch (DbException e) {
+            LOG.error("Failed checking for revisit, treating as new object", e);
+            return recordMeta;
+        }
 
         if (isDuplicate.isPresent()) {
             WriteRequestMeta.RecordMeta.Builder recordMetaBuilder = recordMeta.toBuilder();

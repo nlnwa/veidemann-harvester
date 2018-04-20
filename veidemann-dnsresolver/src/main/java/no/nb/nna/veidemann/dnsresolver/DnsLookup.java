@@ -30,6 +30,7 @@ import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
 import no.nb.nna.veidemann.commons.ExtraStatusCodes;
 import no.nb.nna.veidemann.commons.client.ContentWriterClient;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
+import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.util.Sha1Digest;
 import no.nb.nna.veidemann.db.ProtoUtils;
 import org.netpreserve.commons.util.datetime.DateFormat;
@@ -60,7 +61,6 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
-import java.security.NoSuchAlgorithmException;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -171,8 +171,7 @@ public class DnsLookup {
         this.acceptNonDnsResolves = acceptNonDnsResolves;
     }
 
-    protected void storeDnsRecord(final String host, final State state) throws IOException, NoSuchAlgorithmException,
-            InterruptedException, StatusException {
+    protected void storeDnsRecord(final String host, final State state) throws InterruptedException, StatusException {
 
         ByteBuf payload = Unpooled.buffer();
 
@@ -228,7 +227,11 @@ public class DnsLookup {
                     .setPayloadDigest(responseRecordMeta.getPayloadDigest())
                     .build();
             if (db != null) {
-                crawlLog = db.saveCrawlLog(crawlLog);
+                try {
+                    crawlLog = db.saveCrawlLog(crawlLog);
+                } catch (DbException e) {
+                    LOG.error("Unable to store crawl log for DNS resolution", e);
+                }
             }
         }
 
@@ -456,7 +459,7 @@ public class DnsLookup {
                     if (!state.fromCache) {
                         try {
                             storeDnsRecord(host, state);
-                        } catch (IOException | NoSuchAlgorithmException | InterruptedException | StatusException ex) {
+                        } catch (InterruptedException | StatusException ex) {
                             LOG.error("Could not store DNS lookup", ex);
                             activeResolvers.remove(host);
                             throw new RuntimeException(ex);

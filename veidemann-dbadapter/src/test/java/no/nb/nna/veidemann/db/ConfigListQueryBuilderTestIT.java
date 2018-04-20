@@ -19,6 +19,7 @@ import no.nb.nna.veidemann.api.ConfigProto.CrawlEntity;
 import no.nb.nna.veidemann.api.ConfigProto.Meta;
 import no.nb.nna.veidemann.api.ControllerProto.CrawlEntityListReply;
 import no.nb.nna.veidemann.api.ControllerProto.ListRequest;
+import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.util.ApiTools;
 import no.nb.nna.veidemann.db.initializer.DbInitializer;
 import org.junit.AfterClass;
@@ -38,7 +39,7 @@ public class ConfigListQueryBuilderTestIT {
     static CrawlEntity e1, e2, e3, e4, e5;
 
     @BeforeClass
-    public static void init() {
+    public static void init() throws DbException {
         String dbHost = System.getProperty("db.host");
         int dbPort = Integer.parseInt(System.getProperty("db.port"));
         if (!RethinkDbConnection.isConfigured()) {
@@ -95,7 +96,7 @@ public class ConfigListQueryBuilderTestIT {
     }
 
     @Test
-    public void testBuildNameQuery() {
+    public void testBuildNameQuery() throws DbException {
         CrawlEntityListReply reply;
 
         // Match part of name
@@ -118,7 +119,7 @@ public class ConfigListQueryBuilderTestIT {
     }
 
     @Test
-    public void testBuildSelectorQuery() {
+    public void testBuildSelectorQuery() throws DbException {
         CrawlEntityListReply reply;
 
         // No filter
@@ -168,7 +169,7 @@ public class ConfigListQueryBuilderTestIT {
     }
 
     @Test
-    public void testMix() {
+    public void testMix() throws DbException {
         CrawlEntityListReply reply;
 
         reply = db.listCrawlEntities(ListRequest.newBuilder().addLabelSelector("foo:abc*").setName("Entity").build());

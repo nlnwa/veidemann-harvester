@@ -19,6 +19,7 @@ import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus;
 import no.nb.nna.veidemann.api.StatusProto.ExecutionsListReply;
 import no.nb.nna.veidemann.api.StatusProto.ListExecutionsRequest;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
+import no.nb.nna.veidemann.commons.db.DbException;
 
 import java.util.List;
 
@@ -28,7 +29,7 @@ public class CrawlExecutionsHelper {
     final ExecutionsListReply executionsListReply;
     int reportedCount;
 
-    public CrawlExecutionsHelper(DbAdapter db) {
+    public CrawlExecutionsHelper(DbAdapter db) throws DbException {
         executionsListReply = db.listExecutionStatus(ListExecutionsRequest.newBuilder().setPageSize(500).build());
         reportedCount = (int) executionsListReply.getCount();
         checkCount();

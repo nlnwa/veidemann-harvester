@@ -15,6 +15,8 @@
  */
 package no.nb.nna.veidemann.db.initializer;
 
+import no.nb.nna.veidemann.commons.db.DbException;
+
 /**
  * Main class for launching the service.
  */
@@ -29,9 +31,10 @@ public final class Main {
     /**
      * Start the server.
      * <p>
+     *
      * @param args the command line arguments
      */
-    public static void main(String[] args) {
+    public static void main(String[] args) throws DbException {
         // This class intentionally doesn't do anything except for instanciating a ResourceResolverServer.
         // This is necessary to be able to replace the LogManager. The system property must be set before any other
         // logging is even loaded.

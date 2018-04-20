@@ -22,6 +22,7 @@ import no.nb.nna.veidemann.api.ConfigProto.PolitenessConfig;
 import no.nb.nna.veidemann.api.ConfigProto.PolitenessConfig.RobotsPolicy;
 import no.nb.nna.veidemann.api.ControllerProto;
 import no.nb.nna.veidemann.commons.ExtraStatusCodes;
+import no.nb.nna.veidemann.commons.db.DbException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,7 +42,7 @@ public class Preconditions {
     }
 
     public static boolean checkPreconditions(Frontier frontier, CrawlConfig config, StatusWrapper status,
-                                             QueuedUriWrapper qUri, long sequence) {
+                                             QueuedUriWrapper qUri, long sequence) throws DbException {
 
         PolitenessConfig politeness = DbUtil.getInstance().getPolitenessConfigForCrawlConfig(config);
         BrowserConfig browserConfig = DbUtil.getInstance().getBrowserConfigForCrawlConfig(config);
@@ -82,7 +83,8 @@ public class Preconditions {
         return true;
     }
 
-    private static boolean checkRobots(Frontier frontier, String userAgent, PolitenessConfig politeness, QueuedUriWrapper qUri) {
+    private static boolean checkRobots(Frontier frontier, String userAgent, PolitenessConfig politeness,
+                                       QueuedUriWrapper qUri) throws DbException {
         LOG.debug("Check robots.txt for URI '{}'", qUri.getUri());
         // Check robots.txt
         if (politeness.getRobotsPolicy() != RobotsPolicy.IGNORE_ROBOTS
@@ -121,7 +123,7 @@ public class Preconditions {
         }
     }
 
-    private static boolean retryLimitReached(PolitenessConfig politeness, QueuedUriWrapper qUri) {
+    private static boolean retryLimitReached(PolitenessConfig politeness, QueuedUriWrapper qUri) throws DbException {
         if (qUri.getRetries() < politeness.getMaxRetries()) {
             return false;
         } else {
@@ -130,7 +132,7 @@ public class Preconditions {
         }
     }
 
-    private static void setCrawlHostGroup(QueuedUriWrapper qUri, PolitenessConfig politeness) {
+    private static void setCrawlHostGroup(QueuedUriWrapper qUri, PolitenessConfig politeness) throws DbException {
         List<CrawlHostGroupConfig> groupConfigs = DbUtil.getInstance().getDb()
                 .listCrawlHostGroupConfigs(ControllerProto.ListRequest.newBuilder()
                         .addAllLabelSelector(politeness.getCrawlHostGroupSelectorList()).build()).getValueList();

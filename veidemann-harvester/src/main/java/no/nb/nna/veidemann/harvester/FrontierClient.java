@@ -68,7 +68,7 @@ public class FrontierClient implements AutoCloseable {
         } catch (RuntimeException e) {
             // Cancel RPC
             requestObserver.onError(e);
-            throw e;
+            availableSessions.release();
         }
     }
 
@@ -127,6 +127,7 @@ public class FrontierClient implements AutoCloseable {
         public void onError(Throwable t) {
             Status status = Status.fromThrowable(t);
             LOG.warn("Get next page failed: {}", status);
+            availableSessions.release();
         }
 
         @Override

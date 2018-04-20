@@ -22,6 +22,7 @@ import no.nb.nna.veidemann.api.MessagesProto;
 import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
 import no.nb.nna.veidemann.api.MessagesProto.QueuedUriOrBuilder;
 import no.nb.nna.veidemann.commons.ExtraStatusCodes;
+import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.db.ProtoUtils;
 import org.netpreserve.commons.uri.Uri;
 import org.netpreserve.commons.uri.UriConfigs;
@@ -41,7 +42,7 @@ public class QueuedUriWrapper {
 
     private Uri surt;
 
-    private QueuedUriWrapper(QueuedUriOrBuilder uri) throws URISyntaxException {
+    private QueuedUriWrapper(QueuedUriOrBuilder uri) throws URISyntaxException, DbException {
         if (uri instanceof QueuedUri.Builder) {
             qUri = (QueuedUri.Builder) uri;
         } else {
@@ -52,12 +53,12 @@ public class QueuedUriWrapper {
         }
     }
 
-    public static QueuedUriWrapper getQueuedUriWrapper(QueuedUri qUri) throws URISyntaxException {
+    public static QueuedUriWrapper getQueuedUriWrapper(QueuedUri qUri) throws URISyntaxException, DbException {
         return new QueuedUriWrapper(qUri);
     }
 
     public static QueuedUriWrapper getQueuedUriWrapper(String uri, String jobExecutionId, String executionId)
-            throws URISyntaxException {
+            throws URISyntaxException, DbException {
         return new QueuedUriWrapper(QueuedUri.newBuilder()
                 .setUri(uri)
                 .setJobExecutionId(jobExecutionId)
@@ -65,7 +66,7 @@ public class QueuedUriWrapper {
         );
     }
 
-    public QueuedUriWrapper addUriToQueue() {
+    public QueuedUriWrapper addUriToQueue() throws DbException {
         if (qUri.getUri().isEmpty()) {
             String msg = "Trying to queue a uri with empty uri string";
             LOG.error(msg);
@@ -86,7 +87,7 @@ public class QueuedUriWrapper {
         return this;
     }
 
-    private void createSurt() throws URISyntaxException {
+    private void createSurt() throws URISyntaxException, DbException {
         LOG.debug("Parse URI '{}'", qUri.getUri());
         try {
             surt = UriConfigs.SURT_KEY.buildUri(qUri.getUri());

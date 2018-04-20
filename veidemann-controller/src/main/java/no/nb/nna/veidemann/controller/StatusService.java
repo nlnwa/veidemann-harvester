@@ -126,8 +126,6 @@ public class StatusService extends StatusGrpc.StatusImplBase {
     @AllowedRoles({Role.CURATOR, Role.ADMIN})
     public void abortJobExecution(ExecutionId request, StreamObserver<JobExecutionStatus> responseObserver) {
         try {
-//            CrawlExecutionStatus status = db.setExecutionStateAborted(request.getId());
-
             JobExecutionStatus status = db.setJobExecutionStateAborted(request.getId());
 
             responseObserver.onNext(status);

@@ -81,6 +81,7 @@ import no.nb.nna.veidemann.commons.db.ChangeFeed;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.FutureOptional;
+import no.nb.nna.veidemann.commons.util.ApiTools.ListReplyWalker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -426,7 +427,7 @@ public class RethinkDbAdapter implements DbAdapter {
 
     @Override
     public JobExecutionStatus setJobExecutionStateAborted(String jobExecutionId) throws DbException {
-        return executeUpdate("db-setJobExecutionStateAborted",
+        JobExecutionStatus result = executeUpdate("db-setJobExecutionStateAborted",
                 r.table(TABLES.JOB_EXECUTIONS.name)
                         .get(jobExecutionId)
                         .update(
@@ -436,6 +437,22 @@ public class RethinkDbAdapter implements DbAdapter {
                                         r.hashMap("state", State.ABORTED_MANUAL.name()).with("endTime", r.now()))
                         ),
                 JobExecutionStatus.class);
+
+        // Set all Crawl Executions which are part of this Job Execution to aborted
+        ListReplyWalker<ListExecutionsRequest, CrawlExecutionStatus> walker = new ListReplyWalker<>();
+        ListExecutionsRequest.Builder executionsRequest = ListExecutionsRequest.newBuilder().setJobExecutionId(jobExecutionId);
+
+        walker.walk(executionsRequest,
+                req -> listExecutionStatus(req),
+                exe -> {
+                    try {
+                        setExecutionStateAborted(exe.getId());
+                    } catch (DbException e) {
+                        LOG.error("Failed to abort Crawl Execution {}", exe.getId(), e);
+                    }
+                });
+
+        return result;
     }
 
     @Override

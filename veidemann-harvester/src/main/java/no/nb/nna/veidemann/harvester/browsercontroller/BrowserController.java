@@ -30,6 +30,7 @@ import no.nb.nna.veidemann.chrome.client.ChromeDebugProtocolConfig;
 import no.nb.nna.veidemann.commons.ExtraStatusCodes;
 import no.nb.nna.veidemann.commons.VeidemannHeaderConstants;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
+import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbHelper;
 import no.nb.nna.veidemann.harvester.BrowserSessionRegistry;
 import org.slf4j.Logger;
@@ -88,65 +89,67 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
         MDC.put("eid", queuedUri.getExecutionId());
         MDC.put("uri", queuedUri.getUri());
 
-        BrowserConfig browserConfig = DbHelper.getInstance().getBrowserConfigForCrawlConfig(config);
-        BrowserSession session = new BrowserSession(chrome, browserConfig, queuedUri, span);
         try {
-            sessionRegistry.put(session);
-
-            session.setBreakpoints();
-            session.setCookies();
-            session.loadPage();
-            session.getCrawlLogs().waitForMatcherToFinish();
-
-            if (session.isPageRenderable()) {
-                if (config.getExtra().getCreateSnapshot()) {
-                    LOG.debug("Save screenshot");
-                    session.saveScreenshot();
-                }
-
-                LOG.debug("Extract outlinks");
-                try {
-                    List<BrowserScript> scripts = getScripts(browserConfig);
-                    result.withOutlinks(session.extractOutlinks(scripts));
-                } catch (Throwable t) {
-                    LOG.error("Failed extracting outlinks", t);
-                }
-
-                session.scrollToTop();
-
-            } else {
-                LOG.info("Page is not renderable");
-            }
+            BrowserConfig browserConfig = DbHelper.getInstance().getBrowserConfigForCrawlConfig(config);
+            BrowserSession session = new BrowserSession(chrome, browserConfig, queuedUri, span);
             try {
+                sessionRegistry.put(session);
 
-                LOG.debug("======== PAGELOG ========\n{}", session.getUriRequests());
+                session.setBreakpoints();
+                session.setCookies();
+                session.loadPage();
+                session.getCrawlLogs().waitForMatcherToFinish();
 
-                PageLog.Builder pageLog = PageLog.newBuilder()
-                        .setUri(queuedUri.getUri())
-                        .setExecutionId(queuedUri.getExecutionId());
-                if (session.getUriRequests().getInitialRequest() == null) {
-                    LOG.error("Missing initial request");
+                if (session.isPageRenderable()) {
+                    if (config.getExtra().getCreateSnapshot()) {
+                        LOG.debug("Save screenshot");
+                        session.saveScreenshot();
+                    }
+
+                    LOG.debug("Extract outlinks");
+                    try {
+                        List<BrowserScript> scripts = getScripts(browserConfig);
+                        result.withOutlinks(session.extractOutlinks(scripts));
+                    } catch (Throwable t) {
+                        LOG.error("Failed extracting outlinks", t);
+                    }
+
+                    session.scrollToTop();
+
                 } else {
-                    pageLog.setWarcId(session.getUriRequests().getInitialRequest().getWarcId())
-                            .setReferrer(session.getUriRequests().getInitialRequest().getReferrer());
+                    LOG.info("Page is not renderable");
+                }
+                try {
+
+                    LOG.debug("======== PAGELOG ========\n{}", session.getUriRequests());
+
+                    PageLog.Builder pageLog = PageLog.newBuilder()
+                            .setUri(queuedUri.getUri())
+                            .setExecutionId(queuedUri.getExecutionId());
+                    if (session.getUriRequests().getInitialRequest() == null) {
+                        LOG.error("Missing initial request");
+                    } else {
+                        pageLog.setWarcId(session.getUriRequests().getInitialRequest().getWarcId())
+                                .setReferrer(session.getUriRequests().getInitialRequest().getReferrer());
+                    }
+
+                    session.getUriRequests().getPageLogResources().forEach(r -> pageLog.addResource(r));
+                    result.getOutlinks().forEach(o -> pageLog.addOutlink(o.getUri()));
+                    DbHelper.getInstance().getDb().savePageLog(pageLog.build());
+                } catch (Throwable t) {
+                    LOG.error("Failed writing pagelog", t);
                 }
 
-                session.getUriRequests().getPageLogResources().forEach(r -> pageLog.addResource(r));
-                result.getOutlinks().forEach(o -> pageLog.addOutlink(o.getUri()));
-                DbHelper.getInstance().getDb().savePageLog(pageLog.build());
-            } catch (Throwable t) {
-                LOG.error("Failed writing pagelog", t);
+                result.withBytesDownloaded(session.getUriRequests().getBytesDownloaded())
+                        .withUriCount(session.getUriRequests().getUriDownloadedCount());
+            } finally {
+                session.close();
+                sessionRegistry.remove(session);
+                span.finish();
             }
-
-            result.withBytesDownloaded(session.getUriRequests().getBytesDownloaded())
-                    .withUriCount(session.getUriRequests().getUriDownloadedCount());
-        } catch (Throwable t) {
+                } catch (Throwable t) {
             LOG.error("Failed loading page", t);
             result.withError(ExtraStatusCodes.RUNTIME_EXCEPTION.toFetchError(t.toString()));
-        } finally {
-            session.close();
-            sessionRegistry.remove(session);
-            span.finish();
         }
 
 //        result.withBytesDownloaded(session.getUriRequests().getBytesDownloaded())
@@ -158,25 +161,29 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
 
     private List<BrowserScript> getScripts(BrowserConfig browserConfig) {
         List<BrowserScript> scripts = new ArrayList<>();
-        for (String scriptId : browserConfig.getScriptIdList()) {
-            BrowserScript script = scriptCache.get(scriptId);
-            if (script == null) {
-                ControllerProto.GetRequest req = ControllerProto.GetRequest.newBuilder()
-                        .setId(scriptId)
-                        .build();
-                script = DbHelper.getInstance().getDb().getBrowserScript(req);
-                scriptCache.put(scriptId, script);
+        try {
+            for (String scriptId : browserConfig.getScriptIdList()) {
+                BrowserScript script = scriptCache.get(scriptId);
+                if (script == null) {
+                    ControllerProto.GetRequest req = ControllerProto.GetRequest.newBuilder()
+                            .setId(scriptId)
+                            .build();
+                    script = DbHelper.getInstance().getDb().getBrowserScript(req);
+                    scriptCache.put(scriptId, script);
+                }
+                scripts.add(script);
             }
-            scripts.add(script);
-        }
-        ListRequest req = ListRequest.newBuilder()
-                .addAllLabelSelector(browserConfig.getScriptSelectorList())
-                .build();
-        for (BrowserScript script : DbHelper.getInstance().getDb().listBrowserScripts(req).getValueList()) {
-            if (!scriptCache.containsKey(script.getId())) {
-                scriptCache.put(script.getId(), script);
+            ListRequest req = ListRequest.newBuilder()
+                    .addAllLabelSelector(browserConfig.getScriptSelectorList())
+                    .build();
+            for (BrowserScript script : DbHelper.getInstance().getDb().listBrowserScripts(req).getValueList()) {
+                if (!scriptCache.containsKey(script.getId())) {
+                    scriptCache.put(script.getId(), script);
+                }
+                scripts.add(script);
             }
-            scripts.add(script);
+        } catch (DbException e) {
+            LOG.warn("Could not get browser scripts from DB", e);
         }
         return scripts;
     }

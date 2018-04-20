@@ -22,6 +22,7 @@ import no.nb.nna.veidemann.api.ConfigProto.CrawlLimitsConfig;
 import no.nb.nna.veidemann.api.ConfigProto.PolitenessConfig;
 import no.nb.nna.veidemann.api.ControllerProto;
 import no.nb.nna.veidemann.commons.VeidemannHeaderConstants;
+import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbHelper;
 import org.junit.Test;
 
@@ -33,7 +34,7 @@ import java.util.concurrent.ExecutionException;
 public class MultiSiteCrawlIT extends CrawlTestBase implements VeidemannHeaderConstants {
 
     @Test
-    public void testHarvest() throws InterruptedException, ExecutionException {
+    public void testHarvest() throws InterruptedException, ExecutionException, DbException {
         DbHelper dbh = DbHelper.getInstance();
         dbh.configure(db);
         CrawlJob job = controllerClient.listCrawlJobs(ControllerProto.ListRequest.newBuilder()

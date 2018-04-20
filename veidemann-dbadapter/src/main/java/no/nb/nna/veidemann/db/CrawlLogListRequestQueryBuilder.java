@@ -18,6 +18,7 @@ package no.nb.nna.veidemann.db;
 import com.rethinkdb.gen.ast.ReqlExpr;
 import no.nb.nna.veidemann.api.ReportProto.CrawlLogListReply;
 import no.nb.nna.veidemann.api.ReportProto.CrawlLogListRequest;
+import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.db.RethinkDbAdapter.TABLES;
 
 import static no.nb.nna.veidemann.db.RethinkDbAdapter.r;
@@ -42,7 +43,7 @@ public class CrawlLogListRequestQueryBuilder extends ConfigListQueryBuilder<Craw
         addFilter(request.getFilterList());
     }
 
-    public CrawlLogListReply.Builder executeList(RethinkDbAdapter db) {
+    public CrawlLogListReply.Builder executeList(RethinkDbAdapter db) throws DbException {
         return executeList(db, CrawlLogListReply.newBuilder());
     }
 

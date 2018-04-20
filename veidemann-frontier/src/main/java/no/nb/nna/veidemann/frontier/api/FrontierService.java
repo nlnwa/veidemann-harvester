@@ -26,6 +26,7 @@ import no.nb.nna.veidemann.api.FrontierProto.CrawlSeedRequest;
 import no.nb.nna.veidemann.api.FrontierProto.PageHarvest;
 import no.nb.nna.veidemann.api.FrontierProto.PageHarvestSpec;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus;
+import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.frontier.worker.CrawlExecution;
 import no.nb.nna.veidemann.frontier.worker.Frontier;
 import org.slf4j.Logger;
@@ -93,17 +94,29 @@ public class FrontierService extends FrontierGrpc.FrontierImplBase {
                         exe.postFetchSuccess(value.getMetrics());
                         break;
                     case OUTLINK:
-                        exe.queueOutlink(value.getOutlink());
+                        try {
+                            exe.queueOutlink(value.getOutlink());
+                        } catch (DbException e) {
+                            LOG.error("Could not add URI to queue", e);
+                        }
                         break;
                     case ERROR:
-                        exe.postFetchFailure(value.getError());
+                        try {
+                            exe.postFetchFailure(value.getError());
+                        } catch (DbException e) {
+                            LOG.error("Could not handle failure", e);
+                        }
                         break;
                 }
             }
 
             @Override
             public void onError(Throwable t) {
-                exe.postFetchFailure(t);
+                try {
+                    exe.postFetchFailure(t);
+                } catch (DbException e) {
+                    LOG.error("Could not handle failure", e);
+                }
                 exe.postFetchFinally();
             }
 

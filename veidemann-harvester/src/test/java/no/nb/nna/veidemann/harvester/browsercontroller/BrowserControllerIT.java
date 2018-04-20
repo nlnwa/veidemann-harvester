@@ -26,6 +26,7 @@ import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
 import no.nb.nna.veidemann.api.MessagesProto.PageLog;
 import no.nb.nna.veidemann.commons.client.ContentWriterClient;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
+import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.util.ApiTools;
 import no.nb.nna.veidemann.harvester.BrowserSessionRegistry;
 import no.nb.nna.veidemann.harvester.proxy.RecordingProxy;
@@ -203,7 +204,7 @@ public class BrowserControllerIT {
         return config;
     }
 
-    private DbAdapter getDbMock() {
+    private DbAdapter getDbMock() throws DbException {
         DbAdapter db = mock(DbAdapter.class);
         when(db.hasCrawledContent(any())).thenReturn(Optional.empty());
         when(db.saveCrawlLog(any())).thenAnswer((InvocationOnMock i) -> {

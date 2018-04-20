@@ -17,6 +17,7 @@ package no.nb.nna.veidemann.db;
 
 import no.nb.nna.veidemann.api.ControllerProto.RoleMappingsListReply;
 import no.nb.nna.veidemann.api.ControllerProto.RoleMappingsListRequest;
+import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.db.RethinkDbAdapter.TABLES;
 
 /**
@@ -36,7 +37,7 @@ public class RoleMappingsListRequestQueryBuilder extends ConfigListQueryBuilder<
 
     }
 
-    public RoleMappingsListReply.Builder executeList(RethinkDbAdapter db) {
+    public RoleMappingsListReply.Builder executeList(RethinkDbAdapter db) throws DbException {
         return executeList(db, RoleMappingsListReply.newBuilder());
     }
 }

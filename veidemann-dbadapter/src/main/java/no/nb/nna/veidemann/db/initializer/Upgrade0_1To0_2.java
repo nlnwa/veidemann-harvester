@@ -15,6 +15,8 @@
  */
 package no.nb.nna.veidemann.db.initializer;
 
+import no.nb.nna.veidemann.commons.db.DbConnectionException;
+import no.nb.nna.veidemann.commons.db.DbQueryException;
 import no.nb.nna.veidemann.db.RethinkDbAdapter.TABLES;
 
 public class Upgrade0_1To0_2 extends UpgradeDbBase {
@@ -22,7 +24,7 @@ public class Upgrade0_1To0_2 extends UpgradeDbBase {
         super(dbName);
     }
 
-    final void upgrade() {
+    final void upgrade() throws DbQueryException, DbConnectionException {
         conn.exec(r.table(TABLES.EXECUTIONS.name).indexCreate("jobId"));
         conn.exec(r.table(TABLES.EXECUTIONS.name).indexCreate("state"));
         conn.exec(r.table(TABLES.EXECUTIONS.name).indexCreate("seedId"));

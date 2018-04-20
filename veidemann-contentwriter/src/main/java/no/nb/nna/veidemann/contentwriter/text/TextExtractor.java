@@ -15,25 +15,30 @@
  */
 package no.nb.nna.veidemann.contentwriter.text;
 
-import java.io.IOException;
-import java.io.InputStream;
-
-import no.nb.nna.veidemann.api.ContentWriterProto.WriteRequestMeta;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
+import no.nb.nna.veidemann.commons.db.DbException;
 import org.apache.tika.exception.TikaException;
 import org.apache.tika.metadata.Metadata;
 import org.apache.tika.parser.AutoDetectParser;
 import org.apache.tika.sax.BodyContentHandler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.xml.sax.ContentHandler;
 import org.xml.sax.SAXException;
+
+import java.io.IOException;
+import java.io.InputStream;
 
 /**
  *
  */
 public class TextExtractor implements AutoCloseable {
+    private static final Logger LOG = LoggerFactory.getLogger(TextExtractor.class);
 
     public void analyze(String warcId, String targetUri, String contentType, int responseCode, InputStream in, DbAdapter db) throws IOException {
+        MDC.put("uri", targetUri);
+
         if (shouldParse(targetUri, contentType, responseCode)) {
             AutoDetectParser parser = new AutoDetectParser();
 
@@ -48,14 +53,14 @@ public class TextExtractor implements AutoCloseable {
                     metadata.add("Orig-Content-Type", contentType);
 //                    stats.log(logEntry.getRequestedUri(), metadata, innerHandler.getText());
                 }
-                System.out.println("META: " + metadata);
+                LOG.debug("META: " + metadata);
                 if (innerHandler.getExtractedText().getCharacterCount() > 50) {
                     db.addExtractedText(innerHandler.getExtractedText());
                 }
             } catch (SAXException | TikaException ex) {
-                System.out.println("Failed reading content from " + targetUri + " ("
-                        + ex.getClass().getName() + ": " + ex.getCause() + ")");
-                ex.printStackTrace();
+                LOG.warn("Failed reading content ({})", ex.toString(), ex);
+            } catch (DbException ex) {
+                LOG.warn("Could not write extracted text to DB", ex);
             }
         }
     }

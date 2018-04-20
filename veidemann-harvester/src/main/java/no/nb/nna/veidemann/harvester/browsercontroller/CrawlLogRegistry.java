@@ -19,6 +19,7 @@ import com.google.protobuf.Timestamp;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlLog.Builder;
 import no.nb.nna.veidemann.commons.ExtraStatusCodes;
+import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbHelper;
 import no.nb.nna.veidemann.db.ProtoUtils;
 import org.slf4j.Logger;
@@ -307,7 +308,11 @@ public class CrawlLogRegistry {
                 crawlLogEntry.crawlLog.setTimeStamp(now);
                 CrawlLog enrichedCrawlLog = r.setCrawlLog(crawlLogEntry.crawlLog);
                 if (!r.isFromCache()) {
-                    DbHelper.getInstance().getDb().saveCrawlLog(enrichedCrawlLog);
+                    try {
+                        DbHelper.getInstance().getDb().saveCrawlLog(enrichedCrawlLog);
+                    } catch (DbException e) {
+                        throw new RuntimeException("Could not save crawl log", e);
+                    }
                 }
             }
             crawlLogEntry.resolved = true;

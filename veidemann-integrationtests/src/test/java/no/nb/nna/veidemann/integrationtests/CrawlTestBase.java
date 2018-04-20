@@ -24,6 +24,8 @@ import no.nb.nna.veidemann.api.ConfigProto.LogLevels.Level;
 import no.nb.nna.veidemann.api.ContentWriterGrpc;
 import no.nb.nna.veidemann.api.ControllerGrpc;
 import no.nb.nna.veidemann.api.StatusGrpc;
+import no.nb.nna.veidemann.commons.db.DbConnectionException;
+import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.db.RethinkDbAdapter;
 import no.nb.nna.veidemann.db.RethinkDbAdapter.TABLES;
 import no.nb.nna.veidemann.db.RethinkDbConnection;
@@ -46,7 +48,7 @@ public abstract class CrawlTestBase {
     static RethinkDB r = RethinkDB.r;
 
     @BeforeClass
-    public static void init() throws InterruptedException {
+    public static void init() throws DbConnectionException {
         String controllerHost = System.getProperty("controller.host");
         int controllerPort = Integer.parseInt(System.getProperty("controller.port"));
         String contentWriterHost = System.getProperty("contentwriter.host");
@@ -75,7 +77,7 @@ public abstract class CrawlTestBase {
     }
 
     @After
-    public void cleanup() {
+    public void cleanup() throws DbException {
         contentWriterClient.delete(Empty.getDefaultInstance());
         db.executeRequest("delete", r.table(TABLES.CRAWLED_CONTENT.name).delete());
         db.executeRequest("delete", r.table(TABLES.CRAWL_LOG.name).delete());

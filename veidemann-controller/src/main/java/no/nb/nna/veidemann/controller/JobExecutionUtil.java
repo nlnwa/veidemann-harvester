@@ -5,12 +5,14 @@ import io.grpc.stub.StreamObserver;
 import no.nb.nna.veidemann.api.ConfigProto.CrawlJob;
 import no.nb.nna.veidemann.api.ConfigProto.Seed;
 import no.nb.nna.veidemann.api.MessagesProto.JobExecutionStatus;
+import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.util.ApiTools;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Supplier;
 
 import static no.nb.nna.veidemann.commons.util.ApiTools.buildLabel;
 
@@ -27,19 +29,21 @@ public class JobExecutionUtil {
     }
 
     /**
-     * Helper method for getting one object. Sends NOT_FOUND if object is null.
+     * Helper method for getting one object. Sends NOT_FOUND if responseSupplier returns null.
      *
-     * @param response the object which is checked for null
+     * @param responseSupplier the supplier which result is checked for null
      * @param responseObserver the observer to send the object to
      */
-    public static void handleGet(Object response, StreamObserver responseObserver) {
+    public static <T> void handleGet(CheckedSupplier<T, DbException> responseSupplier, StreamObserver responseObserver) {
         try {
+            T response = responseSupplier.get();
             if (response == null) {
                 Status status = Status.NOT_FOUND;
                 responseObserver.onError(status.asException());
+            } else {
+                responseObserver.onNext(response);
+                responseObserver.onCompleted();
             }
-            responseObserver.onNext(response);
-            responseObserver.onCompleted();
         } catch (Exception ex) {
             LOG.error(ex.getMessage(), ex);
             Status status = Status.UNKNOWN.withDescription(ex.toString());
@@ -62,5 +66,10 @@ public class JobExecutionUtil {
                 LOG.warn("No frontier defined for seed type {}", type);
             }
         }
+    }
+
+    @FunctionalInterface
+    public interface CheckedSupplier<T, E extends Exception> {
+        T get() throws E;
     }
 }

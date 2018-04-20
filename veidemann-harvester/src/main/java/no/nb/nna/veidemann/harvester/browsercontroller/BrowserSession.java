@@ -35,6 +35,7 @@ import no.nb.nna.veidemann.chrome.client.RuntimeDomain;
 import no.nb.nna.veidemann.chrome.client.Session;
 import no.nb.nna.veidemann.chrome.client.SessionClosedException;
 import no.nb.nna.veidemann.commons.VeidemannHeaderConstants;
+import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbHelper;
 import no.nb.nna.veidemann.commons.util.ApiTools;
 import no.nb.nna.veidemann.db.ProtoUtils;
@@ -297,7 +298,7 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
                     .setExecutionId(getExecutionId())
                     .setUri(uriRequests.getRootRequest().getUrl())
                     .build());
-        } catch (ExecutionException | TimeoutException ex) {
+        } catch (ExecutionException | TimeoutException| DbException  ex) {
             throw new RuntimeException(ex);
         }
     }

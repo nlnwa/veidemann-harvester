@@ -71,36 +71,36 @@ import java.util.Optional;
  */
 public interface DbAdapter extends AutoCloseable {
 
-    Optional<CrawledContent> hasCrawledContent(CrawledContent cc);
+    Optional<CrawledContent> hasCrawledContent(CrawledContent cc) throws DbException;
 
-    CrawlLog saveCrawlLog(CrawlLog cl);
+    CrawlLog saveCrawlLog(CrawlLog cl) throws DbException;
 
-    CrawlLogListReply listCrawlLogs(CrawlLogListRequest request);
+    CrawlLogListReply listCrawlLogs(CrawlLogListRequest request) throws DbException;
 
-    PageLog savePageLog(PageLog pageLog);
+    PageLog savePageLog(PageLog pageLog) throws DbException;
 
-    PageLogListReply listPageLogs(PageLogListRequest request);
+    PageLogListReply listPageLogs(PageLogListRequest request) throws DbException;
 
-    ExtractedText addExtractedText(ExtractedText et);
+    ExtractedText addExtractedText(ExtractedText et) throws DbException;
 
-    JobExecutionStatus createJobExecutionStatus(String jobId);
+    JobExecutionStatus createJobExecutionStatus(String jobId) throws DbException;
 
-    JobExecutionStatus getJobExecutionStatus(String jobExecutionId);
+    JobExecutionStatus getJobExecutionStatus(String jobExecutionId) throws DbException;
 
-    JobExecutionsListReply listJobExecutionStatus(ListJobExecutionsRequest request);
+    JobExecutionsListReply listJobExecutionStatus(ListJobExecutionsRequest request) throws DbException;
 
     /**
      * Update the state for a Job Execution to ABORTED_MANUAL.
      *
      * @param jobExecutionId id of the job execution to update
      */
-    JobExecutionStatus setJobExecutionStateAborted(String jobExecutionId);
+    JobExecutionStatus setJobExecutionStateAborted(String jobExecutionId) throws DbException;
 
-    CrawlExecutionStatus saveExecutionStatus(CrawlExecutionStatus status);
+    CrawlExecutionStatus saveExecutionStatus(CrawlExecutionStatus status) throws DbException;
 
-    CrawlExecutionStatus getExecutionStatus(String executionId);
+    CrawlExecutionStatus getExecutionStatus(String executionId) throws DbException;
 
-    ExecutionsListReply listExecutionStatus(ListExecutionsRequest request);
+    ExecutionsListReply listExecutionStatus(ListExecutionsRequest request) throws DbException;
 
     /**
      * Update the state for a Crawl Execution to ABORTED_MANUAL.
@@ -109,17 +109,17 @@ public interface DbAdapter extends AutoCloseable {
      *
      * @param executionId id of the execution to update
      */
-    CrawlExecutionStatus setExecutionStateAborted(String executionId);
+    CrawlExecutionStatus setExecutionStateAborted(String executionId) throws DbException;
 
-    QueuedUri saveQueuedUri(QueuedUri qu);
+    QueuedUri saveQueuedUri(QueuedUri qu) throws DbException;
 
-    void deleteQueuedUri(QueuedUri qu);
+    void deleteQueuedUri(QueuedUri qu) throws DbException;
 
-    long deleteQueuedUrisForExecution(String executionId);
+    long deleteQueuedUrisForExecution(String executionId) throws DbException;
 
-    long queuedUriCount(String executionId);
+    long queuedUriCount(String executionId) throws DbException;
 
-    boolean uriNotIncludedInQueue(QueuedUri qu, Timestamp since);
+    boolean uriNotIncludedInQueue(QueuedUri qu, Timestamp since) throws DbException;
 
     /**
      * Get the first URI wich is ready to be fetched for a CrawlHostGroup.
@@ -127,103 +127,103 @@ public interface DbAdapter extends AutoCloseable {
      * @param crawlHostGroup the CrawlHostGroup for which a URI is requested
      * @return an Optional containing the next URI to be fetched or empty if none are ready yet.
      */
-    FutureOptional<QueuedUri> getNextQueuedUriToFetch(CrawlHostGroup crawlHostGroup);
+    FutureOptional<QueuedUri> getNextQueuedUriToFetch(CrawlHostGroup crawlHostGroup) throws DbException;
 
-    CrawlHostGroup getOrCreateCrawlHostGroup(String crawlHostGroupId, String politenessId);
+    CrawlHostGroup getOrCreateCrawlHostGroup(String crawlHostGroupId, String politenessId) throws DbException;
 
-    FutureOptional<CrawlHostGroup> borrowFirstReadyCrawlHostGroup();
+    FutureOptional<CrawlHostGroup> borrowFirstReadyCrawlHostGroup() throws DbException;
 
-    CrawlHostGroup releaseCrawlHostGroup(CrawlHostGroup crawlHostGroup, long nextFetchDelayMs);
+    CrawlHostGroup releaseCrawlHostGroup(CrawlHostGroup crawlHostGroup, long nextFetchDelayMs) throws DbException;
 
-    ScreenshotListReply listScreenshots(ScreenshotListRequest request);
+    ScreenshotListReply listScreenshots(ScreenshotListRequest request) throws DbException;
 
-    Screenshot saveScreenshot(Screenshot screenshot);
+    Screenshot saveScreenshot(Screenshot screenshot) throws DbException;
 
-    Empty deleteScreenshot(Screenshot screenshot);
+    Empty deleteScreenshot(Screenshot screenshot) throws DbException;
 
-    CrawlEntity getCrawlEntity(GetRequest req);
+    CrawlEntity getCrawlEntity(GetRequest req) throws DbException;
 
-    CrawlEntity saveCrawlEntity(CrawlEntity msg);
+    CrawlEntity saveCrawlEntity(CrawlEntity msg) throws DbException;
 
-    CrawlEntityListReply listCrawlEntities(ListRequest request);
+    CrawlEntityListReply listCrawlEntities(ListRequest request) throws DbException;
 
-    Empty deleteCrawlEntity(CrawlEntity entity);
+    Empty deleteCrawlEntity(CrawlEntity entity) throws DbException;
 
-    Seed getSeed(GetRequest req);
+    Seed getSeed(GetRequest req) throws DbException;
 
-    SeedListReply listSeeds(SeedListRequest request);
+    SeedListReply listSeeds(SeedListRequest request) throws DbException;
 
-    Seed saveSeed(Seed seed);
+    Seed saveSeed(Seed seed) throws DbException;
 
-    Empty deleteSeed(Seed seed);
+    Empty deleteSeed(Seed seed) throws DbException;
 
-    CrawlJob getCrawlJob(GetRequest req);
+    CrawlJob getCrawlJob(GetRequest req) throws DbException;
 
-    CrawlJobListReply listCrawlJobs(ListRequest request);
+    CrawlJobListReply listCrawlJobs(ListRequest request) throws DbException;
 
-    CrawlJob saveCrawlJob(CrawlJob crawlJob);
+    CrawlJob saveCrawlJob(CrawlJob crawlJob) throws DbException;
 
-    Empty deleteCrawlJob(CrawlJob crawlJob);
+    Empty deleteCrawlJob(CrawlJob crawlJob) throws DbException;
 
-    CrawlConfig getCrawlConfig(GetRequest req);
+    CrawlConfig getCrawlConfig(GetRequest req) throws DbException;
 
-    CrawlConfigListReply listCrawlConfigs(ListRequest request);
+    CrawlConfigListReply listCrawlConfigs(ListRequest request) throws DbException;
 
-    CrawlConfig saveCrawlConfig(CrawlConfig crawlConfig);
+    CrawlConfig saveCrawlConfig(CrawlConfig crawlConfig) throws DbException;
 
-    Empty deleteCrawlConfig(CrawlConfig crawlConfig);
+    Empty deleteCrawlConfig(CrawlConfig crawlConfig) throws DbException;
 
-    CrawlScheduleConfig getCrawlScheduleConfig(GetRequest req);
+    CrawlScheduleConfig getCrawlScheduleConfig(GetRequest req) throws DbException;
 
-    CrawlScheduleConfigListReply listCrawlScheduleConfigs(ListRequest request);
+    CrawlScheduleConfigListReply listCrawlScheduleConfigs(ListRequest request) throws DbException;
 
-    CrawlScheduleConfig saveCrawlScheduleConfig(CrawlScheduleConfig crawlScheduleConfig);
+    CrawlScheduleConfig saveCrawlScheduleConfig(CrawlScheduleConfig crawlScheduleConfig) throws DbException;
 
-    Empty deleteCrawlScheduleConfig(CrawlScheduleConfig crawlScheduleConfig);
+    Empty deleteCrawlScheduleConfig(CrawlScheduleConfig crawlScheduleConfig) throws DbException;
 
-    PolitenessConfig getPolitenessConfig(GetRequest req);
+    PolitenessConfig getPolitenessConfig(GetRequest req) throws DbException;
 
-    PolitenessConfigListReply listPolitenessConfigs(ListRequest request);
+    PolitenessConfigListReply listPolitenessConfigs(ListRequest request) throws DbException;
 
-    PolitenessConfig savePolitenessConfig(PolitenessConfig politenessConfig);
+    PolitenessConfig savePolitenessConfig(PolitenessConfig politenessConfig) throws DbException;
 
-    Empty deletePolitenessConfig(PolitenessConfig politenessConfig);
+    Empty deletePolitenessConfig(PolitenessConfig politenessConfig) throws DbException;
 
-    BrowserConfig getBrowserConfig(GetRequest req);
+    BrowserConfig getBrowserConfig(GetRequest req) throws DbException;
 
-    BrowserConfigListReply listBrowserConfigs(ListRequest request);
+    BrowserConfigListReply listBrowserConfigs(ListRequest request) throws DbException;
 
-    BrowserConfig saveBrowserConfig(BrowserConfig browserConfig);
+    BrowserConfig saveBrowserConfig(BrowserConfig browserConfig) throws DbException;
 
-    Empty deleteBrowserConfig(BrowserConfig browserConfig);
+    Empty deleteBrowserConfig(BrowserConfig browserConfig) throws DbException;
 
-    BrowserScript getBrowserScript(GetRequest req);
+    BrowserScript getBrowserScript(GetRequest req) throws DbException;
 
-    BrowserScript saveBrowserScript(BrowserScript script);
+    BrowserScript saveBrowserScript(BrowserScript script) throws DbException;
 
-    Empty deleteBrowserScript(BrowserScript script);
+    Empty deleteBrowserScript(BrowserScript script) throws DbException;
 
-    BrowserScriptListReply listBrowserScripts(ListRequest request);
+    BrowserScriptListReply listBrowserScripts(ListRequest request) throws DbException;
 
-    CrawlHostGroupConfig getCrawlHostGroupConfig(GetRequest req);
+    CrawlHostGroupConfig getCrawlHostGroupConfig(GetRequest req) throws DbException;
 
-    CrawlHostGroupConfig saveCrawlHostGroupConfig(CrawlHostGroupConfig crawlHostGroupConfig);
+    CrawlHostGroupConfig saveCrawlHostGroupConfig(CrawlHostGroupConfig crawlHostGroupConfig) throws DbException;
 
-    Empty deleteCrawlHostGroupConfig(CrawlHostGroupConfig crawlHostGroupConfig);
+    Empty deleteCrawlHostGroupConfig(CrawlHostGroupConfig crawlHostGroupConfig) throws DbException;
 
-    CrawlHostGroupConfigListReply listCrawlHostGroupConfigs(ListRequest request);
+    CrawlHostGroupConfigListReply listCrawlHostGroupConfigs(ListRequest request) throws DbException;
 
-    LogLevels getLogConfig();
+    LogLevels getLogConfig() throws DbException;
 
-    LogLevels saveLogConfig(LogLevels logLevels);
+    LogLevels saveLogConfig(LogLevels logLevels) throws DbException;
 
-    ChangeFeed<RunningExecutionsListReply> getExecutionStatusStream(RunningExecutionsRequest request);
+    ChangeFeed<RunningExecutionsListReply> getExecutionStatusStream(RunningExecutionsRequest request) throws DbException;
 
-    RoleMappingsListReply listRoleMappings(RoleMappingsListRequest request);
+    RoleMappingsListReply listRoleMappings(RoleMappingsListRequest request) throws DbException;
 
-    RoleMapping saveRoleMapping(RoleMapping roleMapping);
+    RoleMapping saveRoleMapping(RoleMapping roleMapping) throws DbException;
 
-    Empty deleteRoleMapping(RoleMapping roleMapping);
+    Empty deleteRoleMapping(RoleMapping roleMapping) throws DbException;
 
     @Override
     public void close();

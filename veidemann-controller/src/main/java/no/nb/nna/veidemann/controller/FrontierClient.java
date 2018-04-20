@@ -47,7 +47,7 @@ public class FrontierClient implements AutoCloseable {
     private final FrontierStub asyncStub;
 
     public FrontierClient(final String host, final int port, String supportedSeedType) {
-        this(ManagedChannelBuilder.forAddress(host, port).usePlaintext(true), supportedSeedType);
+        this(ManagedChannelBuilder.forAddress(host, port).usePlaintext(), supportedSeedType);
         LOG.info("Harvester client pointing to " + host + ":" + port);
     }
 

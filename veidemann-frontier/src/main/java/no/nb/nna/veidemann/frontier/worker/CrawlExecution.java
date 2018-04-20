@@ -30,6 +30,7 @@ import no.nb.nna.veidemann.api.MessagesProto.CrawlHostGroup;
 import no.nb.nna.veidemann.api.MessagesProto.Error;
 import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
 import no.nb.nna.veidemann.commons.ExtraStatusCodes;
+import no.nb.nna.veidemann.commons.db.DbException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -69,7 +70,7 @@ public class CrawlExecution {
 
     private Span span;
 
-    public CrawlExecution(QueuedUri qUri, CrawlHostGroup crawlHostGroup, Frontier frontier) {
+    public CrawlExecution(QueuedUri qUri, CrawlHostGroup crawlHostGroup, Frontier frontier) throws DbException {
         this.status = StatusWrapper.getStatusWrapper(qUri.getExecutionId());
         this.status.setCurrentUri(qUri.getUri());
 
@@ -168,7 +169,7 @@ public class CrawlExecution {
      *
      * @param error the Error causing the failure
      */
-    public void postFetchFailure(Error error) {
+    public void postFetchFailure(Error error) throws DbException {
         MDC.put("eid", qUri.getExecutionId());
         MDC.put("uri", qUri.getUri());
 
@@ -181,7 +182,7 @@ public class CrawlExecution {
      *
      * @param t the exception thrown
      */
-    public void postFetchFailure(Throwable t) {
+    public void postFetchFailure(Throwable t) throws DbException {
         MDC.put("eid", qUri.getExecutionId());
         MDC.put("uri", qUri.getUri());
 
@@ -198,11 +199,11 @@ public class CrawlExecution {
         MDC.put("eid", qUri.getExecutionId());
         MDC.put("uri", qUri.getUri());
 
-        long fetchEnd = System.currentTimeMillis();
-        fetchTimeMs = fetchEnd - fetchStart;
-        calculateDelay();
-
         try {
+            long fetchEnd = System.currentTimeMillis();
+            fetchTimeMs = fetchEnd - fetchStart;
+            calculateDelay();
+
             if (qUri.hasError() && qUri.getDiscoveryPath().isEmpty()) {
                 // Seed failed; mark crawl as failed
                 endCrawl(CrawlExecutionStatus.State.FAILED, qUri.getError());
@@ -216,25 +217,26 @@ public class CrawlExecution {
             if (isManualAbort()) {
                 delayMs = 0L;
             }
-        } catch (Throwable t) {
-            // An error here indicates problems with DB communication. No idea how to handle that yet.
-            LOG.error("Error updating status after fetch: {}", t.toString(), t);
-        } finally {
             // Save updated status
             status.saveStatus();
+        } catch (DbException e) {
+            // An error here indicates problems with DB communication. No idea how to handle that yet.
+            LOG.error("Error updating status after fetch: {}", e.toString(), e);
         }
 
         try {
             DbUtil.getInstance().getDb().releaseCrawlHostGroup(getCrawlHostGroup(), getDelay(TimeUnit.MILLISECONDS));
+        } catch (DbException e) {
+            LOG.error("Error releasing CrawlHostGroup: {}", e.toString(), e);
         } catch (Throwable t) {
-            // An error here indicates problems with DB communication. No idea how to handle that yet.
+            // An error here indicates unknown problems with DB communication. No idea how to handle that yet.
             LOG.error("Error releasing CrawlHostGroup: {}", t.toString(), t);
         }
 
         span.finish();
     }
 
-    public void queueOutlink(QueuedUri outlink) {
+    public void queueOutlink(QueuedUri outlink) throws DbException {
         try {
             QueuedUriWrapper outUri = QueuedUriWrapper.getQueuedUriWrapper(outlink);
 
@@ -248,7 +250,7 @@ public class CrawlExecution {
         }
     }
 
-    boolean shouldInclude(QueuedUriWrapper outlink) {
+    boolean shouldInclude(QueuedUriWrapper outlink) throws DbException {
         if (!LimitsCheck.isQueueable(limits, status, outlink)) {
             return false;
         }
@@ -300,7 +302,7 @@ public class CrawlExecution {
         }
     }
 
-    private void retryUri(QueuedUriWrapper qUri, Error error) {
+    private void retryUri(QueuedUriWrapper qUri, Error error) throws DbException {
 
         LOG.info("Failed fetching ({}) at attempt #{}", qUri, qUri.getRetries());
         qUri.incrementRetries()
@@ -325,7 +327,7 @@ public class CrawlExecution {
         }
     }
 
-    private boolean isManualAbort() {
+    private boolean isManualAbort() throws DbException {
         if (status.getState() == CrawlExecutionStatus.State.ABORTED_MANUAL) {
             status.clearCurrentUri()
                     .incrementDocumentsDenied(DbUtil.getInstance().getDb().deleteQueuedUrisForExecution(status.getId()));

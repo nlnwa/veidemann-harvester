@@ -16,6 +16,9 @@
 package no.nb.nna.veidemann.db.initializer;
 
 import com.rethinkdb.RethinkDB;
+import no.nb.nna.veidemann.commons.db.DbConnectionException;
+import no.nb.nna.veidemann.commons.db.DbException;
+import no.nb.nna.veidemann.commons.db.DbQueryException;
 import no.nb.nna.veidemann.db.RethinkDbAdapter.TABLES;
 import no.nb.nna.veidemann.db.RethinkDbConnection;
 import org.slf4j.Logger;
@@ -39,10 +42,14 @@ public class CreateNewDb implements Runnable {
     @Override
     public void run() {
         conn = RethinkDbConnection.getInstance();
-        createDb();
+        try {
+            createDb();
+        } catch (DbException e) {
+            throw new RuntimeException(e);
+        }
     }
 
-    private final void createDb() {
+    private final void createDb() throws DbQueryException, DbConnectionException {
         conn.exec("create-db", r.dbCreate(dbName));
 
         conn.exec(r.tableCreate(TABLES.SYSTEM.name));
@@ -141,7 +148,7 @@ public class CreateNewDb implements Runnable {
         conn.exec(r.table(TABLES.JOB_EXECUTIONS.name).indexWait("startTime", "jobId", "state"));
     }
 
-    private final void createMetaIndexes(TABLES... tables) {
+    private final void createMetaIndexes(TABLES... tables) throws DbQueryException, DbConnectionException {
         for (TABLES table : tables) {
             conn.exec(r.table(table.name).indexCreate("name", row -> row.g("meta").g("name").downcase()));
             conn.exec(r.table(table.name)

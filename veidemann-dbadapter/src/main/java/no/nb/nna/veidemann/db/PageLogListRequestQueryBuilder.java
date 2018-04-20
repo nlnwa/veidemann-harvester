@@ -18,6 +18,7 @@ package no.nb.nna.veidemann.db;
 import com.rethinkdb.gen.ast.ReqlExpr;
 import no.nb.nna.veidemann.api.ReportProto.PageLogListReply;
 import no.nb.nna.veidemann.api.ReportProto.PageLogListRequest;
+import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.db.RethinkDbAdapter.TABLES;
 
 import static no.nb.nna.veidemann.db.RethinkDbAdapter.r;
@@ -42,7 +43,7 @@ public class PageLogListRequestQueryBuilder extends ConfigListQueryBuilder<PageL
         addFilter(request.getFilterList());
     }
 
-    public PageLogListReply.Builder executeList(RethinkDbAdapter db) {
+    public PageLogListReply.Builder executeList(RethinkDbAdapter db) throws DbException {
         return executeList(db, PageLogListReply.newBuilder());
     }
 

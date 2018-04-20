@@ -18,6 +18,7 @@ package no.nb.nna.veidemann.db;
 import com.rethinkdb.gen.ast.ReqlExpr;
 import no.nb.nna.veidemann.api.ReportProto.ScreenshotListReply;
 import no.nb.nna.veidemann.api.ReportProto.ScreenshotListRequest;
+import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.db.RethinkDbAdapter.TABLES;
 
 import static no.nb.nna.veidemann.db.RethinkDbAdapter.r;
@@ -51,7 +52,7 @@ public class ScreenshotListRequestQueryBuilder extends ConfigListQueryBuilder<Sc
         addFilter(request.getFilterList());
     }
 
-    public ScreenshotListReply.Builder executeList(RethinkDbAdapter db) {
+    public ScreenshotListReply.Builder executeList(RethinkDbAdapter db) throws DbException {
         return executeList(db, ScreenshotListReply.newBuilder());
     }
 

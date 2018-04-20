@@ -72,7 +72,7 @@ public class StatusService extends StatusGrpc.StatusImplBase {
     @Override
     @AllowedRoles({Role.READONLY, Role.CURATOR, Role.ADMIN})
     public void getExecution(ExecutionId request, StreamObserver<CrawlExecutionStatus> responseObserver) {
-        handleGet(db.getExecutionStatus(request.getId()), responseObserver);
+        handleGet(() -> db.getExecutionStatus(request.getId()), responseObserver);
     }
 
     @Override
@@ -106,7 +106,7 @@ public class StatusService extends StatusGrpc.StatusImplBase {
     @Override
     @AllowedRoles({Role.READONLY, Role.CURATOR, Role.ADMIN})
     public void getJobExecution(ExecutionId request, StreamObserver<JobExecutionStatus> responseObserver) {
-        handleGet(db.getJobExecutionStatus(request.getId()), responseObserver);
+        handleGet(() -> db.getJobExecutionStatus(request.getId()), responseObserver);
     }
 
     @Override

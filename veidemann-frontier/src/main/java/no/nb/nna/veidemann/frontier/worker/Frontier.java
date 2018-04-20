@@ -21,6 +21,7 @@ import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus.State;
 import no.nb.nna.veidemann.commons.ExtraStatusCodes;
 import no.nb.nna.veidemann.commons.client.DnsServiceClient;
 import no.nb.nna.veidemann.commons.client.RobotsServiceClient;
+import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.db.RethinkDbAdapter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,7 +49,7 @@ public class Frontier implements AutoCloseable {
         this.queueWorker = new QueueWorker(this);
     }
 
-    public CrawlExecutionStatus scheduleSeed(CrawlSeedRequest request) {
+    public CrawlExecutionStatus scheduleSeed(CrawlSeedRequest request) throws DbException {
         // Create execution
         StatusWrapper status = StatusWrapper.getStatusWrapper(CrawlExecutionStatus.newBuilder()
                 .setJobId(request.getJob().getId())

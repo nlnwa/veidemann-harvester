@@ -83,7 +83,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     @Override
     @AllowedRoles({Role.READONLY, Role.CURATOR, Role.ADMIN})
     public void getCrawlEntity(GetRequest request, StreamObserver<CrawlEntity> responseObserver) {
-        handleGet(db.getCrawlEntity(request), responseObserver);
+        handleGet(() -> db.getCrawlEntity(request), responseObserver);
     }
 
     @Override
@@ -128,7 +128,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     @Override
     @AllowedRoles({Role.READONLY, Role.CURATOR, Role.ADMIN})
     public void getCrawlScheduleConfig(GetRequest request, StreamObserver<CrawlScheduleConfig> responseObserver) {
-        handleGet(db.getCrawlScheduleConfig(request), responseObserver);
+        handleGet(() -> db.getCrawlScheduleConfig(request), responseObserver);
     }
 
     @Override
@@ -175,7 +175,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     @Override
     @AllowedRoles({Role.READONLY, Role.CURATOR, Role.ADMIN})
     public void getCrawlConfig(GetRequest request, StreamObserver<CrawlConfig> responseObserver) {
-        handleGet(db.getCrawlConfig(request), responseObserver);
+        handleGet(() -> db.getCrawlConfig(request), responseObserver);
     }
 
     @Override
@@ -220,7 +220,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     @Override
     @AllowedRoles({Role.CURATOR, Role.ADMIN})
     public void getCrawlJob(GetRequest request, StreamObserver<CrawlJob> responseObserver) {
-        handleGet(db.getCrawlJob(request), responseObserver);
+        handleGet(() -> db.getCrawlJob(request), responseObserver);
     }
 
     @Override
@@ -265,7 +265,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     @Override
     @AllowedRoles({Role.READONLY, Role.CURATOR, Role.ADMIN})
     public void getSeed(GetRequest request, StreamObserver<Seed> responseObserver) {
-        handleGet(db.getSeed(request), responseObserver);
+        handleGet(() -> db.getSeed(request), responseObserver);
     }
 
     @Override
@@ -316,7 +316,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     @Override
     @AllowedRoles({Role.READONLY, Role.CURATOR, Role.ADMIN})
     public void getBrowserConfig(GetRequest request, StreamObserver<BrowserConfig> responseObserver) {
-        handleGet(db.getBrowserConfig(request), responseObserver);
+        handleGet(() -> db.getBrowserConfig(request), responseObserver);
     }
 
     @Override
@@ -363,7 +363,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     @Override
     @AllowedRoles({Role.READONLY, Role.CURATOR, Role.ADMIN})
     public void getPolitenessConfig(GetRequest request, StreamObserver<PolitenessConfig> responseObserver) {
-        handleGet(db.getPolitenessConfig(request), responseObserver);
+        handleGet(() -> db.getPolitenessConfig(request), responseObserver);
     }
 
     @Override
@@ -408,7 +408,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     @Override
     @AllowedRoles({Role.READONLY, Role.CURATOR, Role.ADMIN})
     public void getBrowserScript(GetRequest request, StreamObserver<BrowserScript> responseObserver) {
-        handleGet(db.getBrowserScript(request), responseObserver);
+        handleGet(() -> db.getBrowserScript(request), responseObserver);
     }
 
     @Override
@@ -454,7 +454,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     @Override
     @AllowedRoles({Role.READONLY, Role.CURATOR, Role.ADMIN})
     public void getCrawlHostGroupConfig(GetRequest request, StreamObserver<CrawlHostGroupConfig> responseObserver) {
-        handleGet(db.getCrawlHostGroupConfig(request), responseObserver);
+        handleGet(() -> db.getCrawlHostGroupConfig(request), responseObserver);
     }
 
     @Override

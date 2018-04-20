@@ -14,25 +14,25 @@
  * limitations under the License.
  */
 
-package no.nb.nna.veidemann.db;
+package no.nb.nna.veidemann.commons.db;
 
 /**
- *
+ * Exception thrown when failing a database upgrade.
  */
-public class DbException extends RuntimeException {
+public class DbUpgradeException extends DbException {
 
-    public DbException() {
+    public DbUpgradeException() {
     }
 
-    public DbException(String message) {
+    public DbUpgradeException(String message) {
         super(message);
     }
 
-    public DbException(String message, Throwable cause) {
+    public DbUpgradeException(String message, Throwable cause) {
         super(message, cause);
     }
 
-    public DbException(Throwable cause) {
+    public DbUpgradeException(Throwable cause) {
         super(cause);
     }
 

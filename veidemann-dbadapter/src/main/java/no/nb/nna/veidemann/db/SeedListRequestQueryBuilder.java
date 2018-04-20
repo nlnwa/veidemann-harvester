@@ -18,6 +18,7 @@ package no.nb.nna.veidemann.db;
 
 import no.nb.nna.veidemann.api.ControllerProto.SeedListReply;
 import no.nb.nna.veidemann.api.ControllerProto.SeedListRequest;
+import no.nb.nna.veidemann.commons.db.DbException;
 
 import static no.nb.nna.veidemann.db.RethinkDbAdapter.r;
 
@@ -46,7 +47,7 @@ public class SeedListRequestQueryBuilder extends ConfigListQueryBuilder<SeedList
         }
     }
 
-    public SeedListReply.Builder executeList(RethinkDbAdapter db) {
+    public SeedListReply.Builder executeList(RethinkDbAdapter db) throws DbException {
         return executeList(db, SeedListReply.newBuilder());
     }
 

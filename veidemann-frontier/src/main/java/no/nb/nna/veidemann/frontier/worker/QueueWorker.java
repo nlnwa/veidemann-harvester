@@ -16,8 +16,8 @@
 package no.nb.nna.veidemann.frontier.worker;
 
 import no.nb.nna.veidemann.api.MessagesProto;
+import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.FutureOptional;
-import no.nb.nna.veidemann.db.DbException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,7 +51,7 @@ public class QueueWorker {
      *
      * @return
      */
-    public CrawlExecution getNextToFetch() throws InterruptedException {
+    public synchronized CrawlExecution getNextToFetch() throws InterruptedException {
         long sleep = 0L;
 
         while (true) {

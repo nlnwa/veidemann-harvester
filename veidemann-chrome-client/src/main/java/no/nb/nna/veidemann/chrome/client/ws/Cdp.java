@@ -61,11 +61,11 @@ public class Cdp implements WebSocketCallback {
 
     final ConcurrentHashMap<String, List<Consumer<JsonElement>>> eventListeners = new ConcurrentHashMap<>();
 
-    final WebsocketClient websocketClient;
+    WebsocketClient websocketClient;
 
     final ChromeDebugProtocolConfig config;
 
-    final String scheme;
+    String scheme;
 
     final AtomicBoolean closed = new AtomicBoolean(false);
 
@@ -81,16 +81,30 @@ public class Cdp implements WebSocketCallback {
 
         try {
             URL versionUrl = new URL("http", config.getHost(), config.getPort(), "/json/version");
-            try (InputStream in = versionUrl.openStream()) {
-                InputStreamReader inr = new InputStreamReader(in);
-                Map version = gson.fromJson(inr, Map.class);
-                URI webSocketUri = new URI((String) version.get("webSocketDebuggerUrl"));
-                String browserVersion = (String) version.get("Browser");
-                this.scheme = webSocketUri.getScheme();
+            boolean connected = false;
+            int connectAttempts = 0;
+            while (!connected && connectAttempts < config.getMaxConnectionAttempts()) {
+                try (InputStream in = versionUrl.openStream()) {
+                    InputStreamReader inr = new InputStreamReader(in);
+                    Map version = gson.fromJson(inr, Map.class);
+                    URI webSocketUri = new URI((String) version.get("webSocketDebuggerUrl"));
+                    String browserVersion = (String) version.get("Browser");
+                    this.scheme = webSocketUri.getScheme();
 
-                this.websocketClient = new WebsocketClient(this, webSocketUri, config, workerGroup);
+                    this.websocketClient = new WebsocketClient(this, webSocketUri, config, workerGroup);
+                    connected = true;
+                } catch (IOException e) {
+                    connectAttempts++;
+                    LOG.debug("Could not connect to Chrome Browser. Retrying in {}ms", config.getReconnectDelay());
+                    try {
+                        Thread.sleep(config.getReconnectDelay());
+                    } catch (InterruptedException e1) {
+                        throw new RuntimeException(e1);
+                    }
+                }
             }
         } catch (URISyntaxException | IOException e) {
+            LOG.error("Failed to connect to Chrome Browser.", e);
             closed.set(true);
             throw new RuntimeException(e);
         }

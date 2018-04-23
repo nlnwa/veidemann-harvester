@@ -205,11 +205,6 @@
                                                 <dns>
                                                     <host>${docker.container.testsites.net.cdp-test-net.ip}</host>
                                                 </dns>
-                                                <wait>
-                                                    <time>5000</time>
-                                                    <log>DevTools listening on ws</log>
-                                                    <kill>1000</kill>
-                                                </wait>
                                             </run>
                                         </image>
                                     </images>

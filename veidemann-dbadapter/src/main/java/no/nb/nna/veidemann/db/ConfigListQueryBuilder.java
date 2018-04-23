@@ -53,16 +53,19 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
 
     final RethinkDbAdapter.TABLES table;
 
-    private final boolean orderByName;
+    private final String orderByIndex;
 
-    public ConfigListQueryBuilder(T request, RethinkDbAdapter.TABLES table, boolean orderByName) {
+    private final boolean descending;
+
+    public ConfigListQueryBuilder(T request, RethinkDbAdapter.TABLES table, String orderByIndex, boolean descending) {
         this.request = Objects.requireNonNull(request, "The request cannot be null");
         this.table = Objects.requireNonNull(table);
-        this.orderByName = orderByName;
+        this.orderByIndex = orderByIndex == null ? "" : orderByIndex;
+        this.descending = descending;
     }
 
     public ConfigListQueryBuilder(T request, RethinkDbAdapter.TABLES table) {
-        this(request, table, true);
+        this(request, table, "name", false);
     }
 
     /**
@@ -103,7 +106,7 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
 
         LOG.debug("Adding name query: {qry={}}", qry);
 
-        if (orderByName) {
+        if ("name".equals(orderByIndex)) {
             addQuery(r.table(table.name)
                     .orderBy().optArg("index", "name")
                     .filter(doc -> doc.g("meta").g("name").match(qry)));
@@ -189,10 +192,10 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
 
     void addFilter(ReqlFunction1... filter) {
         if (listQry == null) {
-            if (orderByName) {
-                listQry = r.table(table.name).orderBy().optArg("index", "name");
-            } else {
+            if (orderByIndex.isEmpty()) {
                 listQry = r.table(table.name);
+            } else {
+                listQry = r.table(table.name).orderBy().optArg("index", orderByIndex);
             }
         }
 
@@ -250,10 +253,10 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
 
     public long executeCount(RethinkDbAdapter db) throws DbException {
         if (listQry == null) {
-            if (orderByName) {
-                listQry = r.table(table.name).orderBy().optArg("index", "name");
-            } else {
+            if (orderByIndex.isEmpty()) {
                 listQry = r.table(table.name);
+            } else {
+                listQry = r.table(table.name).orderBy().optArg("index", orderByIndex);
             }
         }
 
@@ -262,10 +265,10 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
 
     public <R extends Message.Builder> R executeList(RethinkDbAdapter db, R resultBuilder) throws DbException {
         if (listQry == null) {
-            if (orderByName) {
-                listQry = r.table(table.name).orderBy().optArg("index", "name");
-            } else {
+            if (orderByIndex.isEmpty()) {
                 listQry = r.table(table.name);
+            } else {
+                listQry = r.table(table.name).orderBy().optArg("index", orderByIndex);
             }
         }
 

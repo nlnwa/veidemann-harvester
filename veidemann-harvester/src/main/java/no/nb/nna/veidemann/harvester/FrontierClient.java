@@ -30,8 +30,6 @@ public class FrontierClient implements AutoCloseable {
 
     private final ManagedChannel channel;
 
-    private final FrontierGrpc.FrontierBlockingStub blockingStub;
-
     private final FrontierGrpc.FrontierStub asyncStub;
 
     /**
@@ -51,8 +49,7 @@ public class FrontierClient implements AutoCloseable {
         this.controller = controller;
         ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor.Builder(GlobalTracer.get()).build();
         channel = channelBuilder.intercept(tracingInterceptor).build();
-        blockingStub = FrontierGrpc.newBlockingStub(channel);
-        asyncStub = FrontierGrpc.newStub(channel);
+        asyncStub = FrontierGrpc.newStub(channel).withWaitForReady();
         availableSessions = new Semaphore(maxOpenSessions);
     }
 

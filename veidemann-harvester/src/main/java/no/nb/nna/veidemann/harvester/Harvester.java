@@ -81,20 +81,20 @@ public class Harvester {
              ContentWriterClient contentWriterClient = new ContentWriterClient(
                      SETTINGS.getContentWriterHost(), SETTINGS.getContentWriterPort());
 
+             FrontierClient frontierClient = new FrontierClient(controller, SETTINGS.getFrontierHost(), SETTINGS.getFrontierPort(), SETTINGS.getMaxOpenSessions());
+
              RecordingProxy proxy = new RecordingProxy(
                      new File(SETTINGS.getWorkDir()),
                      SETTINGS.getProxyPort(), db, contentWriterClient,
                      new DnsServiceHostResolver(dnsServiceClient), sessionRegistry, SETTINGS.getCacheHost(), SETTINGS.getCachePort());
-
-             FrontierClient frontierClient = new FrontierClient(controller, SETTINGS.getFrontierHost(), SETTINGS.getFrontierPort(), SETTINGS.getMaxOpenSessions());
         ) {
             Runtime.getRuntime().addShutdownHook(new Thread(() -> shouldRun = false));
 
             LOG.info("Veidemann harvester (v. {}) started", Harvester.class.getPackage().getImplementationVersion());
             while (shouldRun) {
-                frontierClient.requestNextPage();
-                // Ensure that the browser gets a little time to settle after a new session is opened
+                // Ensure that the browser gets a little time to settle before opening a new session
                 Thread.sleep(2000);
+                frontierClient.requestNextPage();
             }
         } catch (ConfigException ex) {
             System.err.println("Configuration error: " + ex.getLocalizedMessage());

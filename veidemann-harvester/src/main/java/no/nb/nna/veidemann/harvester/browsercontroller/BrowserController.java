@@ -147,7 +147,7 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
                 sessionRegistry.remove(session);
                 span.finish();
             }
-                } catch (Throwable t) {
+        } catch (Throwable t) {
             LOG.error("Failed loading page", t);
             result.withError(ExtraStatusCodes.RUNTIME_EXCEPTION.toFetchError(t.toString()));
         }

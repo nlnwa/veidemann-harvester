@@ -294,9 +294,16 @@ public class RethinkDbAdapter implements DbAdapter {
                     r.table(TABLES.CRAWL_HOST_GROUP.name).optArg("read_mode", "majority")
                             .get(chgId)
                             .replace(d ->
-                                    r.branch(r.not(d), null, d.g("busy").eq(false).and(d.g("queuedUriCount").eq(0L)), null,
+                                    r.branch(
+                                            // Another service has deleted this CrawlHostGroup, return null (unchanged)
+                                            r.not(d), null,
+                                            // The uri queue for this CrawlHostGroup is empty, delete it by returning null
+                                            d.g("busy").eq(false).and(d.g("queuedUriCount").eq(0L)), null,
+                                            // This is the one we want, set busy to false and return it
                                             d.g("busy").eq(false), d.merge(r.hashMap("busy", true)),
-                                            d.merge(r.hashMap("busy", d.g("busy")))))
+                                            // The CrawlHostGroup is busy, return it unchanged
+                                            d
+                                    ))
                             .optArg("return_changes", true)
                             .optArg("durability", "hard")
             );

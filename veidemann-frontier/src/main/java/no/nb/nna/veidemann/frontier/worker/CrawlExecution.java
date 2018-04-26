@@ -124,7 +124,6 @@ public class CrawlExecution {
             status.setState(CrawlExecutionStatus.State.FETCHING)
                     .setStartTimeIfUnset()
                     .saveStatus();
-            status.saveStatus();
             DbUtil.getInstance().getDb().deleteQueuedUri(qUri.getQueuedUri());
 
             if (isManualAbort() || LimitsCheck.isLimitReached(frontier, limits, status, qUri)) {

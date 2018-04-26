@@ -299,7 +299,7 @@ public class RethinkDbAdapter implements DbAdapter {
                                             r.not(d), null,
                                             // The uri queue for this CrawlHostGroup is empty, delete it by returning null
                                             d.g("busy").eq(false).and(d.g("queuedUriCount").eq(0L)), null,
-                                            // This is the one we want, set busy to false and return it
+                                            // This is the one we want, set busy to true and return it
                                             d.g("busy").eq(false), d.merge(r.hashMap("busy", true)),
                                             // The CrawlHostGroup is busy, return it unchanged
                                             d

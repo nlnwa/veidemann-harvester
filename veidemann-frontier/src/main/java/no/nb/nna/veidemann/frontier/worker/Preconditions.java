@@ -17,17 +17,14 @@ package no.nb.nna.veidemann.frontier.worker;
 
 import no.nb.nna.veidemann.api.ConfigProto.BrowserConfig;
 import no.nb.nna.veidemann.api.ConfigProto.CrawlConfig;
-import no.nb.nna.veidemann.api.ConfigProto.CrawlHostGroupConfig;
 import no.nb.nna.veidemann.api.ConfigProto.PolitenessConfig;
 import no.nb.nna.veidemann.api.ConfigProto.PolitenessConfig.RobotsPolicy;
-import no.nb.nna.veidemann.api.ControllerProto;
 import no.nb.nna.veidemann.commons.ExtraStatusCodes;
 import no.nb.nna.veidemann.commons.db.DbException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.UnknownHostException;
-import java.util.List;
 
 /**
  *
@@ -36,51 +33,42 @@ public class Preconditions {
 
     private static final Logger LOG = LoggerFactory.getLogger(Preconditions.class);
 
-    private static final String DNS_FAILURE = "dns_failure";
+    public enum PreconditionState {
+        OK,
+        DENIED,
+        RETRY,
+        FAIL
+    }
 
     private Preconditions() {
     }
 
-    public static boolean checkPreconditions(Frontier frontier, CrawlConfig config, StatusWrapper status,
-                                             QueuedUriWrapper qUri, long sequence) throws DbException {
+    public static PreconditionState checkPreconditions(Frontier frontier, CrawlConfig config, StatusWrapper status,
+                                             QueuedUriWrapper qUri) throws DbException {
 
         PolitenessConfig politeness = DbUtil.getInstance().getPolitenessConfigForCrawlConfig(config);
         BrowserConfig browserConfig = DbUtil.getInstance().getBrowserConfigForCrawlConfig(config);
 
-        qUri.setExecutionId(status.getId())
-                .setPolitenessId(config.getPolitenessId())
-                .setSequence(sequence)
-                .setJobExecutionId(status.getJobExecutionId());
+        qUri.clearError();
 
         if (!checkRobots(frontier, browserConfig.getUserAgent(), politeness, qUri)) {
             status.incrementDocumentsDenied(1L);
-            return false;
+            return PreconditionState.DENIED;
         }
 
-        resolveDns(frontier, politeness, qUri);
-
-        if (retryLimitReached(politeness, qUri)) {
-            LOG.info("Failed fetching '{}' due to retry limit", qUri.getUri());
-            status.incrementDocumentsFailed();
-            return false;
-        }
-
-        if (qUri.getIp().isEmpty()) {
-            // If ip is empty (caused by failed dns resolution) the value 'dns_failure' is used as crawl host group
-            // To be able so schedule uri for new dns resolution attempt.
-
-            DbUtil.getInstance().getDb().getOrCreateCrawlHostGroup(DNS_FAILURE, config.getPolitenessId());
-            qUri.setCrawlHostGroupId(DNS_FAILURE);
+        if (resolveDns(frontier, politeness, qUri)) {
+            qUri.setResolved(politeness);
+            return PreconditionState.OK;
         } else {
-            setCrawlHostGroup(qUri, politeness);
+            if (LimitsCheck.isRetryLimitReached(politeness, qUri)) {
+                LOG.info("Failed fetching '{}' due to retry limit", qUri.getUri());
+                status.incrementDocumentsFailed();
+                return PreconditionState.FAIL;
+            } else {
+                status.incrementDocumentsRetried();
+                return PreconditionState.RETRY;
+            }
         }
-
-        if (qUri.hasError()) {
-            status.incrementDocumentsRetried();
-        }
-
-        qUri.addUriToQueue();
-        return true;
     }
 
     private static boolean checkRobots(Frontier frontier, String userAgent, PolitenessConfig politeness,
@@ -97,9 +85,9 @@ public class Preconditions {
         return true;
     }
 
-    private static void resolveDns(Frontier frontier, PolitenessConfig politeness, QueuedUriWrapper qUri) {
+    private static boolean resolveDns(Frontier frontier, PolitenessConfig politeness, QueuedUriWrapper qUri) {
         if (!qUri.getIp().isEmpty()) {
-            return;
+            return true;
         }
 
         LOG.debug("Resolve ip for URI '{}'", qUri.getUri());
@@ -110,6 +98,7 @@ public class Preconditions {
                     .getAddress()
                     .getHostAddress();
             qUri.setIp(ip);
+            return true;
         } catch (UnknownHostException ex) {
             LOG.info("Failed ip resolution for URI '{}' by extracting host '{}' and port '{}'",
                     qUri.getUri(),
@@ -120,27 +109,8 @@ public class Preconditions {
             qUri.setError(ExtraStatusCodes.FAILED_DNS.toFetchError(ex.toString()))
                     .setEarliestFetchDelaySeconds(politeness.getRetryDelaySeconds())
                     .incrementRetries();
-        }
-    }
-
-    private static boolean retryLimitReached(PolitenessConfig politeness, QueuedUriWrapper qUri) throws DbException {
-        if (qUri.getRetries() < politeness.getMaxRetries()) {
             return false;
-        } else {
-            DbUtil.getInstance().writeLog(qUri, ExtraStatusCodes.RETRY_LIMIT_REACHED.getCode());
-            return true;
         }
-    }
-
-    private static void setCrawlHostGroup(QueuedUriWrapper qUri, PolitenessConfig politeness) throws DbException {
-        List<CrawlHostGroupConfig> groupConfigs = DbUtil.getInstance().getDb()
-                .listCrawlHostGroupConfigs(ControllerProto.ListRequest.newBuilder()
-                        .addAllLabelSelector(politeness.getCrawlHostGroupSelectorList()).build()).getValueList();
-
-        String crawlHostGroupId = CrawlHostGroupCalculator.calculateCrawlHostGroup(qUri.getIp(), groupConfigs);
-        DbUtil.getInstance().getDb().getOrCreateCrawlHostGroup(crawlHostGroupId, politeness.getId());
-
-        qUri.setCrawlHostGroupId(crawlHostGroupId);
     }
 
 }

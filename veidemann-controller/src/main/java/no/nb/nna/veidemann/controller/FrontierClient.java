@@ -25,8 +25,8 @@ import no.nb.nna.veidemann.api.ConfigProto.Seed;
 import no.nb.nna.veidemann.api.FrontierGrpc;
 import no.nb.nna.veidemann.api.FrontierGrpc.FrontierBlockingStub;
 import no.nb.nna.veidemann.api.FrontierGrpc.FrontierStub;
+import no.nb.nna.veidemann.api.FrontierProto.CrawlExecutionId;
 import no.nb.nna.veidemann.api.FrontierProto.CrawlSeedRequest;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus;
 import no.nb.nna.veidemann.api.MessagesProto.JobExecutionStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,7 +60,7 @@ public class FrontierClient implements AutoCloseable {
         JobExecutionUtil.addFrontierClient(supportedSeedType, this);
     }
 
-    public CrawlExecutionStatus crawlSeed(CrawlJob crawlJob, Seed seed, JobExecutionStatus jobExecution) {
+    public CrawlExecutionId crawlSeed(CrawlJob crawlJob, Seed seed, JobExecutionStatus jobExecution) {
         try {
             CrawlSeedRequest request = CrawlSeedRequest.newBuilder()
                     .setJob(crawlJob)

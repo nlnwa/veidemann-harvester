@@ -15,9 +15,9 @@
  */
 package no.nb.nna.veidemann.frontier.worker;
 
+import no.nb.nna.veidemann.api.ConfigProto.CrawlConfig;
 import no.nb.nna.veidemann.api.FrontierProto.CrawlSeedRequest;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus.State;
 import no.nb.nna.veidemann.commons.ExtraStatusCodes;
 import no.nb.nna.veidemann.commons.client.DnsServiceClient;
 import no.nb.nna.veidemann.commons.client.RobotsServiceClient;
@@ -63,16 +63,11 @@ public class Frontier implements AutoCloseable {
         String uri = request.getSeed().getMeta().getName();
 
         try {
-            QueuedUriWrapper qUri = QueuedUriWrapper.getQueuedUriWrapper(uri, request.getJobExecutionId(), status.getId());
-            boolean isAllowed = Preconditions.checkPreconditions(this,
-                    DbUtil.getInstance().getCrawlConfigForJob(request.getJob()), status, qUri, 1L);
-            if (isAllowed) {
-                LOG.debug("Seed '{}' added to queue", qUri.getUri());
-            } else {
-                LOG.info("Seed '{}' not queueable. Cause: {}", qUri.getUri(), qUri.getError());
-                status.setEndState(State.FINISHED)
-                        .setError(qUri.getError());
-            }
+            CrawlConfig crawlConfig = DbUtil.getInstance().getCrawlConfigForJob(request.getJob());
+            QueuedUriWrapper qUri = QueuedUriWrapper.getQueuedUriWrapper(uri, request.getJobExecutionId(),
+                    status.getId(), crawlConfig.getPolitenessId());
+            qUri.addUriToQueue();
+            LOG.debug("Seed '{}' added to queue", qUri.getUri());
         } catch (URISyntaxException ex) {
             status.incrementDocumentsFailed()
                     .setEndState(CrawlExecutionStatus.State.FAILED)

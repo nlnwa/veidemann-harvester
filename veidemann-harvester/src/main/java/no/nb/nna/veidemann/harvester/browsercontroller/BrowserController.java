@@ -27,6 +27,7 @@ import no.nb.nna.veidemann.api.MessagesProto.PageLog;
 import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
 import no.nb.nna.veidemann.chrome.client.ChromeDebugProtocol;
 import no.nb.nna.veidemann.chrome.client.ChromeDebugProtocolConfig;
+import no.nb.nna.veidemann.chrome.client.ClientClosedException;
 import no.nb.nna.veidemann.commons.ExtraStatusCodes;
 import no.nb.nna.veidemann.commons.VeidemannHeaderConstants;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
@@ -89,73 +90,80 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
         MDC.put("eid", queuedUri.getExecutionId());
         MDC.put("uri", queuedUri.getUri());
 
+        BrowserConfig browserConfig = null;
+        BrowserSession session = null;
         try {
-            BrowserConfig browserConfig = DbHelper.getInstance().getBrowserConfigForCrawlConfig(config);
-            BrowserSession session = new BrowserSession(chrome, browserConfig, queuedUri, span);
-            try {
-                sessionRegistry.put(session);
-
-                session.setBreakpoints();
-                session.setCookies();
-                session.loadPage();
-                session.getCrawlLogs().waitForMatcherToFinish();
-
-                if (session.isPageRenderable()) {
-                    if (config.getExtra().getCreateSnapshot()) {
-                        LOG.debug("Save screenshot");
-                        session.saveScreenshot();
-                    }
-
-                    LOG.debug("Extract outlinks");
-                    try {
-                        List<BrowserScript> scripts = getScripts(browserConfig);
-                        result.withOutlinks(session.extractOutlinks(scripts));
-                    } catch (Throwable t) {
-                        LOG.error("Failed extracting outlinks", t);
-                    }
-
-                    session.scrollToTop();
-
-                } else {
-                    LOG.info("Page is not renderable");
-                }
-                try {
-
-                    LOG.debug("======== PAGELOG ========\n{}", session.getUriRequests());
-
-                    PageLog.Builder pageLog = PageLog.newBuilder()
-                            .setUri(queuedUri.getUri())
-                            .setExecutionId(queuedUri.getExecutionId());
-                    if (session.getUriRequests().getInitialRequest() == null) {
-                        LOG.error("Missing initial request");
-                    } else {
-                        pageLog.setWarcId(session.getUriRequests().getInitialRequest().getWarcId())
-                                .setReferrer(session.getUriRequests().getInitialRequest().getReferrer());
-                    }
-
-                    session.getUriRequests().getPageLogResources().forEach(r -> pageLog.addResource(r));
-                    result.getOutlinks().forEach(o -> pageLog.addOutlink(o.getUri()));
-                    DbHelper.getInstance().getDb().savePageLog(pageLog.build());
-                } catch (Throwable t) {
-                    LOG.error("Failed writing pagelog", t);
-                }
-
-                result.withBytesDownloaded(session.getUriRequests().getBytesDownloaded())
-                        .withUriCount(session.getUriRequests().getUriDownloadedCount());
-            } finally {
+            browserConfig = DbHelper.getInstance().getBrowserConfigForCrawlConfig(config);
+            session = new BrowserSession(chrome, browserConfig, queuedUri, span);
+        } catch (Throwable t) {
+            if (session != null) {
                 session.close();
-                sessionRegistry.remove(session);
-                span.finish();
             }
+            span.finish();
+
+            LOG.error("Failed creating session", t);
+            throw new ClientClosedException(t.toString());
+        }
+
+        try {
+            sessionRegistry.put(session);
+
+            session.setBreakpoints();
+            session.setCookies();
+            session.loadPage();
+            session.getCrawlLogs().waitForMatcherToFinish();
+
+            if (session.isPageRenderable()) {
+                if (config.getExtra().getCreateSnapshot()) {
+                    LOG.debug("Save screenshot");
+                    session.saveScreenshot();
+                }
+
+                LOG.debug("Extract outlinks");
+                try {
+                    List<BrowserScript> scripts = getScripts(browserConfig);
+                    result.withOutlinks(session.extractOutlinks(scripts));
+                } catch (Throwable t) {
+                    LOG.error("Failed extracting outlinks", t);
+                }
+
+                session.scrollToTop();
+
+            } else {
+                LOG.info("Page is not renderable");
+            }
+            try {
+
+                LOG.debug("======== PAGELOG ========\n{}", session.getUriRequests());
+
+                PageLog.Builder pageLog = PageLog.newBuilder()
+                        .setUri(queuedUri.getUri())
+                        .setExecutionId(queuedUri.getExecutionId());
+                if (session.getUriRequests().getInitialRequest() == null) {
+                    LOG.error("Missing initial request");
+                } else {
+                    pageLog.setWarcId(session.getUriRequests().getInitialRequest().getWarcId())
+                            .setReferrer(session.getUriRequests().getInitialRequest().getReferrer());
+                }
+
+                session.getUriRequests().getPageLogResources().forEach(r -> pageLog.addResource(r));
+                result.getOutlinks().forEach(o -> pageLog.addOutlink(o.getUri()));
+                DbHelper.getInstance().getDb().savePageLog(pageLog.build());
+            } catch (Throwable t) {
+                LOG.error("Failed writing pagelog", t);
+            }
+
+            result.withBytesDownloaded(session.getUriRequests().getBytesDownloaded())
+                    .withUriCount(session.getUriRequests().getUriDownloadedCount());
         } catch (Throwable t) {
             LOG.error("Failed loading page", t);
             result.withError(ExtraStatusCodes.RUNTIME_EXCEPTION.toFetchError(t.toString()));
         }
 
-//        result.withBytesDownloaded(session.getUriRequests().getBytesDownloaded())
-//                .withUriCount(session.getUriRequests().getUriDownloadedCount());
+        session.close();
+        sessionRegistry.remove(session);
+        span.finish();
 
-        MDC.clear();
         return result;
     }
 

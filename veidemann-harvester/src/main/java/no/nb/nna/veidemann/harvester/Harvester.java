@@ -90,6 +90,7 @@ public class Harvester {
         ) {
             Runtime.getRuntime().addShutdownHook(new Thread(() -> shouldRun = false));
 
+            Thread.sleep(4000);
             LOG.info("Veidemann harvester (v. {}) started", Harvester.class.getPackage().getImplementationVersion());
             while (shouldRun) {
                 // Ensure that the browser gets a little time to settle before opening a new session

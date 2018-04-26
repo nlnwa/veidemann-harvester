@@ -97,6 +97,7 @@ public class RethinkDbConnection implements AutoCloseable {
                 try {
                     conn.connect();
                 } catch (TimeoutException ex) {
+                    LOG.debug(ex.toString(), ex);
                     throw new DbConnectionException("Timed out waiting for connection", ex);
                 }
             }
@@ -108,10 +109,13 @@ public class RethinkDbConnection implements AutoCloseable {
             if (result instanceof Map
                     && ((Map) result).containsKey("errors")
                     && !((Map) result).get("errors").equals(0L)) {
-                throw new DbQueryException((String) ((Map) result).get("first_error"));
+                DbQueryException ex = new DbQueryException((String) ((Map) result).get("first_error"));
+                LOG.debug(ex.toString(), ex);
+                throw ex;
             }
             return result;
         } catch (ReqlError e) {
+            LOG.debug(e.toString(), e);
             throw new DbQueryException(e.getMessage(), e);
         }
     }

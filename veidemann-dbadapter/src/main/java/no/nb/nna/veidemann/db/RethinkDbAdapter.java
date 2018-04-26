@@ -88,6 +88,7 @@ import org.slf4j.LoggerFactory;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 
@@ -252,121 +253,110 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
-    public CrawlHostGroup getOrCreateCrawlHostGroup(String crawlHostGroupId, String politenessId) throws DbException {
+    public CrawlHostGroup addToCrawlHostGroup(QueuedUri qUri) throws DbException {
+        String crawlHostGroupId = qUri.getCrawlHostGroupId();
+        String politenessId = qUri.getPolitenessId();
+        Objects.requireNonNull(crawlHostGroupId, "CrawlHostGroupId cannot be null");
+        Objects.requireNonNull(politenessId, "PolitenessId cannot be null");
+
         List key = r.array(crawlHostGroupId, politenessId);
         Map<String, Object> response = executeRequest("db-getOrCreateCrawlHostGroup",
-                r.table(TABLES.CRAWL_HOST_GROUP.name)
-                        .insert(r.hashMap("id", key).with("nextFetchTime", r.now()).with("busy", false))
-                        .optArg("conflict", (id, oldDoc, newDoc) -> oldDoc)
+                r.table(TABLES.CRAWL_HOST_GROUP.name).optArg("read_mode", "majority")
+                        .get(key)
+                        .replace(d -> r.branch(r.not(d),
+                                r.hashMap("id", key)
+                                        .with("nextFetchTime", r.now())
+                                        .with("busy", false)
+                                        .with("queuedUriCount", 1L),
+                                d.merge(r.hashMap("queuedUriCount", d.g("queuedUriCount").add(1)))))
                         .optArg("return_changes", "always")
+                        .optArg("durability", "hard")
         );
 
-        Map resultDoc = ((List<Map<String, Map>>) response.get("changes")).get(0).get("new_val");
-
-        CrawlHostGroup chg = CrawlHostGroup.newBuilder()
-                .setId(((List<String>) resultDoc.get("id")).get(0))
-                .setPolitenessId(((List<String>) resultDoc.get("id")).get(1))
-                .setNextFetchTime(ProtoUtils.odtToTs((OffsetDateTime) resultDoc.get("nextFetchTime")))
-                .setBusy((boolean) resultDoc.get("busy"))
-                .build();
-
-        return chg;
+        return buildCrawlHostGroup(((List<Map<String, Map>>) response.get("changes")).get(0).get("new_val"));
     }
 
     @Override
     public FutureOptional<CrawlHostGroup> borrowFirstReadyCrawlHostGroup() throws DbException {
-        Map<String, Object> response = executeRequest("db-borrowFirstReadyCrawlHostGroup",
+        OffsetDateTime nextReadyTime = null;
+
+        Cursor<Map<String, Object>> response = executeRequest("db-borrowFirstReadyCrawlHostGroup",
                 r.table(TABLES.CRAWL_HOST_GROUP.name)
                         .orderBy().optArg("index", "nextFetchTime")
                         .between(r.minval(), r.now()).optArg("right_bound", "closed")
                         .filter(r.hashMap("busy", false))
-                        .limit(1)
-                        .update(r.hashMap("busy", true))
-                        .optArg("return_changes", "always")
         );
 
-        long replaced = (long) response.get("replaced");
-        long unchanged = (long) response.get("unchanged");
+        for (Map<String, Object> chgDoc : response) {
+            Object chgId = chgDoc.get("id");
 
-        if (unchanged == 1L) {
-            // Another thread picked the same CrawlHostGroup during the query (the query is not atomic)
-            // Retry the request.
-            return borrowFirstReadyCrawlHostGroup();
-        }
-
-        if (replaced == 0L) {
-            // No CrawlHostGroup was ready, find time when next will be ready
-            Cursor<Map<String, Object>> cursor = executeRequest("db-borrowFirstReadyCrawlHostGroup-findNext",
-                    r.table(TABLES.CRAWL_HOST_GROUP.name)
-                            .orderBy().optArg("index", "nextFetchTime")
-                            .filter(r.hashMap("busy", false))
-                            .limit(1)
-                            .pluck("nextFetchTime")
+            Map<String, Object> borrowResponse = executeRequest("db-borrowFirstReadyCrawlHostGroup",
+                    r.table(TABLES.CRAWL_HOST_GROUP.name).optArg("read_mode", "majority")
+                            .get(chgId)
+                            .replace(d ->
+                                    r.branch(r.not(d), null, d.g("busy").eq(false).and(d.g("queuedUriCount").eq(0L)), null,
+                                            d.g("busy").eq(false), d.merge(r.hashMap("busy", true)),
+                                            d.merge(r.hashMap("busy", d.g("busy")))))
+                            .optArg("return_changes", true)
+                            .optArg("durability", "hard")
             );
 
-            if (cursor.hasNext()) {
-                return FutureOptional.emptyUntil((OffsetDateTime) cursor.next().get("nextFetchTime"));
+            long replaced = (long) borrowResponse.get("replaced");
+            if (replaced == 1L) {
+                CrawlHostGroup chg = buildCrawlHostGroup(((List<Map<String, Map>>) borrowResponse.get("changes")).get(0).get("new_val"));
+                return FutureOptional.of(chg);
             } else {
-                return FutureOptional.empty();
+                if (nextReadyTime == null) {
+                    nextReadyTime = (OffsetDateTime) chgDoc.get("nextFetchTime");
+                }
             }
         }
 
-        Map resultDoc = ((List<Map<String, Map>>) response.get("changes")).get(0).get("new_val");
-
-        CrawlHostGroup chg = CrawlHostGroup.newBuilder()
-                .setId(((List<String>) resultDoc.get("id")).get(0))
-                .setPolitenessId(((List<String>) resultDoc.get("id")).get(1))
-                .setNextFetchTime(ProtoUtils.odtToTs((OffsetDateTime) resultDoc.get("nextFetchTime")))
-                .setBusy((boolean) resultDoc.get("busy"))
-                .build();
-
-        return FutureOptional.of(chg);
+        if (nextReadyTime == null) {
+            return FutureOptional.empty();
+        } else {
+            return FutureOptional.emptyUntil(nextReadyTime);
+        }
     }
 
     @Override
-    public CrawlHostGroup releaseCrawlHostGroup(CrawlHostGroup crawlHostGroup, long nextFetchDelayMs) throws DbException {
+    public CrawlHostGroup releaseCrawlHostGroup(CrawlHostGroup crawlHostGroup, long nextFetchDelayMs, boolean qUriProcessed) throws DbException {
         List key = r.array(crawlHostGroup.getId(), crawlHostGroup.getPolitenessId());
         double nextFetchDelayS = nextFetchDelayMs / 1000.0;
 
-        // This db update is so important that we retry it a couple of times if it fails.
         Map<String, Object> response = null;
-        int maxAttempts = 3;
-        int attempts = 0;
-        boolean success = false;
-        while (!success) {
-            try {
-                response = executeRequest("db-releaseCrawlHostGroup",
-                        r.table(TABLES.CRAWL_HOST_GROUP.name)
-                                .get(key)
-                                .update(r.hashMap("busy", false).with("nextFetchTime", r.now().add(nextFetchDelayS)))
-                                .optArg("return_changes", "always")
-                );
-                success = true;
-            } catch (DbException e) {
-                attempts++;
-                if (attempts >= maxAttempts) {
-                    LOG.error("Could not release crawl host group", e);
-                    throw e;
-                }
-                // Wait a little in hope that DB had a temporary outage.
-                try {
-                    Thread.sleep(2000L);
-                } catch (InterruptedException e1) {
-                    throw new RuntimeException(e);
-                }
-            }
+        Update qry;
+        if (qUriProcessed) {
+            qry = r.table(TABLES.CRAWL_HOST_GROUP.name).optArg("read_mode", "majority")
+                    .get(key)
+                    .update(chg ->
+                            r.hashMap("busy", false)
+                                    .with("nextFetchTime", r.now().add(nextFetchDelayS))
+                                    .with("queuedUriCount", chg.g("queuedUriCount").sub(1L)))
+                    .optArg("return_changes", "always")
+                    .optArg("durability", "hard");
+        } else {
+            qry = r.table(TABLES.CRAWL_HOST_GROUP.name).optArg("read_mode", "majority")
+                    .get(key)
+                    .update(chg ->
+                            r.hashMap("busy", false)
+                                    .with("nextFetchTime", r.now().add(nextFetchDelayS)))
+                    .optArg("return_changes", "always")
+                    .optArg("durability", "hard");
         }
+        response = executeRequest("db-releaseCrawlHostGroup", qry);
 
-        Map resultDoc = ((List<Map<String, Map>>) response.get("changes")).get(0).get("new_val");
+        return buildCrawlHostGroup(((List<Map<String, Map>>) response.get("changes")).get(0).get("new_val"));
+    }
 
-        CrawlHostGroup chg = CrawlHostGroup.newBuilder()
+    private CrawlHostGroup buildCrawlHostGroup(Map<String, Object> resultDoc) {
+        return CrawlHostGroup.newBuilder()
                 .setId(((List<String>) resultDoc.get("id")).get(0))
                 .setPolitenessId(((List<String>) resultDoc.get("id")).get(1))
                 .setNextFetchTime(ProtoUtils.odtToTs((OffsetDateTime) resultDoc.get("nextFetchTime")))
                 .setBusy((boolean) resultDoc.get("busy"))
+                .setQueuedUriCount((long) resultDoc.get("queuedUriCount"))
                 .build();
-
-        return chg;
     }
 
     @Override
@@ -1073,7 +1063,7 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     private Map summarizeJobExecutionStats(String jobExecutionId) throws DbException {
-        String[] EXECUTIONS_STAT_FIELDS = new String[] {"documentsCrawled", "documentsDenied",
+        String[] EXECUTIONS_STAT_FIELDS = new String[]{"documentsCrawled", "documentsDenied",
                 "documentsFailed", "documentsOutOfScope", "documentsRetried", "urisCrawled", "bytesCrawled"};
 
         return executeRequest("db-summarizeJobExecutionStats",

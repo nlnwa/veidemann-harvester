@@ -57,12 +57,12 @@ public abstract class CrawlTestBase {
         int dbPort = Integer.parseInt(System.getProperty("db.port"));
         System.out.println("Database address: " + dbHost + ":" + dbPort);
 
-        controllerChannel = ManagedChannelBuilder.forAddress(controllerHost, controllerPort).usePlaintext(true).build();
+        controllerChannel = ManagedChannelBuilder.forAddress(controllerHost, controllerPort).usePlaintext().build();
         controllerClient = ControllerGrpc.newBlockingStub(controllerChannel).withWaitForReady();
 
         statusClient = StatusGrpc.newBlockingStub(controllerChannel).withWaitForReady();
 
-        contentWriterChannel = ManagedChannelBuilder.forAddress(contentWriterHost, contentWriterPort).usePlaintext(true)
+        contentWriterChannel = ManagedChannelBuilder.forAddress(contentWriterHost, contentWriterPort).usePlaintext()
                 .build();
         contentWriterClient = ContentWriterGrpc.newBlockingStub(contentWriterChannel).withWaitForReady();
 

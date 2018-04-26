@@ -45,7 +45,7 @@ public class DnsServiceClient implements AutoCloseable {
     private final DnsResolverGrpc.DnsResolverStub asyncStub;
 
     public DnsServiceClient(final String host, final int port) {
-        this(ManagedChannelBuilder.forAddress(host, port).usePlaintext(true));
+        this(ManagedChannelBuilder.forAddress(host, port).usePlaintext());
         LOG.info("DNS service client pointing to " + host + ":" + port);
     }
 

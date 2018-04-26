@@ -22,6 +22,7 @@ import io.opentracing.contrib.OpenTracingContextKey;
 import io.opentracing.tag.Tags;
 import io.opentracing.util.GlobalTracer;
 import no.nb.nna.veidemann.api.FrontierGrpc;
+import no.nb.nna.veidemann.api.FrontierProto.CrawlExecutionId;
 import no.nb.nna.veidemann.api.FrontierProto.CrawlSeedRequest;
 import no.nb.nna.veidemann.api.FrontierProto.PageHarvest;
 import no.nb.nna.veidemann.api.FrontierProto.PageHarvestSpec;
@@ -46,7 +47,7 @@ public class FrontierService extends FrontierGrpc.FrontierImplBase {
     }
 
     @Override
-    public void crawlSeed(CrawlSeedRequest request, StreamObserver<CrawlExecutionStatus> responseObserver) {
+    public void crawlSeed(CrawlSeedRequest request, StreamObserver<CrawlExecutionId> responseObserver) {
         try (ActiveSpan span = GlobalTracer.get()
                 .buildSpan("scheduleSeed")
                 .asChildOf(OpenTracingContextKey.activeSpan())
@@ -56,7 +57,7 @@ public class FrontierService extends FrontierGrpc.FrontierImplBase {
                 .startActive()) {
             CrawlExecutionStatus reply = frontier.scheduleSeed(request);
 
-            responseObserver.onNext(reply);
+            responseObserver.onNext(CrawlExecutionId.newBuilder().setId(reply.getId()).build());
             responseObserver.onCompleted();
         } catch (Exception e) {
             LOG.error(e.getMessage(), e);

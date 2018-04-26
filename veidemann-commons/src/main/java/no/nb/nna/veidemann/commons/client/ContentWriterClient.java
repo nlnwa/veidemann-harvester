@@ -54,7 +54,7 @@ public class ContentWriterClient implements AutoCloseable {
     private final AtomicInteger sessionCount = new AtomicInteger(0);
 
     public ContentWriterClient(final String host, final int port) {
-        this(ManagedChannelBuilder.forAddress(host, port).usePlaintext(true));
+        this(ManagedChannelBuilder.forAddress(host, port).usePlaintext());
         LOG.info("ContentWriter client pointing to " + host + ":" + port);
     }
 

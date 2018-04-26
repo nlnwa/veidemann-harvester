@@ -18,6 +18,7 @@ package no.nb.nna.veidemann.integrationtests;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
 import no.nb.nna.veidemann.api.ReportProto.CrawlLogListReply;
 import no.nb.nna.veidemann.api.ReportProto.CrawlLogListRequest;
+import no.nb.nna.veidemann.commons.ExtraStatusCodes;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.db.DbException;
 
@@ -58,7 +59,10 @@ public class CrawlLogHelper {
         }
 
         List<CrawlLog> typeList = crawlLogsByType.computeIfAbsent(type, k -> new ArrayList<>());
-        typeList.add(crawlLog);
+        if (crawlLog.getStatusCode() != ExtraStatusCodes.RETRY_LIMIT_REACHED.getCode()
+                && !crawlLog.getRequestedUri().endsWith("robots.txt")) {
+            typeList.add(crawlLog);
+        }
 
         List<CrawlLog> eidList = crawlLogsByEid.computeIfAbsent(crawlLog.getExecutionId(), k -> new ArrayList<>());
         eidList.add(crawlLog);

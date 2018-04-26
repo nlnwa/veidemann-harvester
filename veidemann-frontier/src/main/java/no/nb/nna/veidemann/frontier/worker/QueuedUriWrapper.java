@@ -18,6 +18,9 @@ package no.nb.nna.veidemann.frontier.worker;
 import com.google.protobuf.Timestamp;
 import com.google.protobuf.util.Durations;
 import com.google.protobuf.util.Timestamps;
+import no.nb.nna.veidemann.api.ConfigProto.CrawlHostGroupConfig;
+import no.nb.nna.veidemann.api.ConfigProto.PolitenessConfig;
+import no.nb.nna.veidemann.api.ControllerProto;
 import no.nb.nna.veidemann.api.MessagesProto;
 import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
 import no.nb.nna.veidemann.api.MessagesProto.QueuedUriOrBuilder;
@@ -30,6 +33,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.URISyntaxException;
+import java.util.List;
 
 /**
  *
@@ -38,177 +42,251 @@ public class QueuedUriWrapper {
 
     private static final Logger LOG = LoggerFactory.getLogger(QueuedUriWrapper.class);
 
-    private QueuedUri.Builder qUri;
+    private QueuedUri.Builder wrapped;
 
     private Uri surt;
 
     private QueuedUriWrapper(QueuedUriOrBuilder uri) throws URISyntaxException, DbException {
         if (uri instanceof QueuedUri.Builder) {
-            qUri = (QueuedUri.Builder) uri;
+            wrapped = (QueuedUri.Builder) uri;
         } else {
-            qUri = ((QueuedUri) uri).toBuilder();
+            wrapped = ((QueuedUri) uri).toBuilder();
         }
-        if (qUri.getSurt().isEmpty()) {
+        if (wrapped.getSurt().isEmpty()) {
             createSurt();
         }
     }
 
     public static QueuedUriWrapper getQueuedUriWrapper(QueuedUri qUri) throws URISyntaxException, DbException {
+        requireNonEmpty(qUri.getUri(), "Empty URI string");
+        requireNonEmpty(qUri.getJobExecutionId(), "Empty JobExecutionId");
+        requireNonEmpty(qUri.getExecutionId(), "Empty ExecutionId");
+        requireNonEmpty(qUri.getPolitenessId(), "Empty PolitenessId");
+
         return new QueuedUriWrapper(qUri);
     }
 
-    public static QueuedUriWrapper getQueuedUriWrapper(String uri, String jobExecutionId, String executionId)
+    public static QueuedUriWrapper getQueuedUriWrapper(QueuedUriWrapper parentUri, QueuedUri qUri) throws URISyntaxException, DbException {
+        requireNonEmpty(qUri.getUri(), "Empty URI string");
+        requireNonEmpty(parentUri.getJobExecutionId(), "Empty JobExecutionId");
+        requireNonEmpty(parentUri.getExecutionId(), "Empty ExecutionId");
+        requireNonEmpty(parentUri.getPolitenessId(), "Empty PolitenessId");
+
+        QueuedUriWrapper wrapper = new QueuedUriWrapper(qUri)
+                .setJobExecutionId(parentUri.getJobExecutionId())
+                .setExecutionId(parentUri.getExecutionId())
+                .setPolitenessId(parentUri.getPolitenessId());
+        wrapper.wrapped.setUnresolved(true);
+
+        return wrapper;
+    }
+
+    public static QueuedUriWrapper getQueuedUriWrapper(String uri, String jobExecutionId, String executionId, String politenessId)
             throws URISyntaxException, DbException {
         return new QueuedUriWrapper(QueuedUri.newBuilder()
                 .setUri(uri)
                 .setJobExecutionId(jobExecutionId)
                 .setExecutionId(executionId)
+                .setPolitenessId(politenessId)
+                .setUnresolved(true)
+                .setSequence(1L)
         );
     }
 
     public QueuedUriWrapper addUriToQueue() throws DbException {
-        if (qUri.getUri().isEmpty()) {
-            String msg = "Trying to queue a uri with empty uri string";
-            LOG.error(msg);
-            throw new IllegalStateException(msg);
-        }
-        if (qUri.getJobExecutionId().isEmpty()) {
-            String msg = "Uri is missing job execution id. Uri: " + qUri.getUri();
-            LOG.error(msg);
-            throw new IllegalStateException(msg);
-        }
-        if (qUri.getExecutionId().isEmpty()) {
-            String msg = "Uri is missing execution id. Uri: " + qUri.getUri();
-            LOG.error(msg);
-            throw new IllegalStateException(msg);
+        requireNonEmpty(wrapped.getUri(), "Empty URI string");
+        requireNonEmpty(wrapped.getJobExecutionId(), "Empty JobExecutionId");
+        requireNonEmpty(wrapped.getExecutionId(), "Empty ExecutionId");
+        requireNonEmpty(wrapped.getPolitenessId(), "Empty PolitenessId");
+        if (wrapped.getSequence() <= 0) {
+            String msg = "Uri is missing Sequence. Uri: " + wrapped.getUri();
+            IllegalStateException ex = new IllegalStateException(msg);
+            LOG.error(msg, ex);
+            throw ex;
         }
 
-        qUri = DbUtil.getInstance().getDb().saveQueuedUri(qUri.build()).toBuilder();
+        if (wrapped.getUnresolved() && wrapped.getCrawlHostGroupId().isEmpty()) {
+            wrapped.setCrawlHostGroupId(CrawlHostGroupCalculator.createSha1Digest(surt.getDecodedHost()));
+        }
+        requireNonEmpty(wrapped.getCrawlHostGroupId(), "Empty CrawlHostGroupId");
+
+        QueuedUri q = wrapped.build();
+        q = DbUtil.getInstance().getDb().saveQueuedUri(q);
+        DbUtil.getInstance().getDb().addToCrawlHostGroup(q);
+        wrapped = q.toBuilder();
+
         return this;
     }
 
     private void createSurt() throws URISyntaxException, DbException {
-        LOG.debug("Parse URI '{}'", qUri.getUri());
+        LOG.debug("Parse URI '{}'", wrapped.getUri());
         try {
-            surt = UriConfigs.SURT_KEY.buildUri(qUri.getUri());
-            qUri.setSurt(surt.toString());
+            surt = UriConfigs.SURT_KEY.buildUri(wrapped.getUri());
+            wrapped.setSurt(surt.toString());
         } catch (Throwable t) {
-            LOG.info("Unparseable URI '{}'", qUri.getUri());
-            qUri = qUri.setError(ExtraStatusCodes.ILLEGAL_URI.toFetchError());
+            LOG.info("Unparseable URI '{}'", wrapped.getUri());
+            wrapped = wrapped.setError(ExtraStatusCodes.ILLEGAL_URI.toFetchError());
             DbUtil.getInstance().writeLog(this);
-            throw new URISyntaxException(qUri.getUri(), t.getMessage());
+            throw new URISyntaxException(wrapped.getUri(), t.getMessage());
         }
     }
 
     public String getHost() {
-        return UriConfigs.WHATWG.buildUri(qUri.getUri()).getHost();
+        return UriConfigs.WHATWG.buildUri(wrapped.getUri()).getHost();
     }
 
     public int getPort() {
         if (surt == null) {
-            surt = UriConfigs.SURT_KEY.buildUri(qUri.getUri());
+            surt = UriConfigs.SURT_KEY.buildUri(wrapped.getUri());
         }
         return surt.getDecodedPort();
     }
 
     public String getUri() {
-        return qUri.getUri();
+        return wrapped.getUri();
     }
 
     public String getIp() {
-        return qUri.getIp();
+        return wrapped.getIp();
     }
 
     QueuedUriWrapper setIp(String value) {
-        qUri.setIp(value);
+        wrapped.setIp(value);
         return this;
     }
 
     public String getExecutionId() {
-        return qUri.getExecutionId();
+        return wrapped.getExecutionId();
     }
 
     QueuedUriWrapper setExecutionId(String id) {
-        qUri.setExecutionId(id);
+        wrapped.setExecutionId(id);
         return this;
     }
 
     public String getJobExecutionId() {
-        return qUri.getJobExecutionId();
+        return wrapped.getJobExecutionId();
     }
 
     QueuedUriWrapper setJobExecutionId(String id) {
-        qUri.setJobExecutionId(id);
+        wrapped.setJobExecutionId(id);
         return this;
     }
 
     public int getRetries() {
-        return qUri.getRetries();
+        return wrapped.getRetries();
     }
 
     QueuedUriWrapper setRetries(int value) {
-        qUri.setRetries(value);
+        wrapped.setRetries(value);
         return this;
     }
 
     String getDiscoveryPath() {
-        return qUri.getDiscoveryPath();
+        return wrapped.getDiscoveryPath();
     }
 
     String getReferrer() {
-        return qUri.getReferrer();
+        return wrapped.getReferrer();
     }
 
     String getSurt() {
-        return qUri.getSurt();
+        return wrapped.getSurt();
     }
 
     boolean hasError() {
-        return qUri.hasError();
+        return wrapped.hasError();
     }
 
     MessagesProto.Error getError() {
-        return qUri.getError();
+        return wrapped.getError();
     }
 
     QueuedUriWrapper setError(MessagesProto.Error value) {
-        qUri.setError(value);
+        wrapped.setError(value);
         return this;
     }
 
     QueuedUriWrapper clearError() {
-        qUri.clearError();
+        wrapped.clearError();
         return this;
     }
 
     QueuedUriWrapper setCrawlHostGroupId(String value) {
-        qUri.setCrawlHostGroupId(value);
+        wrapped.setCrawlHostGroupId(value);
         return this;
     }
 
     QueuedUriWrapper setEarliestFetchDelaySeconds(int value) {
         Timestamp earliestFetch = Timestamps.add(ProtoUtils.getNowTs(), Durations.fromSeconds(value));
-        qUri.setEarliestFetchTimeStamp(earliestFetch);
+        wrapped.setEarliestFetchTimeStamp(earliestFetch);
         return this;
+    }
+
+    String getPolitenessId() {
+        return wrapped.getPolitenessId();
     }
 
     QueuedUriWrapper setPolitenessId(String value) {
-        qUri.setPolitenessId(value);
+        wrapped.setPolitenessId(value);
         return this;
     }
 
+    public long getSequence() {
+        // Internally use a sequence with base 1 to avoid the value beeing deleted from the protobuf object.
+        return wrapped.getSequence() - 1L;
+    }
+
     QueuedUriWrapper setSequence(long value) {
-        qUri.setSequence(value);
+        if (value < 0L) {
+            throw new IllegalArgumentException("Negative values not allowed");
+        }
+
+        // Internally use a sequence with base 1 to avoid the value beeing deleted from the protobuf object.
+        wrapped.setSequence(value + 1L);
         return this;
     }
 
     QueuedUriWrapper incrementRetries() {
-        qUri.setRetries(qUri.getRetries() + 1);
+        wrapped.setRetries(wrapped.getRetries() + 1);
+        return this;
+    }
+
+    public boolean isUnresolved() {
+        return wrapped.getUnresolved();
+    }
+
+    QueuedUriWrapper setResolved(PolitenessConfig politeness) throws DbException {
+        if (wrapped.getUnresolved() == false) {
+            return this;
+        }
+
+        if (wrapped.getIp().isEmpty()) {
+            String msg = "Can't set Uri to resolved when ip is missing. Uri: " + wrapped.getUri();
+            LOG.error(msg);
+            throw new IllegalStateException(msg);
+        }
+
+        // Calculate CrawlHostGroup
+        List<CrawlHostGroupConfig> groupConfigs = DbUtil.getInstance().getDb()
+                .listCrawlHostGroupConfigs(ControllerProto.ListRequest.newBuilder()
+                        .addAllLabelSelector(politeness.getCrawlHostGroupSelectorList()).build()).getValueList();
+        String crawlHostGroupId = CrawlHostGroupCalculator.calculateCrawlHostGroup(wrapped.getIp(), groupConfigs);
+        wrapped.setCrawlHostGroupId(crawlHostGroupId);
+
+        wrapped.setUnresolved(false);
         return this;
     }
 
     public QueuedUri getQueuedUri() {
-        return qUri.build();
+        return wrapped.build();
+    }
+
+    private static void requireNonEmpty(String obj, String message) {
+        if (obj == null || obj.isEmpty()) {
+            LOG.error(message);
+            throw new NullPointerException(message);
+        }
     }
 
 }

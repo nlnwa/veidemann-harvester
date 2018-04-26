@@ -26,18 +26,19 @@ import no.nb.nna.veidemann.api.ControllerProto;
 import no.nb.nna.veidemann.api.FrontierProto.PageHarvest.Metrics;
 import no.nb.nna.veidemann.api.FrontierProto.PageHarvestSpec;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus;
+import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus.State;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlHostGroup;
 import no.nb.nna.veidemann.api.MessagesProto.Error;
 import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
 import no.nb.nna.veidemann.commons.ExtraStatusCodes;
 import no.nb.nna.veidemann.commons.db.DbException;
+import no.nb.nna.veidemann.frontier.worker.Preconditions.PreconditionState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
 import java.net.URISyntaxException;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  *
@@ -66,13 +67,11 @@ public class CrawlExecution {
 
     private long fetchTimeMs = 0L;
 
-    private final AtomicLong nextSeqNum = new AtomicLong(1L);
-
     private Span span;
 
-    public CrawlExecution(QueuedUri qUri, CrawlHostGroup crawlHostGroup, Frontier frontier) throws DbException {
-        this.status = StatusWrapper.getStatusWrapper(qUri.getExecutionId());
-        this.status.setCurrentUri(qUri.getUri());
+    public CrawlExecution(QueuedUri queuedUri, CrawlHostGroup crawlHostGroup, Frontier frontier) throws DbException {
+        this.status = StatusWrapper.getStatusWrapper(queuedUri.getExecutionId());
+        this.status.setCurrentUri(queuedUri.getUri());
 
         ControllerProto.GetRequest jobRequest = ControllerProto.GetRequest.newBuilder()
                 .setId(status.getJobId())
@@ -80,7 +79,7 @@ public class CrawlExecution {
         CrawlJob job = DbUtil.getInstance().getDb().getCrawlJob(jobRequest);
 
         try {
-            this.qUri = QueuedUriWrapper.getQueuedUriWrapper(qUri).clearError();
+            this.qUri = QueuedUriWrapper.getQueuedUriWrapper(queuedUri).clearError();
         } catch (URISyntaxException ex) {
             throw new RuntimeException(ex);
         }
@@ -89,12 +88,6 @@ public class CrawlExecution {
         this.crawlConfig = DbUtil.getInstance().getCrawlConfigForJob(job);
         this.politenessConfig = DbUtil.getInstance().getPolitenessConfigForCrawlConfig(crawlConfig);
         this.limits = job.getLimits();
-
-        if (crawlConfig.getDepthFirst()) {
-            this.nextSeqNum.set(qUri.getSequence() + 1L);
-        } else {
-            this.nextSeqNum.set(qUri.getDiscoveryPath().length() + 1L);
-        }
     }
 
     public String getId() {
@@ -136,14 +129,33 @@ public class CrawlExecution {
             if (isManualAbort() || LimitsCheck.isLimitReached(frontier, limits, status, qUri)) {
                 delayMs = -1L;
                 return null;
-            } else {
-                LOG.info("Fetching " + qUri.getUri());
-                fetchStart = System.currentTimeMillis();
-                return PageHarvestSpec.newBuilder()
-                        .setQueuedUri(qUri.getQueuedUri())
-                        .setCrawlConfig(crawlConfig)
-                        .build();
             }
+
+            if (qUri.isUnresolved()) {
+                PreconditionState check = Preconditions.checkPreconditions(frontier, crawlConfig, status, qUri);
+                switch (check) {
+                    case DENIED:
+                    case FAIL:
+                        delayMs = -1L;
+                        return null;
+                    case RETRY:
+                        qUri.addUriToQueue();
+                        return null;
+                    case OK:
+                        // IP resolution done, requeue to account for politeness
+                        qUri.addUriToQueue();
+                        return null;
+                }
+            }
+
+            LOG.info("Fetching " + qUri.getUri());
+            fetchStart = System.currentTimeMillis();
+
+            return PageHarvestSpec.newBuilder()
+                    .setQueuedUri(qUri.getQueuedUri())
+                    .setCrawlConfig(crawlConfig)
+                    .build();
+
         } catch (Throwable t) {
             // Errors should be handled elsewhere. Exception here indicates a bug.
             LOG.error("Possible bug: {}", t.toString(), t);
@@ -205,12 +217,17 @@ public class CrawlExecution {
             calculateDelay();
 
             if (qUri.hasError() && qUri.getDiscoveryPath().isEmpty()) {
-                // Seed failed; mark crawl as failed
-                endCrawl(CrawlExecutionStatus.State.FAILED, qUri.getError());
+                if (qUri.getError().getCode() == ExtraStatusCodes.PRECLUDED_BY_ROBOTS.getCode()) {
+                    // Seed precluded by robots.txt; mark crawl as finished
+                    endCrawl(State.FINISHED, qUri.getError());
+                } else {
+                    // Seed failed; mark crawl as failed
+                    endCrawl(State.FAILED, qUri.getError());
+                }
             } else if (DbUtil.getInstance().getDb().queuedUriCount(getId()) == 0) {
-                endCrawl(CrawlExecutionStatus.State.FINISHED);
-            } else if (status.getState() == CrawlExecutionStatus.State.FETCHING) {
-                status.setState(CrawlExecutionStatus.State.SLEEPING);
+                endCrawl(State.FINISHED);
+            } else if (status.getState() == State.FETCHING) {
+                status.setState(State.SLEEPING);
             }
 
             // Recheck if user aborted crawl while fetching last uri.
@@ -225,7 +242,7 @@ public class CrawlExecution {
         }
 
         try {
-            DbUtil.getInstance().getDb().releaseCrawlHostGroup(getCrawlHostGroup(), getDelay(TimeUnit.MILLISECONDS));
+            DbUtil.getInstance().getDb().releaseCrawlHostGroup(getCrawlHostGroup(), getDelay(TimeUnit.MILLISECONDS), true);
         } catch (DbException e) {
             LOG.error("Error releasing CrawlHostGroup: {}", e.toString(), e);
         } catch (Throwable t) {
@@ -238,11 +255,25 @@ public class CrawlExecution {
 
     public void queueOutlink(QueuedUri outlink) throws DbException {
         try {
-            QueuedUriWrapper outUri = QueuedUriWrapper.getQueuedUriWrapper(outlink);
+            QueuedUriWrapper outUri = QueuedUriWrapper.getQueuedUriWrapper(qUri, outlink);
 
             if (shouldInclude(outUri)) {
-                Preconditions.checkPreconditions(frontier, crawlConfig, status, outUri, getNextSequenceNum());
-                LOG.debug("Found new URI: {}, queueing.", outUri.getSurt());
+                outUri.setSequence(outUri.getDiscoveryPath().length());
+
+                PreconditionState check = Preconditions.checkPreconditions(frontier, crawlConfig, status, outUri);
+                switch (check) {
+                    case OK:
+                        LOG.debug("Found new URI: {}, queueing.", outUri.getSurt());
+                        outUri.addUriToQueue();
+                        break;
+                    case RETRY:
+                        LOG.debug("Failed preconditions for: {}, queueing for retry.", outUri.getSurt());
+                        outUri.addUriToQueue();
+                        break;
+                    case FAIL:
+                    case DENIED:
+                        break;
+                }
             }
         } catch (URISyntaxException ex) {
             status.incrementDocumentsFailed();
@@ -294,22 +325,18 @@ public class CrawlExecution {
         return unit.convert(delayMs, TimeUnit.MILLISECONDS);
     }
 
-    public long getNextSequenceNum() {
-        if (crawlConfig.getDepthFirst()) {
-            return nextSeqNum.addAndGet(1000L);
-        } else {
-            return nextSeqNum.get();
-        }
-    }
-
     private void retryUri(QueuedUriWrapper qUri, Error error) throws DbException {
-
         LOG.info("Failed fetching ({}) at attempt #{}", qUri, qUri.getRetries());
         qUri.incrementRetries()
                 .setEarliestFetchDelaySeconds(politenessConfig.getRetryDelaySeconds())
                 .setError(error);
 
-        Preconditions.checkPreconditions(frontier, crawlConfig, status, qUri, qUri.getQueuedUri().getSequence());
+        if (LimitsCheck.isRetryLimitReached(politenessConfig, qUri)) {
+            LOG.info("Failed fetching '{}' due to retry limit", qUri.getUri());
+            status.incrementDocumentsFailed();
+        } else {
+            qUri.addUriToQueue();
+        }
     }
 
     private void endCrawl(CrawlExecutionStatus.State state) {

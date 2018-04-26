@@ -19,11 +19,15 @@ import no.nb.nna.veidemann.api.ConfigProto;
 import no.nb.nna.veidemann.api.ConfigProto.CrawlJob;
 import no.nb.nna.veidemann.api.ConfigProto.CrawlLimitsConfig;
 import no.nb.nna.veidemann.api.ControllerProto;
+import no.nb.nna.veidemann.api.MessagesProto.JobExecutionStatus;
 import no.nb.nna.veidemann.commons.VeidemannHeaderConstants;
 import no.nb.nna.veidemann.commons.db.DbException;
 import org.junit.Test;
 
+import java.util.AbstractMap.SimpleEntry;
 import java.util.concurrent.ExecutionException;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  *
@@ -56,12 +60,8 @@ public class SimpleCrawlIT extends CrawlTestBase implements VeidemannHeaderConst
                 .setSeedId(seed.getId())
                 .build();
 
-        System.out.println("Job execution result:\n" + JobCompletion.executeJob(statusClient, request).get());
-
-        // TODO: check these values instead of just printing
-        System.out.println("WARC RECORDS");
-        WarcInspector.getWarcFiles().getRecordStream().forEach(r -> System.out.println(r.header.warcTypeStr + " -- "
-                + r.header.warcTargetUriStr + ", ip: " + r.header.warcIpAddress));
+        JobExecutionStatus jes = JobCompletion.executeJob(db, statusClient, controllerClient, request).get();
+        assertThat(jes.getExecutionsStateMap()).contains(new SimpleEntry<>("FINISHED", 1), new SimpleEntry<>("FAILED", 0));
 
         // The goal is to get as low as 14 when we cache 404, 302, etc
         new CrawlExecutionValidator(db)
@@ -71,7 +71,8 @@ public class SimpleCrawlIT extends CrawlTestBase implements VeidemannHeaderConst
                 .checkCrawlLogCount("dns", 0)
                 .checkPageLogCount(6);
 
-        System.out.println("Job execution result:\n" + JobCompletion.executeJob(statusClient, request).get());
+        jes = JobCompletion.executeJob(db, statusClient, controllerClient, request).get();
+        assertThat(jes.getExecutionsStateMap()).contains(new SimpleEntry<>("FINISHED", 1), new SimpleEntry<>("FAILED", 0));
 
         new CrawlExecutionValidator(db)
                 .validate()

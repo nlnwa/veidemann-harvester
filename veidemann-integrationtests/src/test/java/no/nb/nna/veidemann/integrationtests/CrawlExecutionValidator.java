@@ -132,11 +132,18 @@ public class CrawlExecutionValidator {
         crawlExecutions.getCrawlExecutionStatus().forEach(ces -> {
             System.out.println(CrawlExecutionsHelper.formatCrawlExecution(ces));
             List<CrawlLog> logs = crawlLogs.getCrawlLogsByExecutionId(ces.getId());
-            assertThat(logs.stream().filter(cl -> cl.getStatusCode() != ExtraStatusCodes.RETRY_LIMIT_REACHED.getCode()).count())
+            logs.forEach(c -> System.out.println("  " + c.getStatusCode() + " - " + c.getRequestedUri()));
+            assertThat(logs.stream()
+                    .filter(cl -> (cl.getStatusCode() != ExtraStatusCodes.RETRY_LIMIT_REACHED.getCode()
+                            && !cl.getRequestedUri().endsWith("robots.txt")))
+                    .count())
                     .as("Mismatch between CrawlExecutionStatus.getDocumentsCrawled and CrawlLog count")
                     .isEqualTo((int) ces.getUrisCrawled());
 
-            long summarizedSize = logs.stream().collect(Collectors.summingLong(v -> v.getSize()));
+            long summarizedSize = logs.stream()
+                    .filter(cl -> (cl.getStatusCode() != ExtraStatusCodes.RETRY_LIMIT_REACHED.getCode()
+                            && !cl.getRequestedUri().endsWith("robots.txt")))
+                    .collect(Collectors.summingLong(v -> v.getSize()));
             assertThat(summarizedSize)
                     .as("Mismatch between CrawlExecutionStatus.getBytesCrawled and sum CrawlLogs size")
                     .isEqualTo(ces.getBytesCrawled());

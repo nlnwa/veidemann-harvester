@@ -64,7 +64,7 @@ public class CrawlHostGroupCalculator {
         return (toCheck.compareTo(rangeStart) >= 0 && toCheck.compareTo(rangeEnd) <= 0);
     }
 
-    private static String createSha1Digest(String val) {
+    public static String createSha1Digest(String val) {
         try {
             MessageDigest md = MessageDigest.getInstance("SHA-1");
             md.update(val.getBytes());

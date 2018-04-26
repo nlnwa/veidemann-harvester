@@ -51,7 +51,7 @@ public class QueueWorker {
      *
      * @return
      */
-    public synchronized CrawlExecution getNextToFetch() throws InterruptedException {
+    public CrawlExecution getNextToFetch() throws InterruptedException {
         long sleep = 0L;
 
         while (true) {
@@ -70,18 +70,19 @@ public class QueueWorker {
 
                     if (foqu.isPresent()) {
                         // A fetchabel URI was found, return it
-                        LOG.debug("Found Queued URI: >>{}<<", foqu.get());
+                        LOG.debug("Found Queued URI: {}, crawlHostGroup: {}, sequence: {}",
+                                foqu.get().getUri(), foqu.get().getCrawlHostGroupId(), foqu.get().getSequence());
                         return new CrawlExecution(foqu.get(), crawlHostGroup.get(), frontier);
                     } else if (foqu.isMaybeInFuture()) {
                         // A URI was found, but isn't fetchable yet. Wait for it
                         LOG.debug("Queued URI might be available at: {}", foqu.getWhen());
-                        sleep = (foqu.getDelayMs());
+                        sleep = foqu.getDelayMs();
                     } else {
                         // No URI found for this CrawlHostGroup. Wait for RESCHEDULE_DELAY and try again.
                         LOG.trace("No Queued URI found waiting {}ms before retry", RESCHEDULE_DELAY);
                         sleep = RESCHEDULE_DELAY;
                     }
-                    DbUtil.getInstance().getDb().releaseCrawlHostGroup(crawlHostGroup.get(), sleep);
+                    DbUtil.getInstance().getDb().releaseCrawlHostGroup(crawlHostGroup.get(), sleep, false);
                 } else {
                     // No CrawlHostGroup ready. Wait a moment and try again
                     sleep = RESCHEDULE_DELAY;

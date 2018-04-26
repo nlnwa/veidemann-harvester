@@ -190,6 +190,9 @@
                                         <ports>
                                             <port>+browser.host:browser.port:9222</port>
                                         </ports>
+                                        <dependsOn>
+                                            <container>db-initializer</container>
+                                        </dependsOn>
                                         <env>
                                             <CHROME_OPTS>--proxy-server=harvester:8080 --hide-scrollbars --disable-dev-shm-usage</CHROME_OPTS>
                                         </env>
@@ -203,7 +206,7 @@
                                         </log>
                                         <wait>
                                             <log>DevTools listening on.*</log>
-                                            <time>20000</time>
+                                            <time>30000</time>
                                         </wait>
                                     </run>
                                 </image>
@@ -220,17 +223,8 @@
                                             <port>+harvester.proxy.host:harvester.proxy.port:8080</port>
                                             <port>+harvester.host:harvester.port:9090</port>
                                         </ports>
-                                        <capAdd>
-                                            <add>NET_ADMIN</add>
-                                        </capAdd>
                                         <dependsOn>
                                             <container>db-initializer</container>
-                                            <container>browser</container>
-                                            <container>contentwriter</container>
-                                            <container>testsites</container>
-                                            <container>robots</container>
-                                            <container>dnsresolver</container>
-                                            <container>frontier</container>
                                         </dependsOn>
                                         <volumes>
                                             <bind>
@@ -249,13 +243,14 @@
                                             <DNS_RESOLVER_HOST>dnsresolver</DNS_RESOLVER_HOST>
                                             <DNS_RESOLVER_PORT>50052</DNS_RESOLVER_PORT>
                                             <CACHE_HOST>cache</CACHE_HOST>
+                                            <MAX_OPEN_SESSIONS>3</MAX_OPEN_SESSIONS>
                                         </env>
                                         <log>
                                             <enabled>true</enabled>
                                         </log>
                                         <wait>
                                             <log>Veidemann harvester .* started</log>
-                                            <time>20000</time>
+                                            <time>30000</time>
                                         </wait>
                                     </run>
                                 </image>
@@ -303,7 +298,7 @@
                                                     <port>3128</port>
                                                 </ports>
                                             </tcp>
-                                            <time>20000</time>
+                                            <time>30000</time>
                                         </wait>
                                     </run>
                                 </image>
@@ -338,7 +333,7 @@
                                         </log>
                                         <wait>
                                             <log>Veidemann Content Writer .* started</log>
-                                            <time>20000</time>
+                                            <time>30000</time>
                                         </wait>
                                     </run>
                                 </image>
@@ -372,7 +367,7 @@
                                         </log>
                                         <wait>
                                             <log>Veidemann Content Explorer .* started</log>
-                                            <time>20000</time>
+                                            <time>30000</time>
                                         </wait>
                                     </run>
                                 </image>
@@ -403,7 +398,7 @@
                                         </log>
                                         <wait>
                                             <log>Veidemann Frontier .* started</log>
-                                            <time>20000</time>
+                                            <time>30000</time>
                                         </wait>
                                     </run>
                                 </image>
@@ -437,7 +432,7 @@
                                         </log>
                                         <wait>
                                             <log>Veidemann Controller .* started</log>
-                                            <time>20000</time>
+                                            <time>30000</time>
                                         </wait>
                                     </run>
                                 </image>
@@ -455,7 +450,6 @@
                                         </ports>
                                         <dependsOn>
                                             <container>db-initializer</container>
-                                            <container>contentwriter</container>
                                         </dependsOn>
                                         <env>
                                             <DB_HOST>db</DB_HOST>
@@ -468,7 +462,7 @@
                                         </log>
                                         <wait>
                                             <log>Veidemann Dns Service .* started</log>
-                                            <time>20000</time>
+                                            <time>30000</time>
                                         </wait>
                                     </run>
                                 </image>
@@ -496,7 +490,7 @@
                                         </log>
                                         <wait>
                                             <log>Veidemann Robots Evaluator .* started</log>
-                                            <time>20000</time>
+                                            <time>30000</time>
                                         </wait>
                                     </run>
                                 </image>
@@ -525,7 +519,7 @@
                                                     <port>53</port>
                                                 </ports>
                                             </tcp>
-                                            <time>20000</time>
+                                            <time>30000</time>
                                         </wait>
                                     </run>
                                 </image>

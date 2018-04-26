@@ -20,7 +20,6 @@ import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.db.RethinkDbAdapter;
 import no.nb.nna.veidemann.db.RethinkDbAdapter.TABLES;
 import no.nb.nna.veidemann.db.RethinkDbConnection;
-import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -45,13 +44,6 @@ public class DbInitializerTestIT {
             if (!e.getMessage().matches("Database .* does not exist.")) {
                 throw e;
             }
-        }
-    }
-
-    @AfterClass
-    public static void tearDown() throws Exception {
-        if (db != null) {
-            db.close();
         }
     }
 

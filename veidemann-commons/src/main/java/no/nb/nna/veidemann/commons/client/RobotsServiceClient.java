@@ -45,7 +45,7 @@ public class RobotsServiceClient implements AutoCloseable {
     private final RobotsEvaluatorGrpc.RobotsEvaluatorStub asyncStub;
 
     public RobotsServiceClient(final String host, final int port) {
-        this(ManagedChannelBuilder.forAddress(host, port).usePlaintext(true));
+        this(ManagedChannelBuilder.forAddress(host, port).usePlaintext());
         LOG.info("Robots service client pointing to " + host + ":" + port);
     }
 

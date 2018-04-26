@@ -1,6 +1,8 @@
 package no.nb.nna.veidemann.integrationtests;
 
+import com.rethinkdb.RethinkDB;
 import com.rethinkdb.net.Cursor;
+import no.nb.nna.veidemann.api.ControllerGrpc;
 import no.nb.nna.veidemann.api.ControllerProto;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus;
 import no.nb.nna.veidemann.api.MessagesProto.JobExecutionStatus;
@@ -9,6 +11,7 @@ import no.nb.nna.veidemann.api.StatusProto.ExecutionId;
 import no.nb.nna.veidemann.api.StatusProto.ListExecutionsRequest;
 import no.nb.nna.veidemann.commons.util.ApiTools.ListReplyWalker;
 import no.nb.nna.veidemann.db.ProtoUtils;
+import no.nb.nna.veidemann.db.RethinkDbAdapter;
 import no.nb.nna.veidemann.db.RethinkDbAdapter.TABLES;
 
 import java.util.ArrayList;
@@ -20,6 +23,8 @@ import java.util.concurrent.RunnableFuture;
 import java.util.stream.StreamSupport;
 
 public class JobCompletion extends ForkJoinTask<JobExecutionStatus> implements RunnableFuture<JobExecutionStatus> {
+    static RethinkDB r = RethinkDB.r;
+
     final StatusGrpc.StatusBlockingStub statusClient;
 
     final String jobExecutionId;
@@ -28,22 +33,28 @@ public class JobCompletion extends ForkJoinTask<JobExecutionStatus> implements R
 
     JobExecutionStatus result;
 
-    public static JobCompletion executeJob(StatusGrpc.StatusBlockingStub statusClient, ControllerProto.RunCrawlRequest crawlRequest) {
-        return (JobCompletion) ForkJoinPool.commonPool().submit((ForkJoinTask) new JobCompletion(statusClient, crawlRequest));
+    RethinkDbAdapter db;
+
+    public static JobCompletion executeJob(RethinkDbAdapter db, StatusGrpc.StatusBlockingStub statusClient,
+                                           ControllerGrpc.ControllerBlockingStub controllerClient,
+                                           ControllerProto.RunCrawlRequest crawlRequest) {
+        return (JobCompletion) ForkJoinPool.commonPool().submit(
+                (ForkJoinTask) new JobCompletion(db, statusClient, controllerClient, crawlRequest));
     }
 
-
-    JobCompletion(StatusGrpc.StatusBlockingStub statusClient, ControllerProto.RunCrawlRequest request) {
+    JobCompletion(RethinkDbAdapter db, StatusGrpc.StatusBlockingStub statusClient,
+                  ControllerGrpc.ControllerBlockingStub controllerClient, ControllerProto.RunCrawlRequest request) {
+        this.db = db;
         this.statusClient = statusClient;
 
-        ControllerProto.RunCrawlReply crawlReply = MultiSiteCrawlIT.controllerClient.runCrawl(request);
+        ControllerProto.RunCrawlReply crawlReply = controllerClient.runCrawl(request);
 
         jobExecutionId = crawlReply.getJobExecutionId();
         eIds = new ArrayList<>();
 
         ListReplyWalker<ListExecutionsRequest, CrawlExecutionStatus> w = new ListReplyWalker<>();
         w.walk(ListExecutionsRequest.newBuilder().setJobExecutionId(jobExecutionId),
-                r -> MultiSiteCrawlIT.statusClient.listExecutions(r),
+                r -> statusClient.listExecutions(r),
                 s -> eIds.add(s.getId()));
     }
 
@@ -65,9 +76,9 @@ public class JobCompletion extends ForkJoinTask<JobExecutionStatus> implements R
     @Override
     protected boolean exec() {
         try {
-            Cursor<Map<String, Object>> cursor = MultiSiteCrawlIT.db.executeRequest("list", MultiSiteCrawlIT.r.table(TABLES.JOB_EXECUTIONS.name)
+            Cursor<Map<String, Object>> cursor = db.executeRequest("list", r.table(TABLES.JOB_EXECUTIONS.name)
                     .get(jobExecutionId)
-                    .changes());
+                    .changes().optArg("include_initial", true));
 
             StreamSupport.stream(cursor.spliterator(), false)
                     .filter(e -> e.containsKey("new_val"))

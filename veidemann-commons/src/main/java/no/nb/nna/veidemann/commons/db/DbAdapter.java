@@ -129,11 +129,11 @@ public interface DbAdapter extends AutoCloseable {
      */
     FutureOptional<QueuedUri> getNextQueuedUriToFetch(CrawlHostGroup crawlHostGroup) throws DbException;
 
-    CrawlHostGroup getOrCreateCrawlHostGroup(String crawlHostGroupId, String politenessId) throws DbException;
+    CrawlHostGroup addToCrawlHostGroup(QueuedUri qUri) throws DbException;
 
     FutureOptional<CrawlHostGroup> borrowFirstReadyCrawlHostGroup() throws DbException;
 
-    CrawlHostGroup releaseCrawlHostGroup(CrawlHostGroup crawlHostGroup, long nextFetchDelayMs) throws DbException;
+    CrawlHostGroup releaseCrawlHostGroup(CrawlHostGroup crawlHostGroup, long nextFetchDelayMs, boolean qUriProcessed) throws DbException;
 
     ScreenshotListReply listScreenshots(ScreenshotListRequest request) throws DbException;
 

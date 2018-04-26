@@ -30,8 +30,6 @@ public class FrontierClient implements AutoCloseable {
 
     private final ManagedChannel channel;
 
-    private final FrontierGrpc.FrontierBlockingStub blockingStub;
-
     private final FrontierGrpc.FrontierStub asyncStub;
 
     /**
@@ -51,8 +49,7 @@ public class FrontierClient implements AutoCloseable {
         this.controller = controller;
         ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor.Builder(GlobalTracer.get()).build();
         channel = channelBuilder.intercept(tracingInterceptor).build();
-        blockingStub = FrontierGrpc.newBlockingStub(channel);
-        asyncStub = FrontierGrpc.newStub(channel);
+        asyncStub = FrontierGrpc.newStub(channel).withWaitForReady();
         availableSessions = new Semaphore(maxOpenSessions);
     }
 
@@ -86,6 +83,8 @@ public class FrontierClient implements AutoCloseable {
             MDC.put("uri", fetchUri.getUri());
 
             try {
+                LOG.debug("Start page rendering");
+
                 RenderResult result = controller.render(fetchUri, pageHarvestSpec.getCrawlConfig());
 
                 PageHarvest.Builder reply = PageHarvest.newBuilder();
@@ -105,10 +104,19 @@ public class FrontierClient implements AutoCloseable {
                 });
 
                 requestObserver.onCompleted();
+
+                LOG.debug("Page rendering completed");
             } catch (ClientClosedException ex) {
                 LOG.error("Chrome client can't contact chrome, shutting down", ex);
                 Status status = Status.UNAVAILABLE.withDescription(ex.toString());
                 requestObserver.onError(status.asException());
+
+                // Wait a little before shutting down to allow logs to flush
+                try {
+                    Thread.sleep(3000L);
+                } catch (InterruptedException e) {
+                    // OK
+                }
                 System.exit(1);
             } catch (MaxActiveSessionsExceededException ex) {
                 LOG.debug(ex.getMessage(), ex);
@@ -119,6 +127,7 @@ public class FrontierClient implements AutoCloseable {
                 Status status = Status.UNKNOWN.withDescription(ex.toString());
                 requestObserver.onError(status.asException());
             } finally {
+                MDC.clear();
                 availableSessions.release();
             }
         }

@@ -16,6 +16,8 @@
 package no.nb.nna.veidemann.frontier.worker;
 
 import com.google.protobuf.util.Timestamps;
+import no.nb.nna.veidemann.api.ConfigProto.PolitenessConfig;
+import no.nb.nna.veidemann.commons.ExtraStatusCodes;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.db.ProtoUtils;
 import no.nb.nna.veidemann.api.ConfigProto;
@@ -94,6 +96,17 @@ public class LimitsCheck {
         }
 
         return false;
+    }
+
+    public static boolean isRetryLimitReached(PolitenessConfig politeness, QueuedUriWrapper qUri) throws DbException {
+        if (qUri.getRetries() < politeness.getMaxRetries()) {
+            qUri.clearError();
+            return false;
+        } else {
+            qUri.setError(ExtraStatusCodes.RETRY_LIMIT_REACHED.toFetchError());
+            DbUtil.getInstance().writeLog(qUri, ExtraStatusCodes.RETRY_LIMIT_REACHED.getCode());
+            return true;
+        }
     }
 
     private static int calculateDepth(QueuedUriWrapper qUri) {

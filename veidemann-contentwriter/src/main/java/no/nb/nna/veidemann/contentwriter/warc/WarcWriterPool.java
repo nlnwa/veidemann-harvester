@@ -46,6 +46,7 @@ public class WarcWriterPool implements AutoCloseable {
     /**
      * Creates the pool.
      * <p>
+     *
      * @param poolSize maximum number of writers residing in the pool
      */
     public WarcWriterPool(final String filePrefix, final File targetDir, final long maxFileSize, final boolean compress,
@@ -63,6 +64,7 @@ public class WarcWriterPool implements AutoCloseable {
     /**
      * Gets the next free object from the pool.
      * <p>
+     *
      * @return T borrowed object
      */
     public PooledWarcWriter borrow() throws InterruptedException {
@@ -86,6 +88,7 @@ public class WarcWriterPool implements AutoCloseable {
     /**
      * Returns object back to the pool.
      * <p>
+     *
      * @param object object to be returned
      */
     public void release(PooledWarcWriter object) {
@@ -122,7 +125,7 @@ public class WarcWriterPool implements AutoCloseable {
                 int s = poolSize.get();
                 for (int i = 0; i < s; i++) {
                     try {
-                        pool.takeFirst().close();
+                        pool.takeFirst().closeWarcFile();
                     } catch (Exception ex) {
                         // Can't do anything but close the others
                     }
@@ -175,5 +178,8 @@ public class WarcWriterPool implements AutoCloseable {
             release(this);
         }
 
+        public void closeWarcFile() throws Exception {
+            warcWriter.close();
+        }
     }
 }

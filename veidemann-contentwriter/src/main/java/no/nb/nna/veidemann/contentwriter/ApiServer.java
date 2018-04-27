@@ -16,9 +16,6 @@
 
 package no.nb.nna.veidemann.contentwriter;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
-
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.opentracing.contrib.ServerTracingInterceptor;
@@ -29,12 +26,16 @@ import no.nb.nna.veidemann.contentwriter.warc.WarcWriterPool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+
 /**
  *
  */
 public class ApiServer implements AutoCloseable {
-private static final Logger LOG = LoggerFactory.getLogger(ApiServer.class);
+    private static final Logger LOG = LoggerFactory.getLogger(ApiServer.class);
     private final Server server;
+    private final WarcWriterPool warcWriterPool;
 
     /**
      * Construct a new REST API server.
@@ -50,6 +51,7 @@ private static final Logger LOG = LoggerFactory.getLogger(ApiServer.class);
                         ServerTracingInterceptor.ServerRequestAttribute.METHOD_TYPE)
                 .build();
 
+        this.warcWriterPool = warcWriterPool;
         server = serverBuilder.addService(tracingInterceptor.intercept(new ContentWriterService(db, warcWriterPool, textExtractor))).build();
     }
 
@@ -78,6 +80,9 @@ private static final Logger LOG = LoggerFactory.getLogger(ApiServer.class);
 
     @Override
     public void close() {
+        if (warcWriterPool != null) {
+            warcWriterPool.close();
+        }
         if (server != null) {
             server.shutdown();
         }

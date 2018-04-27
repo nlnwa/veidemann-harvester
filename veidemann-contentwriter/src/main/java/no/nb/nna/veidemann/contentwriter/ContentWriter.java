@@ -15,8 +15,6 @@
  */
 package no.nb.nna.veidemann.contentwriter;
 
-import java.io.File;
-
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigBeanFactory;
 import com.typesafe.config.ConfigException;
@@ -31,6 +29,8 @@ import no.nb.nna.veidemann.db.RethinkDbAdapter;
 import no.nb.nna.veidemann.db.RethinkDbConnection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.File;
 
 /**
  * Class for launching the service.
@@ -78,8 +78,6 @@ public class ContentWriter {
 
             LOG.info("Veidemann Content Writer (v. {}) started",
                     ContentWriter.class.getPackage().getImplementationVersion());
-
-            Runtime.getRuntime().addShutdownHook(new Thread(() -> warcWriterPool.close()));
 
             try {
                 Thread.currentThread().join();

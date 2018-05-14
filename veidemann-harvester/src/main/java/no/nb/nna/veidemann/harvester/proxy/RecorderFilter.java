@@ -222,7 +222,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                     if (res.headers().get("X-Cache-Lookup", "MISS").contains("HIT")) {
                         foundInCache = true;
 
-                        LOG.info("Found in cache");
+                        LOG.debug("Found in cache");
                         requestSpan.log("Loaded from cache");
                     }
 

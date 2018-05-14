@@ -57,7 +57,11 @@ public class FrontierClient implements AutoCloseable {
         availableSessions.acquire();
         ResponseObserver responseObserver = new ResponseObserver();
 
-        StreamObserver<PageHarvest> requestObserver = asyncStub.getNextPage(responseObserver);
+        FrontierGrpc.FrontierStub s = asyncStub
+                .withDeadlineAfter(10, TimeUnit.MINUTES);
+
+        StreamObserver<PageHarvest> requestObserver = s
+                .getNextPage(responseObserver);
         responseObserver.setRequestObserver(requestObserver);
 
         try {
@@ -128,19 +132,23 @@ public class FrontierClient implements AutoCloseable {
                 requestObserver.onError(status.asException());
             } finally {
                 MDC.clear();
-                availableSessions.release();
             }
         }
 
         @Override
         public void onError(Throwable t) {
             Status status = Status.fromThrowable(t);
-            LOG.warn("Get next page failed: {}", status);
+            if (status.getCode().equals(Status.DEADLINE_EXCEEDED.getCode())) {
+                LOG.info("Deadline expired while talking to the frontier", status);
+            } else {
+                LOG.warn("Get next page failed: {}", status);
+            }
             availableSessions.release();
         }
 
         @Override
         public void onCompleted() {
+            availableSessions.release();
         }
     }
 

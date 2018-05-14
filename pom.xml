@@ -53,8 +53,8 @@
         <io.opentracing.version>0.30.0</io.opentracing.version>
         <io.opentracing.brave.version>0.20.0</io.opentracing.brave.version>
         <com.uber.jaeger.version>0.21.0</com.uber.jaeger.version>
-        <io.grpc.version>1.11.0</io.grpc.version>
-        <io.grpc.protoc-gen-grpc-java.version>1.11.0</io.grpc.protoc-gen-grpc-java.version>
+        <io.grpc.version>1.12.0</io.grpc.version>
+        <io.grpc.protoc-gen-grpc-java.version>1.12.0</io.grpc.protoc-gen-grpc-java.version>
         <com.google.protobuf.protoc.version>3.5.1</com.google.protobuf.protoc.version>
         <io.zipkin.reporter.version>0.10.0</io.zipkin.reporter.version>
         <io.zipkin.brave.version>4.3.4</io.zipkin.brave.version>

@@ -124,6 +124,7 @@ public class FrontierService extends FrontierGrpc.FrontierImplBase {
             @Override
             public void onCompleted() {
                 exe.postFetchFinally();
+                responseObserver.onCompleted();
             }
         };
     }

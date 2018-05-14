@@ -289,4 +289,8 @@ public class QueuedUriWrapper {
         }
     }
 
+    @Override
+    public String toString() {
+        return getUri().toString();
+    }
 }

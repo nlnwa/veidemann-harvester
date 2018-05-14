@@ -15,6 +15,9 @@
  */
 package no.nb.nna.veidemann.frontier.worker;
 
+import io.grpc.Status;
+import io.grpc.Status.Code;
+import io.grpc.StatusRuntimeException;
 import io.opentracing.Span;
 import io.opentracing.tag.Tags;
 import io.opentracing.util.GlobalTracer;
@@ -121,41 +124,59 @@ public class CrawlExecution {
                 .startManual();
 
         try {
-            status.setState(CrawlExecutionStatus.State.FETCHING)
-                    .setStartTimeIfUnset()
-                    .saveStatus();
-            DbUtil.getInstance().getDb().deleteQueuedUri(qUri.getQueuedUri());
+            try {
+                status.setState(CrawlExecutionStatus.State.FETCHING)
+                        .setStartTimeIfUnset()
+                        .saveStatus();
+                DbUtil.getInstance().getDb().deleteQueuedUri(qUri.getQueuedUri());
 
-            if (isManualAbort() || LimitsCheck.isLimitReached(frontier, limits, status, qUri)) {
+                if (isManualAbort() || LimitsCheck.isLimitReached(frontier, limits, status, qUri)) {
+                    delayMs = -1L;
+                    return null;
+                }
+
+                if (qUri.isUnresolved()) {
+                    PreconditionState check = Preconditions.checkPreconditions(frontier, crawlConfig, status, qUri);
+                    switch (check) {
+                        case DENIED:
+                        case FAIL:
+                            delayMs = -1L;
+                            return null;
+                        case RETRY:
+                            qUri.addUriToQueue();
+                            return null;
+                        case OK:
+                            // IP resolution done, requeue to account for politeness
+                            qUri.addUriToQueue();
+                            return null;
+                    }
+                }
+
+                LOG.info("Fetching " + qUri.getUri());
+                fetchStart = System.currentTimeMillis();
+
+                return PageHarvestSpec.newBuilder()
+                        .setQueuedUri(qUri.getQueuedUri())
+                        .setCrawlConfig(crawlConfig)
+                        .build();
+
+            } catch (StatusRuntimeException e) {
+                Code code = e.getStatus().getCode();
+                if (code.equals(Status.CANCELLED.getCode())
+                        || code.equals(Status.DEADLINE_EXCEEDED.getCode())
+                        || code.equals(Status.ABORTED.getCode())) {
+                    LOG.info("Request was aborted", e);
+                    qUri.addUriToQueue();
+                } else {
+                    LOG.error("Unexpected error", e);
+                }
                 delayMs = -1L;
                 return null;
             }
-
-            if (qUri.isUnresolved()) {
-                PreconditionState check = Preconditions.checkPreconditions(frontier, crawlConfig, status, qUri);
-                switch (check) {
-                    case DENIED:
-                    case FAIL:
-                        delayMs = -1L;
-                        return null;
-                    case RETRY:
-                        qUri.addUriToQueue();
-                        return null;
-                    case OK:
-                        // IP resolution done, requeue to account for politeness
-                        qUri.addUriToQueue();
-                        return null;
-                }
-            }
-
-            LOG.info("Fetching " + qUri.getUri());
-            fetchStart = System.currentTimeMillis();
-
-            return PageHarvestSpec.newBuilder()
-                    .setQueuedUri(qUri.getQueuedUri())
-                    .setCrawlConfig(crawlConfig)
-                    .build();
-
+        } catch (DbException e) {
+            LOG.error("Failed communicating with DB: {}", e.toString(), e);
+            delayMs = -1L;
+            return null;
         } catch (Throwable t) {
             // Errors should be handled elsewhere. Exception here indicates a bug.
             LOG.error("Possible bug: {}", t.toString(), t);
@@ -332,7 +353,7 @@ public class CrawlExecution {
                 .setError(error);
 
         if (LimitsCheck.isRetryLimitReached(politenessConfig, qUri)) {
-            LOG.info("Failed fetching '{}' due to retry limit", qUri.getUri());
+            LOG.info("Failed fetching '{}' due to retry limit", qUri);
             status.incrementDocumentsFailed();
         } else {
             qUri.addUriToQueue();

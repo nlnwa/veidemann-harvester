@@ -18,10 +18,11 @@ package no.nb.nna.veidemann.commons.client;
 
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import io.grpc.Status;
+import io.grpc.Status.Code;
 import io.grpc.StatusRuntimeException;
 import io.opentracing.contrib.ClientTracingInterceptor;
 import io.opentracing.util.GlobalTracer;
-import no.nb.nna.veidemann.api.ConfigProto.CrawlConfig;
 import no.nb.nna.veidemann.api.ConfigProto.PolitenessConfig;
 import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
 import no.nb.nna.veidemann.api.RobotsEvaluatorGrpc;
@@ -69,7 +70,14 @@ public class RobotsServiceClient implements AutoCloseable {
             RobotsEvaluatorProto.IsAllowedReply reply = blockingStub.isAllowed(request);
             return reply.getIsAllowed();
         } catch (StatusRuntimeException ex) {
-            LOG.error("RPC failed: " + ex.getStatus(), ex);
+            Code code = ex.getStatus().getCode();
+            if (code.equals(Status.CANCELLED.getCode())
+                    || code.equals(Status.DEADLINE_EXCEEDED.getCode())
+                    || code.equals(Status.ABORTED.getCode())) {
+                LOG.debug("Request was aborted", ex);
+            } else {
+                LOG.error("RPC failed: " + ex.getStatus(), ex);
+            }
             throw ex;
         }
     }

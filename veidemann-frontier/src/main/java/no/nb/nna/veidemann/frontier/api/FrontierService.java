@@ -86,7 +86,7 @@ public class FrontierService extends FrontierGrpc.FrontierImplBase {
                             }
                             responseObserver.onNext(pageHarvestSpec);
                         } catch (InterruptedException e) {
-                            e.printStackTrace();
+                            LOG.warn(e.toString(), e);
                             Status status = Status.UNKNOWN.withDescription(e.toString());
                             responseObserver.onError(status.asException());
                         }

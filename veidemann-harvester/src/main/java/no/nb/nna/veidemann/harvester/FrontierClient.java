@@ -57,8 +57,8 @@ public class FrontierClient implements AutoCloseable {
         availableSessions.acquire();
         ResponseObserver responseObserver = new ResponseObserver();
 
-        FrontierGrpc.FrontierStub s = asyncStub
-                .withDeadlineAfter(10, TimeUnit.MINUTES);
+        FrontierGrpc.FrontierStub s = asyncStub;
+//                .withDeadlineAfter(10, TimeUnit.MINUTES);
 
         StreamObserver<PageHarvest> requestObserver = s
                 .getNextPage(responseObserver);

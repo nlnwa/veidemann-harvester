@@ -95,17 +95,17 @@ public class FrontierClient implements AutoCloseable {
 
                 if (result.hasError()) {
                     reply.setError(result.getError());
+                    requestObserver.onNext(reply.build());
                 } else {
                     reply.getMetricsBuilder()
                             .setBytesDownloaded(result.getBytesDownloaded())
                             .setUriCount(result.getUriCount());
+                    requestObserver.onNext(reply.build());
+
+                    result.getOutlinks().forEach(ol -> {
+                        requestObserver.onNext(PageHarvest.newBuilder().setOutlink(ol).build());
+                    });
                 }
-
-                requestObserver.onNext(reply.build());
-
-                result.getOutlinks().forEach(ol -> {
-                    requestObserver.onNext(PageHarvest.newBuilder().setOutlink(ol).build());
-                });
 
                 requestObserver.onCompleted();
 
@@ -155,7 +155,10 @@ public class FrontierClient implements AutoCloseable {
     @Override
     public void close() {
         try {
-            channel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
+            boolean isTerminated = channel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
+            if (!isTerminated) {
+                LOG.warn("Harvester client has open connections after close");
+            }
         } catch (InterruptedException ex) {
             throw new RuntimeException(ex);
         }

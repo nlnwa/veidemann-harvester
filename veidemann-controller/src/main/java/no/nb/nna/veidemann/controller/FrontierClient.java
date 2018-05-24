@@ -48,11 +48,11 @@ public class FrontierClient implements AutoCloseable {
 
     public FrontierClient(final String host, final int port, String supportedSeedType) {
         this(ManagedChannelBuilder.forAddress(host, port).usePlaintext(), supportedSeedType);
-        LOG.info("Harvester client pointing to " + host + ":" + port);
+        LOG.info("Frontier client pointing to " + host + ":" + port);
     }
 
     public FrontierClient(ManagedChannelBuilder<?> channelBuilder, String supportedSeedType) {
-        LOG.info("Setting up harvester client");
+        LOG.info("Setting up Frontier client");
         ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor.Builder(GlobalTracer.get()).build();
         channel = channelBuilder.intercept(tracingInterceptor).build();
         blockingStub = FrontierGrpc.newBlockingStub(channel);

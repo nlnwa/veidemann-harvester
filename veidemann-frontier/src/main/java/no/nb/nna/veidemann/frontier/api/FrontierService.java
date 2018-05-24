@@ -85,27 +85,41 @@ public class FrontierService extends FrontierGrpc.FrontierImplBase {
                                 }
                             }
                             responseObserver.onNext(pageHarvestSpec);
-                        } catch (InterruptedException e) {
+                        } catch (Exception e) {
                             LOG.warn(e.toString(), e);
                             Status status = Status.UNKNOWN.withDescription(e.toString());
                             responseObserver.onError(status.asException());
+                            exe.postFetchFinally();
                         }
                         break;
                     case METRICS:
-                        exe.postFetchSuccess(value.getMetrics());
+                        try {
+                            exe.postFetchSuccess(value.getMetrics());
+                        } catch (Exception e) {
+                            LOG.warn(e.toString(), e);
+                            Status status = Status.UNKNOWN.withDescription(e.toString());
+                            responseObserver.onError(status.asException());
+                            exe.postFetchFinally();
+                        }
                         break;
                     case OUTLINK:
                         try {
                             exe.queueOutlink(value.getOutlink());
-                        } catch (DbException e) {
-                            LOG.error("Could not add URI to queue", e);
+                        } catch (Exception e) {
+                            LOG.warn(e.toString(), e);
+                            Status status = Status.UNKNOWN.withDescription(e.toString());
+                            responseObserver.onError(status.asException());
+                            exe.postFetchFinally();
                         }
                         break;
                     case ERROR:
                         try {
                             exe.postFetchFailure(value.getError());
-                        } catch (DbException e) {
-                            LOG.error("Could not handle failure", e);
+                        } catch (Exception e) {
+                            LOG.warn(e.toString(), e);
+                            Status status = Status.UNKNOWN.withDescription(e.toString());
+                            responseObserver.onError(status.asException());
+                            exe.postFetchFinally();
                         }
                         break;
                 }

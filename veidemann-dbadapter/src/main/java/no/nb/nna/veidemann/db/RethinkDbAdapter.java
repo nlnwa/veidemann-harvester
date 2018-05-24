@@ -280,41 +280,42 @@ public class RethinkDbAdapter implements DbAdapter {
     public FutureOptional<CrawlHostGroup> borrowFirstReadyCrawlHostGroup() throws DbException {
         OffsetDateTime nextReadyTime = null;
 
-        Cursor<Map<String, Object>> response = executeRequest("db-borrowFirstReadyCrawlHostGroup",
+        try (Cursor<Map<String, Object>> response = executeRequest("db-borrowFirstReadyCrawlHostGroup",
                 r.table(TABLES.CRAWL_HOST_GROUP.name)
                         .orderBy().optArg("index", "nextFetchTime")
                         .between(r.minval(), r.now()).optArg("right_bound", "closed")
                         .filter(r.hashMap("busy", false))
-        );
+        )) {
 
-        for (Map<String, Object> chgDoc : response) {
-            Object chgId = chgDoc.get("id");
+            for (Map<String, Object> chgDoc : response) {
+                Object chgId = chgDoc.get("id");
 
-            Map<String, Object> borrowResponse = executeRequest("db-borrowFirstReadyCrawlHostGroup",
-                    r.table(TABLES.CRAWL_HOST_GROUP.name).optArg("read_mode", "majority")
-                            .get(chgId)
-                            .replace(d ->
-                                    r.branch(
-                                            // Another service has deleted this CrawlHostGroup, return null (unchanged)
-                                            r.not(d), null,
-                                            // The uri queue for this CrawlHostGroup is empty, delete it by returning null
-                                            d.g("busy").eq(false).and(d.g("queuedUriCount").eq(0L)), null,
-                                            // This is the one we want, set busy to true and return it
-                                            d.g("busy").eq(false), d.merge(r.hashMap("busy", true)),
-                                            // The CrawlHostGroup is busy, return it unchanged
-                                            d
-                                    ))
-                            .optArg("return_changes", true)
-                            .optArg("durability", "hard")
-            );
+                Map<String, Object> borrowResponse = executeRequest("db-borrowFirstReadyCrawlHostGroup",
+                        r.table(TABLES.CRAWL_HOST_GROUP.name).optArg("read_mode", "majority")
+                                .get(chgId)
+                                .replace(d ->
+                                        r.branch(
+                                                // Another service has deleted this CrawlHostGroup, return null (unchanged)
+                                                r.not(d), null,
+                                                // The uri queue for this CrawlHostGroup is empty, delete it by returning null
+                                                d.g("busy").eq(false).and(d.g("queuedUriCount").eq(0L)), null,
+                                                // This is the one we want, set busy to true and return it
+                                                d.g("busy").eq(false), d.merge(r.hashMap("busy", true)),
+                                                // The CrawlHostGroup is busy, return it unchanged
+                                                d
+                                        ))
+                                .optArg("return_changes", true)
+                                .optArg("durability", "hard")
+                );
 
-            long replaced = (long) borrowResponse.get("replaced");
-            if (replaced == 1L) {
-                CrawlHostGroup chg = buildCrawlHostGroup(((List<Map<String, Map>>) borrowResponse.get("changes")).get(0).get("new_val"));
-                return FutureOptional.of(chg);
-            } else {
-                if (nextReadyTime == null) {
-                    nextReadyTime = (OffsetDateTime) chgDoc.get("nextFetchTime");
+                long replaced = (long) borrowResponse.get("replaced");
+                if (replaced == 1L) {
+                    CrawlHostGroup chg = buildCrawlHostGroup(((List<Map<String, Map>>) borrowResponse.get("changes")).get(0).get("new_val"));
+                    return FutureOptional.of(chg);
+                } else {
+                    if (nextReadyTime == null) {
+                        nextReadyTime = (OffsetDateTime) chgDoc.get("nextFetchTime");
+                    }
                 }
             }
         }

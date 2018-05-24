@@ -53,10 +53,10 @@ public class CrawlLogRegistry {
     private long lastActivityTime = System.currentTimeMillis();
 
     public class Entry {
-        long proxyRequestId;
-        String uri;
-        CrawlLog.Builder crawlLog;
-        boolean resolved = false;
+        final long proxyRequestId;
+        final String uri;
+        private CrawlLog.Builder crawlLog;
+        private boolean resolved = false;
 
         public Entry(long proxyRequestId, String uri) {
             this.proxyRequestId = proxyRequestId;
@@ -72,6 +72,15 @@ public class CrawlLogRegistry {
             } finally {
                 crawlLogsLock.unlock();
             }
+        }
+
+        public Builder getCrawlLog() {
+            if (crawlLog == null) {
+                NullPointerException e = new NullPointerException("Crawl log is null");
+                LOG.warn("Trying to access missing crawl log", e);
+                throw e;
+            }
+            return crawlLog;
         }
 
         boolean isResponseReceived() {
@@ -201,7 +210,7 @@ public class CrawlLogRegistry {
 
             if (!isWaitingForResponse) {
                 crawlLogs.stream()
-                        .filter(e -> (e.uri.equals(r.getUrl()) && e.crawlLog.getStatusCode() == r.getStatusCode()))
+                        .filter(e -> (e.uri.equals(r.getUrl()) && e.getCrawlLog().getStatusCode() == r.getStatusCode()))
                         .findFirst().ifPresent(e -> {
                     LOG.info("Found already resolved CrawlLog for {}. Setting fromCache for request {} to true",
                             r.getUrl(), r.getRequestId());
@@ -226,9 +235,9 @@ public class CrawlLogRegistry {
             crawlLogs.forEach(c -> {
                 browserSession.getUriRequests().resolveCurrentUriRequest("1").ifPresent(parent -> {
                     UriRequest r = UriRequest.create("1",
-                            c.crawlLog.getRequestedUri(), browserSession.queuedUri.getReferrer(), ResourceType.Other,
+                            c.getCrawlLog().getRequestedUri(), browserSession.queuedUri.getReferrer(), ResourceType.Other,
                             'R', parent, browserSession.getUriRequests().getPageSpan());
-                    r.setStatusCode(c.crawlLog.getStatusCode());
+                    r.setStatusCode(c.getCrawlLog().getStatusCode());
                     browserSession.getUriRequests().add(r);
                 }).otherwise(() -> {
                     // No parent, this is a root request;
@@ -236,7 +245,7 @@ public class CrawlLogRegistry {
                             UriRequest r = UriRequest.createRoot("1",
                                     c.uri, browserSession.queuedUri.getReferrer(), ResourceType.Other,
                                     browserSession.queuedUri.getDiscoveryPath(), browserSession.getUriRequests().getPageSpan());
-                            r.setStatusCode(c.crawlLog.getStatusCode());
+                            r.setStatusCode(c.getCrawlLog().getStatusCode());
                             browserSession.getUriRequests().add(r);
                     }
                 });
@@ -291,11 +300,11 @@ public class CrawlLogRegistry {
                 && !r.isFromCache()
                 && Objects.equals(r.getUrl(), crawlLogEntry.uri)) {
 
-            if (crawlLogEntry.isResponseReceived() && crawlLogEntry.crawlLog.getStatusCode() == r.getStatusCode()) {
+            if (crawlLogEntry.isResponseReceived() && crawlLogEntry.getCrawlLog().getStatusCode() == r.getStatusCode()) {
                 requestFound = true;
             } else if (r.getStatusCode() == ExtraStatusCodes.CANCELED_BY_BROWSER.getCode()) {
                 if (crawlLogEntry.isResponseReceived()) {
-                    r.setStatusCode(crawlLogEntry.crawlLog.getStatusCode());
+                    r.setStatusCode(crawlLogEntry.getCrawlLog().getStatusCode());
                     requestFound = true;
                 } else {
                     requestFound = true;
@@ -305,8 +314,8 @@ public class CrawlLogRegistry {
 
         if (requestFound) {
             if (crawlLogEntry.isResponseReceived()) {
-                crawlLogEntry.crawlLog.setTimeStamp(now);
-                CrawlLog enrichedCrawlLog = r.setCrawlLog(crawlLogEntry.crawlLog);
+                crawlLogEntry.getCrawlLog().setTimeStamp(now);
+                CrawlLog enrichedCrawlLog = r.setCrawlLog(crawlLogEntry.getCrawlLog());
                 if (!r.isFromCache()) {
                     try {
                         DbHelper.getInstance().getDb().saveCrawlLog(enrichedCrawlLog);
@@ -364,7 +373,7 @@ public class CrawlLogRegistry {
             crawlLogsLock.lock();
             try {
                 crawlLogs.stream().filter(e -> !e.isResolved()).forEach(e -> sb.append("\n    [")
-                        .append(e.isResponseReceived() ? e.crawlLog.getStatusCode() : "abort").append(", ")
+                        .append(e.isResponseReceived() ? e.getCrawlLog().getStatusCode() : "abort").append(", ")
                         .append(e.uri).append("], "));
             } finally {
                 crawlLogsLock.unlock();

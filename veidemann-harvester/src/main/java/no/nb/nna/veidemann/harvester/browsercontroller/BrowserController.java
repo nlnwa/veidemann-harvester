@@ -79,7 +79,6 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
 
         Span span = GlobalTracer.get()
                 .buildSpan("render")
-//                .asChildOf(OpenTracingContextKey.activeSpan())
                 .withTag(Tags.COMPONENT.getKey(), "BrowserController")
                 .withTag("executionId", queuedUri.getExecutionId())
                 .withTag("uri", queuedUri.getUri())

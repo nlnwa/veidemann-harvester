@@ -16,12 +16,12 @@
 package no.nb.nna.veidemann.frontier.worker;
 
 import com.google.protobuf.util.Timestamps;
+import no.nb.nna.veidemann.api.ConfigProto;
 import no.nb.nna.veidemann.api.ConfigProto.PolitenessConfig;
+import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus.State;
 import no.nb.nna.veidemann.commons.ExtraStatusCodes;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.db.ProtoUtils;
-import no.nb.nna.veidemann.api.ConfigProto;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus.State;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,11 +40,11 @@ public class LimitsCheck {
      *
      * @param limits the limits configuration
      * @param status the status object which might be updated by this method
-     * @param qUri the URI to check
+     * @param qUri   the URI to check
      * @return true if the submitted URI is within limits for queueing
      */
     public static boolean isQueueable(ConfigProto.CrawlLimitsConfig limits, StatusWrapper status,
-            QueuedUriWrapper qUri) {
+                                      QueuedUriWrapper qUri) {
 
         if (limits.getDepth() > 0 && limits.getDepth() <= calculateDepth(qUri)) {
             LOG.debug("Maximum configured depth reached for: {}, skipping.", qUri.getSurt());
@@ -58,13 +58,13 @@ public class LimitsCheck {
      * Checks that should be run after fetching a URI to see if the limits for crawling are reached.
      *
      * @param frontier the frontier
-     * @param limits the limits configuration
-     * @param status the status object which might be updated by this method
-     * @param qUri the URI to check
+     * @param limits   the limits configuration
+     * @param status   the status object which might be updated by this method
+     * @param qUri     the URI to check
      * @return true if crawl should be stopped
      */
     public static boolean isLimitReached(Frontier frontier, ConfigProto.CrawlLimitsConfig limits, StatusWrapper status,
-            QueuedUriWrapper qUri) throws DbException {
+                                         QueuedUriWrapper qUri) throws DbException {
 
         if (limits.getMaxBytes() > 0 && status.getBytesCrawled() > limits.getMaxBytes()) {
             switch (status.getState()) {
@@ -73,8 +73,11 @@ public class LimitsCheck {
                 case SLEEPING:
                 case UNDEFINED:
                 case UNRECOGNIZED:
-                    status.setEndState(State.ABORTED_SIZE);
-                    status.incrementDocumentsDenied(DbUtil.getInstance().getDb().deleteQueuedUrisForExecution(status.getId()));
+                    status.setEndState(State.ABORTED_SIZE)
+                            .incrementDocumentsDenied(
+                                    DbUtil.getInstance().getDb().deleteQueuedUrisForExecution(
+                                            status.getId(), qUri.getCrawlHostGroupId(), qUri.getPolitenessId())
+                            );
             }
             return true;
         }
@@ -90,7 +93,10 @@ public class LimitsCheck {
                 case UNDEFINED:
                 case UNRECOGNIZED:
                     status.setEndState(State.ABORTED_TIMEOUT);
-                    status.incrementDocumentsDenied(DbUtil.getInstance().getDb().deleteQueuedUrisForExecution(status.getId()));
+                    status.incrementDocumentsDenied(
+                            DbUtil.getInstance().getDb().deleteQueuedUrisForExecution(
+                                    status.getId(), qUri.getCrawlHostGroupId(), qUri.getPolitenessId())
+                    );
             }
             return true;
         }

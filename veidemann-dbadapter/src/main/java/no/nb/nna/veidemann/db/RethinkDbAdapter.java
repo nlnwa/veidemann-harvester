@@ -154,7 +154,21 @@ public class RethinkDbAdapter implements DbAdapter {
         if (response == null) {
             return Optional.empty();
         } else {
-            return Optional.of(ProtoUtils.rethinkToProto(response, CrawledContent.class));
+            CrawledContent result = ProtoUtils.rethinkToProto(response, CrawledContent.class);
+
+            // Check existence of original in crawl log.
+            // This prevents false positives in the case where writing of original record was cancelled after
+            // crawled_content table was updated.
+            CrawlLogListReply cl = listCrawlLogs(CrawlLogListRequest.newBuilder()
+                    .setPageSize(1)
+                    .addWarcId(result.getWarcId())
+                    .build()
+            );
+            if (cl.getValueList().isEmpty()) {
+                return Optional.empty();
+            } else {
+                return Optional.of(result);
+            }
         }
     }
 

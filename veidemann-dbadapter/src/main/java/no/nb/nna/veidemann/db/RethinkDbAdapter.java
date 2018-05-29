@@ -154,7 +154,21 @@ public class RethinkDbAdapter implements DbAdapter {
         if (response == null) {
             return Optional.empty();
         } else {
-            return Optional.of(ProtoUtils.rethinkToProto(response, CrawledContent.class));
+            CrawledContent result = ProtoUtils.rethinkToProto(response, CrawledContent.class);
+
+            // Check existence of original in crawl log.
+            // This prevents false positives in the case where writing of original record was cancelled after
+            // crawled_content table was updated.
+            CrawlLogListReply cl = listCrawlLogs(CrawlLogListRequest.newBuilder()
+                    .setPageSize(1)
+                    .addWarcId(result.getWarcId())
+                    .build()
+            );
+            if (cl.getValueList().isEmpty()) {
+                return Optional.empty();
+            } else {
+                return Optional.of(result);
+            }
         }
     }
 
@@ -572,12 +586,24 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
-    public long deleteQueuedUrisForExecution(String executionId) throws DbException {
-        return executeRequest("db-deleteQueuedUrisForExecution",
+    public long deleteQueuedUrisForExecution(String executionId, String crawlHostGroupId, String politenessId) throws DbException {
+        // Delete remaining uris in queue for crawl execution id
+        long deleted = executeRequest("db-deleteQueuedUrisForExecution",
                 r.table(TABLES.URI_QUEUE.name)
                         .getAll(executionId).optArg("index", "executionId")
                         .delete().g("deleted")
         );
+
+        // Update crawlHostGroup with new uri count
+        List key = r.array(crawlHostGroupId, politenessId);
+        executeRequest("db-deleteQueuedUrisForExecution",
+                r.table(TABLES.CRAWL_HOST_GROUP.name).optArg("read_mode", "majority")
+                        .get(key)
+                        .replace(d ->
+                                d.merge(r.hashMap("queuedUriCount", d.g("queuedUriCount").sub(deleted))))
+                        .optArg("durability", "hard")
+        );
+        return deleted;
     }
 
     @Override

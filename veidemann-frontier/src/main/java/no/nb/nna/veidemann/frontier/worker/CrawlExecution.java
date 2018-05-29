@@ -125,15 +125,16 @@ public class CrawlExecution {
 
         try {
             try {
-                status.setState(CrawlExecutionStatus.State.FETCHING)
-                        .setStartTimeIfUnset()
-                        .saveStatus();
-                DbUtil.getInstance().getDb().deleteQueuedUri(qUri.getQueuedUri());
+                status.setStartTimeIfUnset();
 
                 if (isManualAbort() || LimitsCheck.isLimitReached(frontier, limits, status, qUri)) {
                     delayMs = -1L;
                     return null;
                 }
+
+                status.setState(CrawlExecutionStatus.State.FETCHING)
+                        .saveStatus();
+                DbUtil.getInstance().getDb().deleteQueuedUri(qUri.getQueuedUri());
 
                 if (qUri.isUnresolved()) {
                     PreconditionState check = Preconditions.checkPreconditions(frontier, crawlConfig, status, qUri);
@@ -378,7 +379,8 @@ public class CrawlExecution {
     private boolean isManualAbort() throws DbException {
         if (status.getState() == CrawlExecutionStatus.State.ABORTED_MANUAL) {
             status.clearCurrentUri()
-                    .incrementDocumentsDenied(DbUtil.getInstance().getDb().deleteQueuedUrisForExecution(status.getId()));
+                    .incrementDocumentsDenied(DbUtil.getInstance().getDb().deleteQueuedUrisForExecution(
+                            status.getId(), qUri.getCrawlHostGroupId(), qUri.getPolitenessId()));
 
             // Re-set end state to ensure end time is updated
             status.setEndState(status.getState());

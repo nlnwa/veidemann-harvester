@@ -212,6 +212,10 @@ public class QueuedUriWrapper {
         return this;
     }
 
+    String getCrawlHostGroupId() {
+        return wrapped.getCrawlHostGroupId();
+    }
+
     QueuedUriWrapper setCrawlHostGroupId(String value) {
         wrapped.setCrawlHostGroupId(value);
         return this;

@@ -115,7 +115,7 @@ public interface DbAdapter extends AutoCloseable {
 
     void deleteQueuedUri(QueuedUri qu) throws DbException;
 
-    long deleteQueuedUrisForExecution(String executionId) throws DbException;
+    long deleteQueuedUrisForExecution(String executionId, String crawlHostGroupId, String politenessId) throws DbException;
 
     long queuedUriCount(String executionId) throws DbException;
 

@@ -30,6 +30,12 @@ import no.nb.nna.veidemann.api.ConfigProto.Role;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.script.Invocable;
+import javax.script.ScriptEngine;
+import javax.script.ScriptEngineManager;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+
 /**
  *
  */
@@ -79,6 +85,31 @@ public class ReportService extends ReportGrpc.ReportImplBase {
             LOG.error(e.getMessage(), e);
             Status status = Status.UNKNOWN.withDescription(e.toString());
             respObserver.onError(status.asException());
+        }
+    }
+
+//    @Override
+    @AllowedRoles({Role.CURATOR, Role.ADMIN})
+    public void executeJsQuery(String request, StreamObserver<ScreenshotListReply> respObserver) {
+        try {
+            ScriptEngine engine = new ScriptEngineManager().getEngineByName("nashorn");
+
+            try (InputStream js = this.getClass().getClassLoader().getResourceAsStream("rethinkdbQueryParser.js");) {
+                engine.eval(new InputStreamReader(js));
+            }
+            Invocable invocable = (Invocable) engine;
+
+            Object qry = engine.eval("r.db('veidemann').table('crawl_log')");
+
+            Object result = invocable.invokeFunction("qryToProto", qry);
+            System.out.println("1: " + result);
+
+//            respObserver.onNext(db.listScreenshots(request));
+//            respObserver.onCompleted();
+        } catch (Exception e) {
+            LOG.error(e.getMessage(), e);
+            Status status = Status.UNKNOWN.withDescription(e.toString());
+//            respObserver.onError(status.asException());
         }
     }
 }

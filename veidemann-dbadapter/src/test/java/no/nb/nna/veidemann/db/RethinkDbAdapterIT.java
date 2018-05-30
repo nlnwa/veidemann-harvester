@@ -397,6 +397,11 @@ public class RethinkDbAdapterIT {
                 .build();
 
         assertThat(db.hasCrawledContent(cc1).isPresent()).isFalse();
+        db.saveCrawlLog(CrawlLog.newBuilder()
+                .setWarcId(cc1.getWarcId())
+                .setJobExecutionId("jeid")
+                .setExecutionId("ceid")
+                .build());
 
         Optional<CrawledContent> r2 = db.hasCrawledContent(cc2);
         assertThat(r2.isPresent()).isTrue();

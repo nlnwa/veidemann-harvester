@@ -23,6 +23,7 @@ import no.nb.nna.veidemann.api.ConfigProto.LogLevels;
 import no.nb.nna.veidemann.api.ConfigProto.LogLevels.Level;
 import no.nb.nna.veidemann.api.ContentWriterGrpc;
 import no.nb.nna.veidemann.api.ControllerGrpc;
+import no.nb.nna.veidemann.api.ReportGrpc;
 import no.nb.nna.veidemann.api.StatusGrpc;
 import no.nb.nna.veidemann.commons.db.DbConnectionException;
 import no.nb.nna.veidemann.commons.db.DbException;
@@ -40,6 +41,8 @@ public abstract class CrawlTestBase {
     static ControllerGrpc.ControllerBlockingStub controllerClient;
 
     static StatusGrpc.StatusBlockingStub statusClient;
+
+    static ReportGrpc.ReportStub reportClient;
 
     static ContentWriterGrpc.ContentWriterBlockingStub contentWriterClient;
 
@@ -61,6 +64,8 @@ public abstract class CrawlTestBase {
         controllerClient = ControllerGrpc.newBlockingStub(controllerChannel).withWaitForReady();
 
         statusClient = StatusGrpc.newBlockingStub(controllerChannel).withWaitForReady();
+
+        reportClient = ReportGrpc.newStub(controllerChannel).withWaitForReady();
 
         contentWriterChannel = ManagedChannelBuilder.forAddress(contentWriterHost, contentWriterPort).usePlaintext()
                 .build();

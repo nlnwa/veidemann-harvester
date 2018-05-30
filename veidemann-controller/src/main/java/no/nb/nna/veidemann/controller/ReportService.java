@@ -15,26 +15,28 @@
  */
 package no.nb.nna.veidemann.controller;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.rethinkdb.ast.ReqlAst;
+import com.rethinkdb.net.Cursor;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
+import no.nb.nna.veidemann.api.ConfigProto.Role;
 import no.nb.nna.veidemann.api.ReportGrpc;
 import no.nb.nna.veidemann.api.ReportProto.CrawlLogListReply;
 import no.nb.nna.veidemann.api.ReportProto.CrawlLogListRequest;
+import no.nb.nna.veidemann.api.ReportProto.ExecuteDbQueryReply;
+import no.nb.nna.veidemann.api.ReportProto.ExecuteDbQueryRequest;
 import no.nb.nna.veidemann.api.ReportProto.PageLogListReply;
 import no.nb.nna.veidemann.api.ReportProto.PageLogListRequest;
 import no.nb.nna.veidemann.api.ReportProto.ScreenshotListReply;
 import no.nb.nna.veidemann.api.ReportProto.ScreenshotListRequest;
 import no.nb.nna.veidemann.commons.auth.AllowedRoles;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
-import no.nb.nna.veidemann.api.ConfigProto.Role;
+import no.nb.nna.veidemann.controller.query.QueryEngine;
+import no.nb.nna.veidemann.db.RethinkDbConnection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import javax.script.Invocable;
-import javax.script.ScriptEngine;
-import javax.script.ScriptEngineManager;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 
 /**
  *
@@ -45,8 +47,12 @@ public class ReportService extends ReportGrpc.ReportImplBase {
 
     private final DbAdapter db;
 
+    private final Gson gson;
+
     public ReportService(DbAdapter db) {
         this.db = db;
+        gson = new GsonBuilder()
+                .create();
     }
 
     @Override
@@ -88,28 +94,44 @@ public class ReportService extends ReportGrpc.ReportImplBase {
         }
     }
 
-//    @Override
-    @AllowedRoles({Role.CURATOR, Role.ADMIN})
-    public void executeJsQuery(String request, StreamObserver<ScreenshotListReply> respObserver) {
+    @Override
+    @AllowedRoles({Role.ADMIN})
+    public void executeDbQuery(ExecuteDbQueryRequest request, StreamObserver<ExecuteDbQueryReply> respObserver) {
         try {
-            ScriptEngine engine = new ScriptEngineManager().getEngineByName("nashorn");
+            ReqlAst qry = QueryEngine.getInstance().parseQuery(request.getQuery());
+            int limit = request.getLimit();
 
-            try (InputStream js = this.getClass().getClassLoader().getResourceAsStream("rethinkdbQueryParser.js");) {
-                engine.eval(new InputStreamReader(js));
+            // Default limit
+            if (limit == 0) {
+                limit = 50;
             }
-            Invocable invocable = (Invocable) engine;
 
-            Object qry = engine.eval("r.db('veidemann').table('crawl_log')");
+            Object result = RethinkDbConnection.getInstance().exec("js-query", qry);
+            if (result != null) {
+                if (result instanceof Cursor) {
+                    try (Cursor c = (Cursor) result) {
+                        int index = 0;
+                        while (c.hasNext() && (limit == -1 || index++ < limit)) {
+                            Object r = c.next();
+                            respObserver.onNext(recordToExecuteDbQueryReply(r));
+                        }
+                    }
+                } else {
+                    respObserver.onNext(recordToExecuteDbQueryReply(result));
+                }
+            }
 
-            Object result = invocable.invokeFunction("qryToProto", qry);
-            System.out.println("1: " + result);
-
-//            respObserver.onNext(db.listScreenshots(request));
-//            respObserver.onCompleted();
+            respObserver.onCompleted();
         } catch (Exception e) {
             LOG.error(e.getMessage(), e);
             Status status = Status.UNKNOWN.withDescription(e.toString());
-//            respObserver.onError(status.asException());
+            respObserver.onError(status.asException());
         }
+    }
+
+    private ExecuteDbQueryReply recordToExecuteDbQueryReply(Object record) {
+        return ExecuteDbQueryReply.newBuilder()
+                .setRecord(gson.toJson(record))
+                .build();
     }
 }

@@ -16,6 +16,7 @@
 package no.nb.nna.veidemann.db;
 
 import com.rethinkdb.RethinkDB;
+import com.rethinkdb.ast.ReqlAst;
 import com.rethinkdb.gen.ast.ReqlExpr;
 import com.rethinkdb.gen.exc.ReqlDriverError;
 import com.rethinkdb.gen.exc.ReqlError;
@@ -87,11 +88,11 @@ public class RethinkDbConnection implements AutoCloseable {
         return instance != null;
     }
 
-    public <T> T exec(ReqlExpr qry) throws DbConnectionException, DbQueryException {
+    public <T> T exec(ReqlAst qry) throws DbConnectionException, DbQueryException {
         return exec("db-query", qry);
     }
 
-    public <T> T exec(String operationName, ReqlExpr qry) throws DbConnectionException, DbQueryException {
+    public <T> T exec(String operationName, ReqlAst qry) throws DbConnectionException, DbQueryException {
         synchronized (this) {
             if (!conn.isOpen()) {
                 try {

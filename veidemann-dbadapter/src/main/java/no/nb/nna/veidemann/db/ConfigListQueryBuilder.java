@@ -267,6 +267,8 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
         if (listQry == null) {
             if (orderByIndex.isEmpty()) {
                 listQry = r.table(table.name);
+            } else if (descending) {
+                listQry = r.table(table.name).orderBy().optArg("index", r.desc(orderByIndex));
             } else {
                 listQry = r.table(table.name).orderBy().optArg("index", orderByIndex);
             }

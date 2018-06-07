@@ -111,8 +111,7 @@ public class QueuedUriWrapper {
         requireNonEmpty(wrapped.getCrawlHostGroupId(), "Empty CrawlHostGroupId");
 
         QueuedUri q = wrapped.build();
-        q = DbUtil.getInstance().getDb().saveQueuedUri(q);
-        DbUtil.getInstance().getDb().addToCrawlHostGroup(q);
+        q = DbUtil.getInstance().getDb().addToCrawlHostGroup(q);
         wrapped = q.toBuilder();
 
         return this;

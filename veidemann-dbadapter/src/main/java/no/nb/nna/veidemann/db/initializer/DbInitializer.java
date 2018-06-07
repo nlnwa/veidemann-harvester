@@ -57,27 +57,28 @@ public class DbInitializer {
         conn = RethinkDbConnection.getInstance();
     }
 
-    public void initialize() throws DbUpgradeException, DbQueryException, DbConnectionException {
-        try {
-            if (!(boolean) conn.exec(r.dbList().contains(SETTINGS.getDbName()))) {
-                // No existing database, creating a new one
-                LOG.info("Creating database: " + SETTINGS.getDbName());
-                new CreateNewDb(SETTINGS.getDbName()).run();
-                LOG.info("Populating database with default data");
-                new PopulateDbWithDefaultData().run();
+    public DbInitializer initialize() throws DbUpgradeException, DbQueryException, DbConnectionException {
+        if (!(boolean) conn.exec(r.dbList().contains(SETTINGS.getDbName()))) {
+            // No existing database, creating a new one
+            LOG.info("Creating database: " + SETTINGS.getDbName());
+            new CreateNewDb(SETTINGS.getDbName()).run();
+            LOG.info("Populating database with default data");
+            new PopulateDbWithDefaultData().run();
+        } else {
+            String version = conn.exec(r.table(TABLES.SYSTEM.name).get("db_version").g("db_version"));
+            if (CreateNewDb.DB_VERSION.equals(version)) {
+                LOG.info("Database found and is newest version: {}", version);
             } else {
-                String version = conn.exec(r.table(TABLES.SYSTEM.name).get("db_version").g("db_version"));
-                if (CreateNewDb.DB_VERSION.equals(version)) {
-                    LOG.info("Database found and is newest version: {}", version);
-                } else {
-                    LOG.info("Database with version {} found, upgrading", version);
-                    upgrade(version);
-                }
+                LOG.info("Database with version {} found, upgrading", version);
+                upgrade(version);
             }
-        } finally {
-            conn.close();
         }
         LOG.info("DB initialized");
+        return this;
+    }
+
+    public void close() {
+        conn.close();
     }
 
     private void upgrade(String fromVersion) throws DbUpgradeException {

@@ -134,7 +134,6 @@ public class CrawlExecution {
 
                 status.setState(CrawlExecutionStatus.State.FETCHING)
                         .saveStatus();
-                DbUtil.getInstance().getDb().deleteQueuedUri(qUri.getQueuedUri());
 
                 if (qUri.isUnresolved()) {
                     PreconditionState check = Preconditions.checkPreconditions(frontier, crawlConfig, status, qUri);
@@ -264,7 +263,7 @@ public class CrawlExecution {
         }
 
         try {
-            DbUtil.getInstance().getDb().releaseCrawlHostGroup(getCrawlHostGroup(), getDelay(TimeUnit.MILLISECONDS), true);
+            DbUtil.getInstance().getDb().releaseCrawlHostGroup(getCrawlHostGroup(), getDelay(TimeUnit.MILLISECONDS));
         } catch (DbException e) {
             LOG.error("Error releasing CrawlHostGroup: {}", e.toString(), e);
         } catch (Throwable t) {

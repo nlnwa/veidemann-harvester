@@ -111,10 +111,6 @@ public interface DbAdapter extends AutoCloseable {
      */
     CrawlExecutionStatus setExecutionStateAborted(String executionId) throws DbException;
 
-    QueuedUri saveQueuedUri(QueuedUri qu) throws DbException;
-
-    void deleteQueuedUri(QueuedUri qu) throws DbException;
-
     long deleteQueuedUrisForExecution(String executionId, String crawlHostGroupId, String politenessId) throws DbException;
 
     long queuedUriCount(String executionId) throws DbException;
@@ -129,11 +125,11 @@ public interface DbAdapter extends AutoCloseable {
      */
     FutureOptional<QueuedUri> getNextQueuedUriToFetch(CrawlHostGroup crawlHostGroup) throws DbException;
 
-    CrawlHostGroup addToCrawlHostGroup(QueuedUri qUri) throws DbException;
+    QueuedUri addToCrawlHostGroup(QueuedUri qUri) throws DbException;
 
     FutureOptional<CrawlHostGroup> borrowFirstReadyCrawlHostGroup() throws DbException;
 
-    CrawlHostGroup releaseCrawlHostGroup(CrawlHostGroup crawlHostGroup, long nextFetchDelayMs, boolean qUriProcessed) throws DbException;
+    CrawlHostGroup releaseCrawlHostGroup(CrawlHostGroup crawlHostGroup, long nextFetchDelayMs) throws DbException;
 
     ScreenshotListReply listScreenshots(ScreenshotListRequest request) throws DbException;
 

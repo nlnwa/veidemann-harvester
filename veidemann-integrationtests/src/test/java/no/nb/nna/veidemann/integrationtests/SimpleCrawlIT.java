@@ -45,15 +45,8 @@ public class SimpleCrawlIT extends CrawlTestBase implements VeidemannHeaderConst
         job = controllerClient.saveCrawlJob(job);
         String jobId = job.getId();
 
-        ConfigProto.CrawlEntity entity = ConfigProto.CrawlEntity.newBuilder().setMeta(ConfigProto.Meta.newBuilder()
-                .setName("Test entity 1")).build();
-        entity = controllerClient.saveEntity(entity);
-        ConfigProto.Seed seed = ConfigProto.Seed.newBuilder()
-                .setMeta(ConfigProto.Meta.newBuilder().setName("http://a1.com"))
-                .setEntityId(entity.getId())
-                .addJobId(jobId)
-                .build();
-        seed = controllerClient.saveSeed(seed);
+        ConfigProto.CrawlEntity entity = createEntity("Test entity 1");
+        ConfigProto.Seed seed = createSeed("http://a1.com", entity, jobId);
 
         ControllerProto.RunCrawlRequest request = ControllerProto.RunCrawlRequest.newBuilder()
                 .setJobId(jobId)

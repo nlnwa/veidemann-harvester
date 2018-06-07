@@ -15,8 +15,10 @@
  */
 package no.nb.nna.veidemann.integrationtests;
 
+import com.google.gson.Gson;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
 import no.nb.nna.veidemann.api.MessagesProto.PageLog;
+import no.nb.nna.veidemann.api.ReportProto.ExecuteDbQueryRequest;
 import no.nb.nna.veidemann.api.ReportProto.PageLogListRequest;
 import no.nb.nna.veidemann.commons.ExtraStatusCodes;
 import no.nb.nna.veidemann.commons.db.DbException;
@@ -46,9 +48,10 @@ public class CrawlExecutionValidator {
         this.db = db;
     }
 
-    public CrawlExecutionValidator validate() throws DbException {
+    public CrawlExecutionValidator validate() throws DbException, InterruptedException {
         init();
 
+        checkDrainedQueue();
         checkConsistency();
         checkValidWarc();
         checkChecksum();
@@ -69,6 +72,30 @@ public class CrawlExecutionValidator {
                 .as("Wrong number of page log records")
                 .isEqualTo(expectedSize);
         return this;
+    }
+
+    private void checkDrainedQueue() throws InterruptedException {
+        // Check that crawl host group has zero queuedUriCount
+        QueryObserver observer = new QueryObserver();
+        CrawlTestBase.reportClient.executeDbQuery(ExecuteDbQueryRequest.newBuilder()
+                .setQuery("r.table('crawl_host_group')").build(), observer);
+        observer.await();
+        assertThat(observer.getResults().size()).isLessThanOrEqualTo(1);
+        if (observer.getResults().size() > 0) {
+            assertThat(new Gson().fromJson(observer.getResults().get(0), Map.class).get("queuedUriCount"))
+                    .as("queuedUriCount in crawlHostGroup should be null after crawl has ended")
+                    .isEqualTo(0.0);
+        }
+
+        // Check that there is no uri's in queue
+        observer = new QueryObserver();
+        CrawlTestBase.reportClient.executeDbQuery(ExecuteDbQueryRequest.newBuilder()
+                .setQuery("r.table('uri_queue').count()").build(), observer);
+        observer.await();
+        assertThat(observer.getResults()).hasSize(1);
+        assertThat(observer.getResults().get(0))
+                .as("There should be no uri's in queue after crawl has ended")
+                .isEqualTo("0");
     }
 
     private void checkConsistency() {
@@ -277,4 +304,5 @@ public class CrawlExecutionValidator {
         }
         return warcUrn.substring(10, warcUrn.lastIndexOf(">"));
     }
+
 }

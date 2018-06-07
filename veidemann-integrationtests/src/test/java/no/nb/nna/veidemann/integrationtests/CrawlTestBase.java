@@ -19,8 +19,11 @@ import com.google.protobuf.Empty;
 import com.rethinkdb.RethinkDB;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import no.nb.nna.veidemann.api.ConfigProto;
+import no.nb.nna.veidemann.api.ConfigProto.CrawlEntity;
 import no.nb.nna.veidemann.api.ConfigProto.LogLevels;
 import no.nb.nna.veidemann.api.ConfigProto.LogLevels.Level;
+import no.nb.nna.veidemann.api.ConfigProto.Seed;
 import no.nb.nna.veidemann.api.ContentWriterGrpc;
 import no.nb.nna.veidemann.api.ControllerGrpc;
 import no.nb.nna.veidemann.api.ReportGrpc;
@@ -31,6 +34,7 @@ import no.nb.nna.veidemann.db.RethinkDbAdapter;
 import no.nb.nna.veidemann.db.RethinkDbAdapter.TABLES;
 import no.nb.nna.veidemann.db.RethinkDbConnection;
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.BeforeClass;
 
 public abstract class CrawlTestBase {
@@ -81,6 +85,13 @@ public abstract class CrawlTestBase {
         controllerClient.saveLogConfig(logLevels.build());
     }
 
+    @AfterClass
+    public static void shutdown() {
+        if (db != null) {
+            db.close();
+        }
+    }
+
     @After
     public void cleanup() throws DbException {
         contentWriterClient.delete(Empty.getDefaultInstance());
@@ -93,6 +104,22 @@ public abstract class CrawlTestBase {
         db.executeRequest("delete", r.table(TABLES.SCREENSHOT.name).delete());
         db.executeRequest("delete", r.table(TABLES.URI_QUEUE.name).delete());
         db.executeRequest("delete", r.table(TABLES.CRAWL_HOST_GROUP.name).delete());
-        db.executeRequest("delete", r.table(TABLES.ALREADY_CRAWLED_CACHE.name).delete());
+        db.executeRequest("delete", r.table(TABLES.CRAWL_ENTITIES.name).delete());
+        db.executeRequest("delete", r.table(TABLES.SEEDS.name).delete());
+    }
+
+    CrawlEntity createEntity(String name) {
+        return controllerClient.saveEntity(
+                ConfigProto.CrawlEntity.newBuilder()
+                        .setMeta(ConfigProto.Meta.newBuilder().setName(name))
+                        .build());
+    }
+
+    Seed createSeed(String uri, CrawlEntity entity, String jobId) {
+        return controllerClient.saveSeed(ConfigProto.Seed.newBuilder()
+                .setMeta(ConfigProto.Meta.newBuilder().setName(uri))
+                .setEntityId(entity.getId())
+                .addJobId(jobId)
+                .build());
     }
 }

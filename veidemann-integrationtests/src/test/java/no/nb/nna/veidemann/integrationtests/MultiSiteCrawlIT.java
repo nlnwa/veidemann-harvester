@@ -60,46 +60,18 @@ public class MultiSiteCrawlIT extends CrawlTestBase implements VeidemannHeaderCo
         job = controllerClient.saveCrawlJob(job);
         String jobId = job.getId();
 
-        ConfigProto.CrawlEntity entity1 = controllerClient.saveEntity(
-                ConfigProto.CrawlEntity.newBuilder().setMeta(ConfigProto.Meta.newBuilder()
-                        .setName("Test entity 1")).build());
-        ConfigProto.Seed seed1 = controllerClient.saveSeed(ConfigProto.Seed.newBuilder()
-                .setMeta(ConfigProto.Meta.newBuilder().setName("http://a1.com"))
-                .setEntityId(entity1.getId())
-                .addJobId(jobId)
-                .build());
+        ConfigProto.CrawlEntity entity1 = createEntity("Test entity 1");
+        ConfigProto.Seed seed1 = createSeed("http://a1.com", entity1, jobId);
 
-        ConfigProto.CrawlEntity entity2 = controllerClient.saveEntity(
-                ConfigProto.CrawlEntity.newBuilder().setMeta(ConfigProto.Meta.newBuilder()
-                        .setName("Test entity 2")).build());
-        ConfigProto.Seed seed2 = controllerClient.saveSeed(ConfigProto.Seed.newBuilder()
-                .setMeta(ConfigProto.Meta.newBuilder().setName("http://a2.com"))
-                .setEntityId(entity2.getId())
-                .addJobId(jobId)
-                .build());
-        ConfigProto.Seed seed3 = controllerClient.saveSeed(ConfigProto.Seed.newBuilder()
-                .setMeta(ConfigProto.Meta.newBuilder().setName("http://a3.com"))
-                .setEntityId(entity2.getId())
-                .addJobId(jobId)
-                .build());
+        ConfigProto.CrawlEntity entity2 = createEntity("Test entity 2");
+        ConfigProto.Seed seed2 = createSeed("http://a2.com", entity2, jobId);
+        ConfigProto.Seed seed3 = createSeed("http://a3.com", entity2, jobId);
 
-        ConfigProto.CrawlEntity entity3 = controllerClient.saveEntity(
-                ConfigProto.CrawlEntity.newBuilder().setMeta(ConfigProto.Meta.newBuilder()
-                        .setName("Test entity 3")).build());
-        ConfigProto.Seed invalidSeed = controllerClient.saveSeed(ConfigProto.Seed.newBuilder()
-                .setMeta(ConfigProto.Meta.newBuilder().setName("https://www.toll.no/ // etat under finansdepartementet"))
-                .setEntityId(entity3.getId())
-                .addJobId(jobId)
-                .build());
+        ConfigProto.CrawlEntity entity3 = createEntity("Test entity 3");
+        ConfigProto.Seed invalidSeed = createSeed("https://www.toll.no/ // etat under finansdepartementet", entity3, jobId);
 
-        ConfigProto.CrawlEntity entity4 = controllerClient.saveEntity(
-                ConfigProto.CrawlEntity.newBuilder().setMeta(ConfigProto.Meta.newBuilder()
-                        .setName("Test entity 4")).build());
-        ConfigProto.Seed notFoundSeed = controllerClient.saveSeed(ConfigProto.Seed.newBuilder()
-                .setMeta(ConfigProto.Meta.newBuilder().setName("http://static.com/not-found.gif"))
-                .setEntityId(entity4.getId())
-                .addJobId(jobId)
-                .build());
+        ConfigProto.CrawlEntity entity4 = createEntity("Test entity 4");
+        ConfigProto.Seed notFoundSeed = createSeed("http://static.com/not-found.gif", entity4, jobId);
 
         ControllerProto.RunCrawlRequest request = ControllerProto.RunCrawlRequest.newBuilder()
                 .setJobId(jobId)

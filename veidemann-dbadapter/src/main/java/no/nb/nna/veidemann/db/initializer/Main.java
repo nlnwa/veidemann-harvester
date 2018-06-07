@@ -40,7 +40,7 @@ public final class Main {
         // logging is even loaded.
         System.setProperty("java.util.logging.manager", "org.apache.logging.log4j.jul.LogManager");
 
-        new DbInitializer().initialize();
+        new DbInitializer().initialize().close();
     }
 
 }

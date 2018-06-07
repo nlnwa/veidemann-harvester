@@ -85,7 +85,7 @@ public class JobCompletion extends ForkJoinTask<JobExecutionStatus> implements R
                     .map(e -> ProtoUtils
                             .rethinkToProto((Map<String, Object>) e.get("new_val"), JobExecutionStatus.class))
                     .forEach(e -> {
-                        if (isEnded(e)) {
+                        if (e.hasEndTime()) {
                             System.out.println("Job completed");
                             cursor.close();
                         }
@@ -99,16 +99,6 @@ public class JobCompletion extends ForkJoinTask<JobExecutionStatus> implements R
             throw rex;
         } catch (Exception ex) {
             throw new RuntimeException(ex);
-        }
-    }
-
-    private boolean isEnded(JobExecutionStatus execution) {
-        switch (execution.getState()) {
-            case CREATED:
-            case RUNNING:
-                return false;
-            default:
-                return true;
         }
     }
 

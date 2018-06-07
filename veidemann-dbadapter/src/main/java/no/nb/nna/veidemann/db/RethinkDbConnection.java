@@ -17,7 +17,6 @@ package no.nb.nna.veidemann.db;
 
 import com.rethinkdb.RethinkDB;
 import com.rethinkdb.ast.ReqlAst;
-import com.rethinkdb.gen.ast.ReqlExpr;
 import com.rethinkdb.gen.exc.ReqlDriverError;
 import com.rethinkdb.gen.exc.ReqlError;
 import com.rethinkdb.model.OptArgs;
@@ -124,6 +123,7 @@ public class RethinkDbConnection implements AutoCloseable {
     @Override
     public void close() {
         conn.close();
+        instance = null;
     }
 
     private Connection connect(String dbHost, int dbPort, String dbName, String dbUser, String dbPassword,

@@ -82,7 +82,7 @@ public class QueueWorker {
                         LOG.trace("No Queued URI found waiting {}ms before retry", RESCHEDULE_DELAY);
                         sleep = RESCHEDULE_DELAY;
                     }
-                    DbUtil.getInstance().getDb().releaseCrawlHostGroup(crawlHostGroup.get(), sleep, false);
+                    DbUtil.getInstance().getDb().releaseCrawlHostGroup(crawlHostGroup.get(), sleep);
                 } else {
                     // No CrawlHostGroup ready. Wait a moment and try again
                     sleep = RESCHEDULE_DELAY;

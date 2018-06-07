@@ -267,7 +267,7 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
-    public CrawlHostGroup addToCrawlHostGroup(QueuedUri qUri) throws DbException {
+    public QueuedUri addToCrawlHostGroup(QueuedUri qUri) throws DbException {
         String crawlHostGroupId = qUri.getCrawlHostGroupId();
         String politenessId = qUri.getPolitenessId();
         Objects.requireNonNull(crawlHostGroupId, "CrawlHostGroupId cannot be null");
@@ -287,7 +287,10 @@ public class RethinkDbAdapter implements DbAdapter {
                         .optArg("durability", "hard")
         );
 
-        return buildCrawlHostGroup(((List<Map<String, Map>>) response.get("changes")).get(0).get("new_val"));
+        if (!qUri.hasEarliestFetchTimeStamp()) {
+            qUri = qUri.toBuilder().setEarliestFetchTimeStamp(ProtoUtils.getNowTs()).build();
+        }
+        return saveMessage(qUri, TABLES.URI_QUEUE);
     }
 
     @Override
@@ -342,30 +345,19 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
-    public CrawlHostGroup releaseCrawlHostGroup(CrawlHostGroup crawlHostGroup, long nextFetchDelayMs, boolean qUriProcessed) throws DbException {
+    public CrawlHostGroup releaseCrawlHostGroup(CrawlHostGroup crawlHostGroup, long nextFetchDelayMs) throws DbException {
         List key = r.array(crawlHostGroup.getId(), crawlHostGroup.getPolitenessId());
         double nextFetchDelayS = nextFetchDelayMs / 1000.0;
 
         Map<String, Object> response = null;
         Update qry;
-        if (qUriProcessed) {
-            qry = r.table(TABLES.CRAWL_HOST_GROUP.name).optArg("read_mode", "majority")
-                    .get(key)
-                    .update(chg ->
-                            r.hashMap("busy", false)
-                                    .with("nextFetchTime", r.now().add(nextFetchDelayS))
-                                    .with("queuedUriCount", chg.g("queuedUriCount").sub(1L)))
-                    .optArg("return_changes", "always")
-                    .optArg("durability", "hard");
-        } else {
-            qry = r.table(TABLES.CRAWL_HOST_GROUP.name).optArg("read_mode", "majority")
-                    .get(key)
-                    .update(chg ->
-                            r.hashMap("busy", false)
-                                    .with("nextFetchTime", r.now().add(nextFetchDelayS)))
-                    .optArg("return_changes", "always")
-                    .optArg("durability", "hard");
-        }
+        qry = r.table(TABLES.CRAWL_HOST_GROUP.name).optArg("read_mode", "majority")
+                .get(key)
+                .update(chg ->
+                        r.hashMap("busy", false)
+                                .with("nextFetchTime", r.now().add(nextFetchDelayS)))
+                .optArg("return_changes", "always")
+                .optArg("durability", "hard");
         response = executeRequest("db-releaseCrawlHostGroup", qry);
 
         return buildCrawlHostGroup(((List<Map<String, Map>>) response.get("changes")).get(0).get("new_val"));
@@ -446,7 +438,7 @@ public class RethinkDbAdapter implements DbAdapter {
                                 doc -> r.branch(
                                         doc.hasFields("endTime"),
                                         r.hashMap(),
-                                        r.hashMap("state", State.ABORTED_MANUAL.name()).with("endTime", r.now()))
+                                        r.hashMap("state", State.ABORTED_MANUAL.name()))
                         ),
                 JobExecutionStatus.class);
 
@@ -573,19 +565,6 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
-    public QueuedUri saveQueuedUri(QueuedUri qu) throws DbException {
-        if (!qu.hasEarliestFetchTimeStamp()) {
-            qu = qu.toBuilder().setEarliestFetchTimeStamp(ProtoUtils.getNowTs()).build();
-        }
-        return saveMessage(qu, TABLES.URI_QUEUE);
-    }
-
-    @Override
-    public void deleteQueuedUri(QueuedUri qu) throws DbException {
-        deleteConfigMessage(qu, TABLES.URI_QUEUE);
-    }
-
-    @Override
     public long deleteQueuedUrisForExecution(String executionId, String crawlHostGroupId, String politenessId) throws DbException {
         // Delete remaining uris in queue for crawl execution id
         long deleted = executeRequest("db-deleteQueuedUrisForExecution",
@@ -655,6 +634,19 @@ public class RethinkDbAdapter implements DbAdapter {
             if (cursor.hasNext()) {
                 QueuedUri qUri = ProtoUtils.rethinkToProto(cursor.next(), QueuedUri.class);
                 if (Timestamps.comparator().compare(qUri.getEarliestFetchTimeStamp(), ProtoUtils.getNowTs()) <= 0) {
+                    // URI is ready to be processed, remove it from queue
+                    deleteConfigMessage(qUri, TABLES.URI_QUEUE);
+
+                    // Decrement queuedUriCount in CrawlHostGroup
+                    List chgKey = r.array(
+                            crawlHostGroup.getId(),
+                            crawlHostGroup.getPolitenessId()
+                    );
+                    executeRequest("", r.table(TABLES.CRAWL_HOST_GROUP.name).optArg("read_mode", "majority")
+                            .get(chgKey)
+                            .update(chg ->
+                                    r.hashMap("queuedUriCount", chg.g("queuedUriCount").sub(1L)))
+                            .optArg("durability", "hard"));
                     return FutureOptional.of(qUri);
                 } else {
                     return FutureOptional.emptyUntil(ProtoUtils.tsToOdt(qUri.getEarliestFetchTimeStamp()));

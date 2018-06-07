@@ -24,6 +24,7 @@ import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.FutureOptional;
 import no.nb.nna.veidemann.db.RethinkDbAdapter.TABLES;
 import no.nb.nna.veidemann.db.initializer.DbInitializer;
+import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -75,6 +76,13 @@ public class CrawlHostGroupTestIT {
         new DbInitializer().initialize();
     }
 
+    @AfterClass
+    public static void shutdown() {
+        if (db != null) {
+            db.close();
+        }
+    }
+
     @Test
     public void testConsistency() throws DbException, InterruptedException {
         String politenessId = "PolitenessId";
@@ -84,12 +92,12 @@ public class CrawlHostGroupTestIT {
         while (qc < QURI_COUNT) {
             for (int i = 0; i < CRAWL_HOST_GROUP_COUNT && qc++ < QURI_COUNT; i++) {
                 String chgId = "chg" + i;
-                QueuedUri qUri = db.saveQueuedUri(QueuedUri.newBuilder()
+                QueuedUri qUri = QueuedUri.newBuilder()
                         .setCrawlHostGroupId(chgId)
                         .setPolitenessId(politenessId)
                         .setSequence(1)
-                        .build());
-                CrawlHostGroup chg = db.addToCrawlHostGroup(qUri);
+                        .build();
+                qUri = db.addToCrawlHostGroup(qUri);
             }
         }
         finishLatch.await();
@@ -138,7 +146,7 @@ public class CrawlHostGroupTestIT {
                             // No URI found for this CrawlHostGroup. Wait for RESCHEDULE_DELAY and try again.
                             sleep = RESCHEDULE_DELAY;
                         }
-                        db.releaseCrawlHostGroup(crawlHostGroup.get(), sleep, false);
+                        db.releaseCrawlHostGroup(crawlHostGroup.get(), sleep);
                     } else {
                         // No CrawlHostGroup ready. Wait a moment and try again
                         sleep = RESCHEDULE_DELAY;
@@ -159,12 +167,10 @@ public class CrawlHostGroupTestIT {
                 while (true) {
                     Exe exe = getNextToFetch();
 
-                    db.deleteQueuedUri(exe.qUri);
-
                     long crawlTime = rnd.nextInt(200) + 20L;
                     Thread.sleep(crawlTime);
 
-                    CrawlHostGroup chg = db.releaseCrawlHostGroup(exe.chg, crawlTime, true);
+                    CrawlHostGroup chg = db.releaseCrawlHostGroup(exe.chg, crawlTime);
                     assertThat(chg.getQueuedUriCount()).isGreaterThan(-1L);
 
                     assertThat(finishLatch.getCount()).isGreaterThan(0);

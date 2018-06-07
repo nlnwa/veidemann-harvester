@@ -20,6 +20,7 @@ import com.google.gson.GsonBuilder;
 import com.rethinkdb.ast.ReqlAst;
 import com.rethinkdb.net.Cursor;
 import io.grpc.Status;
+import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
 import no.nb.nna.veidemann.api.ConfigProto.Role;
 import no.nb.nna.veidemann.api.ReportGrpc;
@@ -37,6 +38,8 @@ import no.nb.nna.veidemann.controller.query.QueryEngine;
 import no.nb.nna.veidemann.db.RethinkDbConnection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.TimeoutException;
 
 /**
  *
@@ -111,9 +114,14 @@ public class ReportService extends ReportGrpc.ReportImplBase {
                 if (result instanceof Cursor) {
                     try (Cursor c = (Cursor) result) {
                         int index = 0;
-                        while (c.hasNext() && (limit == -1 || index++ < limit)) {
-                            Object r = c.next();
-                            respObserver.onNext(recordToExecuteDbQueryReply(r));
+                        while (!((ServerCallStreamObserver) respObserver).isCancelled()
+                                && c.hasNext() && (limit == -1 || index++ < limit)) {
+                            try {
+                                Object r = c.next(1000);
+                                respObserver.onNext(recordToExecuteDbQueryReply(r));
+                            } catch (TimeoutException e) {
+                                // Timeout is ok
+                            }
                         }
                     }
                 } else {

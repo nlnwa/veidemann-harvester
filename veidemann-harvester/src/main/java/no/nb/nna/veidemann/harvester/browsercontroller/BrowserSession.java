@@ -23,7 +23,7 @@ import no.nb.nna.veidemann.api.ConfigProto;
 import no.nb.nna.veidemann.api.ConfigProto.BrowserConfig;
 import no.nb.nna.veidemann.api.MessagesProto;
 import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
-import no.nb.nna.veidemann.chrome.client.ChromeDebugProtocol;
+import no.nb.nna.veidemann.chrome.client.BrowserClient;
 import no.nb.nna.veidemann.chrome.client.ClientClosedException;
 import no.nb.nna.veidemann.chrome.client.DebuggerDomain;
 import no.nb.nna.veidemann.chrome.client.NetworkDomain;
@@ -31,8 +31,8 @@ import no.nb.nna.veidemann.chrome.client.NetworkDomain.AuthChallengeResponse;
 import no.nb.nna.veidemann.chrome.client.NetworkDomain.CookieParam;
 import no.nb.nna.veidemann.chrome.client.NetworkDomain.RequestPattern;
 import no.nb.nna.veidemann.chrome.client.PageDomain;
+import no.nb.nna.veidemann.chrome.client.PageSession;
 import no.nb.nna.veidemann.chrome.client.RuntimeDomain;
-import no.nb.nna.veidemann.chrome.client.Session;
 import no.nb.nna.veidemann.chrome.client.SessionClosedException;
 import no.nb.nna.veidemann.commons.VeidemannHeaderConstants;
 import no.nb.nna.veidemann.commons.db.DbException;
@@ -63,7 +63,9 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
 
     final QueuedUri queuedUri;
 
-    final Session session;
+    final BrowserClient browser;
+
+    final PageSession session;
 
     final long protocolTimeout;
 
@@ -78,18 +80,19 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
 
     volatile boolean closed = false;
 
-    public BrowserSession(ChromeDebugProtocol chrome, BrowserConfig browserConfig, QueuedUri queuedUri, BaseSpan span) throws IOException, ExecutionException, TimeoutException {
+    public BrowserSession(BrowserClient browser, BrowserConfig browserConfig, QueuedUri queuedUri, BaseSpan span) throws IOException, ExecutionException, TimeoutException {
         this.queuedUri = Objects.requireNonNull(queuedUri);
 
+        this.browser = browser;
         // Ensure that we at least wait a second even if the configuration says less.
         long maxIdleTime = Math.max(browserConfig.getSleepAfterPageloadMs(), 1000);
         crawlLogs = new CrawlLogRegistry(this, browserConfig.getPageLoadTimeoutMs(), maxIdleTime);
         uriRequests = new UriRequestRegistry(crawlLogs, queuedUri, span);
         protocolTimeout = browserConfig.getPageLoadTimeoutMs();
 
-        session = chrome.newSession(browserConfig.getWindowWidth(), browserConfig.getWindowHeight());
+        session = browser.newPage(browserConfig.getWindowWidth(), browserConfig.getWindowHeight());
 
-        LOG.debug("Browser session created");
+        LOG.debug("Browser page created");
 
         String userAgent = browserConfig.getUserAgent();
 
@@ -298,7 +301,7 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
                     .setExecutionId(getExecutionId())
                     .setUri(uriRequests.getRootRequest().getUrl())
                     .build());
-        } catch (ExecutionException | TimeoutException| DbException  ex) {
+        } catch (ExecutionException | TimeoutException | DbException ex) {
             throw new RuntimeException(ex);
         }
     }
@@ -497,8 +500,8 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
     @Override
     public void close() {
         closed = true;
-        if (session != null) {
-            session.close();
+        if (browser != null) {
+            browser.close();
         }
         uriRequests.close();
     }

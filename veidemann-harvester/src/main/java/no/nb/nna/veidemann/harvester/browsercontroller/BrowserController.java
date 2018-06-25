@@ -55,22 +55,20 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
 
     private final ChromeDebugProtocol chrome;
 
+    private final ChromeDebugProtocolConfig chromeDebugProtocolConfig;
+
     private final BrowserSessionRegistry sessionRegistry;
 
     private final Map<String, BrowserScript> scriptCache = new HashMap<>();
 
-    public BrowserController(final String chromeHost, final int chromePort, final int maxOpenSessions,
-                             final DbAdapter db, final BrowserSessionRegistry sessionRegistry) {
+    public BrowserController(final String browserWSEndpoint, final DbAdapter db, final BrowserSessionRegistry sessionRegistry) {
         DbHelper.getInstance().configure(db);
 
-        LOG.info("Connecting browser at {}:{}", chromeHost, chromePort);
-        ChromeDebugProtocolConfig chromeDebugProtocolConfig = new ChromeDebugProtocolConfig(chromeHost, chromePort)
+        chromeDebugProtocolConfig = new ChromeDebugProtocolConfig(browserWSEndpoint)
                 .withTracer(GlobalTracer.get())
-                .withMaxOpenSessions(maxOpenSessions)
-                .withProtocolTimeoutMs(10000)
-                .withWorkerThreads(32);
+                .withProtocolTimeoutMs(10000);
 
-        this.chrome = new ChromeDebugProtocol(chromeDebugProtocolConfig);
+        this.chrome = new ChromeDebugProtocol();
         this.sessionRegistry = sessionRegistry;
     }
 
@@ -93,7 +91,7 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
         BrowserSession session = null;
         try {
             browserConfig = DbHelper.getInstance().getBrowserConfigForCrawlConfig(config);
-            session = new BrowserSession(chrome, browserConfig, queuedUri, span);
+            session = new BrowserSession(chrome.connect(chromeDebugProtocolConfig), browserConfig, queuedUri, span);
         } catch (Throwable t) {
             if (session != null) {
                 session.close();

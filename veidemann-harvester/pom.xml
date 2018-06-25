@@ -211,40 +211,31 @@
                         </run>
                     </image>
                     <image>
-                        <name>norsknettarkiv/chrome-headless:${chrome.version}</name>
+                        <name>browserless/chrome:release-puppeteer-1.5.0</name>
                         <alias>browser</alias>
                         <run>
-                            <user>${uid}</user>
+                            <namingStrategy>alias</namingStrategy>
+                            <network>
+                                <mode>custom</mode>
+                                <name>cdp-test-net</name>
+                                <alias>browser</alias>
+                            </network>
                             <ports>
-                                <port>+browser.host:browser.port:9222</port>
+                                <port>+browser.host:browser.port:3000</port>
                             </ports>
                             <env>
-                                <CHROME_OPTS>--proxy-server=${proxy.ip}:${proxy.port} --hide-scrollbars --disable-dev-shm-usage</CHROME_OPTS>
+                                <CHROME_OPTS>--hide-scrollbars --disable-dev-shm-usage</CHROME_OPTS>
                             </env>
                             <!-- 1GB -->
                             <memory>1073741824</memory>
                             <shmSize>1073741824</shmSize>
-                            <volumes>
-                                <bind>
-                                    <volume>${project.build.directory}/it-workdir:/data</volume>
-                                </bind>
-                            </volumes>
                             <log>
                                 <enabled>true</enabled>
                             </log>
-                            <wait>
-                                <tcp>
-                                    <mode>mapped</mode>
-                                    <ports>
-                                        <port>9222</port>
-                                    </ports>
-                                </tcp>
-                                <time>20000</time>
-                                <log>Certificate /data/certificates/VeidemannCA.pem imported</log>
-                            </wait>
-                            <dependsOn>
-                                <container>testsites</container>
-                            </dependsOn>
+                            <dns>
+                                <host>${docker.container.testsites.net.cdp-test-net.ip}</host>
+                                <!--<host>8.8.8.8</host>-->
+                            </dns>
                         </run>
                     </image>
                 </images>

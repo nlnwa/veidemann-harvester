@@ -1129,4 +1129,28 @@ public class RethinkDbAdapterIT {
         assertThat(jList.getValueCount()).isEqualTo(2);
         assertThat(jList.getValueList()).containsExactlyInAnyOrder(jes1, jes2);
     }
+
+    @Test
+    public void testPaused() throws DbException {
+        assertThat(db.getPausedState(false)).isFalse();
+        assertThat(db.getPausedState(true)).isFalse();
+
+        assertThat(db.setPausedState(false, true)).isFalse();
+        assertThat(db.setPausedState(true, true)).isFalse();
+
+        assertThat(db.getPausedState(false)).isTrue();
+        assertThat(db.getPausedState(true)).isTrue();
+
+        assertThat(db.setPausedState(false, true)).isTrue();
+        assertThat(db.setPausedState(true, true)).isTrue();
+
+        assertThat(db.getPausedState(false)).isTrue();
+        assertThat(db.getPausedState(true)).isTrue();
+
+        assertThat(db.setPausedState(false, false)).isTrue();
+        assertThat(db.setPausedState(true, false)).isTrue();
+
+        assertThat(db.getPausedState(false)).isFalse();
+        assertThat(db.getPausedState(true)).isFalse();
+    }
 }

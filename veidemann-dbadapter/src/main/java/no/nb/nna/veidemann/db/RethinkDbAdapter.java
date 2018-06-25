@@ -910,6 +910,36 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
+    public boolean setPausedState(boolean actual, boolean value) throws DbException {
+        String key = actual ? "isPaused" : "shouldPause";
+        Map<String, List<Map<String, Map>>> state = executeRequest("set-paused",
+                r.table(TABLES.SYSTEM.name)
+                .insert(r.hashMap("id", "state").with(key, value))
+                .optArg("conflict", "update")
+                .optArg("return_changes", "always")
+        );
+        Map oldValue = state.get("changes").get(0).get("old_val");
+        if (oldValue == null || (Boolean) oldValue.computeIfAbsent(key, k -> Boolean.FALSE) == false) {
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+    @Override
+    public boolean getPausedState(boolean actual) throws DbException {
+        Map<String, Object> state = executeRequest("get-paused",
+                r.table(TABLES.SYSTEM.name)
+                        .get("state")
+        );
+        if (state == null) {
+            return false;
+        }
+        String key = actual ? "isPaused" : "shouldPause";
+        return (Boolean) state.computeIfAbsent(key, k -> Boolean.FALSE);
+    }
+
+    @Override
     public LogLevels getLogConfig() throws DbException {
         Map<String, Object> response = executeRequest("get-logconfig",
                 r.table(RethinkDbAdapter.TABLES.SYSTEM.name)

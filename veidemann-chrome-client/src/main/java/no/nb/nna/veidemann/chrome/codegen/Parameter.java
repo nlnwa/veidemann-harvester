@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package no.nb.nna.veidemann.chrome.client.codegen;
+package no.nb.nna.veidemann.chrome.codegen;
 
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.ParameterSpec;

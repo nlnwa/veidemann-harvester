@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package no.nb.nna.veidemann.chrome.client.codegen;
+package no.nb.nna.veidemann.chrome.codegen;
 
 import com.squareup.javapoet.AnnotationSpec;
 import com.squareup.javapoet.ClassName;
@@ -22,6 +22,7 @@ import com.squareup.javapoet.FieldSpec;
 import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeSpec;
+import no.nb.nna.veidemann.chrome.client.TargetDomainBase;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,14 +68,15 @@ public class Domain {
                 .addModifiers(Modifier.PUBLIC)
                 .addAnnotation(generatedAnnotation)
                 .addField(logger)
-                .addField(Session.entryPoint)
                 .addField(sessionClient)
                 .addMethod(MethodSpec.constructorBuilder().addModifiers(Modifier.PUBLIC)
-                        .addParameter(Session.entryPoint.type, Session.entryPoint.name)
                         .addParameter(sessionClient.type, sessionClient.name)
-                        .addStatement("this.$1N = $1N", Session.entryPoint)
                         .addStatement("this.$1N = $1N", sessionClient)
                         .build());
+
+        if ("target".equals(domain)) {
+            builder.superclass(TargetDomainBase.class);
+        }
     }
 
     public void buildType(Protocol protocol) {

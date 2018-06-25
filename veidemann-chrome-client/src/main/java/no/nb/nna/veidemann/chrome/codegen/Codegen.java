@@ -1,22 +1,24 @@
-package no.nb.nna.veidemann.chrome.client.codegen;
+package no.nb.nna.veidemann.chrome.codegen;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonElement;
 import com.google.gson.annotations.SerializedName;
 import com.squareup.javapoet.AnnotationSpec;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.FieldSpec;
 import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.TypeSpec;
+import no.nb.nna.veidemann.chrome.client.BrowserClientBase.CreateTargetReply;
+import no.nb.nna.veidemann.chrome.client.ws.TargetInfo;
 
 import javax.lang.model.element.Modifier;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -49,10 +51,10 @@ public class Codegen {
         System.out.println("Sources generated in: " + outdir);
 
         String browserProtocol = "https://chromium.googlesource.com/chromium/src/+/"
-                + CHROME_VERSION + "/third_party/WebKit/Source/core/inspector/browser_protocol.json?format=text";
+                + CHROME_VERSION + "/third_party/blink/renderer/core/inspector/browser_protocol.pdl?format=text";
 
         String jsProtocol = "https://chromium.googlesource.com/v8/v8/+/chromium/"
-                + CHROME_VERSION.split("\\.")[2] + "/src/inspector/js_protocol.json?format=text";
+                + CHROME_VERSION.split("\\.")[2] + "/src/inspector/js_protocol.pdl?format=text";
 
         Protocol protocol = loadProtocol(browserProtocol);
         protocol.merge(loadProtocol(jsProtocol));
@@ -61,9 +63,10 @@ public class Codegen {
     }
 
     static Protocol loadProtocol(String url) throws IOException {
-        try (InputStream stream = Base64.getDecoder().wrap(new URL(url).openStream());
-             InputStreamReader reader = new InputStreamReader(stream, StandardCharsets.UTF_8)) {
-            return gson.fromJson(reader, Protocol.class);
+        try (InputStream stream = Base64.getDecoder().wrap(new URL(url).openStream())) {
+            Map proto = PdlParser.parse(stream);
+            JsonElement json = gson.toJsonTree(proto);
+            return gson.fromJson(json, Protocol.class);
         }
     }
 
@@ -71,6 +74,10 @@ public class Codegen {
         String typeName = cap(name);
         TypeSpec.Builder typeSpec = TypeSpec.classBuilder(typeName)
                 .addModifiers(PUBLIC, STATIC);
+
+        if ("TargetInfo".equals(name)) {
+            typeSpec.addSuperinterface(TargetInfo.class);
+        }
 
         StringBuilder fieldStrings = new StringBuilder();
 
@@ -144,6 +151,10 @@ public class Codegen {
         String typeName = name.substring(0, 1).toUpperCase() + name.substring(1);
         TypeSpec.Builder typeSpec = TypeSpec.classBuilder(typeName)
                 .addModifiers(PUBLIC, STATIC);
+
+        if ("CreateTargetResponse".equals(typeName)) {
+            typeSpec.addSuperinterface(CreateTargetReply.class);
+        }
 
         // Private constructor to avoid instatiation
         typeSpec.addMethod(MethodSpec.constructorBuilder()

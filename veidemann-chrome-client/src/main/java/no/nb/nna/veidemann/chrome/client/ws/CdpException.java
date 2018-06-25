@@ -20,4 +20,16 @@ public class CdpException extends Exception {
     public CdpException(long code, String message) {
         super(message + " (" + code + ")");
     }
+
+    public CdpException(String message) {
+        super(message);
+    }
+
+    public CdpException(String message, Throwable t) {
+        super(message, t);
+    }
+
+    public CdpException(Throwable t) {
+        super(t);
+    }
 }

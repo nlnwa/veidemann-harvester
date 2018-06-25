@@ -15,21 +15,21 @@
  */
 package no.nb.nna.veidemann.chrome.client.ws;
 
-import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 
 public final class CdpResponse {
 
     final long id;
 
-    final JsonElement result;
+    final JsonObject result;
 
     final CdpError error;
 
     final String method;
 
-    final JsonElement params;
+    final JsonObject params;
 
-    public CdpResponse(long id, JsonElement result, CdpError error, String method, JsonElement params) {
+    public CdpResponse(long id, JsonObject result, CdpError error, String method, JsonObject params) {
         this.id = id;
         this.result = result;
         this.error = error;
@@ -37,9 +37,25 @@ public final class CdpResponse {
         this.params = params;
     }
 
-    @Override
-    public String toString() {
-        return "CdpResponse{" + "id=" + id + ", result=" + result + ", error=" + error + ", method=" + method + ", params=" + params + '}';
+    String serialize() {
+        try {
+            return Cdp.GSON.toJson(this);
+        } catch (Throwable t) {
+            throw new RuntimeException(t);
+        }
     }
 
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder(this.getClass().getSimpleName());
+        String msg = serialize();
+
+        // Restrict size of msg
+        if (msg.length() > Cdp.MAX_TOSTRING_SIZE) {
+            msg = msg.substring(0, Cdp.MAX_TOSTRING_SIZE) + "... ";
+        }
+
+        sb.append(msg);
+        return sb.toString();
+    }
 }

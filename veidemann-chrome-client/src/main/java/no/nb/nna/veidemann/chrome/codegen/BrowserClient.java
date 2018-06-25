@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package no.nb.nna.veidemann.chrome.client.codegen;
+package no.nb.nna.veidemann.chrome.codegen;
 
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.CodeBlock;
@@ -24,9 +24,10 @@ import com.squareup.javapoet.ParameterSpec;
 import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
+import no.nb.nna.veidemann.chrome.client.BrowserClientBase;
 import no.nb.nna.veidemann.chrome.client.ChromeDebugProtocolConfig;
 import no.nb.nna.veidemann.chrome.client.ClientClosedException;
-import no.nb.nna.veidemann.chrome.client.MaxActiveSessionsExceededException;
+import no.nb.nna.veidemann.chrome.client.ws.CdpSession;
 import no.nb.nna.veidemann.chrome.client.ws.ClientClosedListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,35 +36,25 @@ import javax.lang.model.element.Modifier;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static javax.lang.model.element.Modifier.PUBLIC;
-import static no.nb.nna.veidemann.chrome.client.codegen.Protocol.INDENT;
 
 /**
- * Generates the ChromeDebugProtocol class.
+ * Generates the BrowserClient class.
  */
-public class EntryPoint {
-    static final ClassName type = ClassName.get(Codegen.PACKAGE, "ChromeDebugProtocol");
+public class BrowserClient {
+    static final ClassName type = ClassName.get(Codegen.PACKAGE, "BrowserClient");
 
     final FieldSpec logger = FieldSpec
             .builder(Logger.class, "LOG", Modifier.PRIVATE, Modifier.FINAL, Modifier.STATIC)
             .initializer(CodeBlock.of("$T.getLogger($T.class)", LoggerFactory.class, type)).build();
 
     static final FieldSpec protocolClient = FieldSpec.builder(Codegen.CLIENT_CLASS, "protocolClient", Modifier.FINAL)
-            .build();
-
-    final TypeName sessionListType = ParameterizedTypeName.get(ClassName.get(List.class), Session.type);
-
-    final TypeName contextIdListType = ParameterizedTypeName.get(ClassName.get(List.class), ClassName.get(String.class));
-
-    final FieldSpec sessions = FieldSpec
-            .builder(sessionListType, "sessions", Modifier.PRIVATE, Modifier.FINAL)
-            .initializer("new $T<>()", ArrayList.class)
             .build();
 
     final FieldSpec config = FieldSpec.builder(ChromeDebugProtocolConfig.class, "config", Modifier.FINAL).build();
@@ -77,32 +68,31 @@ public class EntryPoint {
 
     final TypeSpec.Builder classBuilder;
 
-    public EntryPoint(List<Domain> domains, File outdir) {
+    public BrowserClient(List<Domain> domains, File outdir) {
         this.domains = domains;
         this.outdir = outdir;
 
+        final TypeName superClass = ParameterizedTypeName.get(ClassName.get(BrowserClientBase.class), PageSession.type);
+
         classBuilder = TypeSpec.classBuilder(type).addModifiers(Modifier.PUBLIC)
+                .superclass(superClass)
                 .addSuperinterface(Closeable.class)
                 .addSuperinterface(ClientClosedListener.class)
                 .addField(logger)
-                .addField(config)
-                .addField(protocolClient)
-                .addField(sessions)
                 .addField(closed);
     }
 
     static void generate(List<Domain> domains, File outdir) throws IOException {
-        EntryPoint e = new EntryPoint(domains, outdir);
-        e.genConstructors();
-        e.genNewSessionMethod();
-        e.genCloseMethod();
+        BrowserClient e = new BrowserClient(domains, outdir);
+        e.genInitMethod();
+        e.genNewTargetMethod();
+        e.genNewPageSessionMethod();
         e.genIsClosedMethod();
         e.genOnSessionClosedMethod();
         e.genClientClosedMethod();
         e.genToStringAndVersionMethods();
-        e.genGetOpenContextsMethod();
 
-        JavaFile javaFile = JavaFile.builder(Codegen.PACKAGE, e.classBuilder.build()).indent(INDENT).build();
+        JavaFile javaFile = JavaFile.builder(Codegen.PACKAGE, e.classBuilder.build()).indent(Protocol.INDENT).build();
         if (outdir == null) {
             javaFile.writeTo(System.out);
         } else {
@@ -110,22 +100,19 @@ public class EntryPoint {
         }
     }
 
-    void genConstructors() {
-
-        MethodSpec.Builder constructor = MethodSpec.constructorBuilder()
-                .addModifiers(Modifier.PUBLIC)
+    void genInitMethod() {
+        MethodSpec.Builder init = MethodSpec.methodBuilder("init")
                 .addParameter(config.type, config.name, Modifier.FINAL)
-                .addStatement("this.$1N = $1N", config)
-                .addStatement("$N = new Cdp($N)", protocolClient, config)
+                .addStatement("super.init($N)", config)
                 .addStatement("$N.setClientClosedListener(this)", protocolClient);
 
         for (Domain domain : domains) {
             if ("Target".equals(domain.domain) || "Browser".equals(domain.domain)) {
                 FieldSpec field = FieldSpec
-                        .builder(domain.className, Codegen.uncap(domain.domain), Modifier.FINAL, Modifier.PRIVATE)
+                        .builder(domain.className, Codegen.uncap(domain.domain), Modifier.PRIVATE)
                         .build();
                 classBuilder.addField(field);
-                constructor.addStatement("$N = new $T(this, $N)", field, field.type, protocolClient);
+                init.addStatement("$N = new $T($N)", field, field.type, protocolClient);
 
                 classBuilder.addMethod(MethodSpec.methodBuilder(Codegen.uncap(domain.domain))
                         .addModifiers(PUBLIC)
@@ -143,53 +130,55 @@ public class EntryPoint {
             }
         }
 
-        classBuilder.addMethod(constructor.build());
+        init.beginControlFlow("try")
+                .addStatement("target().onTargetCreated(t -> onTargetCreated(t.targetInfo()))")
+                .addStatement("target().onTargetDestroyed(t -> onTargetDestroyed(t.targetId()))")
+                .addStatement("target().onTargetInfoChanged(t -> onTargetInfoChanged(t.targetInfo()))")
+                .addStatement("target().setDiscoverTargets(true).runAsync()")
+                .nextControlFlow("catch (Exception e)")
+                .addStatement("$N.error(e.getMessage(), e)", logger)
+                .addStatement("throw new $T(e)", RuntimeException.class)
+                .endControlFlow();
+
+        classBuilder.addMethod(init.build());
     }
 
-    void genNewSessionMethod() {
+    void genNewTargetMethod() {
+        ParameterSpec contextId = ParameterSpec.builder(String.class, "contextId", Modifier.FINAL).build();
         ParameterSpec clientWidth = ParameterSpec.builder(int.class, "clientWidth", Modifier.FINAL).build();
         ParameterSpec clientHeight = ParameterSpec.builder(int.class, "clientHeight", Modifier.FINAL).build();
-        classBuilder.addMethod(MethodSpec.methodBuilder("newSession")
-                .addException(IOException.class)
+        final TypeName returnType = ParameterizedTypeName.get(ClassName.get(CompletableFuture.class), ClassName.get("no.nb.nna.veidemann.chrome.client.TargetDomain", "CreateTargetResponse"));
+
+        classBuilder.addMethod(MethodSpec.methodBuilder("newTarget")
+                .addException(ClientClosedException.class)
                 .addException(TimeoutException.class)
                 .addException(ExecutionException.class)
-                .addModifiers(Modifier.PUBLIC, Modifier.SYNCHRONIZED)
+                .addAnnotation(Override.class)
+                .addParameter(contextId)
                 .addParameter(clientWidth)
                 .addParameter(clientHeight)
-                .returns(Session.type)
-                .beginControlFlow("if (isClosed())")
-                .addStatement("$N.info(\"Creating new session on closed client. {}\", $N.getClosedReason())", logger, protocolClient)
-                .addStatement("throw new $T($N.getClosedReason())", ClientClosedException.class, protocolClient)
-                .endControlFlow()
-                .beginControlFlow("if (target().getTargets().run().targetInfos().size() > $N.getMaxOpenSessions())", config)
-                .addStatement("throw new $T($N.getMaxOpenSessions())", MaxActiveSessionsExceededException.class, config)
-                .endControlFlow()
-                .addStatement("$1T s = new $1T(this, $2N, $3N, $4N)",
-                        Session.type, config, clientWidth, clientHeight)
-                .addStatement("$N.add(s)", sessions)
-                .addStatement("return s")
+                .returns(returnType)
+                .addStatement("return target().createTarget(\"about:blank\")\n.withWidth($N)\n.withHeight($N)\n" +
+                                ".withBrowserContextId($N)\n.withEnableBeginFrameControl(false)\n.runAsync()",
+                        clientWidth, clientHeight, contextId)
+                .build());
+    }
+
+    void genNewPageSessionMethod() {
+        ParameterSpec sessionClient = ParameterSpec.builder(CdpSession.class, "sessionClient", Modifier.FINAL).build();
+        classBuilder.addMethod(MethodSpec.methodBuilder("newPageSession")
+                .addAnnotation(Override.class)
+                .addParameter(sessionClient)
+                .returns(PageSession.type)
+                .addStatement("return new $T(this, $N)", PageSession.type, sessionClient)
                 .build());
     }
 
     void genOnSessionClosedMethod() {
-        ParameterSpec session = ParameterSpec.builder(Session.type, "session", Modifier.FINAL).build();
+        ParameterSpec session = ParameterSpec.builder(PageSession.type, "session", Modifier.FINAL).build();
         classBuilder.addMethod(MethodSpec.methodBuilder("onSessionClosed")
                 .addModifiers(Modifier.SYNCHRONIZED)
                 .addParameter(session)
-                .addStatement("$N.remove($N)", sessions, session)
-                .build());
-    }
-
-    void genCloseMethod() {
-        classBuilder.addMethod(MethodSpec.methodBuilder("close")
-                .addModifiers(Modifier.PUBLIC, Modifier.SYNCHRONIZED)
-                .addAnnotation(Override.class)
-                .addStatement("$N.set(true)", closed)
-                .beginControlFlow("while (!$N.isEmpty())", sessions)
-                .addStatement("$N.get(0).close()", sessions)
-                .endControlFlow()
-                .addStatement("$N.onClose(\"Client is closed by user\")", protocolClient)
-                .addStatement("$N.cleanup()", protocolClient)
                 .build());
     }
 
@@ -207,9 +196,6 @@ public class EntryPoint {
                 .addAnnotation(Override.class)
                 .addParameter(String.class, "reason")
                 .addStatement("$N.set(true)", closed)
-                .beginControlFlow("while (!$N.isEmpty())", sessions)
-                .addStatement("$N.get(0).close(\"Client closed\")", sessions)
-                .endControlFlow()
                 .build());
     }
 
@@ -227,25 +213,6 @@ public class EntryPoint {
                 .returns(String.class)
                 .addStatement("return $S + $N()", "Chrome Debug Protocol ", version)
                 .build());
-    }
-
-    void genGetOpenContextsMethod() {
-        MethodSpec getOpenContexts = MethodSpec.methodBuilder("getOpenContexts")
-                .addModifiers(Modifier.PUBLIC, Modifier.SYNCHRONIZED)
-                .addException(IOException.class)
-                .returns(contextIdListType)
-                .addJavadoc("Get a list of context ids opened by this client.\n\n"
-                        + "@return List of context ids\n")
-                .beginControlFlow("if ($N.get())", closed)
-                .addStatement("throw new $T($S)", IOException.class, "Client is closed")
-                .endControlFlow()
-                .addStatement("$T contextIds = new $T<>()", contextIdListType, ArrayList.class)
-                .beginControlFlow("for ($T s : $N)", Session.type, sessions)
-                .addStatement("contextIds.add(s.contextId)")
-                .endControlFlow()
-                .addStatement("return contextIds")
-                .build();
-        classBuilder.addMethod(getOpenContexts);
     }
 
 }

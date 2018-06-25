@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package no.nb.nna.veidemann.chrome.client.codegen;
+package no.nb.nna.veidemann.chrome.codegen;
 
 import com.squareup.javapoet.AnnotationSpec;
 import com.squareup.javapoet.JavaFile;
@@ -51,8 +51,9 @@ public class Protocol {
                 javaFile.writeTo(outdir);
             }
         }
-        EntryPoint.generate(domains, outdir);
-        Session.generate(domains, outdir);
+        EntryPoint.generate(outdir);
+        BrowserClient.generate(domains, outdir);
+        PageSession.generate(domains, outdir);
     }
 
     public Domain domain(String domainName) {

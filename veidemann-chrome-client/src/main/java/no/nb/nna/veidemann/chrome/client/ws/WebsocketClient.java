@@ -182,19 +182,6 @@ public class WebsocketClient {
     }
 
     public void sendMessage(String msg) {
-        int retryAttempts = 0;
-        while (!channel.isActive() && retryAttempts < config.getMaxSendMessageAttempts()) {
-            LOG.info("WS channel closed, try to reopen.");
-            close();
-            try {
-                Thread.sleep(config.getReconnectDelay());
-            } catch (InterruptedException e) {
-                break;
-            }
-            connect();
-            retryAttempts++;
-        }
-
         if (!channel.isActive()) {
             throw new IllegalStateException("closed", closeReason);
         }

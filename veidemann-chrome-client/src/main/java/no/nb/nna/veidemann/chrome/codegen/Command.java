@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package no.nb.nna.veidemann.chrome.client.codegen;
+package no.nb.nna.veidemann.chrome.codegen;
 
 import com.google.gson.annotations.SerializedName;
 import com.squareup.javapoet.AnnotationSpec;
@@ -26,21 +26,14 @@ import com.squareup.javapoet.ParameterSpec;
 import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
-import no.nb.nna.veidemann.chrome.client.ChromeDebugProtocolConfig;
-import no.nb.nna.veidemann.chrome.client.ClientClosedException;
-import no.nb.nna.veidemann.chrome.client.SessionClosedException;
 
 import javax.lang.model.element.Modifier;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
 
 import static javax.lang.model.element.Modifier.PRIVATE;
 import static javax.lang.model.element.Modifier.PUBLIC;
-import static no.nb.nna.veidemann.chrome.client.codegen.EntryPoint.protocolClient;
 
 /**
  *
@@ -70,17 +63,18 @@ public class Command {
         }
 
 
-        String returnTypeName = Codegen.cap(name) + "RequestBuilder";
+        String returnTypeName = Codegen.cap(name) + "Command";
         TypeName returnType = ClassName.get("", domain.javaName, returnTypeName);
-        String builderClassDescription = "Builder for " + Codegen.cap(name) + " request.";
-        TypeSpec.Builder returnClass = buildBuilderClass(returnTypeName, resultType, builderClassDescription, parameters, protocol, domain);
+        String commandClassDescription = Codegen.cap(name) + " command.";
+        TypeSpec.Builder returnClass = buildCommandClass(returnTypeName, resultType, commandClassDescription, parameters, protocol, domain);
         b.addType(returnClass.build());
 
         methodSpec.returns(returnType);
 
-        CodeBlock.Builder createCommandBuilder = CodeBlock.builder()
-                .add("return new $T(", returnType)
-                .add("$N.config", Session.entryPoint);
+        CodeBlock.Builder createCommand = CodeBlock.builder()
+                .add("return new $T(", returnType);
+
+        boolean notFirst = false;
         for (Parameter param : parameters) {
             if (!param.optional) {
                 TypeName type = param.typeName(protocol, domain);
@@ -96,20 +90,23 @@ public class Command {
                             .append("\n");
                 }
 
-                createCommandBuilder.add(", $N", param.name);
+                if (notFirst) {
+                    createCommand.add(", ");
+                } else {
+                    notFirst = true;
+                }
+                createCommand.add("$N", param.name);
             }
         }
         methodSpec.addJavadoc(javadoc.toString())
-                .addCode(createCommandBuilder.addStatement(")").build());
+                .addCode(createCommand.addStatement(")").build());
 
         b.addMethod(methodSpec.build());
     }
 
-    private TypeSpec.Builder buildBuilderClass(String typeName, ClassName resultType, String description, List<Parameter> members, Protocol protocol, Domain domain) {
+    private TypeSpec.Builder buildCommandClass(String typeName, ClassName resultType, String description, List<Parameter> members, Protocol protocol, Domain domain) {
         TypeSpec.Builder typeSpec = TypeSpec.classBuilder(typeName)
                 .addModifiers(PUBLIC);
-
-        StringBuilder fieldStrings = new StringBuilder();
 
         if (description != null) {
             typeSpec.addJavadoc(description.replace("$", "$$") + "\n");
@@ -118,8 +115,7 @@ public class Command {
         // Constructor
         MethodSpec.Builder constructor = MethodSpec.constructorBuilder()
                 .addModifiers(Modifier.PRIVATE)
-                .addParameter(ChromeDebugProtocolConfig.class, "cdpConfig", Modifier.FINAL)
-                .addStatement("super($N)", "cdpConfig");
+                .addStatement("super($N, $S, $S, $T.class)", domain.sessionClient, domain.domain, name, resultType);
 
         for (Parameter member : members) {
             if (Objects.equals(member.name, "this")) {
@@ -135,12 +131,6 @@ public class Command {
             }
 
             FieldSpec fieldSpec = field.build();
-            typeSpec.addField(fieldSpec);
-
-            if (fieldStrings.length() > 0) {
-                fieldStrings.append(", ");
-            }
-            fieldStrings.append(member.name + "=\" + " + member.name + " + \"");
 
             String memberDescription = member.description == null ? "" : member.description.replace("$", "$$") + "\n";
 
@@ -150,7 +140,7 @@ public class Command {
                         .addModifiers(PUBLIC)
                         .returns(ClassName.get("", typeName))
                         .addParameter(fieldSpec.type, fieldSpec.name, Modifier.FINAL)
-                        .addStatement("this.$N = $N", fieldSpec, fieldSpec)
+                        .addStatement("withParam($S, $N)", fieldSpec.name, fieldSpec)
                         .addStatement("return this")
                         .addJavadoc(memberDescription + "\n")
                         .addJavadoc("@param " + member.name + " " + memberDescription)
@@ -160,53 +150,13 @@ public class Command {
                 // Add required arguments to constructor
                 constructor.addParameter(fieldSpec.type, fieldSpec.name, Modifier.FINAL)
                         .addJavadoc("@param " + member.name + " " + memberDescription)
-                        .addStatement("this.$1N = $1N", fieldSpec);
+                        .addStatement("withParam($S, $N)", fieldSpec.name, fieldSpec);
             }
         }
 
-        typeSpec.superclass(ParameterizedTypeName.get(ClassName.get(Codegen.PACKAGE, "CommandBuilder"), resultType));
+        typeSpec.superclass(ParameterizedTypeName.get(ClassName.get(Codegen.PACKAGE + ".ws", "Command"), resultType));
         typeSpec.addMethod(constructor.build());
 
-        typeSpec.addMethod(buildRunAsync(resultType, protocol, domain));
-
-        typeSpec.addMethod(MethodSpec.methodBuilder("toString")
-                .addModifiers(PUBLIC)
-                .returns(String.class)
-                .addStatement("return \"" + typeName + "{" + fieldStrings + "}\"").build());
-
         return typeSpec;
-    }
-
-    private MethodSpec buildRunAsync(ClassName resultType, Protocol protocol, Domain domain) {
-        TypeName returnType = ParameterizedTypeName.get(ClassName.get(CompletableFuture.class), resultType);
-        MethodSpec.Builder methodSpec = MethodSpec.methodBuilder("runAsync").addModifiers(Modifier.PUBLIC);
-        methodSpec.returns(returnType);
-
-        methodSpec.addException(ClientClosedException.class)
-                .addException(SessionClosedException.class)
-                .beginControlFlow("if ($N.isClosed())", Session.entryPoint)
-                .addStatement("$N.info(\"Accessing $T on closed client. {}\", $N.$N.getClosedReason())", domain.logger, domain.className, Session.entryPoint, protocolClient)
-                .addStatement("throw new $T($N.$N.getClosedReason())", ClientClosedException.class, Session.entryPoint, protocolClient)
-                .endControlFlow()
-                .beginControlFlow("if ($N.isClosed())", domain.sessionClient)
-                .addStatement("$N.info(\"Accessing $T on closed session. {}\", $N.getClosedReason())", domain.logger, domain.className, domain.sessionClient)
-                .addStatement("throw new $T($N.getClosedReason())", SessionClosedException.class, domain.sessionClient)
-                .endControlFlow();
-
-
-        methodSpec.addJavadoc("Run request.\n<p>\n@return a {@link $T} from which the result might be retrieved\n", CompletableFuture.class);
-        if (!parameters.isEmpty()) {
-            methodSpec.addStatement("\n$T<String, Object> params = new $T<>()", Map.class, HashMap.class);
-            for (Parameter param : parameters) {
-                methodSpec.addStatement("params.put($S, $N)", param.name, param.name);
-            }
-        } else {
-            methodSpec.addStatement("$T<String, Object> params = $T.EMPTY_MAP", Map.class, Collections.class);
-        }
-
-        methodSpec.addStatement("return $N.call($S, params, $T.class)",
-                domain.sessionClient, domain.domain + "." + name, resultType);
-
-        return methodSpec.build();
     }
 }

@@ -80,31 +80,14 @@
                     </execution>
                 </executions>
                 <configuration>
-                    <mainClass>no.nb.nna.veidemann.chrome.client.codegen.Codegen</mainClass>
+                    <mainClass>no.nb.nna.veidemann.chrome.codegen.Codegen</mainClass>
                     <includePluginDependencies>true</includePluginDependencies>
                     <arguments>
                         <argument>${chrome.version}</argument>
                         <argument>${project.build.directory}/generated-sources/cdp</argument>
                     </arguments>
+                    <sourceRoot>${project.build.directory}/generated-sources/cdp</sourceRoot>
                 </configuration>
-            </plugin>
-            <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>build-helper-maven-plugin</artifactId>
-                <version>3.0.0</version>
-                <executions>
-                    <execution>
-                        <phase>generate-sources</phase>
-                        <goals>
-                            <goal>add-source</goal>
-                        </goals>
-                        <configuration>
-                            <sources>
-                                <source>${project.build.directory}/generated-sources/cdp</source>
-                            </sources>
-                        </configuration>
-                    </execution>
-                </executions>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -112,7 +95,7 @@
                 <version>3.0.2</version>
                 <configuration>
                     <excludes>
-                        <exclude>no/nb/nna/veidemann/chrome/client/codegen/**</exclude>
+                        <exclude>no/nb/nna/veidemann/chrome/codegen/**</exclude>
                     </excludes>
                 </configuration>
             </plugin>
@@ -181,7 +164,7 @@
                                 <configuration>
                                     <images>
                                         <image>
-                                            <name>norsknettarkiv/chrome-headless:${chrome.version}</name>
+                                            <name>browserless/chrome:release-puppeteer-1.5.0</name>
                                             <alias>browser</alias>
                                             <run>
                                                 <namingStrategy>alias</namingStrategy>
@@ -191,7 +174,7 @@
                                                     <alias>browser</alias>
                                                 </network>
                                                 <ports>
-                                                    <port>+browser.host:browser.port:9222</port>
+                                                    <port>+browser.host:browser.port:3000</port>
                                                 </ports>
                                                 <env>
                                                     <CHROME_OPTS>--hide-scrollbars --disable-dev-shm-usage</CHROME_OPTS>

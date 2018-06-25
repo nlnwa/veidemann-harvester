@@ -17,6 +17,7 @@ package no.nb.nna.veidemann.harvester.browsercontroller;
 
 import com.google.common.net.InetAddresses;
 import no.nb.nna.veidemann.api.ConfigProto;
+import no.nb.nna.veidemann.api.ConfigProto.BrowserConfig;
 import no.nb.nna.veidemann.api.ContentWriterProto;
 import no.nb.nna.veidemann.api.ContentWriterProto.RecordType;
 import no.nb.nna.veidemann.api.ContentWriterProto.WriteResponseMeta;
@@ -31,6 +32,7 @@ import no.nb.nna.veidemann.commons.util.ApiTools;
 import no.nb.nna.veidemann.harvester.BrowserSessionRegistry;
 import no.nb.nna.veidemann.harvester.proxy.RecordingProxy;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.littleshoot.proxy.HostResolver;
 import org.mockito.invocation.InvocationOnMock;
@@ -51,6 +53,7 @@ import static org.mockito.Mockito.when;
 /**
  *
  */
+@Ignore
 public class BrowserControllerIT {
 
     static String browserHost;
@@ -122,6 +125,7 @@ public class BrowserControllerIT {
 //                    .setUri("https://www.nb.no/utstillinger/leksikon/tema01.php") // 404 problemer + data: scheme
 //                    .setUri("https://www.nb.no/baser/bjornson/talekart.html") // 404 problemer + data: scheme
                     .setExecutionId("testId")
+                    .setJobExecutionId("testId")
 //                    .setDiscoveryPath("L")
 //                    .setReferrer("http://example.org/")
                     .build();
@@ -133,19 +137,22 @@ public class BrowserControllerIT {
 
             Thread.sleep(1000);
 
+            String proxyParam = "--proxy-server=http://" + proxyIp + ":" + proxyPort;
+            String browserWSEndpoint = "ws://" + browserHost + ":" + browserPort + "/?" + proxyParam;
+
             try (RecordingProxy proxy = new RecordingProxy(tmpDir, proxyPort, db, contentWriterClient,
                     new TestHostResolver(), sessionRegistry, "", 0);
 
-                 BrowserController controller = new BrowserController(browserHost, browserPort, 5, db,
-                         sessionRegistry);) {
+                 BrowserController controller = new BrowserController(browserWSEndpoint, db, sessionRegistry);) {
 
                 RenderResult result = controller.render(queuedUri, config);
+                System.out.println("##### " + result);
                 int pagesHarvested = 1;
 //                int totalPages = result.getOutlinksCount() + 1;
                 result.getOutlinks().forEach(qu -> {
                     String surt = UriConfigs.SURT_KEY.buildUri(qu.getUri()).toString();
 //                    if (!surt.startsWith("(no,nb,")) {
-//                        System.out.println("OOS: " + surt + " --- " + qu.getUri());
+                        System.out.println("OOS: " + surt + " --- " + qu.getUri());
 //                        totalPages--;
 //                        continue;
 //                    }
@@ -206,6 +213,10 @@ public class BrowserControllerIT {
 
     private DbAdapter getDbMock() throws DbException {
         DbAdapter db = mock(DbAdapter.class);
+        when(db.getBrowserConfig(any())).thenReturn(BrowserConfig.newBuilder()
+                .setWindowWidth(900)
+                .setWindowHeight(900)
+                .build());
         when(db.hasCrawledContent(any())).thenReturn(Optional.empty());
         when(db.saveCrawlLog(any())).thenAnswer((InvocationOnMock i) -> {
             CrawlLog cl = i.getArgument(0);

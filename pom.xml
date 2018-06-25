@@ -40,7 +40,7 @@
         <maven.compiler.target>1.8</maven.compiler.target>
         <docker.tag>latest</docker.tag>
 
-        <chrome.version>67.0.3386.1</chrome.version>
+        <chrome.version>69.0.3452.0</chrome.version>
         <docker.java.image>openjdk:8-jdk-alpine</docker.java.image>
 
         <veidemann.api.version>0.1.9</veidemann.api.version>

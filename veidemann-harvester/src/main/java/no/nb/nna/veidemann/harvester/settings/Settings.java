@@ -15,7 +15,6 @@
  */
 package no.nb.nna.veidemann.harvester.settings;
 
-import com.typesafe.config.ConfigMemorySize;
 import no.nb.nna.veidemann.commons.settings.CommonSettings;
 
 /**
@@ -32,6 +31,8 @@ public class Settings extends CommonSettings {
     private String browserHost;
 
     private int browserPort;
+
+    private String browserWSEndpoint;
 
     private String cacheHost;
 
@@ -71,6 +72,14 @@ public class Settings extends CommonSettings {
 
     public void setFrontierPort(int frontierPort) {
         this.frontierPort = frontierPort;
+    }
+
+    public String getBrowserWSEndpoint() {
+        return browserWSEndpoint;
+    }
+
+    public void setBrowserWSEndpoint(String browserWSEndpoint) {
+        this.browserWSEndpoint = browserWSEndpoint;
     }
 
     public String getWorkDir() {

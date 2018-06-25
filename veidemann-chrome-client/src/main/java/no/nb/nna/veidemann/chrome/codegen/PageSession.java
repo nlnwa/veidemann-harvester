@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package no.nb.nna.veidemann.chrome.client.codegen;
+package no.nb.nna.veidemann.chrome.codegen;
 
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.CodeBlock;
@@ -22,46 +22,34 @@ import com.squareup.javapoet.JavaFile;
 import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.ParameterSpec;
 import com.squareup.javapoet.TypeSpec;
-import no.nb.nna.veidemann.chrome.client.ChromeDebugProtocolConfig;
+import no.nb.nna.veidemann.chrome.client.BrowserClientBase.BrowserPage;
 import no.nb.nna.veidemann.chrome.client.ClientClosedException;
 import no.nb.nna.veidemann.chrome.client.SessionClosedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.lang.model.element.Modifier;
-import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeoutException;
 
 import static javax.lang.model.element.Modifier.PUBLIC;
-import static no.nb.nna.veidemann.chrome.client.codegen.EntryPoint.protocolClient;
-import static no.nb.nna.veidemann.chrome.client.codegen.Protocol.INDENT;
+import static no.nb.nna.veidemann.chrome.codegen.BrowserClient.protocolClient;
 
 /**
  *
  */
-public class Session {
+public class PageSession {
 
-    static final ClassName type = ClassName.get(Codegen.PACKAGE, "Session");
+    static final ClassName type = ClassName.get(Codegen.PACKAGE, "PageSession");
 
-    static final FieldSpec entryPoint = FieldSpec.builder(EntryPoint.type, "chromeDebugProtocol", Modifier.FINAL).build();
+    static final FieldSpec entryPoint = FieldSpec.builder(BrowserClient.type, "browser", Modifier.PROTECTED, Modifier.FINAL).build();
 
-    final FieldSpec sessionClient = FieldSpec
-            .builder(Codegen.CLIENT_CLASS, "sessionClient", Modifier.PRIVATE, Modifier.FINAL).build();
+    final FieldSpec sessionClient = FieldSpec.builder(Codegen.CLIENT_CLASS, "sessionClient", Modifier.PROTECTED, Modifier.FINAL).build();
 
     final FieldSpec logger = FieldSpec
             .builder(Logger.class, "LOG", Modifier.PRIVATE, Modifier.FINAL, Modifier.STATIC)
             .initializer(CodeBlock.of("$T.getLogger($T.class)", LoggerFactory.class, type)).build();
-
-    final FieldSpec config = FieldSpec
-            .builder(ChromeDebugProtocolConfig.class, "config", Modifier.PRIVATE, Modifier.FINAL).build();
-
-    final FieldSpec contextId = FieldSpec.builder(String.class, "contextId", Modifier.FINAL).build();
-
-    final FieldSpec targetId = FieldSpec.builder(String.class, "targetId", Modifier.FINAL).build();
 
     final List<Domain> domains;
 
@@ -69,28 +57,25 @@ public class Session {
 
     final TypeSpec.Builder classBuilder;
 
-    public Session(List<Domain> domains, File outdir) {
+    public PageSession(List<Domain> domains, File outdir) {
         this.domains = domains;
         this.outdir = outdir;
 
         classBuilder = TypeSpec.classBuilder(type).addModifiers(Modifier.PUBLIC)
-                .addSuperinterface(Closeable.class)
+                .addSuperinterface(BrowserPage.class)
                 .addField(logger)
-                .addField(config)
                 .addField(entryPoint)
-                .addField(sessionClient)
-                .addField(contextId)
-                .addField(targetId);
+                .addField(sessionClient);
 
     }
 
     static void generate(List<Domain> domains, File outdir) throws IOException {
-        Session s = new Session(domains, outdir);
+        PageSession s = new PageSession(domains, outdir);
         s.genConstructor();
         s.genCloseMethod();
         s.genToStringAndVersionMethods();
 
-        JavaFile javaFile = JavaFile.builder(Codegen.PACKAGE, s.classBuilder.build()).indent(INDENT).build();
+        JavaFile javaFile = JavaFile.builder(Codegen.PACKAGE, s.classBuilder.build()).indent(Protocol.INDENT).build();
         if (outdir == null) {
             javaFile.writeTo(System.out);
         } else {
@@ -99,30 +84,11 @@ public class Session {
     }
 
     void genConstructor() {
-        ParameterSpec config = ParameterSpec.builder(ChromeDebugProtocolConfig.class, "config", Modifier.FINAL).build();
-        ParameterSpec clientWidth = ParameterSpec.builder(int.class, "clientWidth", Modifier.FINAL).build();
-        ParameterSpec clientHeight = ParameterSpec.builder(int.class, "clientHeight", Modifier.FINAL).build();
-
         MethodSpec.Builder constructor = MethodSpec.constructorBuilder()
-                .addException(IOException.class)
-                .addException(ExecutionException.class)
-                .addException(TimeoutException.class)
                 .addParameter(entryPoint.type, entryPoint.name, Modifier.FINAL)
-                .addParameter(config)
-                .addParameter(clientWidth)
-                .addParameter(clientHeight)
+                .addParameter(sessionClient.type, sessionClient.name, Modifier.FINAL)
                 .addStatement("this.$1N = $1N", entryPoint)
-                .addStatement("this.$1N = $1N", config)
-                .addStatement("$N = $N.target().createBrowserContext().run().browserContextId()", contextId, entryPoint)
-                .addStatement("$N = $N.target().createTarget(\"about:blank\")\n.withWidth($N)\n.withHeight($N)\n" +
-                                ".withBrowserContextId($N)\n.withEnableBeginFrameControl(false)\n.run().targetId()",
-                        targetId, entryPoint, clientWidth, clientHeight, contextId)
-                .addCode("\n")
-                .addStatement("$N = $N.$N.createSessionClient($N)",
-                        sessionClient,
-                        entryPoint,
-                        protocolClient,
-                        targetId)
+                .addStatement("this.$1N = $1N", sessionClient)
                 .addCode("\n");
 
         for (Domain domain : domains) {
@@ -136,7 +102,7 @@ public class Session {
                 FieldSpec field = fieldBuilder.build();
                 classBuilder.addField(field);
 
-                constructor.addStatement("$N = new $T($N, $N)", field, field.type, entryPoint, sessionClient);
+                constructor.addStatement("$N = new $T($N)", field, field.type, sessionClient);
 
                 classBuilder.addMethod(MethodSpec.methodBuilder(Codegen.uncap(domain.domain))
                         .addModifiers(PUBLIC)
@@ -159,54 +125,13 @@ public class Session {
             }
         }
 
-        constructor.addCode("\n")
-                .addStatement("inspector.onTargetCrashed(c -> close(\"Session has crashed\"))");
-
-        constructor.addCode("\n").addStatement("$N.debug($S, $N)", logger, "Browser session created: {}", contextId);
-
         classBuilder.addMethod(constructor.build());
     }
 
     void genCloseMethod() {
-        classBuilder.addMethod(MethodSpec.methodBuilder("isClosed")
-                .addModifiers(Modifier.PUBLIC)
-                .returns(boolean.class)
-                .addStatement("return $N.isClosed()", sessionClient)
-                .build());
-
         classBuilder.addMethod(MethodSpec.methodBuilder("close")
                 .addModifiers(Modifier.PUBLIC)
                 .addAnnotation(Override.class)
-                .addStatement("close(\"Session is closed by user\")")
-                .build());
-
-        classBuilder.addMethod(MethodSpec.methodBuilder("close")
-                .addParameter(String.class, "reason", Modifier.FINAL)
-                .addStatement("$N.debug($S, $N)", logger, "Browser session closing: {}", contextId)
-                .beginControlFlow("try")
-                .addStatement("$N.onClose(reason)", sessionClient)
-                .beginControlFlow("if ($N != null)", targetId)
-                .beginControlFlow("try")
-                .addStatement("$N.target().closeTarget(targetId).run()", entryPoint)
-                .nextControlFlow("catch ($T | $T ex)", ClientClosedException.class, SessionClosedException.class)
-                .addComment("Already closed, do nothing")
-                .endControlFlow()
-                .endControlFlow()
-                .beginControlFlow("if ($N != null)", contextId)
-                .beginControlFlow("try")
-                .beginControlFlow("if (!$N.target().disposeBrowserContext(contextId).run().success())", entryPoint)
-                .addStatement("$N.info($S, $N)", logger, "Failed closing context {}", contextId)
-                .endControlFlow()
-                .nextControlFlow("catch ($T | $T ex)", ClientClosedException.class, SessionClosedException.class)
-                .addComment("Already closed, do nothing")
-                .endControlFlow()
-                .endControlFlow()
-                .nextControlFlow("catch ($T | $T ex)", ExecutionException.class, TimeoutException.class)
-                .addStatement("$N.error($S, $N, ex.toString(), ex)",
-                        logger, "Failed closing browser session '{}': {}", contextId)
-                .nextControlFlow("finally")
-                .addStatement("$N.onSessionClosed(this)", entryPoint)
-                .endControlFlow()
                 .build());
     }
 

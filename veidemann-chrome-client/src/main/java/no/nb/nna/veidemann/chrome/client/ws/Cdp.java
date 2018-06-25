@@ -16,220 +16,128 @@
 package no.nb.nna.veidemann.chrome.client.ws;
 
 import com.google.gson.Gson;
-import com.google.gson.JsonElement;
-import io.netty.channel.EventLoopGroup;
-import io.netty.channel.nio.NioEventLoopGroup;
+import com.google.gson.JsonObject;
 import io.opentracing.ActiveSpan;
 import io.opentracing.NoopActiveSpanSource;
 import io.opentracing.Tracer;
 import io.opentracing.tag.Tags;
 import no.nb.nna.veidemann.chrome.client.ChromeDebugProtocolConfig;
-import no.nb.nna.veidemann.chrome.client.SessionClosedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
 /**
  *
  */
-public class Cdp implements WebSocketCallback {
+public abstract class Cdp implements WebSocketCallback {
 
     private static final Logger LOG = LoggerFactory.getLogger(Cdp.class);
 
-    static Gson gson = new Gson();
+    final static int MAX_TOSTRING_SIZE = 250;
 
-    final AtomicLong idSeq = new AtomicLong(1);
+    final static Gson GSON = new Gson();
 
-    final ConcurrentHashMap<Long, CompletableFuture<JsonElement>> methodFutures = new ConcurrentHashMap<>();
+    private final AtomicLong idSeq = new AtomicLong(1);
 
-    final ConcurrentHashMap<String, List<CompletableFuture<JsonElement>>> eventFutures = new ConcurrentHashMap<>();
+    final ConcurrentHashMap<Long, CompletableFuture<JsonObject>> methodFutures = new ConcurrentHashMap<>();
 
-    final ConcurrentHashMap<String, List<Consumer<JsonElement>>> eventListeners = new ConcurrentHashMap<>();
+    final ConcurrentHashMap<String, List<CompletableFuture<JsonObject>>> eventFutures = new ConcurrentHashMap<>();
 
-    WebsocketClient websocketClient;
+    final ConcurrentHashMap<String, List<Consumer<JsonObject>>> eventListeners = new ConcurrentHashMap<>();
+
+    protected final ConcurrentHashMap<String, CdpSession> sessions = new ConcurrentHashMap<>();
 
     final ChromeDebugProtocolConfig config;
 
-    String scheme;
-
-    final AtomicBoolean closed = new AtomicBoolean(false);
-
-    String closedReason;
-
     ClientClosedListener clientClosedListener;
-
-    private final EventLoopGroup workerGroup;
 
     public Cdp(final ChromeDebugProtocolConfig config) {
         this.config = config;
-        workerGroup = new NioEventLoopGroup(config.getWorkerThreads());
+    }
 
-        try {
-            URL versionUrl = new URL("http", config.getHost(), config.getPort(), "/json/version");
-            boolean connected = false;
-            int connectAttempts = 0;
-            while (!connected && connectAttempts < config.getMaxConnectionAttempts()) {
-                try (InputStream in = versionUrl.openStream()) {
-                    InputStreamReader inr = new InputStreamReader(in);
-                    Map version = gson.fromJson(inr, Map.class);
-                    URI webSocketUri = new URI((String) version.get("webSocketDebuggerUrl"));
-                    String browserVersion = (String) version.get("Browser");
-                    this.scheme = webSocketUri.getScheme();
+    public CdpSession createSessionClient(final String sessionId) {
+        CdpSession newSession = new CdpSession(sessionId, this);
+        sessions.put(sessionId, newSession);
+        return newSession;
+    }
 
-                    this.websocketClient = new WebsocketClient(this, webSocketUri, config, workerGroup);
-                    connected = true;
-                } catch (IOException e) {
-                    connectAttempts++;
-                    LOG.debug("Could not connect to Chrome Browser. Retrying in {}ms", config.getReconnectDelay());
-                    try {
-                        Thread.sleep(config.getReconnectDelay());
-                    } catch (InterruptedException e1) {
-                        throw new RuntimeException(e1);
-                    }
-                }
+    public void removeSessionClient(final String sessionId) {
+        sessions.remove(sessionId);
+    }
+
+    public abstract <T> CompletableFuture<T> call(Command<T> command);
+
+    public void addEventListener(String method, Consumer<JsonObject> listener) {
+        List<Consumer<JsonObject>> list = eventListeners.compute(method, (k, v) -> {
+            if (v == null) {
+                v = Collections.synchronizedList(new ArrayList<>());
             }
-        } catch (URISyntaxException | IOException e) {
-            LOG.error("Failed to connect to Chrome Browser.", e);
-            closed.set(true);
-            throw new RuntimeException(e);
-        }
-    }
-
-    private Cdp(final String scheme, final String path, final ChromeDebugProtocolConfig config, EventLoopGroup workerGroup) {
-        this.scheme = scheme;
-        this.config = config;
-        this.workerGroup = workerGroup;
-
-        try {
-            URI webSocketUri = new URI(scheme, null, config.getHost(), config.getPort(), path, null, null);
-
-            this.websocketClient = new WebsocketClient(this, webSocketUri, config, workerGroup);
-        } catch (URISyntaxException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    public Cdp createSessionClient(final String targetId) {
-        return new Cdp(scheme, "/devtools/page/" + targetId, config, workerGroup);
-    }
-
-    public CompletableFuture<JsonElement> call(String method, Map<String, Object> params) {
-        try (ActiveSpan span = buildSpan(method)) {
-
-            final ActiveSpan.Continuation cont = span.capture();
-
-            if (closed.get()) {
-                LOG.info("Calling {} on closed session. {}", method, closedReason);
-                CompletableFuture<JsonElement> future = new CompletableFuture<>();
-                future.completeExceptionally(new SessionClosedException(closedReason));
-                return future;
-            }
-
-            CdpRequest request = new CdpRequest(idSeq.getAndIncrement(), method, params);
-            CompletableFuture<JsonElement> future = new CompletableFuture<JsonElement>().whenComplete((json, error) -> {
-                try (ActiveSpan activeSpan = cont.activate()) {
-                    if (error != null) {
-                        activeSpan.log(error.toString());
-                    }
-                }
-            });
-
-            methodFutures.put(request.id, future);
-
-            String msg = gson.toJson(request);
-
-            span.setTag("request", msg);
-
-            if (LOG.isDebugEnabled()) {
-                if (LOG.isTraceEnabled()) {
-                    LOG.trace("Sent: {}", msg);
-                } else {
-                    LOG.debug("Sent: id={}, method={}", request.id, request.method);
-                }
-            }
-
-            try {
-                websocketClient.sendMessage(msg);
-            } catch (Throwable t) {
-                methodFutures.remove(request.id);
-                future.completeExceptionally(t);
-            }
-            return future;
-        }
-    }
-
-    public <T> CompletableFuture<T> call(String method, Map<String, Object> params, Class<T> resultType) {
-        return call(method, params).thenApply(result -> gson.fromJson(result, resultType));
-    }
-
-    public synchronized void addEventListener(String method, Consumer<JsonElement> listener) {
-        List<Consumer<JsonElement>> list = eventListeners.get(method);
-        if (list == null) {
-            list = Collections.synchronizedList(new ArrayList<>());
-            eventListeners.put(method, list);
-        }
-        list.add(listener);
+            v.add(listener);
+            return v;
+        });
     }
 
     public <T> void addEventListener(String method, Consumer<T> listener, Class<T> eventType) {
-        addEventListener(method, el -> listener.accept(gson.fromJson(el, eventType)));
+        addEventListener(method, el -> listener.accept(parseResult(el, eventType)));
     }
 
-    public synchronized <T> CompletableFuture<T> eventFuture(String method, Class<T> eventType) {
-        CompletableFuture<JsonElement> future = new CompletableFuture<>();
-        List<CompletableFuture<JsonElement>> list = eventFutures.get(method);
-        if (list == null) {
-            list = Collections.synchronizedList(new ArrayList<>());
-            eventFutures.put(method, list);
-        }
-        list.add(future);
-        return future.thenApply(el -> gson.fromJson(el, eventType));
+    public <T> CompletableFuture<T> eventFuture(String method, Class<T> eventType) {
+        CompletableFuture<JsonObject> future = new CompletableFuture<>();
+        List<CompletableFuture<JsonObject>> list = eventFutures.compute(method, (k, v) -> {
+            if (v == null) {
+                v = Collections.synchronizedList(new ArrayList<>());
+            }
+            v.add(future);
+            return v;
+        });
+        return future.thenApply(el -> parseResult(el, eventType));
     }
 
     @Override
     public void onMessageReceived(String msg) {
-        CdpResponse response = gson.fromJson(msg, CdpResponse.class);
+        CdpResponse response = GSON.fromJson(msg, CdpResponse.class);
 
-        if (response.method == null) {
-            if (LOG.isDebugEnabled()) {
-                if (LOG.isTraceEnabled()) {
-                    LOG.trace("Received: {}", msg.substring(0, Math.min(msg.length(), 2048)));
-                } else {
-                    LOG.debug("Received: id={}, error={}", response.id, response.method, response.error != null);
-                }
+        if (response.id != 0) {
+            if (LOG.isTraceEnabled()) {
+                LOG.trace("Received: {}", response);
+            } else if (LOG.isDebugEnabled()) {
+                LOG.debug("Received: id={}, error={}", response.id, response.error);
             }
 
             dispatchResponse(response);
         } else {
-            if (LOG.isDebugEnabled()) {
-                if (LOG.isTraceEnabled()) {
-                    LOG.trace("Received: {}", msg.substring(0, Math.min(msg.length(), 2048)));
-                } else {
-                    LOG.debug("Received: event={}", response.method);
-                }
+            if (LOG.isTraceEnabled()) {
+                LOG.trace("Received: {}", response);
+            } else if (LOG.isDebugEnabled()) {
+                LOG.debug("Received: event={}", response.method);
             }
 
-            dispatchEvent(response.method, response.params);
+            if ("Target.receivedMessageFromTarget".equals(response.method)) {
+                CdpSession session = sessions.get(response.params.get("sessionId").getAsString());
+                if (session != null) {
+                    session.onMessageReceived(response.params.get("message").getAsString());
+                }
+            } else if ("Target.detachedFromTarget".equals(response.method)) {
+                CdpSession session = sessions.get(response.params.get("sessionId").getAsString());
+                if (session != null) {
+                    session.onClose("");
+                }
+                sessions.remove(session.sessionId);
+            } else {
+                dispatchEvent(response.method, response.params);
+            }
         }
     }
 
-    synchronized void dispatchResponse(CdpResponse response) {
-        CompletableFuture<JsonElement> future = methodFutures.remove(response.id);
+    void dispatchResponse(CdpResponse response) {
+        CompletableFuture<JsonObject> future = methodFutures.remove(response.id);
         if (future != null) {
             if (response.error != null) {
                 future.completeExceptionally(new CdpException(response.error.code, response.error.message));
@@ -239,17 +147,24 @@ public class Cdp implements WebSocketCallback {
         }
     }
 
-    synchronized void dispatchEvent(String method, JsonElement event) {
-        List<CompletableFuture<JsonElement>> futures = eventFutures.remove(method);
+    void dispatchEvent(String method, JsonObject event) {
+        List<CompletableFuture<JsonObject>> futures = eventFutures.remove(method);
         if (futures != null) {
-            for (CompletableFuture<JsonElement> future : futures) {
+            for (CompletableFuture<JsonObject> future : futures) {
                 future.complete(event);
             }
         }
 
-        for (Consumer<JsonElement> listener : eventListeners.getOrDefault(method, Collections.emptyList())) {
+        for (Consumer<JsonObject> listener : eventListeners.getOrDefault(method, Collections.emptyList())) {
             listener.accept(event);
         }
+    }
+
+    <T> T parseResult(JsonObject result, Class<T> resultType) {
+        if (resultType.equals(Void.TYPE)) {
+            return null;
+        }
+        return GSON.fromJson(result, resultType);
     }
 
     ActiveSpan buildSpan(String operationName) {
@@ -269,25 +184,17 @@ public class Cdp implements WebSocketCallback {
         this.clientClosedListener = clientClosedListener;
     }
 
-    public boolean isClosed() {
-        return closed.get();
+    public abstract boolean isClosed();
+
+    public abstract String getClosedReason();
+
+    public abstract String getRemoteVersion();
+
+    public ChromeDebugProtocolConfig getConfig() {
+        return config;
     }
 
-    public String getClosedReason() {
-        return closedReason;
-    }
-
-    @Override
-    public void onClose(String reason) {
-        closedReason = reason;
-        closed.set(true);
-        websocketClient.close();
-        if (clientClosedListener != null) {
-            clientClosedListener.clientClosed(reason);
-        }
-    }
-
-    public void cleanup() {
-        workerGroup.shutdownGracefully();
+    public long getNextRequestId() {
+        return idSeq.getAndIncrement();
     }
 }

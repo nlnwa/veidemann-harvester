@@ -1,3 +1,18 @@
+/*
+ * Copyright 2018 National Library of Norway.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package no.nb.nna.veidemann.chrome.client;
 
 import io.opentracing.Tracer;
@@ -7,11 +22,10 @@ import java.util.Objects;
 public class ChromeDebugProtocolConfig {
     private final String host;
     private final int port;
+    private final String browserWSEndpoint;
     private Tracer tracer;
     private boolean activeSpanOnly = true;
     private int maxConnectionAttempts = 10;
-    private int maxSendMessageAttempts = 3;
-    private int maxOpenSessions = 20;
     private long protocolTimeoutMs = 5000;
     private long reconnectDelay = 2000;
     private int workerThreads = 8;
@@ -25,6 +39,18 @@ public class ChromeDebugProtocolConfig {
     public ChromeDebugProtocolConfig(String host, int port) {
         this.host = Objects.requireNonNull(host, "Host must be set");
         this.port = port;
+        this.browserWSEndpoint = null;
+    }
+
+    /**
+     * Construct a new ChromeDebugProtocolConfig.
+     *
+     * @param browserWSEndpoint Websocket endpoint where Chrome is listening
+     */
+    public ChromeDebugProtocolConfig(String browserWSEndpoint) {
+        this.host = null;
+        this.port = 0;
+        this.browserWSEndpoint = browserWSEndpoint;
     }
 
     /**
@@ -45,16 +71,6 @@ public class ChromeDebugProtocolConfig {
 
     public ChromeDebugProtocolConfig withMaxConnectionAttempts(int maxConnectionAttempts) {
         this.maxConnectionAttempts = maxConnectionAttempts;
-        return this;
-    }
-
-    public ChromeDebugProtocolConfig withMaxSendMessageAttempts(int maxSendMessageAttempts) {
-        this.maxSendMessageAttempts = maxSendMessageAttempts;
-        return this;
-    }
-
-    public ChromeDebugProtocolConfig withMaxOpenSessions(int maxOpenSessions) {
-        this.maxOpenSessions = maxOpenSessions;
         return this;
     }
 
@@ -93,14 +109,6 @@ public class ChromeDebugProtocolConfig {
         return maxConnectionAttempts;
     }
 
-    public int getMaxSendMessageAttempts() {
-        return maxSendMessageAttempts;
-    }
-
-    public int getMaxOpenSessions() {
-        return maxOpenSessions;
-    }
-
     public long getProtocolTimeoutMs() {
         return protocolTimeoutMs;
     }
@@ -111,5 +119,9 @@ public class ChromeDebugProtocolConfig {
 
     public int getWorkerThreads() {
         return workerThreads;
+    }
+
+    public String getBrowserWSEndpoint() {
+        return browserWSEndpoint;
     }
 }

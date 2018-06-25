@@ -15,26 +15,16 @@
  */
 package no.nb.nna.veidemann.chrome.client;
 
-import io.netty.channel.nio.NioEventLoopGroup;
-import no.nb.nna.veidemann.chrome.client.ws.Cdp;
-import no.nb.nna.veidemann.chrome.client.ws.WebSocketCallback;
-import no.nb.nna.veidemann.chrome.client.ws.WebsocketClient;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import static org.assertj.core.api.Assertions.fail;
 
 public class ChromeDebugProtocolIT {
 
@@ -50,7 +40,7 @@ public class ChromeDebugProtocolIT {
     public static void init() {
         chromeHost = System.getProperty("browser.host");
         chromePort = Integer.parseInt(System.getProperty("browser.port"));
-        config = new ChromeDebugProtocolConfig(chromeHost, chromePort).withMaxOpenSessions(250);
+        config = new ChromeDebugProtocolConfig("ws://" + chromeHost + ":" + chromePort);
     }
 
     /**
@@ -59,7 +49,8 @@ public class ChromeDebugProtocolIT {
     @Test
     public void testRender() throws Exception {
         System.out.println("Chrome address: " + chromeHost + ":" + chromePort);
-        ChromeDebugProtocol chrome = new ChromeDebugProtocol(config);
+        ChromeDebugProtocol cdp = new ChromeDebugProtocol();
+        BrowserClient chrome = cdp.connect(config);
         chrome.target().getTargets().run().targetInfos().forEach(t -> System.out.println(t));
         System.out.println();
 
@@ -69,8 +60,8 @@ public class ChromeDebugProtocolIT {
 //        chrome.target.onTargetInfoChanged(t -> System.out.println(t));
 
         List<Sess> sessions = new ArrayList<>();
-        for (int i = 0; i < 10; i++) {
-            sessions.add(new Sess(chrome.newSession(1280, 1024)));
+        for (int i = 0; i < 5; i++) {
+//            sessions.add(new Sess(chrome.newSession(1280, 1024)));
             System.out.println("Targets: " + chrome.target().getTargets().run().targetInfos().size());
         }
 
@@ -108,7 +99,9 @@ public class ChromeDebugProtocolIT {
 //            Thread.sleep(sleep);
 //        }
 //        sessions.stream().filter(s -> s.crashed).forEach(s -> s.navigate());
-        sessions.stream().filter(s -> !s.session.isClosed()).forEach(s -> {
+        sessions.stream()
+//                .filter(s -> !s.session.isClosed())
+                .forEach(s -> {
             if (!stop.get()) {
                 if (i.getAndIncrement() % 2 == 0) {
 //                    s.session.close();
@@ -139,25 +132,25 @@ public class ChromeDebugProtocolIT {
     }
 
     class Sess {
-        Session session;
+        PageSession session;
         boolean crashed;
         AtomicInteger navigated = new AtomicInteger();
 
-        Sess(Session session) throws ExecutionException, InterruptedException, IOException, TimeoutException {
+        Sess(PageSession session) throws ExecutionException, InterruptedException, IOException, TimeoutException {
             this.session = session;
             session.page().enable().run();
             session.inspector().enable().run();
             session.inspector().onTargetCrashed(c -> {
                 crashed = true;
-                session.close();
+//                session.close();
 //                stop.set(true);
-                System.out.println("Session crashed");
+                System.out.println("PageSession crashed");
             });
             session.page().onFrameNavigated(n -> System.out.println(navigated.incrementAndGet()));
         }
 
         void navigate(String url) {
-            if (!session.isClosed()) {
+//            if (!session.isClosed()) {
                 try {
                     crashed = false;
                     session.page().navigate(url).run();
@@ -169,7 +162,7 @@ public class ChromeDebugProtocolIT {
                 } catch (Exception e) {
                     System.out.println("Failed navigation: " + e);
                 }
-            }
+//            }
         }
 
         @Override
@@ -185,36 +178,36 @@ public class ChromeDebugProtocolIT {
     /**
      * Test of sendMessage method, of class ChromeDebugClient.
      */
-    @Test
-    @Ignore
-    public void testCall() throws InterruptedException, ExecutionException, URISyntaxException {
-        System.out.println("sendMessage");
-        String msg = "Hello World";
-//        Cdp instance = new Cdp("ws://localhost:9222/devtools/page/cdb3c308-6abe-4159-b09e-4e464b499a92", null, true);
-        Cdp instance = null;
-        try {
-            System.out.println(">>> " + instance.call("mm", null).get());
-        } catch (Exception e) {
-            System.out.println("E: " + e);
-        }
-        System.out.println(">>> " + instance.call("mm", null)
-                .handle((r, t) -> {
-                    System.out.println("  E: " + t + ", R: " + r);
-                    return instance.call("mm", null)
-                            .handle((r2, t2) -> {
-                                System.out.println("  E: " + t2 + ", R: " + r2);
-                                return instance.call("mm", null);
-                            });
-                })
-                .handle((r, t) -> {
-                    System.out.println("  E: " + t + ", R: " + r);
-                    return instance.call("mm", null);
-                })
-                .get());
-//        Thread.sleep(5000);
-        instance.onClose("");
-        // TODO review the generated test code and remove the default call to fail.
-        fail("The test case is a prototype.");
-    }
+//    @Test
+//    @Ignore
+//    public void testCall() throws InterruptedException, ExecutionException, URISyntaxException {
+//        System.out.println("sendMessage");
+//        String msg = "Hello World";
+////        Cdp instance = new Cdp("ws://localhost:9222/devtools/page/cdb3c308-6abe-4159-b09e-4e464b499a92", null, true);
+//        Cdp instance = null;
+//        try {
+//            System.out.println(">>> " + instance.call("mm", null).get());
+//        } catch (Exception e) {
+//            System.out.println("E: " + e);
+//        }
+//        System.out.println(">>> " + instance.call("mm", null)
+//                .handle((r, t) -> {
+//                    System.out.println("  E: " + t + ", R: " + r);
+//                    return instance.call("mm", null)
+//                            .handle((r2, t2) -> {
+//                                System.out.println("  E: " + t2 + ", R: " + r2);
+//                                return instance.call("mm", null);
+//                            });
+//                })
+//                .handle((r, t) -> {
+//                    System.out.println("  E: " + t + ", R: " + r);
+//                    return instance.call("mm", null);
+//                })
+//                .get());
+////        Thread.sleep(5000);
+//        instance.onClose("");
+//        // TODO review the generated test code and remove the default call to fail.
+//        fail("The test case is a prototype.");
+//    }
 }
 

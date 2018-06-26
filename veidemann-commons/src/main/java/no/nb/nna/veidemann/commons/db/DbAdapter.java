@@ -221,6 +221,31 @@ public interface DbAdapter extends AutoCloseable {
 
     Empty deleteRoleMapping(RoleMapping roleMapping) throws DbException;
 
+    /**
+     * Set the desired pause state for Veidemann
+     *
+     * @param value true if Veidemann should pause
+     * @return the old state
+     * @throws DbException
+     */
+    boolean setDesiredPausedState(boolean value) throws DbException;
+
+    /**
+     * Get the desired pause state for Veidemann
+     *
+     * @return true if Veidemann should pause
+     * @throws DbException
+     */
+    boolean getDesiredPausedState() throws DbException;
+
+    /**
+     * Get the actual pause state for Veidemann
+     *
+     * @return true if Veidemann is paused
+     * @throws DbException
+     */
+    boolean isPaused() throws DbException;
+
     @Override
     public void close();
 

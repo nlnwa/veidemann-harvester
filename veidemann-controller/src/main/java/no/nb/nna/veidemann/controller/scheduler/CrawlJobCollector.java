@@ -55,6 +55,11 @@ public class CrawlJobCollector implements TaskCollector {
         Map<String, CrawlScheduleConfig> schedules = new HashMap<>();
 
         try {
+            // Do not schedule jobs if Veidemann is paused.
+            if (db.isPaused()) {
+                return tasks;
+            }
+
             for (CrawlJob job : db.listCrawlJobs(listRequest).getValueList()) {
                 // Check if job is disabled
                 if (!job.getDisabled()) {

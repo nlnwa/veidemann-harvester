@@ -910,6 +910,52 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
+    public boolean setDesiredPausedState(boolean value) throws DbException {
+        String id = "state";
+        String key = "shouldPause";
+        Map<String, List<Map<String, Map>>> state = executeRequest("set-paused",
+                r.table(TABLES.SYSTEM.name)
+                .insert(r.hashMap("id", id).with(key, value))
+                .optArg("conflict", "update")
+                .optArg("return_changes", "always")
+        );
+        Map oldValue = state.get("changes").get(0).get("old_val");
+        if (oldValue == null || (Boolean) oldValue.computeIfAbsent(key, k -> Boolean.FALSE) == false) {
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+    @Override
+    public boolean getDesiredPausedState() throws DbException {
+        String id = "state";
+        String key = "shouldPause";
+        Map<String, Object> state = executeRequest("get-paused",
+                r.table(TABLES.SYSTEM.name)
+                        .get(id)
+        );
+        if (state == null) {
+            return false;
+        }
+        return (Boolean) state.computeIfAbsent(key, k -> Boolean.FALSE);
+    }
+
+    @Override
+    public boolean isPaused() throws DbException {
+        if (getDesiredPausedState()) {
+            long busyCount = executeRequest("is-paused",
+                    r.table(TABLES.CRAWL_HOST_GROUP.name)
+                            .filter(r.hashMap("busy", true))
+                            .count()
+            );
+            return busyCount == 0L;
+        } else {
+            return false;
+        }
+    }
+
+    @Override
     public LogLevels getLogConfig() throws DbException {
         Map<String, Object> response = executeRequest("get-logconfig",
                 r.table(RethinkDbAdapter.TABLES.SYSTEM.name)

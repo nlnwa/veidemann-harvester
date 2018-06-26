@@ -58,6 +58,7 @@ import no.nb.nna.veidemann.api.StatusProto.ListJobExecutionsRequest;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.FutureOptional;
 import no.nb.nna.veidemann.commons.util.ApiTools;
+import no.nb.nna.veidemann.db.RethinkDbAdapter.TABLES;
 import no.nb.nna.veidemann.db.initializer.DbInitializer;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -1128,5 +1129,39 @@ public class RethinkDbAdapterIT {
         assertThat(jList.getCount()).isEqualTo(2);
         assertThat(jList.getValueCount()).isEqualTo(2);
         assertThat(jList.getValueList()).containsExactlyInAnyOrder(jes1, jes2);
+    }
+
+    @Test
+    public void testPaused() throws DbException {
+        assertThat(db.getDesiredPausedState()).isFalse();
+        assertThat(db.isPaused()).isFalse();
+
+        assertThat(db.setDesiredPausedState(true)).isFalse();
+
+        assertThat(db.getDesiredPausedState()).isTrue();
+        assertThat(db.isPaused()).isTrue();
+
+        assertThat(db.setDesiredPausedState(true)).isTrue();
+        assertThat(db.isPaused()).isTrue();
+
+        assertThat(db.getDesiredPausedState()).isTrue();
+
+        assertThat(db.setDesiredPausedState(false)).isTrue();
+        assertThat(db.isPaused()).isFalse();
+
+        CrawlHostGroup chg = CrawlHostGroup.newBuilder().setId("chg").setBusy(true).build();
+        db.saveMessage(chg, TABLES.CRAWL_HOST_GROUP);
+
+        assertThat(db.getDesiredPausedState()).isFalse();
+        assertThat(db.isPaused()).isFalse();
+
+        assertThat(db.setDesiredPausedState(true)).isFalse();
+        assertThat(db.isPaused()).isFalse();
+
+        chg = chg.toBuilder().setBusy(false).build();
+        db.saveMessage(chg, TABLES.CRAWL_HOST_GROUP);
+
+        assertThat(db.getDesiredPausedState()).isTrue();
+        assertThat(db.isPaused()).isTrue();
     }
 }

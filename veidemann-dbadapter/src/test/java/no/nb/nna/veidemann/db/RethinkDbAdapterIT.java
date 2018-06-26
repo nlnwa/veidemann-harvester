@@ -58,6 +58,7 @@ import no.nb.nna.veidemann.api.StatusProto.ListJobExecutionsRequest;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.FutureOptional;
 import no.nb.nna.veidemann.commons.util.ApiTools;
+import no.nb.nna.veidemann.db.RethinkDbAdapter.TABLES;
 import no.nb.nna.veidemann.db.initializer.DbInitializer;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -1132,25 +1133,35 @@ public class RethinkDbAdapterIT {
 
     @Test
     public void testPaused() throws DbException {
-        assertThat(db.getPausedState(false)).isFalse();
-        assertThat(db.getPausedState(true)).isFalse();
+        assertThat(db.getDesiredPausedState()).isFalse();
+        assertThat(db.isPaused()).isFalse();
 
-        assertThat(db.setPausedState(false, true)).isFalse();
-        assertThat(db.setPausedState(true, true)).isFalse();
+        assertThat(db.setDesiredPausedState(true)).isFalse();
 
-        assertThat(db.getPausedState(false)).isTrue();
-        assertThat(db.getPausedState(true)).isTrue();
+        assertThat(db.getDesiredPausedState()).isTrue();
+        assertThat(db.isPaused()).isTrue();
 
-        assertThat(db.setPausedState(false, true)).isTrue();
-        assertThat(db.setPausedState(true, true)).isTrue();
+        assertThat(db.setDesiredPausedState(true)).isTrue();
+        assertThat(db.isPaused()).isTrue();
 
-        assertThat(db.getPausedState(false)).isTrue();
-        assertThat(db.getPausedState(true)).isTrue();
+        assertThat(db.getDesiredPausedState()).isTrue();
 
-        assertThat(db.setPausedState(false, false)).isTrue();
-        assertThat(db.setPausedState(true, false)).isTrue();
+        assertThat(db.setDesiredPausedState(false)).isTrue();
+        assertThat(db.isPaused()).isFalse();
 
-        assertThat(db.getPausedState(false)).isFalse();
-        assertThat(db.getPausedState(true)).isFalse();
+        CrawlHostGroup chg = CrawlHostGroup.newBuilder().setId("chg").setBusy(true).build();
+        db.saveMessage(chg, TABLES.CRAWL_HOST_GROUP);
+
+        assertThat(db.getDesiredPausedState()).isFalse();
+        assertThat(db.isPaused()).isFalse();
+
+        assertThat(db.setDesiredPausedState(true)).isFalse();
+        assertThat(db.isPaused()).isFalse();
+
+        chg = chg.toBuilder().setBusy(false).build();
+        db.saveMessage(chg, TABLES.CRAWL_HOST_GROUP);
+
+        assertThat(db.getDesiredPausedState()).isTrue();
+        assertThat(db.isPaused()).isTrue();
     }
 }

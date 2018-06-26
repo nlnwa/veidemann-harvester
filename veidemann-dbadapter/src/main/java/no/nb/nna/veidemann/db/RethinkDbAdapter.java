@@ -910,11 +910,12 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
-    public boolean setPausedState(boolean actual, boolean value) throws DbException {
-        String key = actual ? "isPaused" : "shouldPause";
+    public boolean setDesiredPausedState(boolean value) throws DbException {
+        String id = "state";
+        String key = "shouldPause";
         Map<String, List<Map<String, Map>>> state = executeRequest("set-paused",
                 r.table(TABLES.SYSTEM.name)
-                .insert(r.hashMap("id", "state").with(key, value))
+                .insert(r.hashMap("id", id).with(key, value))
                 .optArg("conflict", "update")
                 .optArg("return_changes", "always")
         );
@@ -927,16 +928,31 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
-    public boolean getPausedState(boolean actual) throws DbException {
+    public boolean getDesiredPausedState() throws DbException {
+        String id = "state";
+        String key = "shouldPause";
         Map<String, Object> state = executeRequest("get-paused",
                 r.table(TABLES.SYSTEM.name)
-                        .get("state")
+                        .get(id)
         );
         if (state == null) {
             return false;
         }
-        String key = actual ? "isPaused" : "shouldPause";
         return (Boolean) state.computeIfAbsent(key, k -> Boolean.FALSE);
+    }
+
+    @Override
+    public boolean isPaused() throws DbException {
+        if (getDesiredPausedState()) {
+            long busyCount = executeRequest("is-paused",
+                    r.table(TABLES.CRAWL_HOST_GROUP.name)
+                            .filter(r.hashMap("busy", true))
+                            .count()
+            );
+            return busyCount == 0L;
+        } else {
+            return false;
+        }
     }
 
     @Override

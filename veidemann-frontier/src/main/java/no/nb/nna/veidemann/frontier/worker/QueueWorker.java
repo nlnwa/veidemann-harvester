@@ -56,36 +56,40 @@ public class QueueWorker {
 
         while (true) {
             try {
-                FutureOptional<MessagesProto.CrawlHostGroup> crawlHostGroup = DbUtil.getInstance().getDb()
-                        .borrowFirstReadyCrawlHostGroup();
-                LOG.trace("Borrow Crawl Host Group: {}", crawlHostGroup);
+                if (DbUtil.getInstance().getDb().getDesiredPausedState()) {
+                    sleep = RESCHEDULE_DELAY;
+                } else {
+                    FutureOptional<MessagesProto.CrawlHostGroup> crawlHostGroup = DbUtil.getInstance().getDb()
+                            .borrowFirstReadyCrawlHostGroup();
+                    LOG.trace("Borrow Crawl Host Group: {}", crawlHostGroup);
 
-                if (crawlHostGroup.isMaybeInFuture()) {
-                    // A CrawlHostGroup suitable for execution in the future was found, wait until it is ready.
-                    LOG.trace("Crawl Host Group not ready yet, delaying: {}", crawlHostGroup.getDelayMs());
-                    sleep = crawlHostGroup.getDelayMs();
-                } else if (crawlHostGroup.isPresent()) {
-                    FutureOptional<MessagesProto.QueuedUri> foqu = DbUtil.getInstance().getDb()
-                            .getNextQueuedUriToFetch(crawlHostGroup.get());
+                    if (crawlHostGroup.isMaybeInFuture()) {
+                        // A CrawlHostGroup suitable for execution in the future was found, wait until it is ready.
+                        LOG.trace("Crawl Host Group not ready yet, delaying: {}", crawlHostGroup.getDelayMs());
+                        sleep = crawlHostGroup.getDelayMs();
+                    } else if (crawlHostGroup.isPresent()) {
+                        FutureOptional<MessagesProto.QueuedUri> foqu = DbUtil.getInstance().getDb()
+                                .getNextQueuedUriToFetch(crawlHostGroup.get());
 
-                    if (foqu.isPresent()) {
-                        // A fetchabel URI was found, return it
-                        LOG.debug("Found Queued URI: {}, crawlHostGroup: {}, sequence: {}",
-                                foqu.get().getUri(), foqu.get().getCrawlHostGroupId(), foqu.get().getSequence());
-                        return new CrawlExecution(foqu.get(), crawlHostGroup.get(), frontier);
-                    } else if (foqu.isMaybeInFuture()) {
-                        // A URI was found, but isn't fetchable yet. Wait for it
-                        LOG.debug("Queued URI might be available at: {}", foqu.getWhen());
-                        sleep = foqu.getDelayMs();
+                        if (foqu.isPresent()) {
+                            // A fetchabel URI was found, return it
+                            LOG.debug("Found Queued URI: {}, crawlHostGroup: {}, sequence: {}",
+                                    foqu.get().getUri(), foqu.get().getCrawlHostGroupId(), foqu.get().getSequence());
+                            return new CrawlExecution(foqu.get(), crawlHostGroup.get(), frontier);
+                        } else if (foqu.isMaybeInFuture()) {
+                            // A URI was found, but isn't fetchable yet. Wait for it
+                            LOG.debug("Queued URI might be available at: {}", foqu.getWhen());
+                            sleep = foqu.getDelayMs();
+                        } else {
+                            // No URI found for this CrawlHostGroup. Wait for RESCHEDULE_DELAY and try again.
+                            LOG.trace("No Queued URI found waiting {}ms before retry", RESCHEDULE_DELAY);
+                            sleep = RESCHEDULE_DELAY;
+                        }
+                        DbUtil.getInstance().getDb().releaseCrawlHostGroup(crawlHostGroup.get(), sleep);
                     } else {
-                        // No URI found for this CrawlHostGroup. Wait for RESCHEDULE_DELAY and try again.
-                        LOG.trace("No Queued URI found waiting {}ms before retry", RESCHEDULE_DELAY);
+                        // No CrawlHostGroup ready. Wait a moment and try again
                         sleep = RESCHEDULE_DELAY;
                     }
-                    DbUtil.getInstance().getDb().releaseCrawlHostGroup(crawlHostGroup.get(), sleep);
-                } else {
-                    // No CrawlHostGroup ready. Wait a moment and try again
-                    sleep = RESCHEDULE_DELAY;
                 }
             } catch (DbException e) {
                 LOG.error("Caught an DB exception. Might be a temporary condition try again after {}ms",

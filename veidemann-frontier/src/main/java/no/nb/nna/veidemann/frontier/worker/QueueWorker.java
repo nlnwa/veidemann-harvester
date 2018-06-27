@@ -51,7 +51,7 @@ public class QueueWorker {
      *
      * @return
      */
-    public CrawlExecution getNextToFetch() throws InterruptedException {
+    public synchronized CrawlExecution getNextToFetch() throws InterruptedException {
         long sleep = 0L;
 
         while (true) {

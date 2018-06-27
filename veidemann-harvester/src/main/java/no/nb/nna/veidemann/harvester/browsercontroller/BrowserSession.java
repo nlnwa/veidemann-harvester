@@ -112,7 +112,8 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
 
 //        session.debugger().setBreakpointsActive(true).run();
 //        session.debugger().setAsyncCallStackDepth(0).run();
-        session.security().setOverrideCertificateErrors(true).run();
+//        session.security().setOverrideCertificateErrors(true).run();
+        session.security().setIgnoreCertificateErrors(true).run();
         session.network().setCacheDisabled(true).run();
 
         // Request patterns for enabling interception on requests and responses

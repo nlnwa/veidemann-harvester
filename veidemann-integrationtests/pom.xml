@@ -236,10 +236,7 @@
                                             </from>
                                         </volumes>
                                         <env>
-                                            <BROWSER_HOST>browser</BROWSER_HOST>
-                                            <BROWSER_PORT>3000</BROWSER_PORT>
-                                            <!--<BROWSER_WS_ENDPOINT>ws://browser:3000/?&#45;&#45;proxy-server=http%3A%2F%2Fharvester%3A8080</BROWSER_WS_ENDPOINT>-->
-                                            <BROWSER_WS_ENDPOINT>ws://browser:3000/?--proxy-server=harvester%3A8080</BROWSER_WS_ENDPOINT>
+                                            <BROWSER_WS_ENDPOINT>ws://browser:3000/?--proxy-server=harvester:8080</BROWSER_WS_ENDPOINT>
                                             <DB_HOST>db</DB_HOST>
                                             <FRONTIER_HOST>frontier</FRONTIER_HOST>
                                             <CONTENT_WRITER_HOST>contentwriter</CONTENT_WRITER_HOST>

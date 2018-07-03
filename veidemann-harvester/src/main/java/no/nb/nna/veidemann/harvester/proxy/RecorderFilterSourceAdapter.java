@@ -40,6 +40,8 @@ public class RecorderFilterSourceAdapter extends HttpFiltersSourceAdapter {
 
     private static final AttributeKey<String> CONNECTED_URL = AttributeKey.valueOf("connected_url");
 
+    private final int proxyId;
+
     private final DbAdapter db;
 
     private final ContentWriterClient contentWriterClient;
@@ -48,8 +50,9 @@ public class RecorderFilterSourceAdapter extends HttpFiltersSourceAdapter {
 
     private final HostResolver hostResolver;
 
-    public RecorderFilterSourceAdapter(final DbAdapter db, final ContentWriterClient contentWriterClient,
-            final BrowserSessionRegistry sessionRegistry, final HostResolver hostResolver) {
+    public RecorderFilterSourceAdapter(final int proxyId, final DbAdapter db, final ContentWriterClient contentWriterClient,
+                                       final BrowserSessionRegistry sessionRegistry, final HostResolver hostResolver) {
+        this.proxyId = proxyId;
         this.db = db;
         this.contentWriterClient = contentWriterClient;
         this.sessionRegistry = sessionRegistry;
@@ -73,10 +76,11 @@ public class RecorderFilterSourceAdapter extends HttpFiltersSourceAdapter {
 
         String connectedUrl = clientCtx.channel().attr(CONNECTED_URL).get();
         if (connectedUrl == null) {
-            return new RecorderFilter(uri, originalRequest, clientCtx, db, contentWriterClient, sessionRegistry, hostResolver);
+            return new RecorderFilter(proxyId, uri, originalRequest, clientCtx,
+                    db, contentWriterClient, sessionRegistry, hostResolver);
         }
-        return new RecorderFilter(
-                connectedUrl + uri, originalRequest, clientCtx, db, contentWriterClient, sessionRegistry, hostResolver);
+        return new RecorderFilter(proxyId, connectedUrl + uri, originalRequest, clientCtx,
+                db, contentWriterClient, sessionRegistry, hostResolver);
     }
 
 }

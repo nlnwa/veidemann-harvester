@@ -130,7 +130,7 @@
                             <images>
                                 <image>
                                     <name>norsknettarkiv/${project.artifactId}</name>
-                                    <alias>harvester</alias>
+                                    <alias>frontier</alias>
                                     <build>
                                         <from>${docker.java.image}</from>
                                         <maintainer>National Library of Norway</maintainer>

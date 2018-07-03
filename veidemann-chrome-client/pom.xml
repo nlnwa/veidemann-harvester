@@ -11,6 +11,12 @@
     <artifactId>veidemann-chrome-client</artifactId>
     <packaging>jar</packaging>
 
+    <properties>
+        <veidemann.cache.version>v0.1.0-alpha7</veidemann.cache.version>
+        <!--<test.dns.server>testsites</test.dns.server>-->
+        <test.dns.server>8.8.8.8</test.dns.server>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>io.netty</groupId>
@@ -152,6 +158,58 @@
                                                 </wait>
                                             </run>
                                         </image>
+                                        <image>
+                                            <name>norsknettarkiv/veidemann-certgen</name>
+                                            <alias>certgen</alias>
+                                        </image>
+                                        <image>
+                                            <name>norsknettarkiv/veidemann-cache:${veidemann.cache.version}</name>
+                                            <alias>cache</alias>
+                                            <run>
+                                                <namingStrategy>alias</namingStrategy>
+                                                <network>
+                                                    <mode>custom</mode>
+                                                    <name>cdp-test-net</name>
+                                                    <alias>cache</alias>
+                                                </network>
+                                                <ports>
+                                                    <port>+cache.http.host:cache.http.port:3128</port>
+                                                    <port>+cache.https.host:cache.https.port:3129</port>
+                                                </ports>
+                                                <capAdd>
+                                                    <add>NET_ADMIN</add>
+                                                </capAdd>
+                                                <!-- 2GB -->
+                                                <memory>2147483648</memory>
+                                                <shmSize>2147483648</shmSize>
+                                                <volumes>
+                                                    <bind>
+                                                        <volume>cache-data:/var/cache/squid</volume>
+                                                    </bind>
+                                                    <from>
+                                                        <image>certgen</image>
+                                                    </from>
+                                                </volumes>
+                                                <env>
+                                                    <DNS_SERVERS>${test.dns.server}</DNS_SERVERS>
+                                                </env>
+                                                <log>
+                                                    <enabled>false</enabled>
+                                                </log>
+                                                <dependsOn>
+                                                    <container>testsites</container>
+                                                </dependsOn>
+                                                <wait>
+                                                    <tcp>
+                                                        <mode>mapped</mode>
+                                                        <ports>
+                                                            <port>3128</port>
+                                                        </ports>
+                                                    </tcp>
+                                                    <time>30000</time>
+                                                </wait>
+                                            </run>
+                                        </image>
                                     </images>
                                 </configuration>
                             </execution>
@@ -186,8 +244,13 @@
                                                     <enabled>true</enabled>
                                                 </log>
                                                 <dns>
-                                                    <host>${docker.container.testsites.net.cdp-test-net.ip}</host>
+                                                    <!--<host>${docker.container.testsites.net.cdp-test-net.ip}</host>-->
+                                                    <host>8.8.8.8</host>
+                                                    <!--<host>${test.dns.server}</host>-->
                                                 </dns>
+                                                <dependsOn>
+                                                    <container>cache</container>
+                                                </dependsOn>
                                             </run>
                                         </image>
                                     </images>
@@ -227,6 +290,8 @@
                             <systemPropertyVariables>
                                 <browser.host>${browser.host}</browser.host>
                                 <browser.port>${browser.port}</browser.port>
+                                <cache.host>${cache.http.host}</cache.host>
+                                <cache.port>${cache.http.port}</cache.port>
                             </systemPropertyVariables>
                         </configuration>
                     </plugin>

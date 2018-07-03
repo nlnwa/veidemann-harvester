@@ -19,6 +19,7 @@ import com.google.gson.JsonObject;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.opentracing.ActiveSpan;
+import no.nb.nna.veidemann.chrome.client.ChromeDebugProtocolBase;
 import no.nb.nna.veidemann.chrome.client.ChromeDebugProtocolConfig;
 import no.nb.nna.veidemann.chrome.client.ClientClosedException;
 import org.slf4j.Logger;

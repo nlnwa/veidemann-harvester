@@ -12,14 +12,21 @@ import no.nb.nna.veidemann.api.FrontierProto.PageHarvestSpec;
 import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
 import no.nb.nna.veidemann.chrome.client.ClientClosedException;
 import no.nb.nna.veidemann.chrome.client.MaxActiveSessionsExceededException;
+import no.nb.nna.veidemann.commons.util.Pool;
+import no.nb.nna.veidemann.commons.util.Pool.Lease;
 import no.nb.nna.veidemann.harvester.browsercontroller.BrowserController;
+import no.nb.nna.veidemann.harvester.browsercontroller.BrowserSession;
 import no.nb.nna.veidemann.harvester.browsercontroller.RenderResult;
+import org.netpreserve.commons.uri.ParsedQuery;
+import org.netpreserve.commons.uri.ParsedQuery.Entry;
+import org.netpreserve.commons.uri.Uri;
+import org.netpreserve.commons.uri.UriConfigs;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class FrontierClient implements AutoCloseable {
     private static final Logger LOG = LoggerFactory.getLogger(FrontierClient.class);
@@ -32,33 +39,35 @@ public class FrontierClient implements AutoCloseable {
 
     private final FrontierGrpc.FrontierStub asyncStub;
 
-    /**
-     * Used to ensure that only the given number of browser sessions are run.
-     */
-    private final Semaphore availableSessions;
+    private final AtomicInteger idx = new AtomicInteger(0);
 
-    public FrontierClient(BrowserController controller, String host, int port, int maxOpenSessions) {
-        this(controller, ManagedChannelBuilder.forAddress(host, port).usePlaintext(), maxOpenSessions);
+    private final Pool<ProxySession> pool;
+
+    public FrontierClient(BrowserController controller, String host, int port, int maxOpenSessions,
+                          String browserWsEndpoint, int firstProxyPort) {
+        this(controller, ManagedChannelBuilder.forAddress(host, port).usePlaintext(), maxOpenSessions,
+                browserWsEndpoint, firstProxyPort);
     }
 
     /**
      * Construct client for accessing RouteGuide server using the existing channel.
      */
-    public FrontierClient(BrowserController controller, ManagedChannelBuilder<?> channelBuilder, int maxOpenSessions) {
+    public FrontierClient(BrowserController controller, ManagedChannelBuilder<?> channelBuilder, int maxOpenSessions,
+                          String browserWsEndpoint, int firstProxyPort) {
         LOG.info("Setting up Frontier client");
         this.controller = controller;
         ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor.Builder(GlobalTracer.get()).build();
         channel = channelBuilder.intercept(tracingInterceptor).build();
         asyncStub = FrontierGrpc.newStub(channel).withWaitForReady();
-        availableSessions = new Semaphore(maxOpenSessions);
+        pool = new Pool<>(maxOpenSessions, () -> new ProxySession(idx.getAndIncrement(),
+                browserWsEndpoint, firstProxyPort), null, p -> p.reset());
     }
 
     public void requestNextPage() throws InterruptedException {
-        availableSessions.acquire();
-        ResponseObserver responseObserver = new ResponseObserver();
+        Lease<ProxySession> proxySessionLease = pool.lease();
+        ResponseObserver responseObserver = new ResponseObserver(proxySessionLease);
 
         FrontierGrpc.FrontierStub s = asyncStub;
-//                .withDeadlineAfter(10, TimeUnit.MINUTES);
 
         StreamObserver<PageHarvest> requestObserver = s
                 .getNextPage(responseObserver);
@@ -69,12 +78,29 @@ public class FrontierClient implements AutoCloseable {
         } catch (RuntimeException e) {
             // Cancel RPC
             requestObserver.onError(e);
-            availableSessions.release();
+            proxySessionLease.close();
+        }
+    }
+
+    @Override
+    public void close() {
+        try {
+            boolean isTerminated = channel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
+            if (!isTerminated) {
+                LOG.warn("Harvester client has open connections after close");
+            }
+        } catch (InterruptedException ex) {
+            throw new RuntimeException(ex);
         }
     }
 
     private class ResponseObserver implements StreamObserver<PageHarvestSpec> {
+        private final Lease<ProxySession> proxySessionLease;
         StreamObserver<PageHarvest> requestObserver;
+
+        public ResponseObserver(Lease<ProxySession> proxySessionLease) {
+            this.proxySessionLease = proxySessionLease;
+        }
 
         public void setRequestObserver(StreamObserver<PageHarvest> requestObserver) {
             this.requestObserver = requestObserver;
@@ -89,7 +115,7 @@ public class FrontierClient implements AutoCloseable {
             try {
                 LOG.debug("Start page rendering");
 
-                RenderResult result = controller.render(fetchUri, pageHarvestSpec.getCrawlConfig());
+                RenderResult result = controller.render(proxySessionLease.getObject(), fetchUri, pageHarvestSpec.getCrawlConfig());
 
                 PageHarvest.Builder reply = PageHarvest.newBuilder();
 
@@ -143,24 +169,72 @@ public class FrontierClient implements AutoCloseable {
             } else {
                 LOG.warn("Get next page failed: {}", status);
             }
-            availableSessions.release();
+            proxySessionLease.close();
         }
 
         @Override
         public void onCompleted() {
-            availableSessions.release();
+            proxySessionLease.close();
         }
     }
 
-    @Override
-    public void close() {
-        try {
-            boolean isTerminated = channel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
-            if (!isTerminated) {
-                LOG.warn("Harvester client has open connections after close");
+    public class ProxySession {
+        private final int proxyId;
+        private final int proxyPort;
+        private final String browserWsEndpoint;
+        private BrowserSession session;
+
+        public ProxySession(int proxyId, String browserWSEndpoint, int firstProxyPort) {
+            this.proxyId = proxyId;
+            this.proxyPort = proxyId + firstProxyPort;
+            Uri ws = UriConfigs.WHATWG.buildUri(browserWSEndpoint);
+            ParsedQuery query = ws.getParsedQuery();
+            Entry proxyEntry;
+            if (query.containsKey("--proxy-server")) {
+                proxyEntry = query.get("--proxy-server");
+                String val = proxyEntry.getSingle().replaceFirst(":\\d+", String.valueOf(proxyPort));
+                proxyEntry = new Entry("--proxy-server", val);
+                query = query.put(proxyEntry);
+            } else {
+                proxyEntry = new Entry("--proxy-server", "http://harvester:" + proxyPort);
+                query = query.add(proxyEntry);
             }
-        } catch (InterruptedException ex) {
-            throw new RuntimeException(ex);
+            browserWsEndpoint = UriConfigs.WHATWG.builder(ws).parsedQuery(query).build().toString();
+            System.out.println("CREATED session :  " + this);
+        }
+
+        public int getProxyId() {
+            return proxyId;
+        }
+
+        public int getProxyPort() {
+            return proxyPort;
+        }
+
+        public String getBrowserWsEndpoint() {
+            return browserWsEndpoint;
+        }
+
+        public BrowserSession getSession() {
+            return session;
+        }
+
+        public void setSession(BrowserSession session) {
+            this.session = session;
+        }
+
+        private void reset() {
+            session = null;
+        }
+
+        @Override
+        public String toString() {
+            final StringBuffer sb = new StringBuffer("ProxySession{");
+            sb.append("proxyId=").append(proxyId);
+            sb.append(", proxyPort=").append(proxyPort);
+            sb.append(", browserWsEndpoint='").append(browserWsEndpoint).append('\'');
+            sb.append('}');
+            return sb.toString();
         }
     }
 }

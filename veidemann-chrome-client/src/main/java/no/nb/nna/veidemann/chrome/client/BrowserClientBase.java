@@ -12,10 +12,10 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
@@ -27,11 +27,11 @@ public abstract class BrowserClientBase<T extends BrowserPage> implements Closea
 
     CdpConnection protocolClient;
 
-    Map<String, BrowserContext> contexts = new HashMap<>();
+    Map<String, BrowserContext> contexts = new ConcurrentHashMap<>();
 
     BrowserContext defaultContext = new BrowserContext("");
 
-    Map<String, CompletableFuture<Target>> targets = new HashMap<>();
+    Map<String, CompletableFuture<Target>> targets = new ConcurrentHashMap<>();
 
     BrowserClientBase() {
     }
@@ -117,6 +117,7 @@ public abstract class BrowserClientBase<T extends BrowserPage> implements Closea
                 target = t.get();
                 target.initializedCallback.complete(false);
             } catch (Exception e) {
+                LOG.error(e.getMessage(), e);
                 return null;
             }
         }
@@ -131,7 +132,10 @@ public abstract class BrowserClientBase<T extends BrowserPage> implements Closea
                 throw new IllegalStateException("Target should not exist before targetCreated");
             }
 
-            BrowserContext context = contexts.get(targetInfo.browserContextId());
+            BrowserContext context = null;
+            if (targetInfo.browserContextId() != null) {
+                context = contexts.get(targetInfo.browserContextId());
+            }
             if (context == null) {
                 context = defaultContext;
             }

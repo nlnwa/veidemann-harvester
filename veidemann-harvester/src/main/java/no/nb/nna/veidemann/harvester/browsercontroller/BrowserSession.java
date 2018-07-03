@@ -26,8 +26,6 @@ import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
 import no.nb.nna.veidemann.chrome.client.BrowserClient;
 import no.nb.nna.veidemann.chrome.client.ClientClosedException;
 import no.nb.nna.veidemann.chrome.client.DebuggerDomain;
-import no.nb.nna.veidemann.chrome.client.NetworkDomain;
-import no.nb.nna.veidemann.chrome.client.NetworkDomain.AuthChallengeResponse;
 import no.nb.nna.veidemann.chrome.client.NetworkDomain.CookieParam;
 import no.nb.nna.veidemann.chrome.client.NetworkDomain.RequestPattern;
 import no.nb.nna.veidemann.chrome.client.PageDomain;
@@ -61,6 +59,8 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
 
     private static final Logger LOG = LoggerFactory.getLogger(BrowserSession.class);
 
+    final int proxyId;
+
     final QueuedUri queuedUri;
 
     final BrowserClient browser;
@@ -75,12 +75,12 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
 
     private final CrawlLogRegistry crawlLogs;
 
-    // TODO: Should be configurable
-    boolean followRedirects = true;
-
     volatile boolean closed = false;
 
-    public BrowserSession(BrowserClient browser, BrowserConfig browserConfig, QueuedUri queuedUri, BaseSpan span) throws IOException, ExecutionException, TimeoutException {
+    public BrowserSession(int proxyId, BrowserClient browser, BrowserConfig browserConfig, QueuedUri queuedUri, BaseSpan span)
+            throws IOException, ExecutionException, TimeoutException {
+
+        this.proxyId = proxyId;
         this.queuedUri = Objects.requireNonNull(queuedUri);
 
         this.browser = browser;
@@ -108,11 +108,10 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
         session.network().enable().run();
         session.page().enable().run();
         session.runtime().enable().run();
-        session.security().enable().run();
+//        session.security().enable().run();
 
 //        session.debugger().setBreakpointsActive(true).run();
 //        session.debugger().setAsyncCallStackDepth(0).run();
-//        session.security().setOverrideCertificateErrors(true).run();
         session.security().setIgnoreCertificateErrors(true).run();
         session.network().setCacheDisabled(true).run();
 
@@ -121,10 +120,8 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
         RequestPattern rp2 = new RequestPattern();
         rp2.withInterceptionStage("HeadersReceived");
         List<RequestPattern> requestPatterns = ImmutableList.of(rp1, rp2);
-        session.network().setRequestInterception(requestPatterns).run();
 
         // set up listeners
-        session.network().onRequestIntercepted(nr -> this.onRequestIntercepted(nr));
         session.network().onRequestWillBeSent(r -> {
             uriRequests.onRequestWillBeSent(r);
         });
@@ -132,10 +129,6 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
         session.network().onLoadingFailed(f -> uriRequests.onLoadingFailed(f));
         session.network().onResponseReceived(l -> uriRequests.onResponseReceived(l));
         session.network().onDataReceived(d -> uriRequests.onDataReceived(d));
-//        session.security().onCertificateError(se -> {
-//            LOG.info("Certificate error: " + se);
-//            session.security().handleCertificateError(se.eventId(), "continue");
-//        });
 
         session.page().setDownloadBehavior("allow").withDownloadPath("/dev/null").run();
 
@@ -148,6 +141,10 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
 
     public String getExecutionId() {
         return queuedUri.getExecutionId();
+    }
+
+    public int getProxyId() {
+        return proxyId;
     }
 
     public long getProtocolTimeout() {
@@ -233,36 +230,6 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
 
     public CrawlLogRegistry getCrawlLogs() {
         return crawlLogs;
-    }
-
-    void onRequestIntercepted(NetworkDomain.RequestIntercepted intercepted) {
-        LOG.trace("Request intercepted: {}", intercepted);
-        try {
-            crawlLogs.signalActivity();
-            Map<String, Object> headers = intercepted.request().headers();
-            headers.put(EXECUTION_ID, queuedUri.getExecutionId());
-            headers.put(JOB_EXECUTION_ID, queuedUri.getJobExecutionId());
-
-            if (intercepted.authChallenge() != null) {
-                // TODO: Add option for filling in user/passwd
-                AuthChallengeResponse authChallengeResponse = new AuthChallengeResponse("Default");
-                session.network().continueInterceptedRequest(intercepted.interceptionId())
-                        .withAuthChallengeResponse(authChallengeResponse)
-                        .runAsync();
-            } else if (!followRedirects && intercepted.isNavigationRequest() && intercepted.redirectUrl() != null) {
-                // Request is a redirect and we are configured to not follow it.
-                LOG.debug("Aborting follow redirect");
-                session.network().continueInterceptedRequest(intercepted.interceptionId())
-                        .withErrorReason("Aborted").withHeaders(headers)
-                        .runAsync();
-            } else {
-                session.network().continueInterceptedRequest(intercepted.interceptionId())
-                        .withHeaders(headers)
-                        .runAsync();
-            }
-        } catch (Throwable ex) {
-            LOG.error(ex.toString(), ex);
-        }
     }
 
     public String getDocumentUrl() throws ClientClosedException, SessionClosedException {

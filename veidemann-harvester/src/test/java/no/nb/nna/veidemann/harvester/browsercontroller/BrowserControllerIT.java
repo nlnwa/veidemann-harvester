@@ -25,6 +25,7 @@ import no.nb.nna.veidemann.api.ControllerProto;
 import no.nb.nna.veidemann.api.MessagesProto;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
 import no.nb.nna.veidemann.api.MessagesProto.PageLog;
+import no.nb.nna.veidemann.chrome.client.ChromeDebugProtocolConfig;
 import no.nb.nna.veidemann.commons.client.ContentWriterClient;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.db.DbException;
@@ -39,6 +40,7 @@ import org.mockito.invocation.InvocationOnMock;
 import org.netpreserve.commons.uri.UriConfigs;
 
 import java.io.File;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.file.Files;
@@ -64,6 +66,10 @@ public class BrowserControllerIT {
 
     static int proxyPort;
 
+    static String cacheHost;
+
+    static int cachePort;
+
     static String testSitesHttpHost;
 
     static int testSitesHttpPort;
@@ -78,11 +84,19 @@ public class BrowserControllerIT {
         browserPort = Integer.parseInt(System.getProperty("browser.port"));
         proxyIp = System.getProperty("proxy.host");
         proxyPort = Integer.parseInt(System.getProperty("proxy.port"));
+        cacheHost = System.getProperty("cache.host");
+        cachePort = Integer.parseInt(System.getProperty("cache.port"));
 //        proxyPort = 41355;
         testSitesHttpHost = System.getProperty("testsites.http.host");
         testSitesHttpPort = Integer.parseInt(System.getProperty("testsites.http.port"));
         testSitesDnsHost = System.getProperty("testsites.dns.host");
         testSitesDnsPort = Integer.parseInt(System.getProperty("testsites.dns.port"));
+
+        System.out.println("BROWSER: " + browserHost + ":" + browserPort);
+        System.out.println("  CACHE: " + cacheHost + ":" + cachePort);
+        System.out.println("  PROXY: " + proxyIp + ":" + proxyPort);
+        System.out.println("  SITES: " + testSitesHttpHost + ":" + testSitesHttpPort);
+        System.out.println("    DNS: " + testSitesDnsHost + ":" + testSitesDnsPort);
     }
 
     /**
@@ -118,6 +132,7 @@ public class BrowserControllerIT {
             MessagesProto.QueuedUri queuedUri = MessagesProto.QueuedUri.newBuilder()
                     .setUri("http://a1.com")
 //                    .setUri("https://www.nb.no")
+//                    .setUri("http://example.org")
 //                    .setUri("http://www.nb.no/sbfil/tekst/Bokselskap_HTML.zip")
 //                    .setUri("https://www.nb.no/Fakta/Om-NB/Ledige-stillinger")
 //                    .setUri("http://www.nb.no/nbsok/search?page=0&menuOpen=false&instant=true&action=search&currentHit=0&currentSesamid=&searchString=%22fredrikke+marie+qvam%22") // Too many redirects
@@ -137,38 +152,40 @@ public class BrowserControllerIT {
 
             Thread.sleep(1000);
 
-            String proxyParam = "--proxy-server=http://" + proxyIp + ":" + proxyPort;
+            String proxyParam = "--proxy-server=http://" + proxyIp + ":" + proxyPort + "&--ignore-certificate-errors";
             String browserWSEndpoint = "ws://" + browserHost + ":" + browserPort + "/?" + proxyParam;
 
-            try (RecordingProxy proxy = new RecordingProxy(tmpDir, proxyPort, db, contentWriterClient,
-                    new TestHostResolver(), sessionRegistry, "", 0);
+            ChromeDebugProtocolConfig protocolConfig = new ChromeDebugProtocolConfig(browserWSEndpoint);
+
+            try (RecordingProxy proxy = new RecordingProxy(2, tmpDir, proxyPort, db, contentWriterClient,
+                    new TestHostResolver(), sessionRegistry, cacheHost, cachePort);
 
                  BrowserController controller = new BrowserController(browserWSEndpoint, db, sessionRegistry);) {
 
-                RenderResult result = controller.render(queuedUri, config);
+                RenderResult result = controller.render(0, protocolConfig, queuedUri, config);
                 System.out.println("##### " + result);
                 int pagesHarvested = 1;
 //                int totalPages = result.getOutlinksCount() + 1;
-                result.getOutlinks().forEach(qu -> {
-                    String surt = UriConfigs.SURT_KEY.buildUri(qu.getUri()).toString();
-//                    if (!surt.startsWith("(no,nb,")) {
-                        System.out.println("OOS: " + surt + " --- " + qu.getUri());
-//                        totalPages--;
-//                        continue;
+//                result.getOutlinks().forEach(qu -> {
+//                    String surt = UriConfigs.SURT_KEY.buildUri(qu.getUri()).toString();
+////                    if (!surt.startsWith("(no,nb,")) {
+//                        System.out.println("OOS: " + surt + " --- " + qu.getUri());
+////                        totalPages--;
+////                        continue;
+////                    }
+//
+////                    pagesHarvested++;
+////                    System.out.println("URI " + pagesHarvested + " of " + totalPages + ": " + qu.getUri());
+//                    try {
+//                        Thread.sleep(1000);
+//                        RenderResult result2 = controller.render(qu, config);
+//                    } catch (Exception e) {
+//                        e.printStackTrace();
 //                    }
-
-//                    pagesHarvested++;
-//                    System.out.println("URI " + pagesHarvested + " of " + totalPages + ": " + qu.getUri());
-                    try {
-                        Thread.sleep(1000);
-                        RenderResult result2 = controller.render(qu, config);
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-//                    if (pagesHarvested > 1) {
-//                        break;
-//                    }
-                });
+////                    if (pagesHarvested > 1) {
+////                        break;
+////                    }
+//                });
 
 //                System.out.println("=========*\n" + result);
                 // TODO review the generated test code and remove the default call to fail.
@@ -264,7 +281,7 @@ public class BrowserControllerIT {
         public InetSocketAddress resolve(String host, int port) throws UnknownHostException {
             InetSocketAddress resolvedAddress = new InetSocketAddress(InetAddresses.forString("127.0.0.1"), testSitesHttpPort);
 //            InetSocketAddress resolvedAddress = new InetSocketAddress(InetAddress.getByName(host), port);
-//            System.out.println("H: " + host + ":" + port + " => " + resolvedAddress);
+            System.out.println("H: " + host + ":" + port + " => " + resolvedAddress);
             return resolvedAddress;
         }
 

@@ -107,7 +107,9 @@ public class BrowserClient {
                 .addStatement("$N.setClientClosedListener(this)", protocolClient);
 
         for (Domain domain : domains) {
-            if ("Target".equals(domain.domain) || "Browser".equals(domain.domain)) {
+            if ("Target".equals(domain.domain)
+                    || "Browser".equals(domain.domain)
+                    || "Security".equals(domain.domain)) {
                 FieldSpec field = FieldSpec
                         .builder(domain.className, Codegen.uncap(domain.domain), Modifier.PRIVATE)
                         .build();

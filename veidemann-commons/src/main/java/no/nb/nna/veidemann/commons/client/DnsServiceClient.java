@@ -65,7 +65,9 @@ public class DnsServiceClient implements AutoCloseable {
                     .setHost(host)
                     .setPort(port)
                     .build();
-            DnsResolverProto.ResolveReply reply = blockingStub.resolve(request);
+
+            DnsResolverProto.ResolveReply reply = GrpcUtil.forkedCall(() -> blockingStub.resolve(request));
+
             InetSocketAddress address = new InetSocketAddress(
                     InetAddress.getByAddress(reply.getHost(), reply.getRawIp().toByteArray()), reply.getPort());
             return address;

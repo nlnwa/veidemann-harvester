@@ -192,7 +192,7 @@ public class FrontierClient implements AutoCloseable {
             Entry proxyEntry;
             if (query.containsKey("--proxy-server")) {
                 proxyEntry = query.get("--proxy-server");
-                String val = proxyEntry.getSingle().replaceFirst(":\\d+", String.valueOf(proxyPort));
+                String val = proxyEntry.getSingle().replaceFirst(":\\d+", ":" + String.valueOf(proxyPort));
                 proxyEntry = new Entry("--proxy-server", val);
                 query = query.put(proxyEntry);
             } else {

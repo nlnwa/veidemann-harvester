@@ -29,6 +29,7 @@ import org.littleshoot.proxy.ChainedProxyAdapter;
 import org.littleshoot.proxy.ChainedProxyManager;
 import org.littleshoot.proxy.HostResolver;
 import org.littleshoot.proxy.HttpProxyServer;
+import org.littleshoot.proxy.HttpProxyServerBootstrap;
 import org.littleshoot.proxy.impl.DefaultHttpProxyServer;
 import org.littleshoot.proxy.impl.ThreadPoolConfiguration;
 import org.slf4j.Logger;
@@ -38,7 +39,9 @@ import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.Queue;
 
 /**
@@ -48,7 +51,7 @@ public class RecordingProxy implements AutoCloseable {
 
     private static final Logger LOG = LoggerFactory.getLogger(RecordingProxy.class);
 
-    private final HttpProxyServer server;
+    private final List<HttpProxyServer> servers = new ArrayList<>();
 
     private final String cacheHost;
 
@@ -57,13 +60,14 @@ public class RecordingProxy implements AutoCloseable {
     /**
      * Construct a new Recording Proxy.
      * <p>
+     *
      * @param workDir a directory for storing temporary files
-     * @param port the port to listen to
+     * @param port    the port to listen to
      * @throws IOException is thrown if certificate directory could not be created
      */
-    public RecordingProxy(File workDir, int port, DbAdapter db, final ContentWriterClient contentWriterClient,
-            final HostResolver hostResolver, BrowserSessionRegistry sessionRegistry,
-            String cacheHost, int cachePort) throws IOException {
+    public RecordingProxy(final int serverCount, File workDir, int port, DbAdapter db, final ContentWriterClient contentWriterClient,
+                          final HostResolver hostResolver, BrowserSessionRegistry sessionRegistry,
+                          String cacheHost, int cachePort) throws IOException {
 
         LOG.info("Starting recording proxy listening on port {}.", port);
 
@@ -102,7 +106,7 @@ public class RecordingProxy implements AutoCloseable {
                 .trustAllServers(true)
                 .build();
 
-        server = DefaultHttpProxyServer.bootstrap()
+        HttpProxyServerBootstrap serverBootstrap = DefaultHttpProxyServer.bootstrap()
                 .withAllowLocalOnly(false)
                 .withPort(port)
                 .withTransparent(true)
@@ -113,7 +117,6 @@ public class RecordingProxy implements AutoCloseable {
                 .withConnectTimeout(60000)
                 .withIdleConnectionTimeout(10)
                 .withThreadPoolConfiguration(new ThreadPoolConfiguration().withAcceptorThreads(4).withClientToProxyWorkerThreads(16).withProxyToServerWorkerThreads(16))
-                .withFiltersSource(new RecorderFilterSourceAdapter(db, contentWriterClient, sessionRegistry, hostResolver))
                 .withChainProxyManager(new ChainedProxyManager() {
                     @Override
                     public void lookupChainedProxies(HttpRequest httpRequest, Queue<ChainedProxy> chainedProxies) {
@@ -125,8 +128,19 @@ public class RecordingProxy implements AutoCloseable {
                         });
 //                        chainedProxies.add(FALLBACK_TO_DIRECT_CONNECTION);
                     }
-                })
-                .start();
+                });
+
+        HttpProxyServer server = serverBootstrap.withFiltersSource(
+                new RecorderFilterSourceAdapter(0, db, contentWriterClient, sessionRegistry, hostResolver)).start();
+        servers.add(server);
+        LOG.info("Started proxy 0 on port: {}", server.getListenAddress().getPort());
+
+        for (int i = 1; i < serverCount; i++) {
+            server = server.clone().withFiltersSource(
+                    new RecorderFilterSourceAdapter(i, db, contentWriterClient, sessionRegistry, hostResolver)).start();
+            servers.add(server);
+            LOG.info("Started proxy {} on port: {}", i, server.getListenAddress().getPort());
+        }
 
         LOG.info("Recording proxy started.");
     }
@@ -134,7 +148,9 @@ public class RecordingProxy implements AutoCloseable {
     @Override
     public void close() {
         LOG.info("Shutting down recording proxy.");
-        server.stop();
+        for (HttpProxyServer server : servers) {
+            server.stop();
+        }
     }
 
 }

@@ -20,9 +20,9 @@ import io.opentracing.Tracer;
 import java.util.Objects;
 
 public class ChromeDebugProtocolConfig {
-    private final String host;
-    private final int port;
-    private final String browserWSEndpoint;
+    private String host;
+    private int port;
+    private String browserWSEndpoint;
     private Tracer tracer;
     private boolean activeSpanOnly = true;
     private int maxConnectionAttempts = 10;
@@ -38,8 +38,6 @@ public class ChromeDebugProtocolConfig {
      */
     public ChromeDebugProtocolConfig(String host, int port) {
         this.host = Objects.requireNonNull(host, "Host must be set");
-        this.port = port;
-        this.browserWSEndpoint = null;
     }
 
     /**
@@ -48,9 +46,25 @@ public class ChromeDebugProtocolConfig {
      * @param browserWSEndpoint Websocket endpoint where Chrome is listening
      */
     public ChromeDebugProtocolConfig(String browserWSEndpoint) {
-        this.host = null;
-        this.port = 0;
         this.browserWSEndpoint = browserWSEndpoint;
+    }
+
+    public ChromeDebugProtocolConfig() {
+    }
+
+    public ChromeDebugProtocolConfig withHost(String host) {
+        this.host = host;
+        return this;
+    }
+
+    public ChromeDebugProtocolConfig withPort(int port) {
+        this.port = port;
+        return this;
+    }
+
+    public ChromeDebugProtocolConfig withBrowserWSEndpoint(String browserWSEndpoint) {
+        this.browserWSEndpoint = browserWSEndpoint;
+        return this;
     }
 
     /**
@@ -124,4 +138,5 @@ public class ChromeDebugProtocolConfig {
     public String getBrowserWSEndpoint() {
         return browserWSEndpoint;
     }
+
 }

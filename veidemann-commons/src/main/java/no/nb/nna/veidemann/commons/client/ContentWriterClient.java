@@ -123,7 +123,7 @@ public class ContentWriterClient implements AutoCloseable {
 
             };
 
-            this.requestObserver = asyncStub.write(responseObserver);
+            this.requestObserver = GrpcUtil.forkedCall(() -> asyncStub.write(responseObserver));
         }
 
         public synchronized ContentWriterSession sendMetadata(WriteRequestMeta meta) {

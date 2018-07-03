@@ -12,6 +12,9 @@
     <packaging>jar</packaging>
 
     <properties>
+        <veidemann.cache.version>v0.1.0-alpha7</veidemann.cache.version>
+        <test.dns.server>testsites</test.dns.server>
+        <!--<test.dns.server>8.8.8.8</test.dns.server>-->
     </properties>
 
     <dependencies>
@@ -110,136 +113,224 @@
                         <id>docker-build</id>
                     </execution>
                 </executions>
-            <configuration>
-                <images>
-                    <image>
-                        <name>norsknettarkiv/${project.artifactId}</name>
-                        <alias>harvester</alias>
-                        <run><skip>true</skip></run>
-                        <build>
-                            <from>${docker.java.image}</from>
-                            <maintainer>National Library of Norway</maintainer>
-                            <tags>
-                                <tag>${docker.tag}</tag>
-                            </tags>
-                            <runCmds>
-                                <run>apk add --no-cache su-exec openssl libuuid</run>
-                                <run>mkdir /workdir</run>
-                            </runCmds>
-                            <volumes>
-                                <volume>/workdir</volume>
-                            </volumes>
-                            <env>
-                                <WORK_DIR>/workdir</WORK_DIR>
-                                <!--<CACHE_HOST></CACHE_HOST>-->
-                            </env>
-                            <ports>
-                                <port>8080</port>
-                                <port>9090</port>
-                            </ports>
-                            <!--<user>operator</user>-->
-                            <cmd>
-                                <exec>
-                                    <!--<arg>/veidemann/bin/${project.artifactId}</arg>-->
-                                    <arg>/veidemann/bin/start.sh</arg>
-                                </exec>
-                            </cmd>
-                            <assembly>
-                                <targetDir>/veidemann</targetDir>
+                <configuration>
+                    <removeVolumes>true</removeVolumes>
+                    <autoCreateCustomNetworks>true</autoCreateCustomNetworks>
+                    <images>
+                        <image>
+                            <name>norsknettarkiv/${project.artifactId}</name>
+                            <alias>harvester</alias>
+                            <run>
+                                <skip>true</skip>
+                            </run>
+                            <build>
+                                <from>${docker.java.image}</from>
+                                <maintainer>National Library of Norway</maintainer>
+                                <tags>
+                                    <tag>${docker.tag}</tag>
+                                </tags>
+                                <runCmds>
+                                    <run>apk add --no-cache su-exec openssl libuuid</run>
+                                    <run>mkdir /workdir</run>
+                                </runCmds>
+                                <volumes>
+                                    <volume>/workdir</volume>
+                                </volumes>
+                                <env>
+                                    <WORK_DIR>/workdir</WORK_DIR>
+                                    <!--<CACHE_HOST></CACHE_HOST>-->
+                                </env>
+                                <ports>
+                                    <port>8080</port>
+                                    <port>9090</port>
+                                </ports>
+                                <!--<user>operator</user>-->
+                                <cmd>
+                                    <exec>
+                                        <!--<arg>/veidemann/bin/${project.artifactId}</arg>-->
+                                        <arg>/veidemann/bin/start.sh</arg>
+                                    </exec>
+                                </cmd>
+                                <assembly>
+                                    <targetDir>/veidemann</targetDir>
 
-                                <inline>
-                                    <includeBaseDirectory>true</includeBaseDirectory>
-                                    <fileSets>
-                                        <fileSet>
-                                            <directory>target/appassembler/bin</directory>
-                                            <outputDirectory>bin</outputDirectory>
-                                            <includes>
-                                                <include>${project.artifactId}</include>
-                                                <include>start.sh</include>
-                                            </includes>
-                                            <fileMode>0755</fileMode>
-                                        </fileSet>
-                                        <fileSet>
-                                            <directory>target/appassembler/bin</directory>
-                                            <outputDirectory>bin</outputDirectory>
-                                            <excludes>
-                                                <exclude>${project.artifactId}</exclude>
-                                                <exclude>start.sh</exclude>
-                                            </excludes>
-                                            <fileMode>0644</fileMode>
-                                        </fileSet>
-                                        <fileSet>
-                                            <directory>target/appassembler</directory>
-                                            <outputDirectory>/</outputDirectory>
-                                            <excludes>
-                                                <exclude>bin</exclude>
-                                            </excludes>
-                                        </fileSet>
-                                    </fileSets>
-                                    <files>
-                                        <file>
-                                            <source>../LICENSE</source>
-                                            <outputDirectory></outputDirectory>
-                                            <fileMode>0644</fileMode>
-                                        </file>
-                                    </files>
-                                </inline>
-                            </assembly>
-                        </build>
-                    </image>
-                    <image>
-                        <name>norsknettarkiv/testsites</name>
-                        <alias>testsites</alias>
-                        <run>
-                            <ports>
-                                <port>+test.http.host:test.http.port:80</port>
-                                <port>+test.dns.host:test.dns.port:53</port>
-                            </ports>
-                            <log>
-                                <enabled>false</enabled>
-                            </log>
-                            <wait>
-                                <tcp>
-                                    <mode>mapped</mode>
-                                    <ports>
-                                        <port>80</port>
-                                        <port>53</port>
-                                    </ports>
-                                </tcp>
-                                <time>20000</time>
-                            </wait>
-                        </run>
-                    </image>
-                    <image>
-                        <name>browserless/chrome:release-puppeteer-1.5.0</name>
-                        <alias>browser</alias>
-                        <run>
-                            <namingStrategy>alias</namingStrategy>
-                            <network>
-                                <mode>custom</mode>
-                                <name>cdp-test-net</name>
-                                <alias>browser</alias>
-                            </network>
-                            <ports>
-                                <port>+browser.host:browser.port:3000</port>
-                            </ports>
-                            <env>
-                                <CHROME_OPTS>--hide-scrollbars --disable-dev-shm-usage</CHROME_OPTS>
-                            </env>
-                            <!-- 1GB -->
-                            <memory>1073741824</memory>
-                            <shmSize>1073741824</shmSize>
-                            <log>
-                                <enabled>true</enabled>
-                            </log>
-                            <dns>
-                                <host>${docker.container.testsites.net.cdp-test-net.ip}</host>
-                                <!--<host>8.8.8.8</host>-->
-                            </dns>
-                        </run>
-                    </image>
-                </images>
-            </configuration>
+                                    <inline>
+                                        <includeBaseDirectory>true</includeBaseDirectory>
+                                        <fileSets>
+                                            <fileSet>
+                                                <directory>target/appassembler/bin</directory>
+                                                <outputDirectory>bin</outputDirectory>
+                                                <includes>
+                                                    <include>${project.artifactId}</include>
+                                                    <include>start.sh</include>
+                                                </includes>
+                                                <fileMode>0755</fileMode>
+                                            </fileSet>
+                                            <fileSet>
+                                                <directory>target/appassembler/bin</directory>
+                                                <outputDirectory>bin</outputDirectory>
+                                                <excludes>
+                                                    <exclude>${project.artifactId}</exclude>
+                                                    <exclude>start.sh</exclude>
+                                                </excludes>
+                                                <fileMode>0644</fileMode>
+                                            </fileSet>
+                                            <fileSet>
+                                                <directory>target/appassembler</directory>
+                                                <outputDirectory>/</outputDirectory>
+                                                <excludes>
+                                                    <exclude>bin</exclude>
+                                                </excludes>
+                                            </fileSet>
+                                        </fileSets>
+                                        <files>
+                                            <file>
+                                                <source>../LICENSE</source>
+                                                <outputDirectory></outputDirectory>
+                                                <fileMode>0644</fileMode>
+                                            </file>
+                                        </files>
+                                    </inline>
+                                </assembly>
+                            </build>
+                        </image>
+                        <image>
+                            <name>norsknettarkiv/veidemann-certgen</name>
+                            <alias>certgen</alias>
+                            <run>
+                                <namingStrategy>alias</namingStrategy>
+                                <network>
+                                    <mode>custom</mode>
+                                    <name>cdp-test-net</name>
+                                    <alias>certgen</alias>
+                                </network>
+                                <volumes>
+                                    <bind>
+                                        <volume>${project.build.directory}/it-workdir/certificates:/ca-certificates
+                                        </volume>
+                                    </bind>
+                                </volumes>
+                            </run>
+                        </image>
+                        <image>
+                            <name>norsknettarkiv/testsites</name>
+                            <alias>testsites</alias>
+                            <run>
+                                <namingStrategy>alias</namingStrategy>
+                                <network>
+                                    <mode>custom</mode>
+                                    <name>cdp-test-net</name>
+                                    <alias>testsites</alias>
+                                </network>
+                                <ports>
+                                    <port>+test.http.host:test.http.port:80</port>
+                                    <port>+test.dns.host:test.dns.port:53</port>
+                                </ports>
+                                <log>
+                                    <enabled>true</enabled>
+                                </log>
+                                <wait>
+                                    <tcp>
+                                        <mode>mapped</mode>
+                                        <ports>
+                                            <port>80</port>
+                                            <port>53</port>
+                                        </ports>
+                                    </tcp>
+                                    <time>20000</time>
+                                </wait>
+                            </run>
+                        </image>
+                        <image>
+                            <name>norsknettarkiv/veidemann-cache:${veidemann.cache.version}</name>
+                            <alias>cache</alias>
+                            <run>
+                                <namingStrategy>alias</namingStrategy>
+                                <network>
+                                    <mode>custom</mode>
+                                    <name>cdp-test-net</name>
+                                    <alias>cache</alias>
+                                </network>
+                                <ports>
+                                    <port>+cache.http.host:cache.http.port:3128</port>
+                                    <port>+cache.https.host:cache.https.port:3129</port>
+                                </ports>
+                                <capAdd>
+                                    <add>NET_ADMIN</add>
+                                </capAdd>
+                                <!-- 2GB -->
+                                <memory>2147483648</memory>
+                                <shmSize>2147483648</shmSize>
+                                <volumes>
+                                    <bind>
+                                        <volume>cache-data:/var/cache/squid</volume>
+                                    </bind>
+                                    <from>
+                                        <image>certgen</image>
+                                    </from>
+                                </volumes>
+                                <env>
+                                    <DNS_SERVERS>${test.dns.server}</DNS_SERVERS>
+                                </env>
+                                <log>
+                                    <enabled>false</enabled>
+                                </log>
+                                <dependsOn>
+                                    <container>testsites</container>
+                                </dependsOn>
+                                <wait>
+                                    <tcp>
+                                        <mode>mapped</mode>
+                                        <ports>
+                                            <port>3128</port>
+                                        </ports>
+                                    </tcp>
+                                    <time>30000</time>
+                                </wait>
+                            </run>
+                        </image>
+                        <image>
+                            <name>browserless/chrome:release-puppeteer-1.5.0</name>
+                            <alias>browser</alias>
+                            <run>
+                                <namingStrategy>alias</namingStrategy>
+                                <network>
+                                    <mode>custom</mode>
+                                    <name>cdp-test-net</name>
+                                    <alias>browser</alias>
+                                </network>
+                                <dependsOn>
+                                    <container>certgen</container>
+                                    <container>testsites</container>
+                                    <container>cache</container>
+                                </dependsOn>
+                                <volumes>
+                                    <bind>
+                                        <volume>${project.build.directory}/it-workdir/certificates/pki:/root/.pki
+                                        </volume>
+                                    </bind>
+                                </volumes>
+                                <ports>
+                                    <port>+browser.host:browser.port:3000</port>
+                                </ports>
+                                <env>
+                                    <!--<DEBUG>*</DEBUG>-->
+                                    <!--<DEBUG>browserless/chrome</DEBUG>-->
+                                    <CONNECTION_TIMEOUT>60000</CONNECTION_TIMEOUT>
+                                </env>
+                                <memory>1073741824</memory>
+                                <shmSize>1073741824</shmSize>
+                                <log>
+                                    <enabled>true</enabled>
+                                </log>
+                                <dns>
+                                    <!--<host>${docker.container.testsites.net.cdp-test-net.ip}</host>-->
+                                    <!--<host>8.8.8.8</host>-->
+                                </dns>
+                            </run>
+                        </image>
+                    </images>
+                </configuration>
             </plugin>
         </plugins>
     </build>
@@ -268,7 +359,9 @@
                             <configurationDirectory>config</configurationDirectory>
                             <endorsedDir>plugins</endorsedDir>
                             <preAssembleDirectory>src/main/distfiles</preAssembleDirectory>
-                            <extraJvmArguments>-Dconfig.file=@BASEDIR@/config/application.conf -XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap</extraJvmArguments>
+                            <extraJvmArguments>-Dconfig.file=@BASEDIR@/config/application.conf
+                                -XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap
+                            </extraJvmArguments>
                         </configuration>
                         <executions>
                             <execution>
@@ -397,6 +490,8 @@
                                 <browser.port>${browser.port}</browser.port>
                                 <proxy.host>${proxy.ip}</proxy.host>
                                 <proxy.port>${proxy.port}</proxy.port>
+                                <cache.host>${cache.http.host}</cache.host>
+                                <cache.port>${cache.http.port}</cache.port>
                                 <testsites.http.host>${test.http.host}</testsites.http.host>
                                 <testsites.http.port>${test.http.port}</testsites.http.port>
                                 <testsites.dns.host>${test.dns.host}</testsites.dns.host>

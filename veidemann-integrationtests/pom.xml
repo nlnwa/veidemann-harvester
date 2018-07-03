@@ -223,6 +223,7 @@
                                         <ports>
                                             <port>+harvester.proxy.host:harvester.proxy.port:8080</port>
                                             <port>+harvester.host:harvester.port:9090</port>
+                                            <port>5005</port>
                                         </ports>
                                         <dependsOn>
                                             <container>db-initializer</container>
@@ -236,7 +237,7 @@
                                             </from>
                                         </volumes>
                                         <env>
-                                            <BROWSER_WS_ENDPOINT>ws://browser:3000/?--proxy-server=harvester:8080</BROWSER_WS_ENDPOINT>
+                                            <BROWSER_WS_ENDPOINT>ws://browser:3000/</BROWSER_WS_ENDPOINT>
                                             <DB_HOST>db</DB_HOST>
                                             <FRONTIER_HOST>frontier</FRONTIER_HOST>
                                             <CONTENT_WRITER_HOST>contentwriter</CONTENT_WRITER_HOST>
@@ -245,6 +246,7 @@
                                             <DNS_RESOLVER_PORT>50052</DNS_RESOLVER_PORT>
                                             <CACHE_HOST>cache</CACHE_HOST>
                                             <MAX_OPEN_SESSIONS>3</MAX_OPEN_SESSIONS>
+                                            <JAVA_OPTS>-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005</JAVA_OPTS>
                                         </env>
                                         <log>
                                             <enabled>true</enabled>

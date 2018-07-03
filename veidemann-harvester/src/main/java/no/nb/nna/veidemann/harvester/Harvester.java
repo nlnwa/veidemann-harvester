@@ -80,12 +80,15 @@ public class Harvester {
              ContentWriterClient contentWriterClient = new ContentWriterClient(
                      SETTINGS.getContentWriterHost(), SETTINGS.getContentWriterPort());
 
-             FrontierClient frontierClient = new FrontierClient(controller, SETTINGS.getFrontierHost(), SETTINGS.getFrontierPort(), SETTINGS.getMaxOpenSessions());
+             FrontierClient frontierClient = new FrontierClient(controller, SETTINGS.getFrontierHost(),
+                     SETTINGS.getFrontierPort(), SETTINGS.getMaxOpenSessions(), SETTINGS.getBrowserWSEndpoint(),
+                     SETTINGS.getProxyPort());
 
-             RecordingProxy proxy = new RecordingProxy(
+             RecordingProxy proxy = new RecordingProxy(SETTINGS.getMaxOpenSessions(),
                      new File(SETTINGS.getWorkDir()),
                      SETTINGS.getProxyPort(), db, contentWriterClient,
-                     new DnsServiceHostResolver(dnsServiceClient), sessionRegistry, SETTINGS.getCacheHost(), SETTINGS.getCachePort());
+                     new DnsServiceHostResolver(dnsServiceClient), sessionRegistry, SETTINGS.getCacheHost(),
+                     SETTINGS.getCachePort());
         ) {
             Runtime.getRuntime().addShutdownHook(new Thread(() -> shouldRun = false));
 

@@ -16,6 +16,7 @@
 package no.nb.nna.veidemann.chrome.client;
 
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -26,6 +27,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
+@Ignore
 public class ChromeDebugProtocolIT {
 
     static String chromeHost;

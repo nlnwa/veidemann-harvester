@@ -64,6 +64,8 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
 
     private static final Logger LOG = LoggerFactory.getLogger(RecorderFilter.class);
 
+    private final int proxyId;
+
     private static final AtomicLong nextProxyRequestId = new AtomicLong();
 
     private final String uri;
@@ -106,11 +108,12 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
 
     private boolean foundInCache = false;
 
-    public RecorderFilter(final String uri, final HttpRequest originalRequest, final ChannelHandlerContext ctx,
-                          final DbAdapter db, final ContentWriterClient contentWriterClient,
+    public RecorderFilter(final int proxyId, final String uri, final HttpRequest originalRequest,
+                          final ChannelHandlerContext ctx, final DbAdapter db, final ContentWriterClient contentWriterClient,
                           final BrowserSessionRegistry sessionRegistry, final HostResolver hostResolver) {
 
         super(originalRequest, ctx);
+        this.proxyId = proxyId;
         this.db = db;
         this.uri = uri;
 
@@ -135,25 +138,27 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
             if (httpObject instanceof HttpRequest) {
                 HttpRequest request = (HttpRequest) httpObject;
 
-                executionId = request.headers().get(EXECUTION_ID);
-                if (executionId == null || executionId.isEmpty()) {
-                    LOG.error("Missing executionId for {}", uri);
-                    return new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_GATEWAY);
-                }
-
-                jobExecutionId = request.headers().get(JOB_EXECUTION_ID);
-                if (jobExecutionId == null || jobExecutionId.isEmpty()) {
-                    LOG.error("Missing jobExecutionId for {}", uri);
-                    return new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_GATEWAY);
-                }
-
                 Uri parsedUri = UriConfigs.WHATWG.buildUri(uri);
                 resolvedRemoteAddress = hostResolver.resolve(parsedUri.getHost(), parsedUri.getDecodedPort());
 
                 // Lookup browser session, but skip if it is a robots.txt request since that is not coming from browser.
                 if (!uri.endsWith("robots.txt")) {
-                    browserSession = sessionRegistry.get(executionId);
+                    browserSession = sessionRegistry.get(proxyId);
                     crawlLogEntry = browserSession.getCrawlLogs().registerProxyRequest(nextProxyRequestId.getAndIncrement(), uri);
+                    executionId = browserSession.getExecutionId();
+                    jobExecutionId = browserSession.getJobExecutionId();
+                } else {
+                    executionId = request.headers().get(EXECUTION_ID);
+                    if (executionId == null || executionId.isEmpty()) {
+                        LOG.error("Missing executionId for {}", uri);
+                        return new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_GATEWAY);
+                    }
+
+                    jobExecutionId = request.headers().get(JOB_EXECUTION_ID);
+                    if (jobExecutionId == null || jobExecutionId.isEmpty()) {
+                        LOG.error("Missing jobExecutionId for {}", uri);
+                        return new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_GATEWAY);
+                    }
                 }
 
                 MDC.put("eid", executionId);

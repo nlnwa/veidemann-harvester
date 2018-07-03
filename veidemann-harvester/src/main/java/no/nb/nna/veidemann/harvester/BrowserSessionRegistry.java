@@ -29,35 +29,35 @@ import java.util.Objects;
 public class BrowserSessionRegistry {
     private static final Logger LOG = LoggerFactory.getLogger(BrowserSessionRegistry.class);
 
-    Map<String, BrowserSession> executionIdToSession = new HashMap<>();
+    Map<Integer, BrowserSession> proxyIdToSession = new HashMap<>();
 
     public synchronized void put(BrowserSession session) {
-        executionIdToSession.put(session.getExecutionId(), session);
-        LOG.debug("Currently open sessions: {}", executionIdToSession.size());
+        proxyIdToSession.put(session.getProxyId(), session);
+        LOG.debug("Currently open sessions: {}", proxyIdToSession.size());
     }
 
-    public synchronized BrowserSession get(String executionId) {
-        BrowserSession session = executionIdToSession.get(executionId);
+    public synchronized BrowserSession get(Integer proxyId) {
+        BrowserSession session = proxyIdToSession.get(proxyId);
         if (session == null) {
-            LOG.debug("Missing session for executionId {}", executionId);
+            LOG.error("Missing session for proxyId {}", proxyId);
         }
         return session;
     }
 
-    public synchronized BrowserSession remove(String executionId) {
-        return executionIdToSession.remove(executionId);
+    public synchronized BrowserSession remove(Integer proxyId) {
+        return proxyIdToSession.remove(proxyId);
     }
 
     public synchronized BrowserSession remove(BrowserSession session) {
         Objects.requireNonNull(session);
-        return executionIdToSession.remove(session.getExecutionId());
+        return proxyIdToSession.remove(session.getProxyId());
     }
 
     public boolean isEmpty() {
-        return executionIdToSession.isEmpty();
+        return proxyIdToSession.isEmpty();
     }
 
     public int size() {
-        return executionIdToSession.size();
+        return proxyIdToSession.size();
     }
 }

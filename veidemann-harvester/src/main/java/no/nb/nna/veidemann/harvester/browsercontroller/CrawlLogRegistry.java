@@ -49,7 +49,7 @@ public class CrawlLogRegistry {
     private final Matcher matcherThread;
     private final CountDownLatch finishLatch = new CountDownLatch(1);
     private final MatchStatus status = new MatchStatus();
-    private long startTime = System.currentTimeMillis();
+    private final long startTime = System.currentTimeMillis();
     private long lastActivityTime = System.currentTimeMillis();
 
     public class Entry {
@@ -192,6 +192,16 @@ public class CrawlLogRegistry {
                     if (finishLatch.getCount() == 0 || (System.currentTimeMillis() - lastActivityTime) >= maxIdleTime) {
                         LOG.debug("Timed out waiting for network activity");
                         running = false;
+
+                        long timeout = pageLoadTimeout - (System.currentTimeMillis() - startTime);
+                        if (timeout > pageLoadTimeout) {
+                            LOG.error("High pageload timeout calculation: {} = pl {} - (ts {} - start {})", timeout, pageLoadTimeout,
+                                    System.currentTimeMillis(), startTime);
+                        }
+                        if (timeout < 0) {
+                            LOG.info("Pageload timed out");
+                            finishLatch.countDown();
+                        }
                     }
                 }
             } catch (InterruptedException e) {
@@ -242,11 +252,11 @@ public class CrawlLogRegistry {
                 }).otherwise(() -> {
                     // No parent, this is a root request;
                     if (c.isResponseReceived()) {
-                            UriRequest r = UriRequest.createRoot("1",
-                                    c.uri, browserSession.queuedUri.getReferrer(), ResourceType.Other,
-                                    browserSession.queuedUri.getDiscoveryPath(), browserSession.getUriRequests().getPageSpan());
-                            r.setStatusCode(c.getCrawlLog().getStatusCode());
-                            browserSession.getUriRequests().add(r);
+                        UriRequest r = UriRequest.createRoot("1",
+                                c.uri, browserSession.queuedUri.getReferrer(), ResourceType.Other,
+                                browserSession.queuedUri.getDiscoveryPath(), browserSession.getUriRequests().getPageSpan());
+                        r.setStatusCode(c.getCrawlLog().getStatusCode());
+                        browserSession.getUriRequests().add(r);
                     }
                 });
             });

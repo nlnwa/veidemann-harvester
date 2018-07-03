@@ -52,7 +52,7 @@ public class FrontierServiceTest {
         InProcessChannelBuilder inProcessChannelBuilder = InProcessChannelBuilder.forName(uniqueServerName);
         FrontierApiServer inProcessServer = new FrontierApiServer(inProcessServerBuilder, frontierMock).start();
 
-        FrontierClient client = new FrontierClient(controller, inProcessChannelBuilder, 2);
+        FrontierClient client = new FrontierClient(controller, inProcessChannelBuilder, 2, "", 0);
 
         PageHarvestSpec.Builder harvestSpec = PageHarvestSpec.newBuilder();
         harvestSpec.getCrawlConfigBuilder().setId("foo");
@@ -67,7 +67,7 @@ public class FrontierServiceTest {
         when(crawlExecutionMock.preFetch()).thenReturn(harvestSpec1, harvestSpec2);
         doThrow(new RuntimeException("Simulated exception in postFetchSuccess")).when(crawlExecutionMock).postFetchSuccess(any());
 
-        when(controller.render(any(QueuedUri.class), any(CrawlConfig.class)))
+        when(controller.render(any(), any(QueuedUri.class), any(CrawlConfig.class)))
                 .thenReturn(new RenderResult())
                 .thenThrow(new RuntimeException("Simulated render exception"))
                 .thenReturn(new RenderResult().withError(Error.newBuilder().setCode(1).setMsg("Error").build()));
@@ -81,7 +81,7 @@ public class FrontierServiceTest {
         inProcessServer.blockUntilShutdown();
 
         verify(frontierMock, times(3)).getNextPageToFetch();
-        verify(controller, times(3)).render(any(QueuedUri.class), any(CrawlConfig.class));
+        verify(controller, times(3)).render(any(), any(QueuedUri.class), any(CrawlConfig.class));
         verify(crawlExecutionMock, times(3)).preFetch();
         verify(crawlExecutionMock, times(3)).postFetchFinally();
         verify(crawlExecutionMock).postFetchSuccess(any());

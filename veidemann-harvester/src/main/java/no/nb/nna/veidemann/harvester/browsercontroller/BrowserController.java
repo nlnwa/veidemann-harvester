@@ -34,6 +34,7 @@ import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbHelper;
 import no.nb.nna.veidemann.harvester.BrowserSessionRegistry;
+import no.nb.nna.veidemann.harvester.FrontierClient.ProxySession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -43,8 +44,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeoutException;
 
 /**
  *
@@ -53,27 +52,37 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
 
     private static final Logger LOG = LoggerFactory.getLogger(BrowserController.class);
 
+    private final String browserWSEndpoint;
+
     private final ChromeDebugProtocol chrome;
 
-    private final ChromeDebugProtocolConfig chromeDebugProtocolConfig;
+    final ChromeDebugProtocolConfig chromeDebugProtocolConfig;
 
     private final BrowserSessionRegistry sessionRegistry;
 
     private final Map<String, BrowserScript> scriptCache = new HashMap<>();
 
     public BrowserController(final String browserWSEndpoint, final DbAdapter db, final BrowserSessionRegistry sessionRegistry) {
+        this.browserWSEndpoint = browserWSEndpoint;
         DbHelper.getInstance().configure(db);
 
-        chromeDebugProtocolConfig = new ChromeDebugProtocolConfig(browserWSEndpoint)
+        chromeDebugProtocolConfig = new ChromeDebugProtocolConfig()
                 .withTracer(GlobalTracer.get())
-                .withProtocolTimeoutMs(10000);
+                .withProtocolTimeoutMs(30000);
 
         this.chrome = new ChromeDebugProtocol();
         this.sessionRegistry = sessionRegistry;
     }
 
-    public RenderResult render(QueuedUri queuedUri, CrawlConfig config)
-            throws ExecutionException, IOException, TimeoutException {
+    public RenderResult render(ProxySession proxySession, QueuedUri queuedUri, CrawlConfig config) throws IOException {
+        LOG.trace("Connecting to browser with: " + proxySession.getBrowserWsEndpoint());
+        ChromeDebugProtocolConfig protocolConfig = chromeDebugProtocolConfig.withBrowserWSEndpoint(proxySession.getBrowserWsEndpoint());
+
+        return render(proxySession.getProxyId(), protocolConfig, queuedUri, config);
+    }
+
+    public RenderResult render(int proxyId, ChromeDebugProtocolConfig protocolConfig,
+                               QueuedUri queuedUri, CrawlConfig config) throws IOException {
 
         Span span = GlobalTracer.get()
                 .buildSpan("render")
@@ -91,7 +100,8 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
         BrowserSession session = null;
         try {
             browserConfig = DbHelper.getInstance().getBrowserConfigForCrawlConfig(config);
-            session = new BrowserSession(chrome.connect(chromeDebugProtocolConfig), browserConfig, queuedUri, span);
+            session = new BrowserSession(proxyId, chrome.connect(protocolConfig),
+                    browserConfig, queuedUri, span);
         } catch (Throwable t) {
             if (session != null) {
                 session.close();

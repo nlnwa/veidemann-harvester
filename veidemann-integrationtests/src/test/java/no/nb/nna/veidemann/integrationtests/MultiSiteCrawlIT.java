@@ -78,24 +78,24 @@ public class MultiSiteCrawlIT extends CrawlTestBase implements VeidemannHeaderCo
                 .build();
 
         JobExecutionStatus jes = JobCompletion.executeJob(db, statusClient, controllerClient, request).get();
-        assertThat(jes.getExecutionsStateMap()).contains(new SimpleEntry<>("FINISHED", 4), new SimpleEntry<>("FAILED", 1));
+        assertThat(jes.getExecutionsStateMap()).contains(new SimpleEntry<>("FINISHED", 5));
 
         new CrawlExecutionValidator(db)
                 .validate()
-                .checkCrawlLogCount("response", 7)
+                .checkCrawlLogCount("response", 9)
                 .checkCrawlLogCount("revisit", 50)
                 .checkCrawlLogCount("dns", 6)
-                .checkPageLogCount(19);
+                .checkPageLogCount(20);
 
         jes = JobCompletion.executeJob(db, statusClient, controllerClient, request).get();
-        assertThat(jes.getExecutionsStateMap()).contains(new SimpleEntry<>("FINISHED", 4), new SimpleEntry<>("FAILED", 1));
+        assertThat(jes.getExecutionsStateMap()).contains(new SimpleEntry<>("FINISHED", 5));
 
         new CrawlExecutionValidator(db)
                 .validate()
-                .checkCrawlLogCount("response", 7)
+                .checkCrawlLogCount("response", 11)
                 .checkCrawlLogCount("revisit", 107)
                 .checkCrawlLogCount("dns", 6)
-                .checkPageLogCount(38);
+                .checkPageLogCount(40);
     }
 
 }

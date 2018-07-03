@@ -67,7 +67,9 @@ public class RobotsServiceClient implements AutoCloseable {
                     .setUserAgent(userAgent)
                     .setPoliteness(politeness)
                     .build();
-            RobotsEvaluatorProto.IsAllowedReply reply = blockingStub.isAllowed(request);
+
+            RobotsEvaluatorProto.IsAllowedReply reply = GrpcUtil.forkedCall(() -> blockingStub.isAllowed(request));
+
             return reply.getIsAllowed();
         } catch (StatusRuntimeException ex) {
             Code code = ex.getStatus().getCode();

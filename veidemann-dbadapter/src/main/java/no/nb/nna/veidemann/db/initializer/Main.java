@@ -15,12 +15,30 @@
  */
 package no.nb.nna.veidemann.db.initializer;
 
+import com.typesafe.config.Config;
+import com.typesafe.config.ConfigBeanFactory;
+import com.typesafe.config.ConfigFactory;
+import no.nb.nna.veidemann.commons.db.DbConnectionException;
 import no.nb.nna.veidemann.commons.db.DbException;
+import no.nb.nna.veidemann.commons.db.DbService;
+import no.nb.nna.veidemann.commons.opentracing.TracerFactory;
 
 /**
  * Main class for launching the service.
  */
 public final class Main {
+    static {
+        Config config = ConfigFactory.load();
+        config.checkValid(ConfigFactory.defaultReference());
+        Settings settings = ConfigBeanFactory.create(config, Settings.class);
+        try {
+            DbService.configure(settings);
+        } catch (DbConnectionException e) {
+            throw new RuntimeException(e);
+        }
+
+        TracerFactory.init("DbInitializer");
+    }
 
     /**
      * Private constructor to avoid instantiation.
@@ -40,7 +58,9 @@ public final class Main {
         // logging is even loaded.
         System.setProperty("java.util.logging.manager", "org.apache.logging.log4j.jul.LogManager");
 
-        new DbInitializer().initialize().close();
+        try (DbService db = DbService.getInstance()) {
+            db.getDbInitializer().initialize();
+        }
     }
 
 }

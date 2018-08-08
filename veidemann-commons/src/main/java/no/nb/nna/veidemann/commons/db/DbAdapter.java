@@ -16,7 +16,6 @@
 package no.nb.nna.veidemann.commons.db;
 
 import com.google.protobuf.Empty;
-import com.google.protobuf.Timestamp;
 import no.nb.nna.veidemann.api.ConfigProto.BrowserConfig;
 import no.nb.nna.veidemann.api.ConfigProto.BrowserScript;
 import no.nb.nna.veidemann.api.ConfigProto.CrawlConfig;
@@ -43,13 +42,11 @@ import no.nb.nna.veidemann.api.ControllerProto.RoleMappingsListRequest;
 import no.nb.nna.veidemann.api.ControllerProto.SeedListReply;
 import no.nb.nna.veidemann.api.ControllerProto.SeedListRequest;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlHostGroup;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
 import no.nb.nna.veidemann.api.MessagesProto.CrawledContent;
 import no.nb.nna.veidemann.api.MessagesProto.ExtractedText;
 import no.nb.nna.veidemann.api.MessagesProto.JobExecutionStatus;
 import no.nb.nna.veidemann.api.MessagesProto.PageLog;
-import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
 import no.nb.nna.veidemann.api.MessagesProto.Screenshot;
 import no.nb.nna.veidemann.api.ReportProto.CrawlLogListReply;
 import no.nb.nna.veidemann.api.ReportProto.CrawlLogListRequest;
@@ -69,7 +66,7 @@ import java.util.Optional;
 /**
  * Adapter for Veidemann's database.
  */
-public interface DbAdapter extends AutoCloseable {
+public interface DbAdapter {
 
     Optional<CrawledContent> hasCrawledContent(CrawledContent cc) throws DbException;
 
@@ -110,26 +107,6 @@ public interface DbAdapter extends AutoCloseable {
      * @param executionId id of the execution to update
      */
     CrawlExecutionStatus setExecutionStateAborted(String executionId) throws DbException;
-
-    long deleteQueuedUrisForExecution(String executionId, String crawlHostGroupId, String politenessId) throws DbException;
-
-    long queuedUriCount(String executionId) throws DbException;
-
-    boolean uriNotIncludedInQueue(QueuedUri qu, Timestamp since) throws DbException;
-
-    /**
-     * Get the first URI wich is ready to be fetched for a CrawlHostGroup.
-     *
-     * @param crawlHostGroup the CrawlHostGroup for which a URI is requested
-     * @return an Optional containing the next URI to be fetched or empty if none are ready yet.
-     */
-    FutureOptional<QueuedUri> getNextQueuedUriToFetch(CrawlHostGroup crawlHostGroup) throws DbException;
-
-    QueuedUri addToCrawlHostGroup(QueuedUri qUri) throws DbException;
-
-    FutureOptional<CrawlHostGroup> borrowFirstReadyCrawlHostGroup() throws DbException;
-
-    CrawlHostGroup releaseCrawlHostGroup(CrawlHostGroup crawlHostGroup, long nextFetchDelayMs) throws DbException;
 
     ScreenshotListReply listScreenshots(ScreenshotListRequest request) throws DbException;
 
@@ -245,8 +222,5 @@ public interface DbAdapter extends AutoCloseable {
      * @throws DbException
      */
     boolean isPaused() throws DbException;
-
-    @Override
-    public void close();
 
 }

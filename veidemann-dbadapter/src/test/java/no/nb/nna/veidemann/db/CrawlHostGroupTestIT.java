@@ -21,13 +21,16 @@ import no.nb.nna.veidemann.api.MessagesProto;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlHostGroup;
 import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
 import no.nb.nna.veidemann.commons.db.DbException;
+import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.commons.db.FutureOptional;
+import no.nb.nna.veidemann.commons.settings.CommonSettings;
 import no.nb.nna.veidemann.db.RethinkDbAdapter.TABLES;
-import no.nb.nna.veidemann.db.initializer.DbInitializer;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
+import java.time.OffsetDateTime;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.CountDownLatch;
@@ -44,10 +47,11 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 //@Ignore
 public class CrawlHostGroupTestIT {
-    public static RethinkDbAdapter db;
+    public static RethinkDbCrawlQueueAdapter queueAdapter;
+    public static RethinkDbAdapter dbAdapter;
     static final RethinkDB r = RethinkDB.r;
 
-    private final static int THREAD_COUNT = 10;
+    private final static int THREAD_COUNT = 8;
     private final static int QURI_COUNT = 500;
     private final int CRAWL_HOST_GROUP_COUNT = 20;
 
@@ -56,31 +60,151 @@ public class CrawlHostGroupTestIT {
 
     CountDownLatch finishLatch = new CountDownLatch(QURI_COUNT);
 
-    @BeforeClass
-    public static void init() throws DbException {
+    @Before
+    public void init() throws DbException {
         String dbHost = System.getProperty("db.host");
         int dbPort = Integer.parseInt(System.getProperty("db.port"));
-        if (!RethinkDbConnection.isConfigured()) {
-            RethinkDbConnection.configure(dbHost, dbPort, "veidemann", "admin", "");
-        }
-        db = new RethinkDbAdapter();
 
-        RethinkDB r = RethinkDB.r;
+        if (!DbService.isConfigured()) {
+            CommonSettings settings = new CommonSettings();
+            DbService.configure(new CommonSettings()
+                    .withDbHost(dbHost)
+                    .withDbPort(dbPort)
+                    .withDbName("veidemann")
+                    .withDbUser("admin")
+                    .withDbPassword(""));
+        }
+
         try {
-            RethinkDbConnection.getInstance().exec(r.dbDrop("veidemann"));
+            DbService.getInstance().getDbInitializer().delete();
         } catch (DbException e) {
             if (!e.getMessage().matches("Database .* does not exist.")) {
                 throw e;
             }
         }
-        new DbInitializer().initialize();
+        DbService.getInstance().getDbInitializer().initialize();
+
+        queueAdapter = (RethinkDbCrawlQueueAdapter) DbService.getInstance().getCrawlQueueAdapter();
+        dbAdapter = (RethinkDbAdapter) DbService.getInstance().getDbAdapter();
     }
 
-    @AfterClass
-    public static void shutdown() {
-        if (db != null) {
-            db.close();
-        }
+    @After
+    public void shutdown() {
+        DbService.getInstance().close();
+    }
+
+    @Test
+    @Ignore
+    public void testReleaseCrawlHostGroup() throws InterruptedException, DbException {
+        QueuedUri qUri1 = QueuedUri.newBuilder().setCrawlHostGroupId("crawlHostGroupId1").setPolitenessId("politenessId").build();
+        QueuedUri qUri2 = QueuedUri.newBuilder().setCrawlHostGroupId("crawlHostGroupId2").setPolitenessId("politenessId").build();
+        queueAdapter.addToCrawlHostGroup(qUri1);
+        queueAdapter.addToCrawlHostGroup(qUri2);
+
+        FutureOptional<CrawlHostGroup> b1 = queueAdapter.borrowFirstReadyCrawlHostGroup();
+        FutureOptional<CrawlHostGroup> b2 = queueAdapter.borrowFirstReadyCrawlHostGroup();
+
+        CrawlHostGroup r1 = queueAdapter.releaseCrawlHostGroup(b1.get(), 2000);
+        OffsetDateTime now = OffsetDateTime.now();
+        CrawlHostGroup r2 = queueAdapter.releaseCrawlHostGroup(b2.get(), 0);
+
+        FutureOptional<CrawlHostGroup> b3 = queueAdapter.borrowFirstReadyCrawlHostGroup();
+        FutureOptional<CrawlHostGroup> b4 = queueAdapter.borrowFirstReadyCrawlHostGroup();
+
+        assertThat(r1.getId()).isEqualTo("crawlHostGroupId1");
+        assertThat(r1.getBusy()).isFalse();
+        assertThat(ProtoUtils.tsToOdt(r1.getNextFetchTime())).isAfter(now);
+
+        assertThat(r2.getId()).isEqualTo("crawlHostGroupId2");
+        assertThat(r2.getBusy()).isFalse();
+        assertThat(ProtoUtils.tsToOdt(r2.getNextFetchTime())).isBeforeOrEqualTo(OffsetDateTime.now());
+
+        assertThat(b3.isPresent()).isTrue();
+        assertThat(b3.get().getId()).isEqualTo("crawlHostGroupId2");
+        assertThat(b4.isPresent()).isFalse();
+        assertThat(b4.isMaybeInFuture()).isFalse();
+//        assertThat(b4.getWhen()).isBetween(now, now.plusSeconds(2));
+
+//        Thread.sleep(b4.getDelayMs());
+
+        FutureOptional<CrawlHostGroup> b5 = queueAdapter.borrowFirstReadyCrawlHostGroup();
+        FutureOptional<CrawlHostGroup> b6 = queueAdapter.borrowFirstReadyCrawlHostGroup();
+
+        assertThat(b5.isPresent()).isTrue();
+        assertThat(b5.get().getId()).isEqualTo("crawlHostGroupId1");
+        assertThat(b6.isPresent()).isFalse();
+        assertThat(b6.isMaybeInFuture()).isFalse();
+        assertThat(b6.isEmpty()).isTrue();
+    }
+
+    @Test
+    public void testGetNextQueuedUriToFetch() throws DbException {
+        QueuedUri qUri = QueuedUri.newBuilder()
+                .setUri("http://www.foo.bar")
+                .setIp("127.0.0.1")
+                .setSequence(1L)
+                .setCrawlHostGroupId("CHGID")
+                .setPolitenessId("PID")
+                .setExecutionId("EID")
+                .build();
+
+        queueAdapter.addToCrawlHostGroup(qUri);
+        FutureOptional<CrawlHostGroup> b1 = queueAdapter.borrowFirstReadyCrawlHostGroup();
+
+        FutureOptional<QueuedUri> foqu = queueAdapter.getNextQueuedUriToFetch(b1.get());
+        assertThat(foqu.isPresent()).isTrue();
+    }
+
+//    @Test
+//    public void testGetOrCreateCrawlHostGroup() throws DbException {
+//        QueuedUri qUri1 = QueuedUri.newBuilder().setCrawlHostGroupId("crawlHostGroupId1").setPolitenessId("politenessId").build();
+//        QueuedUri qUri2 = QueuedUri.newBuilder().setCrawlHostGroupId("crawlHostGroupId2").setPolitenessId("politenessId").build();
+//        CrawlHostGroup chg1 = db.addToCrawlHostGroup(qUri1);
+//        CrawlHostGroup chg2 = db.addToCrawlHostGroup(qUri1);
+//        CrawlHostGroup chg3 = db.addToCrawlHostGroup(qUri2);
+//
+//        assertThat(chg1.getId()).isEqualTo(chg2.getId()).isEqualTo("crawlHostGroupId1");
+//        assertThat(chg1.getPolitenessId()).isEqualTo(chg2.getPolitenessId()).isEqualTo("politenessId");
+//        assertThat(chg1.getBusy()).isEqualTo(chg2.getBusy()).isFalse();
+//        assertThat(chg1.getQueuedUriCount()).isEqualTo(1);
+//        assertThat(chg2.getQueuedUriCount()).isEqualTo(2);
+//
+//        assertThat(chg3.getId()).isEqualTo("crawlHostGroupId2");
+//        assertThat(chg3.getPolitenessId()).isEqualTo("politenessId");
+//        assertThat(chg3.getBusy()).isFalse();
+//        assertThat(chg3.getQueuedUriCount()).isEqualTo(1);
+//    }
+
+    @Test
+    public void testBorrowFirstReadyCrawlHostGroup() throws DbException {
+        QueuedUri qUri1 = QueuedUri.newBuilder()
+                .setCrawlHostGroupId("crawlHostGroupId1")
+                .setPolitenessId("politenessId")
+                .setSequence(1)
+                .build();
+        QueuedUri qUri2 = QueuedUri.newBuilder()
+                .setCrawlHostGroupId("crawlHostGroupId2")
+                .setPolitenessId("politenessId")
+                .setSequence(1)
+                .build();
+        queueAdapter.addToCrawlHostGroup(qUri1);
+        queueAdapter.addToCrawlHostGroup(qUri2);
+
+        FutureOptional<CrawlHostGroup> b1 = queueAdapter.borrowFirstReadyCrawlHostGroup();
+        FutureOptional<CrawlHostGroup> b2 = queueAdapter.borrowFirstReadyCrawlHostGroup();
+        FutureOptional<CrawlHostGroup> b3 = queueAdapter.borrowFirstReadyCrawlHostGroup();
+
+        assertThat(b1.isPresent()).isTrue();
+        assertThat(b2.isPresent()).isTrue();
+        assertThat(b3.isPresent()).isFalse();
+
+        assertThat(b1.get().getId()).isEqualTo("crawlHostGroupId1");
+        assertThat(b1.get().getBusy()).isTrue();
+        assertThat(ProtoUtils.tsToOdt(b1.get().getNextFetchTime())).isBeforeOrEqualTo(OffsetDateTime.now());
+
+        assertThat(b2.get().getId()).isEqualTo("crawlHostGroupId2");
+        assertThat(b2.get().getBusy()).isTrue();
+        assertThat(ProtoUtils.tsToOdt(b2.get().getNextFetchTime())).isBeforeOrEqualTo(OffsetDateTime.now());
     }
 
     @Test
@@ -97,14 +221,15 @@ public class CrawlHostGroupTestIT {
                         .setPolitenessId(politenessId)
                         .setSequence(1)
                         .build();
-                qUri = db.addToCrawlHostGroup(qUri);
+                qUri = queueAdapter.addToCrawlHostGroup(qUri);
             }
         }
         finishLatch.await();
         Thread.sleep(1000L);
         shouldRun = false;
+        System.out.println();
 
-        Cursor<Map<String, Object>> response = db.executeRequest("test",
+        Cursor<Map<String, Object>> response = dbAdapter.executeRequest("test",
                 r.table(TABLES.CRAWL_HOST_GROUP.name));
         assertThat(finishLatch.getCount()).isZero();
         assertThat(response.iterator()).isEmpty();
@@ -127,14 +252,14 @@ public class CrawlHostGroupTestIT {
 
             while (shouldRun) {
                 try {
-                    FutureOptional<CrawlHostGroup> crawlHostGroup = db.borrowFirstReadyCrawlHostGroup();
+                    FutureOptional<CrawlHostGroup> crawlHostGroup = queueAdapter.borrowFirstReadyCrawlHostGroup();
 
                     if (crawlHostGroup.isMaybeInFuture()) {
                         // A CrawlHostGroup suitable for execution in the future was found, wait until it is ready.
                         sleep = crawlHostGroup.getDelayMs();
                     } else if (crawlHostGroup.isPresent()) {
                         assertThat(crawlHostGroup.get().getQueuedUriCount()).isGreaterThan(-1L);
-                        FutureOptional<MessagesProto.QueuedUri> foqu = db.getNextQueuedUriToFetch(crawlHostGroup.get());
+                        FutureOptional<MessagesProto.QueuedUri> foqu = queueAdapter.getNextQueuedUriToFetch(crawlHostGroup.get());
 
                         if (foqu.isPresent()) {
                             // A fetchabel URI was found, return it
@@ -146,7 +271,7 @@ public class CrawlHostGroupTestIT {
                             // No URI found for this CrawlHostGroup. Wait for RESCHEDULE_DELAY and try again.
                             sleep = RESCHEDULE_DELAY;
                         }
-                        db.releaseCrawlHostGroup(crawlHostGroup.get(), sleep);
+                        queueAdapter.releaseCrawlHostGroup(crawlHostGroup.get(), sleep);
                     } else {
                         // No CrawlHostGroup ready. Wait a moment and try again
                         sleep = RESCHEDULE_DELAY;
@@ -166,11 +291,12 @@ public class CrawlHostGroupTestIT {
                 Random rnd = new Random();
                 while (true) {
                     Exe exe = getNextToFetch();
+                    System.out.print(".");
 
                     long crawlTime = rnd.nextInt(200) + 20L;
                     Thread.sleep(crawlTime);
 
-                    CrawlHostGroup chg = db.releaseCrawlHostGroup(exe.chg, crawlTime);
+                    CrawlHostGroup chg = queueAdapter.releaseCrawlHostGroup(exe.chg, crawlTime);
                     assertThat(chg.getQueuedUriCount()).isGreaterThan(-1L);
 
                     assertThat(finishLatch.getCount()).isGreaterThan(0);

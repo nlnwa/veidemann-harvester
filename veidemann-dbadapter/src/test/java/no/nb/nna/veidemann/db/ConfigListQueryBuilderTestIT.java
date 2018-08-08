@@ -12,18 +12,19 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */package no.nb.nna.veidemann.db;
+ */
+package no.nb.nna.veidemann.db;
 
-import com.rethinkdb.RethinkDB;
 import no.nb.nna.veidemann.api.ConfigProto.CrawlEntity;
 import no.nb.nna.veidemann.api.ConfigProto.Meta;
 import no.nb.nna.veidemann.api.ControllerProto.CrawlEntityListReply;
 import no.nb.nna.veidemann.api.ControllerProto.ListRequest;
 import no.nb.nna.veidemann.commons.db.DbException;
+import no.nb.nna.veidemann.commons.db.DbService;
+import no.nb.nna.veidemann.commons.settings.CommonSettings;
 import no.nb.nna.veidemann.commons.util.ApiTools;
-import no.nb.nna.veidemann.db.initializer.DbInitializer;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -38,24 +39,30 @@ public class ConfigListQueryBuilderTestIT {
 
     static CrawlEntity e1, e2, e3, e4, e5;
 
-    @BeforeClass
-    public static void init() throws DbException {
+    @Before
+    public void init() throws DbException {
         String dbHost = System.getProperty("db.host");
         int dbPort = Integer.parseInt(System.getProperty("db.port"));
-        if (!RethinkDbConnection.isConfigured()) {
-            RethinkDbConnection.configure(dbHost, dbPort, "veidemann", "admin", "");
-        }
-        db = new RethinkDbAdapter();
 
-        RethinkDB r = RethinkDB.r;
+        if (!DbService.isConfigured()) {
+            DbService.configure(new CommonSettings()
+                    .withDbHost(dbHost)
+                    .withDbPort(dbPort)
+                    .withDbName("veidemann")
+                    .withDbUser("admin")
+                    .withDbPassword(""));
+        }
+
         try {
-            RethinkDbConnection.getInstance().exec(r.dbDrop("veidemann"));
+            DbService.getInstance().getDbInitializer().delete();
         } catch (DbException e) {
             if (!e.getMessage().matches("Database .* does not exist.")) {
                 throw e;
             }
         }
-        new DbInitializer().initialize();
+        DbService.getInstance().getDbInitializer().initialize();
+
+        db = (RethinkDbAdapter) DbService.getInstance().getDbAdapter();
 
         e1 = db.saveCrawlEntity(CrawlEntity.newBuilder()
                 .setMeta(Meta.newBuilder()
@@ -88,11 +95,9 @@ public class ConfigListQueryBuilderTestIT {
                 .build());
     }
 
-    @AfterClass
-    public static void shutdown() {
-        if (db != null) {
-            db.close();
-        }
+    @After
+    public void shutdown() {
+        DbService.getInstance().close();
     }
 
     @Test

@@ -38,12 +38,22 @@ public class CommonSettings {
         this.dbHost = dbHost;
     }
 
+    public CommonSettings withDbHost(String dbHost) {
+        this.dbHost = dbHost;
+        return this;
+    }
+
     public int getDbPort() {
         return dbPort;
     }
 
     public void setDbPort(int dbPort) {
         this.dbPort = dbPort;
+    }
+
+    public CommonSettings withDbPort(int dbPort) {
+        this.dbPort = dbPort;
+        return this;
     }
 
     public String getDbName() {
@@ -54,12 +64,22 @@ public class CommonSettings {
         this.dbName = dbName;
     }
 
+    public CommonSettings withDbName(String dbName) {
+        this.dbName = dbName;
+        return this;
+    }
+
     public String getDbUser() {
         return dbUser;
     }
 
     public void setDbUser(String dbUser) {
         this.dbUser = dbUser;
+    }
+
+    public CommonSettings withDbUser(String dbUser) {
+        this.dbUser = dbUser;
+        return this;
     }
 
     public String getDbPassword() {
@@ -70,4 +90,8 @@ public class CommonSettings {
         this.dbPassword = dbPassword;
     }
 
+    public CommonSettings withDbPassword(String dbPassword) {
+        this.dbPassword = dbPassword;
+        return this;
+    }
 }

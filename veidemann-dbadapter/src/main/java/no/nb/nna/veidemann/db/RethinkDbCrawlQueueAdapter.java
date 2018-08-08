@@ -150,7 +150,6 @@ public class RethinkDbCrawlQueueAdapter implements CrawlQueueAdapter {
                                     .g("deleted")
                     );
                     deleted += deleteResponse;
-                    System.out.println("DELETED: " + deleted + ", RESP: " + deleteResponse);
                 }
             } catch (InterruptedException e) {
                 LOG.info("getNextQueuedUriToFetch was interrupted");

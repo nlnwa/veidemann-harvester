@@ -29,8 +29,8 @@ import no.nb.nna.veidemann.api.ContentWriterProto.WriteResponseMeta.RecordMeta;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
 import no.nb.nna.veidemann.commons.ExtraStatusCodes;
 import no.nb.nna.veidemann.commons.client.ContentWriterClient;
-import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.db.DbException;
+import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.commons.util.Sha1Digest;
 import no.nb.nna.veidemann.db.ProtoUtils;
 import org.netpreserve.commons.util.datetime.DateFormat;
@@ -88,8 +88,6 @@ public class DnsLookup {
 
     final Cache cache;
 
-    private final DbAdapter db;
-
     private final ContentWriterClient contentWriterClient;
 
     private final ConcurrentHashMap<String, Future<InetSocketAddress>> activeResolvers = new ConcurrentHashMap<>();
@@ -104,8 +102,7 @@ public class DnsLookup {
 
     private final SimpleResolver[] resolvers;
 
-    public DnsLookup(final DbAdapter db, final ContentWriterClient contentWriterClient, List<String> dnsServers) {
-        this.db = db;
+    public DnsLookup(final ContentWriterClient contentWriterClient, List<String> dnsServers) {
         this.contentWriterClient = contentWriterClient;
         cache = new Cache(DCLASS);
         cache.setMaxCache(24 * 3600); // Cache an answer for a maximum of one day
@@ -226,12 +223,11 @@ public class DnsLookup {
                     .setBlockDigest(responseRecordMeta.getBlockDigest())
                     .setPayloadDigest(responseRecordMeta.getPayloadDigest())
                     .build();
-            if (db != null) {
-                try {
-                    crawlLog = db.saveCrawlLog(crawlLog);
-                } catch (DbException e) {
-                    LOG.error("Unable to store crawl log for DNS resolution", e);
-                }
+
+            try {
+                crawlLog = DbService.getInstance().getDbAdapter().saveCrawlLog(crawlLog);
+            } catch (DbException e) {
+                LOG.error("Unable to store crawl log for DNS resolution", e);
             }
         }
 

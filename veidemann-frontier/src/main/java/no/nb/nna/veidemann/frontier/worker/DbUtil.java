@@ -2,26 +2,14 @@ package no.nb.nna.veidemann.frontier.worker;
 
 import no.nb.nna.veidemann.api.MessagesProto;
 import no.nb.nna.veidemann.commons.db.DbException;
-import no.nb.nna.veidemann.commons.db.DbHelper;
+import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.db.ProtoUtils;
 
 /**
- * Singleton with helper methods for handling DB objects.
+ * Static helper methods for handling DB objects.
  * <p/>
- * Configure must be called before any usage of the utility methods.
  */
-public class DbUtil extends DbHelper {
-    private static DbUtil ourInstance = new DbUtil();
-
-    /**
-     * Get the singleton instance.
-     *
-     * @return the single DbUtil instance
-     */
-    public static DbUtil getInstance() {
-        return ourInstance;
-    }
-
+public class DbUtil {
     /**
      * Private constructor to prevent instantiation.
      */
@@ -36,11 +24,11 @@ public class DbUtil extends DbHelper {
      *
      * @param qUri the uri with failed precondition
      */
-    public void writeLog(QueuedUriWrapper qUri) throws DbException {
+    public static void writeLog(QueuedUriWrapper qUri) throws DbException {
         writeLog(qUri, qUri.getError().getCode());
     }
 
-    public void writeLog(QueuedUriWrapper qUri, int statusCode) throws DbException {
+    public static void writeLog(QueuedUriWrapper qUri, int statusCode) throws DbException {
         MessagesProto.CrawlLog crawlLog = MessagesProto.CrawlLog.newBuilder()
                 .setRequestedUri(qUri.getUri())
                 .setJobExecutionId(qUri.getJobExecutionId())
@@ -54,6 +42,6 @@ public class DbUtil extends DbHelper {
                 .setRetries(qUri.getRetries())
                 .setFetchTimeStamp(ProtoUtils.getNowTs())
                 .build();
-        getDb().saveCrawlLog(crawlLog);
+        DbService.getInstance().getDbAdapter().saveCrawlLog(crawlLog);
     }
 }

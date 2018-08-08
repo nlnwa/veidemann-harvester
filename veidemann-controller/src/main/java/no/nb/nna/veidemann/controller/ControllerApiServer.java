@@ -20,7 +20,6 @@ import io.grpc.ServerBuilder;
 import io.opentracing.contrib.ServerTracingInterceptor;
 import io.opentracing.util.GlobalTracer;
 import no.nb.nna.veidemann.commons.auth.AuAuServerInterceptor;
-import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.controller.settings.Settings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,12 +37,11 @@ public class ControllerApiServer implements AutoCloseable {
 
     private final Server server;
 
-    public ControllerApiServer(Settings settings, DbAdapter db,
-                               AuAuServerInterceptor auAuServerInterceptor) {
-        this(settings, ServerBuilder.forPort(settings.getApiPort()), db, auAuServerInterceptor);
+    public ControllerApiServer(Settings settings, AuAuServerInterceptor auAuServerInterceptor) {
+        this(settings, ServerBuilder.forPort(settings.getApiPort()), auAuServerInterceptor);
     }
 
-    public ControllerApiServer(Settings settings, ServerBuilder<?> serverBuilder, DbAdapter db,
+    public ControllerApiServer(Settings settings, ServerBuilder<?> serverBuilder,
                                AuAuServerInterceptor auAuServerInterceptor) {
 
         ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor.Builder(GlobalTracer.get())
@@ -64,11 +62,11 @@ public class ControllerApiServer implements AutoCloseable {
 
         server = serverBuilder
                 .addService(tracingInterceptor.intercept(
-                        auAuServerInterceptor.intercept(new ControllerService(settings, db))))
+                        auAuServerInterceptor.intercept(new ControllerService(settings))))
                 .addService(tracingInterceptor.intercept(
-                        auAuServerInterceptor.intercept(new StatusService(db))))
+                        auAuServerInterceptor.intercept(new StatusService())))
                 .addService(tracingInterceptor.intercept(
-                        auAuServerInterceptor.intercept(new ReportService(db))))
+                        auAuServerInterceptor.intercept(new ReportService())))
                 .build();
     }
 

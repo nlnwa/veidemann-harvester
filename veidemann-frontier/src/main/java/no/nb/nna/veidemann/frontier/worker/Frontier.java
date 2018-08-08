@@ -22,7 +22,7 @@ import no.nb.nna.veidemann.commons.ExtraStatusCodes;
 import no.nb.nna.veidemann.commons.client.DnsServiceClient;
 import no.nb.nna.veidemann.commons.client.RobotsServiceClient;
 import no.nb.nna.veidemann.commons.db.DbException;
-import no.nb.nna.veidemann.db.RethinkDbAdapter;
+import no.nb.nna.veidemann.commons.db.DbHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,9 +41,7 @@ public class Frontier implements AutoCloseable {
 
     private final QueueWorker queueWorker;
 
-    public Frontier(RethinkDbAdapter db, RobotsServiceClient robotsServiceClient, DnsServiceClient dnsServiceClient) {
-        DbUtil.getInstance().configure(db);
-
+    public Frontier(RobotsServiceClient robotsServiceClient, DnsServiceClient dnsServiceClient) {
         this.robotsServiceClient = robotsServiceClient;
         this.dnsServiceClient = dnsServiceClient;
         this.queueWorker = new QueueWorker(this);
@@ -63,7 +61,7 @@ public class Frontier implements AutoCloseable {
         String uri = request.getSeed().getMeta().getName();
 
         try {
-            CrawlConfig crawlConfig = DbUtil.getInstance().getCrawlConfigForJob(request.getJob());
+            CrawlConfig crawlConfig = DbHelper.getCrawlConfigForJob(request.getJob());
             QueuedUriWrapper qUri = QueuedUriWrapper.getQueuedUriWrapper(uri, request.getJobExecutionId(),
                     status.getId(), crawlConfig.getPolitenessId());
             qUri.addUriToQueue();

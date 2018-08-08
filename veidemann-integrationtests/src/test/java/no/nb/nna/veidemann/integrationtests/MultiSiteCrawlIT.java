@@ -39,15 +39,13 @@ public class MultiSiteCrawlIT extends CrawlTestBase implements VeidemannHeaderCo
 
     @Test
     public void testHarvest() throws InterruptedException, ExecutionException, DbException {
-        DbHelper dbh = DbHelper.getInstance();
-        dbh.configure(db);
         CrawlJob job = controllerClient.listCrawlJobs(ControllerProto.ListRequest.newBuilder()
                 .setName("unscheduled").build())
                 .getValue(0);
 
-        CrawlConfig crawlConfig = dbh.getCrawlConfigForJob(job);
+        CrawlConfig crawlConfig = DbHelper.getCrawlConfigForJob(job);
 
-        PolitenessConfig politeness = dbh.getPolitenessConfigForCrawlConfig(crawlConfig).toBuilder()
+        PolitenessConfig politeness = DbHelper.getPolitenessConfigForCrawlConfig(crawlConfig).toBuilder()
                 .setMaxTimeBetweenPageLoadMs(100)
                 .setMinTimeBetweenPageLoadMs(1)
                 .setDelayFactor(.01f)

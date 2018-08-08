@@ -34,7 +34,7 @@ import no.nb.nna.veidemann.chrome.client.RuntimeDomain;
 import no.nb.nna.veidemann.chrome.client.SessionClosedException;
 import no.nb.nna.veidemann.commons.VeidemannHeaderConstants;
 import no.nb.nna.veidemann.commons.db.DbException;
-import no.nb.nna.veidemann.commons.db.DbHelper;
+import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.commons.util.ApiTools;
 import no.nb.nna.veidemann.db.ProtoUtils;
 import org.slf4j.Logger;
@@ -264,7 +264,7 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
             PageDomain.CaptureScreenshotResponse screenshot = session.page().captureScreenshot().withFormat("png").run();
             byte[] img = Base64.getDecoder().decode(screenshot.data());
 
-            DbHelper.getInstance().getDb().saveScreenshot(MessagesProto.Screenshot.newBuilder()
+            DbService.getInstance().getDbAdapter().saveScreenshot(MessagesProto.Screenshot.newBuilder()
                     .setImg(ByteString.copyFrom(img))
                     .setExecutionId(getExecutionId())
                     .setUri(uriRequests.getRootRequest().getUrl())

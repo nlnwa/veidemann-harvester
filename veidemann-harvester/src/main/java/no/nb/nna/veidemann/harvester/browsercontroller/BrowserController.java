@@ -30,9 +30,9 @@ import no.nb.nna.veidemann.chrome.client.ChromeDebugProtocolConfig;
 import no.nb.nna.veidemann.chrome.client.ClientClosedException;
 import no.nb.nna.veidemann.commons.ExtraStatusCodes;
 import no.nb.nna.veidemann.commons.VeidemannHeaderConstants;
-import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbHelper;
+import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.harvester.BrowserSessionRegistry;
 import no.nb.nna.veidemann.harvester.FrontierClient.ProxySession;
 import org.slf4j.Logger;
@@ -62,9 +62,8 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
 
     private final Map<String, BrowserScript> scriptCache = new HashMap<>();
 
-    public BrowserController(final String browserWSEndpoint, final DbAdapter db, final BrowserSessionRegistry sessionRegistry) {
+    public BrowserController(final String browserWSEndpoint, final BrowserSessionRegistry sessionRegistry) {
         this.browserWSEndpoint = browserWSEndpoint;
-        DbHelper.getInstance().configure(db);
 
         chromeDebugProtocolConfig = new ChromeDebugProtocolConfig()
                 .withTracer(GlobalTracer.get())
@@ -99,7 +98,7 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
         BrowserConfig browserConfig = null;
         BrowserSession session = null;
         try {
-            browserConfig = DbHelper.getInstance().getBrowserConfigForCrawlConfig(config);
+            browserConfig = DbHelper.getBrowserConfigForCrawlConfig(config);
             session = new BrowserSession(proxyId, chrome.connect(protocolConfig),
                     browserConfig, queuedUri, span);
         } catch (Throwable t) {
@@ -155,7 +154,7 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
 
                 session.getUriRequests().getPageLogResources().forEach(r -> pageLog.addResource(r));
                 result.getOutlinks().forEach(o -> pageLog.addOutlink(o.getUri()));
-                DbHelper.getInstance().getDb().savePageLog(pageLog.build());
+                DbService.getInstance().getDbAdapter().savePageLog(pageLog.build());
             } catch (Throwable t) {
                 LOG.error("Failed writing pagelog", t);
             }
@@ -183,7 +182,7 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
                     ControllerProto.GetRequest req = ControllerProto.GetRequest.newBuilder()
                             .setId(scriptId)
                             .build();
-                    script = DbHelper.getInstance().getDb().getBrowserScript(req);
+                    script = DbService.getInstance().getDbAdapter().getBrowserScript(req);
                     scriptCache.put(scriptId, script);
                 }
                 scripts.add(script);
@@ -191,7 +190,7 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
             ListRequest req = ListRequest.newBuilder()
                     .addAllLabelSelector(browserConfig.getScriptSelectorList())
                     .build();
-            for (BrowserScript script : DbHelper.getInstance().getDb().listBrowserScripts(req).getValueList()) {
+            for (BrowserScript script : DbService.getInstance().getDbAdapter().listBrowserScripts(req).getValueList()) {
                 if (!scriptCache.containsKey(script.getId())) {
                     scriptCache.put(script.getId(), script);
                 }

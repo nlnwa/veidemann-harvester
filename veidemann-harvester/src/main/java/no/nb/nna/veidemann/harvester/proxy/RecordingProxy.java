@@ -22,7 +22,6 @@ import net.lightbody.bmp.mitm.TrustSource;
 import net.lightbody.bmp.mitm.keys.ECKeyGenerator;
 import net.lightbody.bmp.mitm.manager.ImpersonatingMitmManager;
 import no.nb.nna.veidemann.commons.client.ContentWriterClient;
-import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.harvester.BrowserSessionRegistry;
 import org.littleshoot.proxy.ChainedProxy;
 import org.littleshoot.proxy.ChainedProxyAdapter;
@@ -65,7 +64,7 @@ public class RecordingProxy implements AutoCloseable {
      * @param port    the port to listen to
      * @throws IOException is thrown if certificate directory could not be created
      */
-    public RecordingProxy(final int serverCount, File workDir, int port, DbAdapter db, final ContentWriterClient contentWriterClient,
+    public RecordingProxy(final int serverCount, File workDir, int port, final ContentWriterClient contentWriterClient,
                           final HostResolver hostResolver, BrowserSessionRegistry sessionRegistry,
                           String cacheHost, int cachePort) throws IOException {
 
@@ -131,13 +130,13 @@ public class RecordingProxy implements AutoCloseable {
                 });
 
         HttpProxyServer server = serverBootstrap.withFiltersSource(
-                new RecorderFilterSourceAdapter(0, db, contentWriterClient, sessionRegistry, hostResolver)).start();
+                new RecorderFilterSourceAdapter(0, contentWriterClient, sessionRegistry, hostResolver)).start();
         servers.add(server);
         LOG.info("Started proxy 0 on port: {}", server.getListenAddress().getPort());
 
         for (int i = 1; i < serverCount; i++) {
             server = server.clone().withFiltersSource(
-                    new RecorderFilterSourceAdapter(i, db, contentWriterClient, sessionRegistry, hostResolver)).start();
+                    new RecorderFilterSourceAdapter(i, contentWriterClient, sessionRegistry, hostResolver)).start();
             servers.add(server);
             LOG.info("Started proxy {} on port: {}", i, server.getListenAddress().getPort());
         }

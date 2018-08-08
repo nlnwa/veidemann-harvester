@@ -20,7 +20,7 @@ import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlLog.Builder;
 import no.nb.nna.veidemann.commons.ExtraStatusCodes;
 import no.nb.nna.veidemann.commons.db.DbException;
-import no.nb.nna.veidemann.commons.db.DbHelper;
+import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.db.ProtoUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -328,7 +328,7 @@ public class CrawlLogRegistry {
                 CrawlLog enrichedCrawlLog = r.setCrawlLog(crawlLogEntry.getCrawlLog());
                 if (!r.isFromCache()) {
                     try {
-                        DbHelper.getInstance().getDb().saveCrawlLog(enrichedCrawlLog);
+                        DbService.getInstance().getDbAdapter().saveCrawlLog(enrichedCrawlLog);
                     } catch (DbException e) {
                         throw new RuntimeException("Could not save crawl log", e);
                     }

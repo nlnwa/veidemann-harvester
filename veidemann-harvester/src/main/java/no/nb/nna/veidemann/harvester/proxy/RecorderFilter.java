@@ -41,6 +41,7 @@ import no.nb.nna.veidemann.commons.client.ContentWriterClient;
 import no.nb.nna.veidemann.commons.client.ContentWriterClient.ContentWriterSession;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.db.DbException;
+import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.db.ProtoUtils;
 import no.nb.nna.veidemann.harvester.BrowserSessionRegistry;
 import no.nb.nna.veidemann.harvester.browsercontroller.BrowserSession;
@@ -109,12 +110,12 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
     private boolean foundInCache = false;
 
     public RecorderFilter(final int proxyId, final String uri, final HttpRequest originalRequest,
-                          final ChannelHandlerContext ctx, final DbAdapter db, final ContentWriterClient contentWriterClient,
+                          final ChannelHandlerContext ctx, final ContentWriterClient contentWriterClient,
                           final BrowserSessionRegistry sessionRegistry, final HostResolver hostResolver) {
 
         super(originalRequest, ctx);
         this.proxyId = proxyId;
-        this.db = db;
+        this.db = DbService.getInstance().getDbAdapter();
         this.uri = uri;
 
         this.contentWriterClient = contentWriterClient;

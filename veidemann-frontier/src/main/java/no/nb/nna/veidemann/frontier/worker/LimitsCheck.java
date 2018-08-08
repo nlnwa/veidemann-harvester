@@ -21,6 +21,7 @@ import no.nb.nna.veidemann.api.ConfigProto.PolitenessConfig;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus.State;
 import no.nb.nna.veidemann.commons.ExtraStatusCodes;
 import no.nb.nna.veidemann.commons.db.DbException;
+import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.db.ProtoUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -75,8 +76,8 @@ public class LimitsCheck {
                 case UNRECOGNIZED:
                     status.setEndState(State.ABORTED_SIZE)
                             .incrementDocumentsDenied(
-                                    DbUtil.getInstance().getDb().deleteQueuedUrisForExecution(
-                                            status.getId(), qUri.getCrawlHostGroupId(), qUri.getPolitenessId())
+                                    DbService.getInstance().getCrawlQueueAdapter()
+                                            .deleteQueuedUrisForExecution(status.getId())
                             );
             }
             return true;
@@ -94,8 +95,8 @@ public class LimitsCheck {
                 case UNRECOGNIZED:
                     status.setEndState(State.ABORTED_TIMEOUT);
                     status.incrementDocumentsDenied(
-                            DbUtil.getInstance().getDb().deleteQueuedUrisForExecution(
-                                    status.getId(), qUri.getCrawlHostGroupId(), qUri.getPolitenessId())
+                            DbService.getInstance().getCrawlQueueAdapter()
+                                    .deleteQueuedUrisForExecution(status.getId())
                     );
             }
             return true;
@@ -110,7 +111,7 @@ public class LimitsCheck {
             return false;
         } else {
             qUri.setError(ExtraStatusCodes.RETRY_LIMIT_REACHED.toFetchError());
-            DbUtil.getInstance().writeLog(qUri, ExtraStatusCodes.RETRY_LIMIT_REACHED.getCode());
+            DbUtil.writeLog(qUri, ExtraStatusCodes.RETRY_LIMIT_REACHED.getCode());
             return true;
         }
     }

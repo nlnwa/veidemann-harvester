@@ -35,6 +35,8 @@ import no.nb.nna.veidemann.api.MessagesProto.Error;
 import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
 import no.nb.nna.veidemann.commons.ExtraStatusCodes;
 import no.nb.nna.veidemann.commons.db.DbException;
+import no.nb.nna.veidemann.commons.db.DbHelper;
+import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.frontier.worker.Preconditions.PreconditionState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -79,7 +81,7 @@ public class CrawlExecution {
         ControllerProto.GetRequest jobRequest = ControllerProto.GetRequest.newBuilder()
                 .setId(status.getJobId())
                 .build();
-        CrawlJob job = DbUtil.getInstance().getDb().getCrawlJob(jobRequest);
+        CrawlJob job = DbService.getInstance().getDbAdapter().getCrawlJob(jobRequest);
 
         try {
             this.qUri = QueuedUriWrapper.getQueuedUriWrapper(queuedUri).clearError();
@@ -88,8 +90,8 @@ public class CrawlExecution {
         }
         this.crawlHostGroup = crawlHostGroup;
         this.frontier = frontier;
-        this.crawlConfig = DbUtil.getInstance().getCrawlConfigForJob(job);
-        this.politenessConfig = DbUtil.getInstance().getPolitenessConfigForCrawlConfig(crawlConfig);
+        this.crawlConfig = DbHelper.getCrawlConfigForJob(job);
+        this.politenessConfig = DbHelper.getPolitenessConfigForCrawlConfig(crawlConfig);
         this.limits = job.getLimits();
     }
 
@@ -245,7 +247,7 @@ public class CrawlExecution {
                     // Seed failed; mark crawl as failed
                     endCrawl(State.FAILED, qUri.getError());
                 }
-            } else if (DbUtil.getInstance().getDb().queuedUriCount(getId()) == 0) {
+            } else if (DbService.getInstance().getCrawlQueueAdapter().queuedUriCount(getId()) == 0) {
                 endCrawl(State.FINISHED);
             } else if (status.getState() == State.FETCHING) {
                 status.setState(State.SLEEPING);
@@ -263,7 +265,7 @@ public class CrawlExecution {
         }
 
         try {
-            DbUtil.getInstance().getDb().releaseCrawlHostGroup(getCrawlHostGroup(), getDelay(TimeUnit.MILLISECONDS));
+            DbService.getInstance().getCrawlQueueAdapter().releaseCrawlHostGroup(getCrawlHostGroup(), getDelay(TimeUnit.MILLISECONDS));
         } catch (DbException e) {
             LOG.error("Error releasing CrawlHostGroup: {}", e.toString(), e);
         } catch (Throwable t) {
@@ -311,7 +313,7 @@ public class CrawlExecution {
             return false;
         }
 
-        if (DbUtil.getInstance().getDb().uriNotIncludedInQueue(outlink.getQueuedUri(), status.getStartTime())) {
+        if (DbService.getInstance().getCrawlQueueAdapter().uriNotIncludedInQueue(outlink.getQueuedUri(), status.getStartTime())) {
             return true;
         }
 
@@ -378,8 +380,8 @@ public class CrawlExecution {
     private boolean isManualAbort() throws DbException {
         if (status.getState() == CrawlExecutionStatus.State.ABORTED_MANUAL) {
             status.clearCurrentUri()
-                    .incrementDocumentsDenied(DbUtil.getInstance().getDb().deleteQueuedUrisForExecution(
-                            status.getId(), qUri.getCrawlHostGroupId(), qUri.getPolitenessId()));
+                    .incrementDocumentsDenied(DbService.getInstance().getCrawlQueueAdapter()
+                            .deleteQueuedUrisForExecution(status.getId()));
 
             // Re-set end state to ensure end time is updated
             status.setEndState(status.getState());

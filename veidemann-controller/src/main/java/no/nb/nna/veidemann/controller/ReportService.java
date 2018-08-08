@@ -34,8 +34,9 @@ import no.nb.nna.veidemann.api.ReportProto.ScreenshotListReply;
 import no.nb.nna.veidemann.api.ReportProto.ScreenshotListRequest;
 import no.nb.nna.veidemann.commons.auth.AllowedRoles;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
+import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.controller.query.QueryEngine;
-import no.nb.nna.veidemann.db.RethinkDbConnection;
+import no.nb.nna.veidemann.db.RethinkDbAdapter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,8 +53,8 @@ public class ReportService extends ReportGrpc.ReportImplBase {
 
     private final Gson gson;
 
-    public ReportService(DbAdapter db) {
-        this.db = db;
+    public ReportService() {
+        this.db = DbService.getInstance().getDbAdapter();
         gson = new GsonBuilder()
                 .create();
     }
@@ -109,7 +110,7 @@ public class ReportService extends ReportGrpc.ReportImplBase {
                 limit = 50;
             }
 
-            Object result = RethinkDbConnection.getInstance().exec("js-query", qry);
+            Object result = ((RethinkDbAdapter) db).executeRequest("js-query", qry);
             if (result != null) {
                 if (result instanceof Cursor) {
                     try (Cursor c = (Cursor) result) {

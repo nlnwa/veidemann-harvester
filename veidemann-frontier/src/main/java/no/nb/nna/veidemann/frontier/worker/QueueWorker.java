@@ -17,6 +17,7 @@ package no.nb.nna.veidemann.frontier.worker;
 
 import no.nb.nna.veidemann.api.MessagesProto;
 import no.nb.nna.veidemann.commons.db.DbException;
+import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.commons.db.FutureOptional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,10 +57,10 @@ public class QueueWorker {
 
         while (true) {
             try {
-                if (DbUtil.getInstance().getDb().getDesiredPausedState()) {
+                if (DbService.getInstance().getDbAdapter().getDesiredPausedState()) {
                     sleep = RESCHEDULE_DELAY;
                 } else {
-                    FutureOptional<MessagesProto.CrawlHostGroup> crawlHostGroup = DbUtil.getInstance().getDb()
+                    FutureOptional<MessagesProto.CrawlHostGroup> crawlHostGroup = DbService.getInstance().getCrawlQueueAdapter()
                             .borrowFirstReadyCrawlHostGroup();
                     LOG.trace("Borrow Crawl Host Group: {}", crawlHostGroup);
 
@@ -68,7 +69,7 @@ public class QueueWorker {
                         LOG.trace("Crawl Host Group not ready yet, delaying: {}", crawlHostGroup.getDelayMs());
                         sleep = crawlHostGroup.getDelayMs();
                     } else if (crawlHostGroup.isPresent()) {
-                        FutureOptional<MessagesProto.QueuedUri> foqu = DbUtil.getInstance().getDb()
+                        FutureOptional<MessagesProto.QueuedUri> foqu = DbService.getInstance().getCrawlQueueAdapter()
                                 .getNextQueuedUriToFetch(crawlHostGroup.get());
 
                         if (foqu.isPresent()) {
@@ -85,7 +86,7 @@ public class QueueWorker {
                             LOG.trace("No Queued URI found waiting {}ms before retry", RESCHEDULE_DELAY);
                             sleep = RESCHEDULE_DELAY;
                         }
-                        DbUtil.getInstance().getDb().releaseCrawlHostGroup(crawlHostGroup.get(), sleep);
+                        DbService.getInstance().getCrawlQueueAdapter().releaseCrawlHostGroup(crawlHostGroup.get(), sleep);
                     } else {
                         // No CrawlHostGroup ready. Wait a moment and try again
                         sleep = RESCHEDULE_DELAY;

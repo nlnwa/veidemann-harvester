@@ -21,10 +21,8 @@ import com.typesafe.config.ConfigException;
 import com.typesafe.config.ConfigFactory;
 import no.nb.nna.veidemann.commons.client.ContentWriterClient;
 import no.nb.nna.veidemann.commons.client.DnsServiceClient;
-import no.nb.nna.veidemann.commons.db.DbAdapter;
+import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.commons.opentracing.TracerFactory;
-import no.nb.nna.veidemann.db.RethinkDbAdapter;
-import no.nb.nna.veidemann.db.RethinkDbConnection;
 import no.nb.nna.veidemann.harvester.browsercontroller.BrowserController;
 import no.nb.nna.veidemann.harvester.proxy.DnsServiceHostResolver;
 import no.nb.nna.veidemann.harvester.proxy.RecordingProxy;
@@ -68,14 +66,12 @@ public class Harvester {
     public Harvester start() {
         BrowserSessionRegistry sessionRegistry = new BrowserSessionRegistry();
 
-        try (RethinkDbConnection conn = RethinkDbConnection.configure(SETTINGS);
-
-             DbAdapter db = new RethinkDbAdapter();
+        try (DbService db = DbService.configure(SETTINGS);
 
              DnsServiceClient dnsServiceClient = new DnsServiceClient(
                      SETTINGS.getDnsResolverHost(), SETTINGS.getDnsResolverPort());
 
-             BrowserController controller = new BrowserController(SETTINGS.getBrowserWSEndpoint(), db, sessionRegistry);
+             BrowserController controller = new BrowserController(SETTINGS.getBrowserWSEndpoint(), sessionRegistry);
 
              ContentWriterClient contentWriterClient = new ContentWriterClient(
                      SETTINGS.getContentWriterHost(), SETTINGS.getContentWriterPort());
@@ -86,7 +82,7 @@ public class Harvester {
 
              RecordingProxy proxy = new RecordingProxy(SETTINGS.getMaxOpenSessions(),
                      new File(SETTINGS.getWorkDir()),
-                     SETTINGS.getProxyPort(), db, contentWriterClient,
+                     SETTINGS.getProxyPort(), contentWriterClient,
                      new DnsServiceHostResolver(dnsServiceClient), sessionRegistry, SETTINGS.getCacheHost(),
                      SETTINGS.getCachePort());
         ) {

@@ -157,10 +157,10 @@ public class BrowserControllerIT {
 
             ChromeDebugProtocolConfig protocolConfig = new ChromeDebugProtocolConfig(browserWSEndpoint);
 
-            try (RecordingProxy proxy = new RecordingProxy(2, tmpDir, proxyPort, db, contentWriterClient,
+            try (RecordingProxy proxy = new RecordingProxy(2, tmpDir, proxyPort, contentWriterClient,
                     new TestHostResolver(), sessionRegistry, cacheHost, cachePort);
 
-                 BrowserController controller = new BrowserController(browserWSEndpoint, db, sessionRegistry);) {
+                 BrowserController controller = new BrowserController(browserWSEndpoint, sessionRegistry);) {
 
                 RenderResult result = controller.render(0, protocolConfig, queuedUri, config);
                 System.out.println("##### " + result);

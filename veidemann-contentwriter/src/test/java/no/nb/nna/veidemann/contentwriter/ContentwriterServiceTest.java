@@ -15,15 +15,13 @@
  */
 package no.nb.nna.veidemann.contentwriter;
 
-import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.StatusException;
 import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
 import no.nb.nna.veidemann.commons.client.ContentWriterClient;
-import no.nb.nna.veidemann.commons.client.ContentWriterClient.ContentWriterSession;
-import no.nb.nna.veidemann.commons.db.DbAdapter;
+import no.nb.nna.veidemann.commons.db.DbService;
+import no.nb.nna.veidemann.commons.db.DbServiceSPI;
 import no.nb.nna.veidemann.contentwriter.text.TextExtractor;
 import no.nb.nna.veidemann.contentwriter.warc.SingleWarcWriter;
 import no.nb.nna.veidemann.contentwriter.warc.WarcWriterPool;
@@ -32,12 +30,10 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
-import java.net.URI;
 import java.net.URISyntaxException;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.fail;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  *
@@ -51,7 +47,8 @@ public class ContentwriterServiceTest {
 
     @Test
     public void testSaveEntity() throws StatusException, InterruptedException, URISyntaxException {
-        DbAdapter dbMock = mock(DbAdapter.class);
+        DbServiceSPI dbProviderMock = mock(DbServiceSPI.class);
+        DbService.configure(dbProviderMock);
         WarcWriterPool warcWriterPoolMock = mock(WarcWriterPool.class);
         PooledWarcWriter pooledWarcWriterMock = mock(PooledWarcWriter.class);
         SingleWarcWriter singleWarcWriterMock = mock(SingleWarcWriter.class);
@@ -59,7 +56,7 @@ public class ContentwriterServiceTest {
 
         InProcessServerBuilder inProcessServerBuilder = InProcessServerBuilder.forName(uniqueServerName).directExecutor();
         ManagedChannelBuilder inProcessChannelBuilder = InProcessChannelBuilder.forName(uniqueServerName).directExecutor();
-        try (ApiServer inProcessServer = new ApiServer(inProcessServerBuilder, dbMock, warcWriterPoolMock, textExtractorMock).start();
+        try (ApiServer inProcessServer = new ApiServer(inProcessServerBuilder, warcWriterPoolMock, textExtractorMock).start();
              ContentWriterClient client = new ContentWriterClient(inProcessChannelBuilder);) {
 
             when(warcWriterPoolMock.borrow()).thenReturn(pooledWarcWriterMock);

@@ -30,9 +30,10 @@ import no.nb.nna.veidemann.api.ReportGrpc;
 import no.nb.nna.veidemann.api.StatusGrpc;
 import no.nb.nna.veidemann.commons.db.DbConnectionException;
 import no.nb.nna.veidemann.commons.db.DbException;
+import no.nb.nna.veidemann.commons.db.DbService;
+import no.nb.nna.veidemann.commons.settings.CommonSettings;
 import no.nb.nna.veidemann.db.RethinkDbAdapter;
 import no.nb.nna.veidemann.db.RethinkDbAdapter.TABLES;
-import no.nb.nna.veidemann.db.RethinkDbConnection;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -75,10 +76,16 @@ public abstract class CrawlTestBase {
                 .build();
         contentWriterClient = ContentWriterGrpc.newBlockingStub(contentWriterChannel).withWaitForReady();
 
-        if (!RethinkDbConnection.isConfigured()) {
-            RethinkDbConnection.configure(dbHost, dbPort, "veidemann", "admin", "");
+        if (!DbService.isConfigured()) {
+            CommonSettings dbSettings = new CommonSettings()
+                    .withDbHost(dbHost)
+                    .withDbPort(dbPort)
+                    .withDbName("veidemann")
+                    .withDbUser("admin")
+                    .withDbPassword("");
+            DbService.configure(dbSettings);
         }
-        db = new RethinkDbAdapter();
+        db = (RethinkDbAdapter) DbService.getInstance().getDbAdapter();
 
         LogLevels.Builder logLevels = controllerClient.getLogConfig(Empty.getDefaultInstance()).toBuilder();
         logLevels.addLogLevelBuilder().setLogger("no.nb.nna.veidemann.frontier").setLevel(Level.INFO);
@@ -87,9 +94,7 @@ public abstract class CrawlTestBase {
 
     @AfterClass
     public static void shutdown() {
-        if (db != null) {
-            db.close();
-        }
+        DbService.getInstance().close();
     }
 
     @After

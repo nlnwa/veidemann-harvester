@@ -21,6 +21,7 @@ import no.nb.nna.veidemann.api.ConfigProto.PolitenessConfig;
 import no.nb.nna.veidemann.api.ConfigProto.PolitenessConfig.RobotsPolicy;
 import no.nb.nna.veidemann.commons.ExtraStatusCodes;
 import no.nb.nna.veidemann.commons.db.DbException;
+import no.nb.nna.veidemann.commons.db.DbHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,10 +45,10 @@ public class Preconditions {
     }
 
     public static PreconditionState checkPreconditions(Frontier frontier, CrawlConfig config, StatusWrapper status,
-                                             QueuedUriWrapper qUri) throws DbException {
+                                                       QueuedUriWrapper qUri) throws DbException {
 
-        PolitenessConfig politeness = DbUtil.getInstance().getPolitenessConfigForCrawlConfig(config);
-        BrowserConfig browserConfig = DbUtil.getInstance().getBrowserConfigForCrawlConfig(config);
+        PolitenessConfig politeness = DbHelper.getPolitenessConfigForCrawlConfig(config);
+        BrowserConfig browserConfig = DbHelper.getBrowserConfigForCrawlConfig(config);
 
         qUri.clearError();
 
@@ -79,7 +80,7 @@ public class Preconditions {
                 && !frontier.getRobotsServiceClient().isAllowed(qUri.getQueuedUri(), userAgent, politeness)) {
             LOG.info("URI '{}' precluded by robots.txt", qUri.getUri());
             qUri = qUri.setError(ExtraStatusCodes.PRECLUDED_BY_ROBOTS.toFetchError());
-            DbUtil.getInstance().writeLog(qUri);
+            DbUtil.writeLog(qUri);
             return false;
         }
         return true;

@@ -3,6 +3,7 @@ package no.nb.nna.veidemann.db;
 import com.google.protobuf.Timestamp;
 import com.google.protobuf.util.Timestamps;
 import com.rethinkdb.RethinkDB;
+import com.rethinkdb.model.GroupedResult;
 import com.rethinkdb.net.Cursor;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlHostGroup;
 import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
@@ -131,16 +132,15 @@ public class RethinkDbCrawlQueueAdapter implements CrawlQueueAdapter {
     public long deleteQueuedUrisForExecution(String executionId) throws DbException {
         long deleted = 0;
 
-        List<Map<String, List>> response = conn.exec("db-deleteQueuedUrisForExecution",
+        List<GroupedResult> response = conn.exec("db-deleteQueuedUrisForExecution",
                 r.table(TABLES.URI_QUEUE.name).optArg("read_mode", "majority")
                         .getAll(executionId).optArg("index", "executionId")
                         .group("crawlHostGroupId", "politenessId")
                         .pluck("id"));
 
-        for (Map<String, List> group : response) {
-            List<String> key = group.get("group");
-            List<Map> values = group.get("values");
-
+        for (GroupedResult<List, List> group : response) {
+            List<String> key = group.group;
+            List<Map> values = group.values.get(0);
             try (Lock lock = aquireLock(key)) {
                 for (Map qUri : values) {
                     long deleteResponse = conn.exec("db-deleteQueuedUrisForExecution",

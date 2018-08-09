@@ -208,6 +208,33 @@ public class CrawlHostGroupTestIT {
     }
 
     @Test
+    public void testDeleteQueuedUrisForExecution() throws DbException {
+        QueuedUri qUri1 = QueuedUri.newBuilder()
+                .setExecutionId("executionId1")
+                .setCrawlHostGroupId("crawlHostGroupId1")
+                .setPolitenessId("politenessId")
+                .setSequence(1)
+                .build();
+        QueuedUri qUri2 = QueuedUri.newBuilder()
+                .setExecutionId("executionId1")
+                .setCrawlHostGroupId("crawlHostGroupId1")
+                .setPolitenessId("politenessId")
+                .setSequence(1)
+                .build();
+        QueuedUri qUri3 = QueuedUri.newBuilder()
+                .setExecutionId("executionId1")
+                .setCrawlHostGroupId("crawlHostGroupId2")
+                .setPolitenessId("politenessId")
+                .setSequence(1)
+                .build();
+        queueAdapter.addToCrawlHostGroup(qUri1);
+        queueAdapter.addToCrawlHostGroup(qUri2);
+        queueAdapter.addToCrawlHostGroup(qUri3);
+
+        assertThat(queueAdapter.deleteQueuedUrisForExecution("executionId1")).isEqualTo(3L);
+    }
+
+    @Test
     public void testConsistency() throws DbException, InterruptedException {
         String politenessId = "PolitenessId";
 

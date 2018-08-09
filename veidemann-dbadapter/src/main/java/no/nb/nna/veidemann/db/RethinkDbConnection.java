@@ -17,13 +17,21 @@ package no.nb.nna.veidemann.db;
 
 import com.rethinkdb.RethinkDB;
 import com.rethinkdb.ast.ReqlAst;
+import com.rethinkdb.gen.ast.DbDrop;
+import com.rethinkdb.gen.ast.TableDrop;
 import com.rethinkdb.gen.exc.ReqlDriverError;
 import com.rethinkdb.gen.exc.ReqlError;
+import com.rethinkdb.gen.exc.ReqlOpFailedError;
 import com.rethinkdb.model.OptArgs;
 import com.rethinkdb.net.Connection;
+import no.nb.nna.veidemann.commons.db.CrawlQueueAdapter;
+import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.db.DbConnectionException;
+import no.nb.nna.veidemann.commons.db.DbInitializer;
 import no.nb.nna.veidemann.commons.db.DbQueryException;
+import no.nb.nna.veidemann.commons.db.DbServiceSPI;
 import no.nb.nna.veidemann.commons.settings.CommonSettings;
+import no.nb.nna.veidemann.db.initializer.RethinkDbInitializer;
 import no.nb.nna.veidemann.db.opentracing.ConnectionTracingInterceptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,61 +39,18 @@ import org.slf4j.LoggerFactory;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
 
-public class RethinkDbConnection implements AutoCloseable {
+public class RethinkDbConnection implements DbServiceSPI {
     private static final Logger LOG = LoggerFactory.getLogger(RethinkDbConnection.class);
 
     static final RethinkDB r = RethinkDB.r;
 
-    private final Connection conn;
+    private Connection conn;
 
-    private static RethinkDbConnection instance;
+    private RethinkDbAdapter dbAdapter;
 
-    private RethinkDbConnection(String dbHost, int dbPort, String dbName, String dbUser, String dbPassword,
-                                int reConnectAttempts) throws DbConnectionException {
-        this.conn = connect(dbHost, dbPort, dbName, dbUser, dbPassword, reConnectAttempts);
-    }
+    private RethinkDbCrawlQueueAdapter queueAdapter;
 
-    /**
-     * Get the singleton instance.
-     *
-     * @return the single RethinkDbConnection instance
-     */
-    public static RethinkDbConnection getInstance() {
-        if (instance == null) {
-            throw new IllegalStateException("Connection is not configured");
-        }
-        return instance;
-    }
-
-    /**
-     * Configure the singleton RethinkDbConnection.
-     * <p/>
-     * The RethinkDbConnection must configured before any usage.
-     */
-    public static RethinkDbConnection configure(String dbHost, int dbPort, String dbName, String dbUser,
-                                                String dbPassword) throws DbConnectionException {
-        if (instance != null) {
-            throw new IllegalStateException("Connection is already configured");
-        }
-        instance = new RethinkDbConnection(dbHost, dbPort, dbName, dbUser, dbPassword, 30);
-        return instance;
-    }
-
-    /**
-     * Configure the singleton RethinkDbConnection.
-     * <p/>
-     * This method must be called before any usage.
-     *
-     * @param settings a {@link CommonSettings} object with connection parameters
-     */
-    public static RethinkDbConnection configure(CommonSettings settings) throws DbConnectionException {
-        return configure(settings.getDbHost(), settings.getDbPort(), settings.getDbName(), settings.getDbUser(),
-                settings.getDbPassword());
-    }
-
-    public static boolean isConfigured() {
-        return instance != null;
-    }
+    private RethinkDbInitializer dbInitializer;
 
     public <T> T exec(ReqlAst qry) throws DbConnectionException, DbQueryException {
         return exec("db-query", qry);
@@ -103,27 +68,66 @@ public class RethinkDbConnection implements AutoCloseable {
             }
         }
 
-        try {
-            OptArgs globalOpts = OptArgs.of(ConnectionTracingInterceptor.OPERATION_NAME_KEY, operationName);
-            T result = qry.run(conn, globalOpts);
-            if (result instanceof Map
-                    && ((Map) result).containsKey("errors")
-                    && !((Map) result).get("errors").equals(0L)) {
-                DbQueryException ex = new DbQueryException((String) ((Map) result).get("first_error"));
-                LOG.debug(ex.toString(), ex);
-                throw ex;
+        while (true) {
+            try {
+                OptArgs globalOpts = OptArgs.of(ConnectionTracingInterceptor.OPERATION_NAME_KEY, operationName);
+                T result = qry.run(conn, globalOpts);
+                if (result instanceof Map
+                        && ((Map) result).containsKey("errors")
+                        && !((Map) result).get("errors").equals(0L)) {
+                    DbQueryException ex = new DbQueryException((String) ((Map) result).get("first_error"));
+                    LOG.debug(ex.toString(), ex);
+                    throw ex;
+                }
+                return result;
+            } catch (ReqlOpFailedError e) {
+                if (e.getTerm().isPresent()
+                        && !((e.getTerm().get() instanceof DbDrop) || e.getTerm().get() instanceof TableDrop)) {
+
+                    LOG.error("DB not available, waiting. Cause: {}", e.toString(), e);
+                    r.db(conn.db().get()).wait_().optArg("wait_for", "ready_for_writes").run(conn);
+                } else {
+                    LOG.warn(e.toString(), e);
+                    throw new DbQueryException(e.getMessage(), e);
+                }
+            } catch (ReqlError e) {
+                LOG.warn(e.toString(), e);
+                throw new DbQueryException(e.getMessage(), e);
             }
-            return result;
-        } catch (ReqlError e) {
-            LOG.debug(e.toString(), e);
-            throw new DbQueryException(e.getMessage(), e);
         }
     }
 
     @Override
     public void close() {
         conn.close();
-        instance = null;
+    }
+
+    public Connection getConnection() {
+        return conn;
+    }
+
+    @Override
+    public DbAdapter getDbAdapter() {
+        return dbAdapter;
+    }
+
+    @Override
+    public CrawlQueueAdapter getCrawlQueueAdapter() {
+        return queueAdapter;
+    }
+
+    @Override
+    public DbInitializer getDbInitializer() {
+        return dbInitializer;
+    }
+
+    public void connect(CommonSettings settings) throws DbConnectionException {
+        conn = connect(settings.getDbHost(), settings.getDbPort(), settings.getDbName(), settings.getDbUser(),
+                settings.getDbPassword(), 30);
+
+        dbAdapter = new RethinkDbAdapter(this);
+        queueAdapter = new RethinkDbCrawlQueueAdapter(this);
+        dbInitializer = new RethinkDbInitializer(this);
     }
 
     private Connection connect(String dbHost, int dbPort, String dbName, String dbUser, String dbPassword,

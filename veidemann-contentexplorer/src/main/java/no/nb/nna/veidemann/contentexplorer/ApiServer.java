@@ -17,6 +17,7 @@
 package no.nb.nna.veidemann.contentexplorer;
 
 import no.nb.nna.veidemann.commons.db.DbAdapter;
+import no.nb.nna.veidemann.commons.db.DbService;
 import org.glassfish.grizzly.http.server.HttpServer;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.grizzly2.httpserver.GrizzlyHttpServerFactory;
@@ -32,12 +33,12 @@ import java.net.URI;
  *
  */
 public class ApiServer {
-private static final Logger LOG = LoggerFactory.getLogger(ApiServer.class);
+    private static final Logger LOG = LoggerFactory.getLogger(ApiServer.class);
 
     /**
      * Construct a new REST API server.
      */
-    public ApiServer(DbAdapter db, File warcDir) {
+    public ApiServer(File warcDir) {
         final int port = ContentExplorer.getSettings().getApiPort();
 
         LOG.info("Starting server listening on port {}.", port);
@@ -54,7 +55,7 @@ private static final Logger LOG = LoggerFactory.getLogger(ApiServer.class);
                 .register(new AbstractBinder() {
                     @Override
                     protected void configure() {
-                        bind(db).to(DbAdapter.class);
+                        bind(DbService.getInstance().getDbAdapter()).to(DbAdapter.class);
                     }
 
                 });

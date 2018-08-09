@@ -17,10 +17,14 @@ package no.nb.nna.veidemann.db.initializer;
 
 import com.rethinkdb.RethinkDB;
 import no.nb.nna.veidemann.commons.db.DbException;
+import no.nb.nna.veidemann.commons.db.DbService;
+import no.nb.nna.veidemann.commons.settings.CommonSettings;
 import no.nb.nna.veidemann.db.RethinkDbAdapter;
 import no.nb.nna.veidemann.db.RethinkDbAdapter.TABLES;
 import no.nb.nna.veidemann.db.RethinkDbConnection;
+import org.junit.After;
 import org.junit.AfterClass;
+import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -29,37 +33,42 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class DbInitializerTestIT {
     public static RethinkDbAdapter db;
 
-    @BeforeClass
-    public static void setUp() throws Exception {
+    @Before
+    public void init() throws DbException {
         String dbHost = System.getProperty("db.host");
         int dbPort = Integer.parseInt(System.getProperty("db.port"));
-        if (!RethinkDbConnection.isConfigured()) {
-            RethinkDbConnection.configure(dbHost, dbPort, "veidemann", "admin", "");
-        }
-        db = new RethinkDbAdapter();
 
-        RethinkDB r = RethinkDB.r;
+        if (!DbService.isConfigured()) {
+            CommonSettings settings = new CommonSettings();
+            DbService.configure(new CommonSettings()
+                    .withDbHost(dbHost)
+                    .withDbPort(dbPort)
+                    .withDbName("veidemann")
+                    .withDbUser("admin")
+                    .withDbPassword(""));
+        }
+
         try {
-            RethinkDbConnection.getInstance().exec(r.dbDrop("veidemann"));
+            DbService.getInstance().getDbInitializer().delete();
         } catch (DbException e) {
             if (!e.getMessage().matches("Database .* does not exist.")) {
                 throw e;
             }
         }
+
+        db = (RethinkDbAdapter) DbService.getInstance().getDbAdapter();
     }
 
-    @AfterClass
-    public static void shutdown() {
-        if (db != null) {
-            db.close();
-        }
+    @After
+    public void shutdown() {
+        DbService.getInstance().close();
     }
 
     @Test
     public void initialize() throws DbException {
-        new CreateDbV0_1("veidemann").run();
-        new DbInitializer().initialize();
-        String version = RethinkDbConnection.getInstance().exec(RethinkDB.r.table(TABLES.SYSTEM.name).get("db_version").g("db_version"));
+        new CreateDbV0_1(db, "veidemann").run();
+        DbService.getInstance().getDbInitializer().initialize();
+        String version = db.executeRequest("", RethinkDB.r.table(TABLES.SYSTEM.name).get("db_version").g("db_version"));
         assertThat(version).isEqualTo("0.2");
     }
 }

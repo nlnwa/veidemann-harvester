@@ -15,19 +15,17 @@
  */
 package no.nb.nna.veidemann.contentexplorer;
 
-import java.io.File;
-
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigBeanFactory;
 import com.typesafe.config.ConfigException;
 import com.typesafe.config.ConfigFactory;
-import no.nb.nna.veidemann.commons.db.DbAdapter;
+import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.commons.opentracing.TracerFactory;
 import no.nb.nna.veidemann.contentexplorer.settings.Settings;
-import no.nb.nna.veidemann.db.RethinkDbAdapter;
-import no.nb.nna.veidemann.db.RethinkDbConnection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.File;
 
 /**
  * Class for launching the service.
@@ -55,13 +53,12 @@ public class ContentExplorer {
     /**
      * Start the service.
      * <p>
+     *
      * @return this instance
      */
     public ContentExplorer start() {
-        try {
-            RethinkDbConnection conn = RethinkDbConnection.configure(SETTINGS);
-            DbAdapter db = new RethinkDbAdapter();
-            ApiServer apiServer = new ApiServer(db, new File(SETTINGS.getWarcDir()));
+        try (DbService db = DbService.configure(SETTINGS)) {
+            ApiServer apiServer = new ApiServer(new File(SETTINGS.getWarcDir()));
 
             LOG.info("Veidemann Content Explorer (v. {}) started",
                     ContentExplorer.class.getPackage().getImplementationVersion());
@@ -84,6 +81,7 @@ public class ContentExplorer {
     /**
      * Get the settings object.
      * <p>
+     *
      * @return the settings
      */
     public static Settings getSettings() {

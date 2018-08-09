@@ -16,11 +16,9 @@
 package no.nb.nna.veidemann.db.initializer;
 
 import com.rethinkdb.RethinkDB;
-import no.nb.nna.veidemann.commons.db.DbConnectionException;
 import no.nb.nna.veidemann.commons.db.DbException;
-import no.nb.nna.veidemann.commons.db.DbQueryException;
+import no.nb.nna.veidemann.db.RethinkDbAdapter;
 import no.nb.nna.veidemann.db.RethinkDbAdapter.TABLES;
-import no.nb.nna.veidemann.db.RethinkDbConnection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,17 +27,17 @@ public class CreateDbV0_1 implements Runnable {
 
     static final RethinkDB r = RethinkDB.r;
 
-    RethinkDbConnection conn;
+    final RethinkDbAdapter db;
 
     final String dbName;
 
-    public CreateDbV0_1(String dbName) {
+    public CreateDbV0_1(RethinkDbAdapter db, String dbName) {
+        this.db = db;
         this.dbName = dbName;
     }
 
     @Override
     public void run() {
-        conn = RethinkDbConnection.getInstance();
         try {
             createDb();
         } catch (DbException e) {
@@ -47,72 +45,72 @@ public class CreateDbV0_1 implements Runnable {
         }
     }
 
-    private final void createDb() throws DbQueryException, DbConnectionException {
-        conn.exec("create-db", r.dbCreate(dbName));
+    private final void createDb() throws DbException {
+        db.executeRequest("create-db", r.dbCreate(dbName));
 
-        conn.exec(r.tableCreate(TABLES.SYSTEM.name));
-        conn.exec(r.table(TABLES.SYSTEM.name).insert(r.hashMap("id", "db_version").with("db_version", "0.1")));
-        conn.exec(r.table(TABLES.SYSTEM.name).insert(r.hashMap("id", "log_levels")
+        db.executeRequest("", r.tableCreate(TABLES.SYSTEM.name));
+        db.executeRequest("", r.table(TABLES.SYSTEM.name).insert(r.hashMap("id", "db_version").with("db_version", "0.1")));
+        db.executeRequest("", r.table(TABLES.SYSTEM.name).insert(r.hashMap("id", "log_levels")
                 .with("logLevel",
                         r.array(r.hashMap("logger", "no.nb.nna.veidemann").with("level", "INFO"))
                 )));
 
-        conn.exec(r.tableCreate(TABLES.CRAWL_LOG.name).optArg("primary_key", "warcId"));
-        conn.exec(r.table(TABLES.CRAWL_LOG.name)
+        db.executeRequest("", r.tableCreate(TABLES.CRAWL_LOG.name).optArg("primary_key", "warcId"));
+        db.executeRequest("", r.table(TABLES.CRAWL_LOG.name)
                 .indexCreate("surt_time", row -> r.array(row.g("surt"), row.g("timeStamp"))));
-        conn.exec(r.table(TABLES.CRAWL_LOG.name).indexCreate("executionId"));
+        db.executeRequest("", r.table(TABLES.CRAWL_LOG.name).indexCreate("executeRequestutionId"));
 
-        conn.exec(r.tableCreate(TABLES.PAGE_LOG.name).optArg("primary_key", "warcId"));
-        conn.exec(r.table(TABLES.PAGE_LOG.name).indexCreate("executionId"));
+        db.executeRequest("", r.tableCreate(TABLES.PAGE_LOG.name).optArg("primary_key", "warcId"));
+        db.executeRequest("", r.table(TABLES.PAGE_LOG.name).indexCreate("executeRequestutionId"));
 
-        conn.exec(r.tableCreate(TABLES.CRAWLED_CONTENT.name).optArg("primary_key", "digest"));
+        db.executeRequest("", r.tableCreate(TABLES.CRAWLED_CONTENT.name).optArg("primary_key", "digest"));
 
-        conn.exec(r.tableCreate(TABLES.EXTRACTED_TEXT.name).optArg("primary_key", "warcId"));
+        db.executeRequest("", r.tableCreate(TABLES.EXTRACTED_TEXT.name).optArg("primary_key", "warcId"));
 
-        conn.exec(r.tableCreate(TABLES.BROWSER_SCRIPTS.name));
+        db.executeRequest("", r.tableCreate(TABLES.BROWSER_SCRIPTS.name));
 
-        conn.exec(r.tableCreate(TABLES.URI_QUEUE.name));
-        conn.exec(r.table(TABLES.URI_QUEUE.name).indexCreate("surt"));
-        conn.exec(r.table(TABLES.URI_QUEUE.name).indexCreate("executionId"));
-        conn.exec(r.table(TABLES.URI_QUEUE.name).indexCreate("crawlHostGroupKey_sequence_earliestFetch",
+        db.executeRequest("", r.tableCreate(TABLES.URI_QUEUE.name));
+        db.executeRequest("", r.table(TABLES.URI_QUEUE.name).indexCreate("surt"));
+        db.executeRequest("", r.table(TABLES.URI_QUEUE.name).indexCreate("executeRequestutionId"));
+        db.executeRequest("", r.table(TABLES.URI_QUEUE.name).indexCreate("crawlHostGroupKey_sequence_earliestFetch",
                 uri -> r.array(uri.g("crawlHostGroupId"),
                         uri.g("politenessId"),
                         uri.g("sequence"),
                         uri.g("earliestFetchTimeStamp"))));
 
-        conn.exec(r.tableCreate(TABLES.EXECUTIONS.name));
-        conn.exec(r.table(TABLES.EXECUTIONS.name).indexCreate("startTime"));
+        db.executeRequest("", r.tableCreate(TABLES.EXECUTIONS.name));
+        db.executeRequest("", r.table(TABLES.EXECUTIONS.name).indexCreate("startTime"));
 
-        conn.exec(r.tableCreate(TABLES.SCREENSHOT.name));
-        conn.exec(r.table(TABLES.SCREENSHOT.name).indexCreate("executionId"));
+        db.executeRequest("", r.tableCreate(TABLES.SCREENSHOT.name));
+        db.executeRequest("", r.table(TABLES.SCREENSHOT.name).indexCreate("executeRequestutionId"));
 
-        conn.exec(r.tableCreate(TABLES.CRAWL_ENTITIES.name));
+        db.executeRequest("", r.tableCreate(TABLES.CRAWL_ENTITIES.name));
 
-        conn.exec(r.tableCreate(TABLES.SEEDS.name));
-        conn.exec(r.table(TABLES.SEEDS.name).indexCreate("jobId").optArg("multi", true));
-        conn.exec(r.table(TABLES.SEEDS.name).indexCreate("entityId"));
+        db.executeRequest("", r.tableCreate(TABLES.SEEDS.name));
+        db.executeRequest("", r.table(TABLES.SEEDS.name).indexCreate("jobId").optArg("multi", true));
+        db.executeRequest("", r.table(TABLES.SEEDS.name).indexCreate("entityId"));
 
-        conn.exec(r.tableCreate(TABLES.CRAWL_JOBS.name));
+        db.executeRequest("", r.tableCreate(TABLES.CRAWL_JOBS.name));
 
-        conn.exec(r.tableCreate(TABLES.CRAWL_CONFIGS.name));
+        db.executeRequest("", r.tableCreate(TABLES.CRAWL_CONFIGS.name));
 
-        conn.exec(r.tableCreate(TABLES.CRAWL_SCHEDULE_CONFIGS.name));
+        db.executeRequest("", r.tableCreate(TABLES.CRAWL_SCHEDULE_CONFIGS.name));
 
-        conn.exec(r.tableCreate(TABLES.BROWSER_CONFIGS.name));
+        db.executeRequest("", r.tableCreate(TABLES.BROWSER_CONFIGS.name));
 
-        conn.exec(r.tableCreate(TABLES.POLITENESS_CONFIGS.name));
+        db.executeRequest("", r.tableCreate(TABLES.POLITENESS_CONFIGS.name));
 
-        conn.exec(r.tableCreate(TABLES.CRAWL_HOST_GROUP_CONFIGS.name));
+        db.executeRequest("", r.tableCreate(TABLES.CRAWL_HOST_GROUP_CONFIGS.name));
 
-        conn.exec(r.tableCreate(TABLES.CRAWL_HOST_GROUP.name));
-        conn.exec(r.table(TABLES.CRAWL_HOST_GROUP.name).indexCreate("nextFetchTime"));
+        db.executeRequest("", r.tableCreate(TABLES.CRAWL_HOST_GROUP.name));
+        db.executeRequest("", r.table(TABLES.CRAWL_HOST_GROUP.name).indexCreate("nextFetchTime"));
 
-        conn.exec(r.tableCreate(TABLES.ALREADY_CRAWLED_CACHE.name)
+        db.executeRequest("", r.tableCreate(TABLES.ALREADY_CRAWLED_CACHE.name)
                 .optArg("durability", "soft")
                 .optArg("shards", 3)
                 .optArg("replicas", 1));
 
-        conn.exec(r.tableCreate(TABLES.ROLE_MAPPINGS.name));
+        db.executeRequest("", r.tableCreate(TABLES.ROLE_MAPPINGS.name));
 
         createMetaIndexes(
                 TABLES.BROWSER_SCRIPTS,
@@ -126,32 +124,32 @@ public class CreateDbV0_1 implements Runnable {
                 TABLES.CRAWL_HOST_GROUP_CONFIGS
         );
 
-        conn.exec(r.table(TABLES.URI_QUEUE.name)
-                .indexWait("surt", "executionId", "crawlHostGroupKey_sequence_earliestFetch"));
-        conn.exec(r.table(TABLES.CRAWL_LOG.name).indexWait("surt_time", "executionId"));
-        conn.exec(r.table(TABLES.PAGE_LOG.name).indexWait("executionId"));
-        conn.exec(r.table(TABLES.SCREENSHOT.name).indexWait("executionId"));
-        conn.exec(r.table(TABLES.SEEDS.name).indexWait("jobId", "entityId"));
-        conn.exec(r.table(TABLES.CRAWL_HOST_GROUP.name).indexWait("nextFetchTime"));
-        conn.exec(r.table(TABLES.EXECUTIONS.name).indexWait("startTime"));
+        db.executeRequest("", r.table(TABLES.URI_QUEUE.name)
+                .indexWait("surt", "executeRequestutionId", "crawlHostGroupKey_sequence_earliestFetch"));
+        db.executeRequest("", r.table(TABLES.CRAWL_LOG.name).indexWait("surt_time", "executeRequestutionId"));
+        db.executeRequest("", r.table(TABLES.PAGE_LOG.name).indexWait("executeRequestutionId"));
+        db.executeRequest("", r.table(TABLES.SCREENSHOT.name).indexWait("executeRequestutionId"));
+        db.executeRequest("", r.table(TABLES.SEEDS.name).indexWait("jobId", "entityId"));
+        db.executeRequest("", r.table(TABLES.CRAWL_HOST_GROUP.name).indexWait("nextFetchTime"));
+        db.executeRequest("", r.table(TABLES.EXECUTIONS.name).indexWait("startTime"));
     }
 
-    private final void createMetaIndexes(TABLES... tables) throws DbQueryException, DbConnectionException {
+    private final void createMetaIndexes(TABLES... tables) throws DbException {
         for (TABLES table : tables) {
-            conn.exec(r.table(table.name).indexCreate("name", row -> row.g("meta").g("name").downcase()));
-            conn.exec(r.table(table.name)
+            db.executeRequest("", r.table(table.name).indexCreate("name", row -> row.g("meta").g("name").downcase()));
+            db.executeRequest("", r.table(table.name)
                     .indexCreate("label",
                             row -> row.g("meta").g("label").map(
                                     label -> r.array(label.g("key").downcase(), label.g("value").downcase())))
                     .optArg("multi", true));
-            conn.exec(r.table(table.name)
+            db.executeRequest("", r.table(table.name)
                     .indexCreate("label_value",
                             row -> row.g("meta").g("label").map(
                                     label -> label.g("value").downcase()))
                     .optArg("multi", true));
         }
         for (TABLES table : tables) {
-            conn.exec(r.table(table.name).indexWait("name", "label", "label_value"));
+            db.executeRequest("", r.table(table.name).indexWait("name", "label", "label_value"));
         }
     }
 }

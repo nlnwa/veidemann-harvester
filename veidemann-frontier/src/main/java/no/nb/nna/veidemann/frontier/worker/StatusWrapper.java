@@ -20,6 +20,7 @@ import no.nb.nna.veidemann.api.ConfigProto;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus;
 import no.nb.nna.veidemann.api.MessagesProto.Error;
 import no.nb.nna.veidemann.commons.db.DbException;
+import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.db.ProtoUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,7 +43,7 @@ public class StatusWrapper {
     }
 
     public static StatusWrapper getStatusWrapper(String executionId) throws DbException {
-        return new StatusWrapper(DbUtil.getInstance().getDb().getExecutionStatus(executionId));
+        return new StatusWrapper(DbService.getInstance().getDbAdapter().getExecutionStatus(executionId));
     }
 
     public static StatusWrapper getStatusWrapper(CrawlExecutionStatus status) {
@@ -54,7 +55,7 @@ public class StatusWrapper {
     }
 
     public StatusWrapper saveStatus() throws DbException {
-        status = DbUtil.getInstance().getDb().saveExecutionStatus(status.build()).toBuilder();
+        status = DbService.getInstance().getDbAdapter().saveExecutionStatus(status.build()).toBuilder();
         return this;
     }
 

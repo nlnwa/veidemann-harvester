@@ -18,10 +18,11 @@ package no.nb.nna.veidemann.db.initializer;
 import no.nb.nna.veidemann.commons.db.DbConnectionException;
 import no.nb.nna.veidemann.commons.db.DbQueryException;
 import no.nb.nna.veidemann.db.RethinkDbAdapter.TABLES;
+import no.nb.nna.veidemann.db.RethinkDbConnection;
 
 public class Upgrade0_1To0_2 extends UpgradeDbBase {
-    public Upgrade0_1To0_2(String dbName) {
-        super(dbName);
+    public Upgrade0_1To0_2(String dbName, RethinkDbConnection conn) {
+        super(dbName, conn);
     }
 
     final void upgrade() throws DbQueryException, DbConnectionException {

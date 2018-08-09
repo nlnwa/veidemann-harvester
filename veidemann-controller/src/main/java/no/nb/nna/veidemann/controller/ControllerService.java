@@ -53,6 +53,7 @@ import no.nb.nna.veidemann.api.MessagesProto.JobExecutionStatus;
 import no.nb.nna.veidemann.commons.auth.AllowedRoles;
 import no.nb.nna.veidemann.commons.auth.RolesContextKey;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
+import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.commons.util.ApiTools.ListReplyWalker;
 import no.nb.nna.veidemann.commons.util.CrawlScopes;
 import no.nb.nna.veidemann.controller.settings.Settings;
@@ -75,9 +76,9 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
 
     private final Settings settings;
 
-    public ControllerService(Settings settings, DbAdapter db) {
+    public ControllerService(Settings settings) {
         this.settings = settings;
-        this.db = db;
+        this.db = DbService.getInstance().getDbAdapter();
     }
 
     @Override

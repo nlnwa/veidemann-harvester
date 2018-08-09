@@ -19,7 +19,6 @@ import io.grpc.Status;
 import no.nb.nna.veidemann.api.ReportProto.ExecuteDbQueryRequest;
 import no.nb.nna.veidemann.commons.VeidemannHeaderConstants;
 import no.nb.nna.veidemann.commons.db.DbException;
-import no.nb.nna.veidemann.commons.db.DbHelper;
 import org.junit.Test;
 
 import java.util.concurrent.ExecutionException;
@@ -33,9 +32,6 @@ public class DbQueryIT extends CrawlTestBase implements VeidemannHeaderConstants
 
     @Test
     public void testHarvest() throws InterruptedException, ExecutionException, DbException {
-        DbHelper dbh = DbHelper.getInstance();
-        dbh.configure(db);
-
         QueryObserver observer = new QueryObserver();
         reportClient.executeDbQuery(ExecuteDbQueryRequest.newBuilder()
                 .setQuery("r.table('config_seeds').count()").build(), observer);
@@ -76,9 +72,6 @@ public class DbQueryIT extends CrawlTestBase implements VeidemannHeaderConstants
 
     @Test
     public void testClientCancel() throws InterruptedException, ExecutionException, DbException {
-        DbHelper dbh = DbHelper.getInstance();
-        dbh.configure(db);
-
         QueryObserver observer = new QueryObserver();
         reportClient.executeDbQuery(ExecuteDbQueryRequest.newBuilder()
                 .setQuery("r.table('config_seeds').changes()").build(), observer);

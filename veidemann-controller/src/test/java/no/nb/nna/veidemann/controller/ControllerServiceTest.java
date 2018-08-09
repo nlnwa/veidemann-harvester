@@ -41,6 +41,8 @@ import no.nb.nna.veidemann.commons.auth.NoopAuAuServerInterceptor;
 import no.nb.nna.veidemann.commons.auth.UserRoleMapper;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.db.DbException;
+import no.nb.nna.veidemann.commons.db.DbService;
+import no.nb.nna.veidemann.commons.db.DbServiceSPI;
 import no.nb.nna.veidemann.controller.settings.Settings;
 import no.nb.nna.veidemann.db.ProtoUtils;
 import org.junit.After;
@@ -104,102 +106,110 @@ public class ControllerServiceTest {
 
     @Test
     public void testSaveEntity() throws InterruptedException, DbException {
+        DbServiceSPI dbProviderMock = mock(DbServiceSPI.class);
         DbAdapter dbMock = mock(DbAdapter.class);
-        AuAuServerInterceptor auau = new NoopAuAuServerInterceptor();
-        inProcessServer = new ControllerApiServer(settings, inProcessServerBuilder, dbMock, auau).start();
+        when(dbProviderMock.getDbAdapter()).thenReturn(dbMock);
+        try (DbService db = DbService.configure(dbProviderMock)) {
+            AuAuServerInterceptor auau = new NoopAuAuServerInterceptor();
+            inProcessServer = new ControllerApiServer(settings, inProcessServerBuilder, auau).start();
 
-        CrawlEntity request = CrawlEntity.newBuilder()
-                .setMeta(ConfigProto.Meta.newBuilder()
-                        .setName("Nasjonalbiblioteket")
-                        .addLabel(ConfigProto.Label.newBuilder()
-                                .setKey("frequency")
-                                .setValue("Daily"))
-                        .addLabel(ConfigProto.Label.newBuilder()
-                                .setKey("orgType")
-                                .setValue("Government"))
-                        .setCreated(ProtoUtils.odtToTs(OffsetDateTime.parse("2017-04-06T06:20:35.779Z"))))
-                .build();
+            CrawlEntity request = CrawlEntity.newBuilder()
+                    .setMeta(ConfigProto.Meta.newBuilder()
+                            .setName("Nasjonalbiblioteket")
+                            .addLabel(ConfigProto.Label.newBuilder()
+                                    .setKey("frequency")
+                                    .setValue("Daily"))
+                            .addLabel(ConfigProto.Label.newBuilder()
+                                    .setKey("orgType")
+                                    .setValue("Government"))
+                            .setCreated(ProtoUtils.odtToTs(OffsetDateTime.parse("2017-04-06T06:20:35.779Z"))))
+                    .build();
 
-        CrawlEntity reply = CrawlEntity.newBuilder()
-                .setId("Random UID")
-                .setMeta(ConfigProto.Meta.newBuilder()
-                        .setName("Nasjonalbiblioteket")
-                        .addLabel(ConfigProto.Label.newBuilder()
-                                .setKey("frequency")
-                                .setValue("Daily"))
-                        .addLabel(ConfigProto.Label.newBuilder()
-                                .setKey("orgType")
-                                .setValue("Government"))
-                        .setCreated(ProtoUtils.odtToTs(OffsetDateTime.parse("2017-04-06T06:20:35.779Z"))))
-                .build();
+            CrawlEntity reply = CrawlEntity.newBuilder()
+                    .setId("Random UID")
+                    .setMeta(ConfigProto.Meta.newBuilder()
+                            .setName("Nasjonalbiblioteket")
+                            .addLabel(ConfigProto.Label.newBuilder()
+                                    .setKey("frequency")
+                                    .setValue("Daily"))
+                            .addLabel(ConfigProto.Label.newBuilder()
+                                    .setKey("orgType")
+                                    .setValue("Government"))
+                            .setCreated(ProtoUtils.odtToTs(OffsetDateTime.parse("2017-04-06T06:20:35.779Z"))))
+                    .build();
 
-        when(dbMock.saveCrawlEntity(request)).thenReturn(reply);
+            when(dbMock.saveCrawlEntity(request)).thenReturn(reply);
 
-        CrawlEntity response;
-        response = blockingStub.saveEntity(request);
-        assertThat(response).isSameAs(reply);
+            CrawlEntity response;
+            response = blockingStub.saveEntity(request);
+            assertThat(response).isSameAs(reply);
 
-        final CountDownLatch latch = new CountDownLatch(1);
-        asyncStub.saveEntity(request, new StreamObserver<CrawlEntity>() {
-            @Override
-            public void onNext(CrawlEntity value) {
-                assertThat(response).isSameAs(reply);
-            }
+            final CountDownLatch latch = new CountDownLatch(1);
+            asyncStub.saveEntity(request, new StreamObserver<CrawlEntity>() {
+                @Override
+                public void onNext(CrawlEntity value) {
+                    assertThat(response).isSameAs(reply);
+                }
 
-            @Override
-            public void onError(Throwable t) {
-                fail("An error was thrown", t);
-            }
+                @Override
+                public void onError(Throwable t) {
+                    fail("An error was thrown", t);
+                }
 
-            @Override
-            public void onCompleted() {
-                latch.countDown();
-            }
+                @Override
+                public void onCompleted() {
+                    latch.countDown();
+                }
 
-        });
-        assertThat(latch.await(1, TimeUnit.SECONDS)).isTrue();
+            });
+            assertThat(latch.await(1, TimeUnit.SECONDS)).isTrue();
 
-        verify(dbMock, times(2)).saveCrawlEntity(request);
-        verifyNoMoreInteractions(dbMock);
+            verify(dbMock, times(2)).saveCrawlEntity(request);
+            verifyNoMoreInteractions(dbMock);
+        }
     }
 
     @Test
     public void testListCrawlEntities() throws InterruptedException, DbException {
+        DbServiceSPI dbProviderMock = mock(DbServiceSPI.class);
         DbAdapter dbMock = mock(DbAdapter.class);
-        AuAuServerInterceptor auau = new NoopAuAuServerInterceptor();
-        inProcessServer = new ControllerApiServer(settings, inProcessServerBuilder, dbMock, auau).start();
+        when(dbProviderMock.getDbAdapter()).thenReturn(dbMock);
+        try (DbService db = DbService.configure(dbProviderMock)) {
+            AuAuServerInterceptor auau = new NoopAuAuServerInterceptor();
+            inProcessServer = new ControllerApiServer(settings, inProcessServerBuilder, auau).start();
 
-        ListRequest request = ListRequest.newBuilder().build();
-        CrawlEntityListReply reply = CrawlEntityListReply.newBuilder().build();
+            ListRequest request = ListRequest.newBuilder().build();
+            CrawlEntityListReply reply = CrawlEntityListReply.newBuilder().build();
 
-        when(dbMock.listCrawlEntities(request)).thenReturn(reply);
+            when(dbMock.listCrawlEntities(request)).thenReturn(reply);
 
-        CrawlEntityListReply response;
-        response = blockingStub.listCrawlEntities(request);
-        assertThat(response).isSameAs(reply);
+            CrawlEntityListReply response;
+            response = blockingStub.listCrawlEntities(request);
+            assertThat(response).isSameAs(reply);
 
-        final CountDownLatch latch = new CountDownLatch(1);
-        asyncStub.listCrawlEntities(null, new StreamObserver<CrawlEntityListReply>() {
-            @Override
-            public void onNext(CrawlEntityListReply value) {
-                assertThat(response).isSameAs(reply);
-            }
+            final CountDownLatch latch = new CountDownLatch(1);
+            asyncStub.listCrawlEntities(null, new StreamObserver<CrawlEntityListReply>() {
+                @Override
+                public void onNext(CrawlEntityListReply value) {
+                    assertThat(response).isSameAs(reply);
+                }
 
-            @Override
-            public void onError(Throwable t) {
-                fail("An error was thrown", t);
-            }
+                @Override
+                public void onError(Throwable t) {
+                    fail("An error was thrown", t);
+                }
 
-            @Override
-            public void onCompleted() {
-                latch.countDown();
-            }
+                @Override
+                public void onCompleted() {
+                    latch.countDown();
+                }
 
-        });
-        assertThat(latch.await(1, TimeUnit.SECONDS)).isTrue();
+            });
+            assertThat(latch.await(1, TimeUnit.SECONDS)).isTrue();
 
-        verify(dbMock, times(2)).listCrawlEntities(request);
-        verifyNoMoreInteractions(dbMock);
+            verify(dbMock, times(2)).listCrawlEntities(request);
+            verifyNoMoreInteractions(dbMock);
+        }
     }
 
     @Test
@@ -218,38 +228,42 @@ public class ControllerServiceTest {
             }
         };
 
+        DbServiceSPI dbProviderMock = mock(DbServiceSPI.class);
         DbAdapter dbMock = mock(DbAdapter.class);
-        IdTokenValidator idValidatorMock = mock(IdTokenValidator.class);
-        UserRoleMapper roleMapperMock = mock(UserRoleMapper.class);
-        AuAuServerInterceptor auau = new IdTokenAuAuServerInterceptor(roleMapperMock, idValidatorMock);
-        inProcessServer = new ControllerApiServer(settings, inProcessServerBuilder, dbMock, auau).start();
+        when(dbProviderMock.getDbAdapter()).thenReturn(dbMock);
+        try (DbService db = DbService.configure(dbProviderMock)) {
+            IdTokenValidator idValidatorMock = mock(IdTokenValidator.class);
+            UserRoleMapper roleMapperMock = mock(UserRoleMapper.class);
+            AuAuServerInterceptor auau = new IdTokenAuAuServerInterceptor(roleMapperMock, idValidatorMock);
+            inProcessServer = new ControllerApiServer(settings, inProcessServerBuilder, auau).start();
 
-        when(dbMock.listCrawlEntities(ListRequest.getDefaultInstance()))
-                .thenReturn(CrawlEntityListReply.getDefaultInstance());
-        when(dbMock.saveCrawlEntity(CrawlEntity.getDefaultInstance()))
-                .thenAnswer((Answer<CrawlEntity>) invocation -> {
-                    assertThat(EmailContextKey.email()).isEqualTo("user@example.com");
-                    return CrawlEntity.getDefaultInstance();
-                });
-        when(idValidatorMock.verifyIdToken("token1"))
-                .thenReturn(new JWTClaimsSet.Builder()
-                        .claim("email", "user@example.com")
-                        .claim("groups", new JSONArray())
-                        .build());
-        when(roleMapperMock.getRolesForUser(eq("user@example.com"), anyList(), anyCollection()))
-                .thenReturn(ImmutableList.of(Role.READONLY));
-
-
-        assertThat(blockingStub.withCallCredentials(cred).listCrawlEntities(ListRequest.getDefaultInstance()))
-                .isSameAs(CrawlEntityListReply.getDefaultInstance());
+            when(dbMock.listCrawlEntities(ListRequest.getDefaultInstance()))
+                    .thenReturn(CrawlEntityListReply.getDefaultInstance());
+            when(dbMock.saveCrawlEntity(CrawlEntity.getDefaultInstance()))
+                    .thenAnswer((Answer<CrawlEntity>) invocation -> {
+                        assertThat(EmailContextKey.email()).isEqualTo("user@example.com");
+                        return CrawlEntity.getDefaultInstance();
+                    });
+            when(idValidatorMock.verifyIdToken("token1"))
+                    .thenReturn(new JWTClaimsSet.Builder()
+                            .claim("email", "user@example.com")
+                            .claim("groups", new JSONArray())
+                            .build());
+            when(roleMapperMock.getRolesForUser(eq("user@example.com"), anyList(), anyCollection()))
+                    .thenReturn(ImmutableList.of(Role.READONLY));
 
 
-        thrown.expect(StatusRuntimeException.class);
-        thrown.expectMessage("PERMISSION_DENIED");
+            assertThat(blockingStub.withCallCredentials(cred).listCrawlEntities(ListRequest.getDefaultInstance()))
+                    .isSameAs(CrawlEntityListReply.getDefaultInstance());
 
-        blockingStub.withCallCredentials(cred).saveEntity(CrawlEntity.getDefaultInstance());
 
-        thrown.expectMessage("UNAUTHENTICATED");
-        blockingStub.saveEntity(CrawlEntity.getDefaultInstance());
+            thrown.expect(StatusRuntimeException.class);
+            thrown.expectMessage("PERMISSION_DENIED");
+
+            blockingStub.withCallCredentials(cred).saveEntity(CrawlEntity.getDefaultInstance());
+
+            thrown.expectMessage("UNAUTHENTICATED");
+            blockingStub.saveEntity(CrawlEntity.getDefaultInstance());
+        }
     }
 }

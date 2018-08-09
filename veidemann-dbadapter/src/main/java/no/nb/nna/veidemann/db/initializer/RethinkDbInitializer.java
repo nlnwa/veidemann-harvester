@@ -16,13 +16,11 @@
 package no.nb.nna.veidemann.db.initializer;
 
 import com.rethinkdb.RethinkDB;
-import com.typesafe.config.Config;
-import com.typesafe.config.ConfigBeanFactory;
-import com.typesafe.config.ConfigFactory;
 import no.nb.nna.veidemann.commons.db.DbConnectionException;
+import no.nb.nna.veidemann.commons.db.DbException;
+import no.nb.nna.veidemann.commons.db.DbInitializer;
 import no.nb.nna.veidemann.commons.db.DbQueryException;
 import no.nb.nna.veidemann.commons.db.DbUpgradeException;
-import no.nb.nna.veidemann.commons.opentracing.TracerFactory;
 import no.nb.nna.veidemann.db.RethinkDbAdapter.TABLES;
 import no.nb.nna.veidemann.db.RethinkDbConnection;
 import org.slf4j.Logger;
@@ -31,37 +29,25 @@ import org.slf4j.LoggerFactory;
 /**
  *
  */
-public class DbInitializer {
+public class RethinkDbInitializer implements DbInitializer {
 
-    private static final Logger LOG = LoggerFactory.getLogger(DbInitializer.class);
-
-    private static final Settings SETTINGS;
+    private static final Logger LOG = LoggerFactory.getLogger(RethinkDbInitializer.class);
 
     static final RethinkDB r = RethinkDB.r;
 
-    final RethinkDbConnection conn;
+    private final RethinkDbConnection conn;
 
-    static {
-        Config config = ConfigFactory.load();
-        config.checkValid(ConfigFactory.defaultReference());
-        SETTINGS = ConfigBeanFactory.create(config, Settings.class);
-
-        TracerFactory.init("DbInitializer");
+    public RethinkDbInitializer(RethinkDbConnection conn) {
+        this.conn = conn;
     }
 
-    public DbInitializer() throws DbConnectionException {
-        System.out.println("Connecting to: " + SETTINGS.getDbHost() + ":" + SETTINGS.getDbPort());
-        if (!RethinkDbConnection.isConfigured()) {
-            RethinkDbConnection.configure(SETTINGS);
-        }
-        conn = RethinkDbConnection.getInstance();
-    }
+    public void initialize() throws DbUpgradeException, DbQueryException, DbConnectionException {
+        String dbName = conn.getConnection().db().get();
 
-    public DbInitializer initialize() throws DbUpgradeException, DbQueryException, DbConnectionException {
-        if (!(boolean) conn.exec(r.dbList().contains(SETTINGS.getDbName()))) {
+        if (!(boolean) conn.exec(r.dbList().contains(dbName))) {
             // No existing database, creating a new one
-            LOG.info("Creating database: " + SETTINGS.getDbName());
-            new CreateNewDb(SETTINGS.getDbName()).run();
+            LOG.info("Creating database: " + dbName);
+            new CreateNewDb(dbName, conn).run();
             LOG.info("Populating database with default data");
             new PopulateDbWithDefaultData().run();
         } else {
@@ -74,17 +60,25 @@ public class DbInitializer {
             }
         }
         LOG.info("DB initialized");
-        return this;
     }
 
-    public void close() {
-        conn.close();
+    @Override
+    public void delete() throws DbException {
+        try {
+            conn.exec(r.dbDrop("veidemann"));
+        } catch (DbException e) {
+            if (!e.getMessage().matches("Database .* does not exist.")) {
+                throw e;
+            }
+        }
     }
 
     private void upgrade(String fromVersion) throws DbUpgradeException {
+        String dbName = conn.getConnection().db().get();
+
         switch (fromVersion) {
             case "0.1":
-                new Upgrade0_1To0_2(SETTINGS.getDbName()).run();
+                new Upgrade0_1To0_2(dbName, conn).run();
                 break;
             default:
                 throw new DbUpgradeException("Unknown database version '" + fromVersion + "', unable to upgrade");

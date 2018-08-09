@@ -26,6 +26,7 @@ import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
 import no.nb.nna.veidemann.api.MessagesProto.QueuedUriOrBuilder;
 import no.nb.nna.veidemann.commons.ExtraStatusCodes;
 import no.nb.nna.veidemann.commons.db.DbException;
+import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.db.ProtoUtils;
 import org.netpreserve.commons.uri.Uri;
 import org.netpreserve.commons.uri.UriConfigs;
@@ -111,7 +112,7 @@ public class QueuedUriWrapper {
         requireNonEmpty(wrapped.getCrawlHostGroupId(), "Empty CrawlHostGroupId");
 
         QueuedUri q = wrapped.build();
-        q = DbUtil.getInstance().getDb().addToCrawlHostGroup(q);
+        q = DbService.getInstance().getCrawlQueueAdapter().addToCrawlHostGroup(q);
         wrapped = q.toBuilder();
 
         return this;
@@ -125,7 +126,7 @@ public class QueuedUriWrapper {
         } catch (Throwable t) {
             LOG.info("Unparseable URI '{}'", wrapped.getUri());
             wrapped = wrapped.setError(ExtraStatusCodes.ILLEGAL_URI.toFetchError());
-            DbUtil.getInstance().writeLog(this);
+            DbUtil.writeLog(this);
             throw new URISyntaxException(wrapped.getUri(), t.getMessage());
         }
     }
@@ -271,7 +272,7 @@ public class QueuedUriWrapper {
         }
 
         // Calculate CrawlHostGroup
-        List<CrawlHostGroupConfig> groupConfigs = DbUtil.getInstance().getDb()
+        List<CrawlHostGroupConfig> groupConfigs = DbService.getInstance().getDbAdapter()
                 .listCrawlHostGroupConfigs(ControllerProto.ListRequest.newBuilder()
                         .addAllLabelSelector(politeness.getCrawlHostGroupSelectorList()).build()).getValueList();
         String crawlHostGroupId = CrawlHostGroupCalculator.calculateCrawlHostGroup(wrapped.getIp(), groupConfigs);

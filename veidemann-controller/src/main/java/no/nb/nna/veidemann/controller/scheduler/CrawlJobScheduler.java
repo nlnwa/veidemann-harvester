@@ -16,7 +16,7 @@
 package no.nb.nna.veidemann.controller.scheduler;
 
 import it.sauronsoftware.cron4j.Scheduler;
-import no.nb.nna.veidemann.commons.db.DbAdapter;
+import no.nb.nna.veidemann.commons.db.DbService;
 
 /**
  *
@@ -25,15 +25,12 @@ public class CrawlJobScheduler implements AutoCloseable {
 
     Scheduler scheduler;
 
-    final DbAdapter db;
-
-    public CrawlJobScheduler(DbAdapter db) {
-        this.db = db;
+    public CrawlJobScheduler() {
     }
 
     public CrawlJobScheduler start() {
         scheduler = new Scheduler();
-        scheduler.addTaskCollector(new CrawlJobCollector(db));
+        scheduler.addTaskCollector(new CrawlJobCollector(DbService.getInstance().getDbAdapter()));
         scheduler.start();
         return this;
     }

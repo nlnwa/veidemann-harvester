@@ -15,7 +15,6 @@
  */
 package no.nb.nna.veidemann.integrationtests;
 
-import com.google.gson.Gson;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
 import no.nb.nna.veidemann.api.MessagesProto.PageLog;
 import no.nb.nna.veidemann.api.ReportProto.ExecuteDbQueryRequest;
@@ -75,20 +74,8 @@ public class CrawlExecutionValidator {
     }
 
     private void checkDrainedQueue() throws InterruptedException {
-        // Check that crawl host group has zero queuedUriCount
-        QueryObserver observer = new QueryObserver();
-        CrawlTestBase.reportClient.executeDbQuery(ExecuteDbQueryRequest.newBuilder()
-                .setQuery("r.table('crawl_host_group')").build(), observer);
-        observer.await();
-        assertThat(observer.getResults().size()).isLessThanOrEqualTo(1);
-        if (observer.getResults().size() > 0) {
-            assertThat(new Gson().fromJson(observer.getResults().get(0), Map.class).get("queuedUriCount"))
-                    .as("queuedUriCount in crawlHostGroup should be null after crawl has ended")
-                    .isEqualTo(0.0);
-        }
-
         // Check that there is no uri's in queue
-        observer = new QueryObserver();
+        QueryObserver observer = new QueryObserver();
         CrawlTestBase.reportClient.executeDbQuery(ExecuteDbQueryRequest.newBuilder()
                 .setQuery("r.table('uri_queue').count()").build(), observer);
         observer.await();

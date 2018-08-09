@@ -30,19 +30,19 @@ public abstract class UpgradeDbBase implements Runnable {
 
     static final RethinkDB r = RethinkDB.r;
 
-    RethinkDbConnection conn;
+    final RethinkDbConnection conn;
 
     final String dbName;
 
-    public UpgradeDbBase(String dbName) {
+    public UpgradeDbBase(String dbName, RethinkDbConnection conn) {
         this.dbName = dbName;
+        this.conn = conn;
     }
 
     @Override
     public void run() {
         LOG.info("Upgrading from {} to {}", fromVersion(), toVersion());
 
-        conn = RethinkDbConnection.getInstance();
         try {
             String version = conn.exec(r.table(TABLES.SYSTEM.name).get("db_version").g("db_version"));
             if (!fromVersion().equals(version)) {

@@ -20,7 +20,6 @@ import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.opentracing.contrib.ServerTracingInterceptor;
 import io.opentracing.util.GlobalTracer;
-import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.contentwriter.text.TextExtractor;
 import no.nb.nna.veidemann.contentwriter.warc.WarcWriterPool;
 import org.slf4j.Logger;
@@ -40,11 +39,11 @@ public class ApiServer implements AutoCloseable {
     /**
      * Construct a new REST API server.
      */
-    public ApiServer(int port, DbAdapter db, WarcWriterPool warcWriterPool, TextExtractor textExtractor) {
-        this(ServerBuilder.forPort(port), db, warcWriterPool, textExtractor);
+    public ApiServer(int port, WarcWriterPool warcWriterPool, TextExtractor textExtractor) {
+        this(ServerBuilder.forPort(port), warcWriterPool, textExtractor);
     }
 
-    public ApiServer(ServerBuilder<?> serverBuilder, DbAdapter db, WarcWriterPool warcWriterPool, TextExtractor textExtractor) {
+    public ApiServer(ServerBuilder<?> serverBuilder, WarcWriterPool warcWriterPool, TextExtractor textExtractor) {
 
         ServerTracingInterceptor tracingInterceptor = new ServerTracingInterceptor.Builder(GlobalTracer.get())
                 .withTracedAttributes(ServerTracingInterceptor.ServerRequestAttribute.CALL_ATTRIBUTES,
@@ -52,7 +51,7 @@ public class ApiServer implements AutoCloseable {
                 .build();
 
         this.warcWriterPool = warcWriterPool;
-        server = serverBuilder.addService(tracingInterceptor.intercept(new ContentWriterService(db, warcWriterPool, textExtractor))).build();
+        server = serverBuilder.addService(tracingInterceptor.intercept(new ContentWriterService(warcWriterPool, textExtractor))).build();
     }
 
     public ApiServer start() {

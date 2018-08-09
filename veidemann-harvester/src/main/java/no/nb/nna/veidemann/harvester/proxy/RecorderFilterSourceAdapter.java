@@ -20,7 +20,6 @@ import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.util.AttributeKey;
 import no.nb.nna.veidemann.commons.client.ContentWriterClient;
-import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.harvester.BrowserSessionRegistry;
 import org.littleshoot.proxy.HostResolver;
 import org.littleshoot.proxy.HttpFilters;
@@ -42,18 +41,15 @@ public class RecorderFilterSourceAdapter extends HttpFiltersSourceAdapter {
 
     private final int proxyId;
 
-    private final DbAdapter db;
-
     private final ContentWriterClient contentWriterClient;
 
     private final BrowserSessionRegistry sessionRegistry;
 
     private final HostResolver hostResolver;
 
-    public RecorderFilterSourceAdapter(final int proxyId, final DbAdapter db, final ContentWriterClient contentWriterClient,
+    public RecorderFilterSourceAdapter(final int proxyId, final ContentWriterClient contentWriterClient,
                                        final BrowserSessionRegistry sessionRegistry, final HostResolver hostResolver) {
         this.proxyId = proxyId;
-        this.db = db;
         this.contentWriterClient = contentWriterClient;
         this.sessionRegistry = sessionRegistry;
         this.hostResolver = hostResolver;
@@ -77,10 +73,10 @@ public class RecorderFilterSourceAdapter extends HttpFiltersSourceAdapter {
         String connectedUrl = clientCtx.channel().attr(CONNECTED_URL).get();
         if (connectedUrl == null) {
             return new RecorderFilter(proxyId, uri, originalRequest, clientCtx,
-                    db, contentWriterClient, sessionRegistry, hostResolver);
+                    contentWriterClient, sessionRegistry, hostResolver);
         }
         return new RecorderFilter(proxyId, connectedUrl + uri, originalRequest, clientCtx,
-                db, contentWriterClient, sessionRegistry, hostResolver);
+                contentWriterClient, sessionRegistry, hostResolver);
     }
 
 }

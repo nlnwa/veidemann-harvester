@@ -22,6 +22,7 @@ import com.typesafe.config.ConfigFactory;
 import no.nb.nna.veidemann.commons.client.DnsServiceClient;
 import no.nb.nna.veidemann.commons.client.RobotsServiceClient;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
+import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.commons.opentracing.TracerFactory;
 import no.nb.nna.veidemann.db.RethinkDbAdapter;
 import no.nb.nna.veidemann.db.RethinkDbConnection;
@@ -61,8 +62,7 @@ public class FrontierService {
      * @return this instance
      */
     public FrontierService start() {
-        try (RethinkDbConnection conn = RethinkDbConnection.configure(SETTINGS);
-             DbAdapter db = new RethinkDbAdapter();
+        try (DbService db = DbService.configure(SETTINGS);
 
              RobotsServiceClient robotsServiceClient = new RobotsServiceClient(
                      SETTINGS.getRobotsEvaluatorHost(), SETTINGS.getRobotsEvaluatorPort());
@@ -70,7 +70,7 @@ public class FrontierService {
              DnsServiceClient dnsServiceClient = new DnsServiceClient(
                      SETTINGS.getDnsResolverHost(), SETTINGS.getDnsResolverPort());
 
-             Frontier frontier = new Frontier((RethinkDbAdapter) db, robotsServiceClient, dnsServiceClient);
+             Frontier frontier = new Frontier(robotsServiceClient, dnsServiceClient);
              FrontierApiServer apiServer = new FrontierApiServer(SETTINGS.getApiPort(), frontier).start();) {
 
             LOG.info("Veidemann Frontier (v. {}) started",

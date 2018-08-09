@@ -31,17 +31,17 @@ public class CreateNewDb implements Runnable {
 
     static final RethinkDB r = RethinkDB.r;
 
-    RethinkDbConnection conn;
+    final RethinkDbConnection conn;
 
     final String dbName;
 
-    public CreateNewDb(String dbName) {
+    public CreateNewDb(String dbName, RethinkDbConnection conn) {
         this.dbName = dbName;
+        this.conn = conn;
     }
 
     @Override
     public void run() {
-        conn = RethinkDbConnection.getInstance();
         try {
             createDb();
         } catch (DbException e) {

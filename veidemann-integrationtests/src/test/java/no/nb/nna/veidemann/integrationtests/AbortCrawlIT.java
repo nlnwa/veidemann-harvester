@@ -126,15 +126,12 @@ public class AbortCrawlIT extends CrawlTestBase implements VeidemannHeaderConsta
     }
 
     private void setupConfigAndSeeds(CrawlJob job) throws DbException {
-        DbHelper dbh = DbHelper.getInstance();
-        dbh.configure(db);
-
         String jobId = job.getId();
 
-        CrawlConfig crawlConfig = dbh.getCrawlConfigForJob(job);
+        CrawlConfig crawlConfig = DbHelper.getCrawlConfigForJob(job);
 
         PolitenessConfig politeness = controllerClient.savePolitenessConfig(
-                dbh.getPolitenessConfigForCrawlConfig(crawlConfig).toBuilder()
+                DbHelper.getPolitenessConfigForCrawlConfig(crawlConfig).toBuilder()
                         .setMaxTimeBetweenPageLoadMs(100)
                         .setMinTimeBetweenPageLoadMs(1)
                         .setDelayFactor(.01f)

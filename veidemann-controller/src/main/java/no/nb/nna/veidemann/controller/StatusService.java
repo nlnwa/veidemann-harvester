@@ -31,6 +31,7 @@ import no.nb.nna.veidemann.api.StatusProto.RunningExecutionsRequest;
 import no.nb.nna.veidemann.commons.auth.AllowedRoles;
 import no.nb.nna.veidemann.commons.db.ChangeFeed;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
+import no.nb.nna.veidemann.commons.db.DbService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,8 +46,8 @@ public class StatusService extends StatusGrpc.StatusImplBase {
 
     private final DbAdapter db;
 
-    public StatusService(DbAdapter db) {
-        this.db = db;
+    public StatusService() {
+        this.db = DbService.getInstance().getDbAdapter();
     }
 
     @Override

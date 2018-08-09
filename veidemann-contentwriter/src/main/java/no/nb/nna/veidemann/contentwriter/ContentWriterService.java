@@ -28,6 +28,7 @@ import no.nb.nna.veidemann.api.ContentWriterProto.WriteResponseMeta;
 import no.nb.nna.veidemann.api.MessagesProto;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.db.DbException;
+import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.contentwriter.text.TextExtractor;
 import no.nb.nna.veidemann.contentwriter.warc.SingleWarcWriter;
 import no.nb.nna.veidemann.contentwriter.warc.WarcWriterPool;
@@ -62,8 +63,8 @@ public class ContentWriterService extends ContentWriterGrpc.ContentWriterImplBas
 
     private final TextExtractor textExtractor;
 
-    public ContentWriterService(DbAdapter db, WarcWriterPool warcWriterPool, TextExtractor textExtractor) {
-        this.db = db;
+    public ContentWriterService(WarcWriterPool warcWriterPool, TextExtractor textExtractor) {
+        this.db = DbService.getInstance().getDbAdapter();
         this.warcWriterPool = warcWriterPool;
         this.textExtractor = textExtractor;
     }

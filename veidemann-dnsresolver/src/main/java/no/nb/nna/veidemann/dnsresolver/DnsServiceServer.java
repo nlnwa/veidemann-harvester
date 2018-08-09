@@ -19,12 +19,10 @@ import com.typesafe.config.Config;
 import com.typesafe.config.ConfigBeanFactory;
 import com.typesafe.config.ConfigException;
 import com.typesafe.config.ConfigFactory;
-import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.client.ContentWriterClient;
 import no.nb.nna.veidemann.commons.db.DbException;
+import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.commons.opentracing.TracerFactory;
-import no.nb.nna.veidemann.db.RethinkDbAdapter;
-import no.nb.nna.veidemann.db.RethinkDbConnection;
 import no.nb.nna.veidemann.dnsresolver.settings.Settings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,16 +50,16 @@ public class DnsServiceServer {
     /**
      * Start the service.
      * <p>
+     *
      * @return this instance
      */
     public DnsServiceServer start() {
-        try (RethinkDbConnection conn = RethinkDbConnection.configure(SETTINGS);
-             DbAdapter db = new RethinkDbAdapter();
+        try (DbService db = DbService.configure(SETTINGS);
              ContentWriterClient contentWriterClient = new ContentWriterClient(
-                        SETTINGS.getContentWriterHost(), SETTINGS.getContentWriterPort());
+                     SETTINGS.getContentWriterHost(), SETTINGS.getContentWriterPort());
              DnsServiceApiServer apiServer = new DnsServiceApiServer(
-                        SETTINGS.getApiPort(), new DnsLookup(db, contentWriterClient, SETTINGS.getDnsServers()))
-                        .start();) {
+                     SETTINGS.getApiPort(), new DnsLookup(contentWriterClient, SETTINGS.getDnsServers()))
+                     .start();) {
 
             LOG.info("Veidemann Dns Service (v. {}) started", DnsServiceServer.class.getPackage()
                     .getImplementationVersion());
@@ -82,6 +80,7 @@ public class DnsServiceServer {
     /**
      * Get the settings object.
      * <p>
+     *
      * @return the settings
      */
     public static Settings getSettings() {

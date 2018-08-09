@@ -147,7 +147,7 @@ public class FrontierClient implements AutoCloseable {
                 } catch (InterruptedException e) {
                     // OK
                 }
-                System.exit(1);
+                System.exit(99);
             } catch (MaxActiveSessionsExceededException ex) {
                 LOG.debug(ex.getMessage(), ex);
                 Status status = Status.RESOURCE_EXHAUSTED.withDescription(ex.toString());

@@ -97,7 +97,7 @@ public class Harvester {
             }
         } catch (ConfigException ex) {
             System.err.println("Configuration error: " + ex.getLocalizedMessage());
-            System.exit(1);
+            System.exit(2);
         } catch (Exception ex) {
             LOG.error("Could not start service", ex);
             throw new RuntimeException(ex);

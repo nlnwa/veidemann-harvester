@@ -213,7 +213,8 @@ public class CrawlLogRegistry {
     }
 
     private void checkForCachedRequests() {
-        for (UriRequest r : status.unhandledRequests) {
+        for (int i = 0; i < status.unhandledRequests.size(); i++) {
+            UriRequest r = status.unhandledRequests.get(i);
             boolean isWaitingForResponse = crawlLogs.stream()
                     .filter(e -> e.uri.equals(r.getUrl()))
                     .anyMatch(e -> !e.isResponseReceived());

@@ -137,17 +137,17 @@ public class FrontierClient implements AutoCloseable {
 
                 LOG.debug("Page rendering completed");
             } catch (ClientClosedException ex) {
-                LOG.error("Chrome client can't contact chrome, shutting down", ex);
-                Status status = Status.UNAVAILABLE.withDescription(ex.toString());
-                requestObserver.onError(status.asException());
+                LOG.error("Chrome client can't contact chrome", ex);
 
-                // Wait a little before shutting down to allow logs to flush
+                // Wait a little before to allow for possible restart of container
                 try {
-                    Thread.sleep(3000L);
+                    Thread.sleep(5000L);
                 } catch (InterruptedException e) {
                     // OK
                 }
-                System.exit(99);
+
+                Status status = Status.ABORTED.withDescription(ex.toString());
+                requestObserver.onError(status.asException());
             } catch (MaxActiveSessionsExceededException ex) {
                 LOG.debug(ex.getMessage(), ex);
                 Status status = Status.RESOURCE_EXHAUSTED.withDescription(ex.toString());

@@ -262,6 +262,10 @@ public class CrawlExecution {
         } catch (DbException e) {
             // An error here indicates problems with DB communication. No idea how to handle that yet.
             LOG.error("Error updating status after fetch: {}", e.toString(), e);
+        } catch (Throwable e) {
+            // Catch everything to ensure crawl host group gets released.
+            // Discovering this message in logs should be investigated as a possible bug.
+            LOG.error("Unknown error in post fetch. Might be a bug", e);
         }
 
         try {

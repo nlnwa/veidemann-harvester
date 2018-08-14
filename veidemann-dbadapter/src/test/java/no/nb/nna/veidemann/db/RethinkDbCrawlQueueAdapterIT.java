@@ -46,7 +46,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * These tests are dependent on a running RethinkDB instance.
  */
 //@Ignore
-public class CrawlHostGroupTestIT {
+public class RethinkDbCrawlQueueAdapterIT {
     public static RethinkDbCrawlQueueAdapter queueAdapter;
     public static RethinkDbAdapter dbAdapter;
     static final RethinkDB r = RethinkDB.r;
@@ -209,29 +209,37 @@ public class CrawlHostGroupTestIT {
 
     @Test
     public void testDeleteQueuedUrisForExecution() throws DbException {
-        QueuedUri qUri1 = QueuedUri.newBuilder()
-                .setExecutionId("executionId1")
-                .setCrawlHostGroupId("crawlHostGroupId1")
-                .setPolitenessId("politenessId")
-                .setSequence(1)
-                .build();
-        QueuedUri qUri2 = QueuedUri.newBuilder()
-                .setExecutionId("executionId1")
-                .setCrawlHostGroupId("crawlHostGroupId1")
-                .setPolitenessId("politenessId")
-                .setSequence(1)
-                .build();
-        QueuedUri qUri3 = QueuedUri.newBuilder()
-                .setExecutionId("executionId1")
-                .setCrawlHostGroupId("crawlHostGroupId2")
-                .setPolitenessId("politenessId")
-                .setSequence(1)
-                .build();
-        queueAdapter.addToCrawlHostGroup(qUri1);
-        queueAdapter.addToCrawlHostGroup(qUri2);
-        queueAdapter.addToCrawlHostGroup(qUri3);
+        System.setProperty(RethinkDbConnection.RETHINK_ARRAY_LIMIT_KEY, "25");
+        for (int i = 0; i < 50; i++) {
+            QueuedUri qUri = QueuedUri.newBuilder()
+                    .setExecutionId("executionId2")
+                    .setCrawlHostGroupId("crawlHostGroupId1")
+                    .setPolitenessId("politenessId")
+                    .setSequence(1)
+                    .build();
+            queueAdapter.addToCrawlHostGroup(qUri);
+        }
+        for (int i = 0; i < 50; i++) {
+            QueuedUri qUri = QueuedUri.newBuilder()
+                    .setExecutionId("executionId1")
+                    .setCrawlHostGroupId("crawlHostGroupId1")
+                    .setPolitenessId("politenessId")
+                    .setSequence(1)
+                    .build();
+            queueAdapter.addToCrawlHostGroup(qUri);
+        }
+        for (int i = 0; i < 50; i++) {
+            QueuedUri qUri = QueuedUri.newBuilder()
+                    .setExecutionId("executionId1")
+                    .setCrawlHostGroupId("crawlHostGroupId2")
+                    .setPolitenessId("politenessId")
+                    .setSequence(1)
+                    .build();
+            queueAdapter.addToCrawlHostGroup(qUri);
+        }
 
-        assertThat(queueAdapter.deleteQueuedUrisForExecution("executionId1")).isEqualTo(3L);
+        assertThat(queueAdapter.deleteQueuedUrisForExecution("executionId1")).isEqualTo(100L);
+        System.clearProperty(RethinkDbConnection.RETHINK_ARRAY_LIMIT_KEY);
     }
 
     @Test

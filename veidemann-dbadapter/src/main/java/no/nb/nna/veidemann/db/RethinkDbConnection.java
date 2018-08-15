@@ -17,8 +17,6 @@ package no.nb.nna.veidemann.db;
 
 import com.rethinkdb.RethinkDB;
 import com.rethinkdb.ast.ReqlAst;
-import com.rethinkdb.gen.ast.DbDrop;
-import com.rethinkdb.gen.ast.TableDrop;
 import com.rethinkdb.gen.exc.ReqlDriverError;
 import com.rethinkdb.gen.exc.ReqlError;
 import com.rethinkdb.gen.exc.ReqlOpFailedError;
@@ -41,6 +39,10 @@ import java.util.concurrent.TimeoutException;
 
 public class RethinkDbConnection implements DbServiceSPI {
     private static final Logger LOG = LoggerFactory.getLogger(RethinkDbConnection.class);
+
+    private static final long MAX_WAIT_FOR_DB_MILLIS = 1000 * 60 * 30; // Half an hour
+
+    static final String RETHINK_ARRAY_LIMIT_KEY = "RETHINK_ARRAY_LIMIT";
 
     static final RethinkDB r = RethinkDB.r;
 
@@ -68,9 +70,17 @@ public class RethinkDbConnection implements DbServiceSPI {
             }
         }
 
+        int retries = 0;
+        long startTime = System.currentTimeMillis();
+
+        OptArgs globalOpts = OptArgs.of(ConnectionTracingInterceptor.OPERATION_NAME_KEY, operationName);
+        int arrayLimit = getArrayLimit();
+        if (arrayLimit > 0) {
+            globalOpts = globalOpts.with("array_limit", arrayLimit);
+        }
+
         while (true) {
             try {
-                OptArgs globalOpts = OptArgs.of(ConnectionTracingInterceptor.OPERATION_NAME_KEY, operationName);
                 T result = qry.run(conn, globalOpts);
                 if (result instanceof Map
                         && ((Map) result).containsKey("errors")
@@ -81,11 +91,11 @@ public class RethinkDbConnection implements DbServiceSPI {
                 }
                 return result;
             } catch (ReqlOpFailedError e) {
-                if (e.getTerm().isPresent()
-                        && !((e.getTerm().get() instanceof DbDrop) || e.getTerm().get() instanceof TableDrop)) {
-
-                    LOG.error("DB not available, waiting. Cause: {}", e.toString(), e);
+                if (System.currentTimeMillis() < startTime + MAX_WAIT_FOR_DB_MILLIS
+                        && e.getMessage().contains("primary replica")) {
+                    LOG.error("DB not available at attempt #{}, waiting. Cause: {}", retries, e.toString(), e);
                     r.db(conn.db().get()).wait_().optArg("wait_for", "ready_for_writes").run(conn);
+                    retries++;
                 } else {
                     LOG.warn(e.toString(), e);
                     throw new DbQueryException(e.getMessage(), e);
@@ -158,5 +168,9 @@ public class RethinkDbConnection implements DbServiceSPI {
             }
         }
         return new ConnectionTracingInterceptor(c, true);
+    }
+
+    private int getArrayLimit() {
+        return Integer.parseInt(System.getProperty(RETHINK_ARRAY_LIMIT_KEY, "0"));
     }
 }

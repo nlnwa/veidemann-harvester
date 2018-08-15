@@ -3,7 +3,6 @@ package no.nb.nna.veidemann.db;
 import com.google.protobuf.Timestamp;
 import com.google.protobuf.util.Timestamps;
 import com.rethinkdb.RethinkDB;
-import com.rethinkdb.model.GroupedResult;
 import com.rethinkdb.net.Cursor;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlHostGroup;
 import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
@@ -132,25 +131,29 @@ public class RethinkDbCrawlQueueAdapter implements CrawlQueueAdapter {
     public long deleteQueuedUrisForExecution(String executionId) throws DbException {
         long deleted = 0;
 
-        List<GroupedResult> response = conn.exec("db-deleteQueuedUrisForExecution",
+        List<Map<String, Object>> chgKeys = conn.exec(
                 r.table(TABLES.URI_QUEUE.name).optArg("read_mode", "majority")
                         .getAll(executionId).optArg("index", "executionId")
-                        .group("crawlHostGroupId", "politenessId")
-                        .pluck("id"));
+                        .pluck("crawlHostGroupId", "politenessId")
+                        .distinct()
+        );
 
-        for (GroupedResult<List, List> group : response) {
-            List<String> key = group.group;
-            List<Map> values = group.values.get(0);
-            try (Lock lock = aquireLock(key)) {
-                for (Map qUri : values) {
-                    long deleteResponse = conn.exec("db-deleteQueuedUrisForExecution",
-                            r.table(TABLES.URI_QUEUE.name)
-                                    .get(qUri.get("id"))
-                                    .delete()
-                                    .g("deleted")
-                    );
-                    deleted += deleteResponse;
-                }
+
+        for (Map<String, Object> group : chgKeys) {
+            List<String> chgKey = r.array(group.get("crawlHostGroupId"), group.get("politenessId"));
+            List<String> startKey = r.array(group.get("crawlHostGroupId"), group.get("politenessId"), r.minval(), r.minval());
+            List<String> endKey = r.array(group.get("crawlHostGroupId"), group.get("politenessId"), r.maxval(), r.maxval());
+
+            try (Lock lock = aquireLock(chgKey)) {
+                long deleteResponse = conn.exec("db-deleteQueuedUrisForExecution",
+                        r.table(TABLES.URI_QUEUE.name)
+                                .between(startKey, endKey)
+                                .optArg("index", "crawlHostGroupKey_sequence_earliestFetch")
+                                .filter(row -> row.g("executionId").eq(executionId))
+                                .delete()
+                                .g("deleted")
+                );
+                deleted += deleteResponse;
             } catch (InterruptedException e) {
                 LOG.info("getNextQueuedUriToFetch was interrupted");
                 throw new RuntimeException(e);

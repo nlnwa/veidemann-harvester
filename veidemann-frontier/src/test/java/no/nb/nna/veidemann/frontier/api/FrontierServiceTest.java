@@ -6,6 +6,7 @@ import no.nb.nna.veidemann.api.ConfigProto.CrawlConfig;
 import no.nb.nna.veidemann.api.FrontierProto.PageHarvestSpec;
 import no.nb.nna.veidemann.api.MessagesProto.Error;
 import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
+import no.nb.nna.veidemann.commons.ExtraStatusCodes;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.frontier.worker.CrawlExecution;
 import no.nb.nna.veidemann.frontier.worker.Frontier;
@@ -85,8 +86,13 @@ public class FrontierServiceTest {
         verify(crawlExecutionMock, times(3)).preFetch();
         verify(crawlExecutionMock, times(3)).postFetchFinally();
         verify(crawlExecutionMock).postFetchSuccess(any());
-        verify(crawlExecutionMock).postFetchFailure(any(Throwable.class));
-        verify(crawlExecutionMock).postFetchFailure(any(Error.class));
+
+        verify(crawlExecutionMock, times(1))
+                .postFetchFailure(Error.newBuilder().setCode(1).setMsg("Error").build());
+        verify(crawlExecutionMock, times(1))
+                .postFetchFailure(ExtraStatusCodes.RUNTIME_EXCEPTION
+                        .toFetchError("java.lang.RuntimeException: Simulated render exception"));
+
         verifyNoMoreInteractions(frontierMock, controller, crawlExecutionMock);
     }
 }

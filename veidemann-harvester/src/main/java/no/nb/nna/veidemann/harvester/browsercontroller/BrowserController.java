@@ -108,7 +108,9 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
             span.finish();
 
             LOG.error("Failed creating session", t);
-            throw new ClientClosedException(t.toString());
+            result.withError(ExtraStatusCodes.RUNTIME_EXCEPTION.toFetchError(t.toString()));
+
+            return result;
         }
 
         try {

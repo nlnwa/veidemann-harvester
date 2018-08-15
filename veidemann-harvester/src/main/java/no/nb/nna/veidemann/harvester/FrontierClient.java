@@ -12,6 +12,7 @@ import no.nb.nna.veidemann.api.FrontierProto.PageHarvestSpec;
 import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
 import no.nb.nna.veidemann.chrome.client.ClientClosedException;
 import no.nb.nna.veidemann.chrome.client.MaxActiveSessionsExceededException;
+import no.nb.nna.veidemann.commons.ExtraStatusCodes;
 import no.nb.nna.veidemann.commons.util.Pool;
 import no.nb.nna.veidemann.commons.util.Pool.Lease;
 import no.nb.nna.veidemann.harvester.browsercontroller.BrowserController;
@@ -136,26 +137,12 @@ public class FrontierClient implements AutoCloseable {
                 requestObserver.onCompleted();
 
                 LOG.debug("Page rendering completed");
-            } catch (ClientClosedException ex) {
-                LOG.error("Chrome client can't contact chrome", ex);
-
-                // Wait a little before to allow for possible restart of container
-                try {
-                    Thread.sleep(5000L);
-                } catch (InterruptedException e) {
-                    // OK
-                }
-
-                Status status = Status.ABORTED.withDescription(ex.toString());
-                requestObserver.onError(status.asException());
-            } catch (MaxActiveSessionsExceededException ex) {
-                LOG.debug(ex.getMessage(), ex);
-                Status status = Status.RESOURCE_EXHAUSTED.withDescription(ex.toString());
-                requestObserver.onError(status.asException());
-            } catch (Exception ex) {
-                LOG.error(ex.getMessage(), ex);
-                Status status = Status.UNKNOWN.withDescription(ex.toString());
-                requestObserver.onError(status.asException());
+            } catch (Throwable t) {
+                LOG.error("Page rendering failed: {}", t.getMessage(), t);
+                PageHarvest.Builder reply = PageHarvest.newBuilder();
+                reply.setError(ExtraStatusCodes.RUNTIME_EXCEPTION.toFetchError(t.toString()));
+                requestObserver.onNext(reply.build());
+                requestObserver.onCompleted();
             } finally {
                 MDC.clear();
             }

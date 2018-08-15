@@ -79,7 +79,7 @@
                                     <autoCreateCustomNetworks>true</autoCreateCustomNetworks>
                                     <images>
                                         <image>
-                                            <name>rethinkdb:2.3.6</name>
+                                            <name>rethinkdb:${rethinkdb.version}</name>
                                             <alias>db</alias>
                                             <run>
                                                 <network>

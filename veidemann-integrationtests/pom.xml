@@ -10,7 +10,6 @@
     <packaging>jar</packaging>
 
     <properties>
-        <veidemann.cache.version>v0.1.0-alpha7</veidemann.cache.version>
         <test.dns.server>testsites</test.dns.server>
         <!--<test.dns.server>8.8.8.8</test.dns.server>-->
     </properties>
@@ -123,7 +122,7 @@
                                     <alias>certgen</alias>
                                 </image>
                                 <image>
-                                    <name>rethinkdb:2.3.6</name>
+                                    <name>rethinkdb:${rethinkdb.version}</name>
                                     <alias>db</alias>
                                     <run>
                                         <network>
@@ -176,7 +175,7 @@
                                     </run>
                                 </image>
                                 <image>
-                                    <name>browserless/chrome:release-puppeteer-1.5.0</name>
+                                    <name>browserless/chrome:${browserless.chrome.version}</name>
                                     <alias>browser</alias>
                                     <run>
                                         <network>

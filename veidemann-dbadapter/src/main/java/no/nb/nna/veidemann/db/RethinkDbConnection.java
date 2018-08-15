@@ -15,16 +15,22 @@
  */
 package no.nb.nna.veidemann.db;
 
+import com.google.protobuf.Message;
 import com.rethinkdb.RethinkDB;
 import com.rethinkdb.ast.ReqlAst;
+import com.rethinkdb.gen.ast.Insert;
+import com.rethinkdb.gen.ast.ReqlExpr;
+import com.rethinkdb.gen.ast.Update;
 import com.rethinkdb.gen.exc.ReqlDriverError;
 import com.rethinkdb.gen.exc.ReqlError;
 import com.rethinkdb.gen.exc.ReqlOpFailedError;
 import com.rethinkdb.model.OptArgs;
 import com.rethinkdb.net.Connection;
+import no.nb.nna.veidemann.commons.db.ConfigAdapter;
 import no.nb.nna.veidemann.commons.db.CrawlQueueAdapter;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.db.DbConnectionException;
+import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbInitializer;
 import no.nb.nna.veidemann.commons.db.DbQueryException;
 import no.nb.nna.veidemann.commons.db.DbServiceSPI;
@@ -34,6 +40,7 @@ import no.nb.nna.veidemann.db.opentracing.ConnectionTracingInterceptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
 
@@ -49,6 +56,8 @@ public class RethinkDbConnection implements DbServiceSPI {
     private Connection conn;
 
     private RethinkDbAdapter dbAdapter;
+
+    private RethinkDbConfigAdapter configAdapter;
 
     private RethinkDbCrawlQueueAdapter queueAdapter;
 
@@ -107,6 +116,28 @@ public class RethinkDbConnection implements DbServiceSPI {
         }
     }
 
+    public <T extends Message> T executeInsert(String operationName, Insert qry, Class<T> type) throws DbException {
+        return executeInsertOrUpdate(operationName, qry, type);
+    }
+
+    public <T extends Message> T executeUpdate(String operationName, Update qry, Class<T> type) throws DbException {
+        return executeInsertOrUpdate(operationName, qry, type);
+    }
+
+    private <T extends Message> T executeInsertOrUpdate(String operationName, ReqlExpr qry, Class<T> type) throws DbException {
+        if (qry instanceof Insert) {
+            qry = ((Insert) qry).optArg("return_changes", "always");
+        } else if (qry instanceof Update) {
+            qry = ((Update) qry).optArg("return_changes", "always");
+        }
+
+        Map<String, Object> response = exec(operationName, qry);
+        List<Map<String, Map>> changes = (List<Map<String, Map>>) response.get("changes");
+
+        Map newDoc = changes.get(0).get("new_val");
+        return ProtoUtils.rethinkToProto(newDoc, type);
+    }
+
     @Override
     public void close() {
         conn.close();
@@ -119,6 +150,11 @@ public class RethinkDbConnection implements DbServiceSPI {
     @Override
     public DbAdapter getDbAdapter() {
         return dbAdapter;
+    }
+
+    @Override
+    public ConfigAdapter getConfigAdapter() {
+        return configAdapter;
     }
 
     @Override
@@ -136,6 +172,7 @@ public class RethinkDbConnection implements DbServiceSPI {
                 settings.getDbPassword(), 30);
 
         dbAdapter = new RethinkDbAdapter(this);
+        configAdapter = new RethinkDbConfigAdapter(this);
         queueAdapter = new RethinkDbCrawlQueueAdapter(this);
         dbInitializer = new RethinkDbInitializer(this);
     }

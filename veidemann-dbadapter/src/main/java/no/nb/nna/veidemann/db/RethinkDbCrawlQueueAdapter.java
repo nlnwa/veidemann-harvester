@@ -44,7 +44,14 @@ public class RethinkDbCrawlQueueAdapter implements CrawlQueueAdapter {
             if (!qUri.hasEarliestFetchTimeStamp()) {
                 qUri = qUri.toBuilder().setEarliestFetchTimeStamp(ProtoUtils.getNowTs()).build();
             }
-            return ((RethinkDbAdapter) conn.getDbAdapter()).saveMessage(qUri, TABLES.URI_QUEUE);
+
+            Map rMap = ProtoUtils.protoToRethink(qUri);
+            return conn.executeInsert("db-saveQueuedUri",
+                    r.table(TABLES.URI_QUEUE.name)
+                            .insert(rMap)
+                            .optArg("conflict", "replace"),
+                    QueuedUri.class
+            );
         } catch (InterruptedException e) {
             LOG.info("addToCrawlHostGroup was interrupted");
             throw new RuntimeException(e);
@@ -214,7 +221,11 @@ public class RethinkDbCrawlQueueAdapter implements CrawlQueueAdapter {
                 if (Timestamps.comparator().compare(qUri.getEarliestFetchTimeStamp(), ProtoUtils.getNowTs()) <= 0) {
                     // URI is ready to be processed, remove it from queue
                     try (Lock lock = aquireLock(crawlHostGroup.getId(), crawlHostGroup.getPolitenessId())) {
-                        ((RethinkDbAdapter) conn.getDbAdapter()).deleteConfigMessage(qUri, TABLES.URI_QUEUE);
+                        conn.exec("db-deleteQueuedUri",
+                                r.table(TABLES.URI_QUEUE.name)
+                                        .get(qUri.getId())
+                                        .delete()
+                        );
                     } catch (InterruptedException e) {
                         LOG.info("getNextQueuedUriToFetch was interrupted");
                         throw new RuntimeException(e);

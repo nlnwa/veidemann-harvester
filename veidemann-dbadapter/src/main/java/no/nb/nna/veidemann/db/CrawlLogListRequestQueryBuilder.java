@@ -43,8 +43,8 @@ public class CrawlLogListRequestQueryBuilder extends ConfigListQueryBuilder<Craw
         addFilter(request.getFilterList());
     }
 
-    public CrawlLogListReply.Builder executeList(RethinkDbAdapter db) throws DbException {
-        return executeList(db, CrawlLogListReply.newBuilder());
+    public CrawlLogListReply.Builder executeList(RethinkDbConnection conn) throws DbException {
+        return executeList(conn, CrawlLogListReply.newBuilder());
     }
 
     void buildExecutionIdQuery(String name) {

@@ -23,11 +23,10 @@ import no.nb.nna.veidemann.api.ConfigProto.CrawlJob;
 import no.nb.nna.veidemann.api.ConfigProto.CrawlScheduleConfig;
 import no.nb.nna.veidemann.api.ConfigProto.PolitenessConfig;
 import no.nb.nna.veidemann.api.ConfigProto.RoleMapping;
-import no.nb.nna.veidemann.commons.db.DbAdapter;
+import no.nb.nna.veidemann.commons.db.ConfigAdapter;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.db.ProtoUtils;
-import no.nb.nna.veidemann.db.RethinkDbAdapter;
 import org.yaml.snakeyaml.Yaml;
 
 import java.io.IOException;
@@ -44,7 +43,7 @@ public class PopulateDbWithDefaultData implements Runnable {
     }
 
     private final void populateDb() {
-        DbAdapter db = DbService.getInstance().getDbAdapter();
+        ConfigAdapter db = DbService.getInstance().getConfigAdapter();
         try {
             try (InputStream in = getClass().getClassLoader()
                     .getResourceAsStream("default_objects/schedule-configs.yaml")) {

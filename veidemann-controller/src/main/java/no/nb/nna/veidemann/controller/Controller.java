@@ -25,7 +25,6 @@ import no.nb.nna.veidemann.commons.auth.IdTokenAuAuServerInterceptor;
 import no.nb.nna.veidemann.commons.auth.IdTokenValidator;
 import no.nb.nna.veidemann.commons.auth.NoopAuAuServerInterceptor;
 import no.nb.nna.veidemann.commons.auth.UserRoleMapper;
-import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.commons.opentracing.TracerFactory;
@@ -95,12 +94,11 @@ public class Controller {
     }
 
     private AuAuServerInterceptor getAuAuServerInterceptor() {
-        DbAdapter db = DbService.getInstance().getDbAdapter();
         String issuerUrl = SETTINGS.getOpenIdConnectIssuer();
         if (issuerUrl == null || issuerUrl.isEmpty()) {
             return new NoopAuAuServerInterceptor();
         } else {
-            return new IdTokenAuAuServerInterceptor(new UserRoleMapper(db), new IdTokenValidator(issuerUrl));
+            return new IdTokenAuAuServerInterceptor(new UserRoleMapper(), new IdTokenValidator(issuerUrl));
         }
     }
 }

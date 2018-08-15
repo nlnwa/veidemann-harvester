@@ -21,8 +21,8 @@ import no.nb.nna.veidemann.api.ConfigProto.CrawlJob;
 import no.nb.nna.veidemann.api.ConfigProto.Seed;
 import no.nb.nna.veidemann.api.ControllerProto.SeedListRequest;
 import no.nb.nna.veidemann.api.MessagesProto.JobExecutionStatus;
-import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.db.DbException;
+import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.commons.util.ApiTools.ListReplyWalker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,10 +38,7 @@ public class ScheduledCrawlJob extends Task {
 
     final CrawlJob job;
 
-    final DbAdapter db;
-
-    public ScheduledCrawlJob(DbAdapter db, CrawlJob job) {
-        this.db = db;
+    public ScheduledCrawlJob(CrawlJob job) {
         this.job = job;
     }
 
@@ -53,11 +50,12 @@ public class ScheduledCrawlJob extends Task {
         SeedListRequest.Builder seedRequest = SeedListRequest.newBuilder().setCrawlJobId(job.getId());
 
         try {
-            if (db.listSeeds(seedRequest.build()).getCount() > 0) {
-                JobExecutionStatus jobExecutionStatus = db.createJobExecutionStatus(job.getId());
+            if (DbService.getInstance().getConfigAdapter().listSeeds(seedRequest.build()).getCount() > 0) {
+                JobExecutionStatus jobExecutionStatus = DbService.getInstance().getDbAdapter()
+                        .createJobExecutionStatus(job.getId());
 
                 walker.walk(seedRequest,
-                        req -> db.listSeeds(req),
+                        req -> DbService.getInstance().getConfigAdapter().listSeeds(req),
                         seed -> crawlSeed(job, seed, jobExecutionStatus));
 
                 LOG.info("All seeds for job '{}' started", job.getMeta().getName());

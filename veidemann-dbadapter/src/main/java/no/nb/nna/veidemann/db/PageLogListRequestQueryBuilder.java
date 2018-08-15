@@ -43,8 +43,8 @@ public class PageLogListRequestQueryBuilder extends ConfigListQueryBuilder<PageL
         addFilter(request.getFilterList());
     }
 
-    public PageLogListReply.Builder executeList(RethinkDbAdapter db) throws DbException {
-        return executeList(db, PageLogListReply.newBuilder());
+    public PageLogListReply.Builder executeList(RethinkDbConnection conn) throws DbException {
+        return executeList(conn, PageLogListReply.newBuilder());
     }
 
     void buildExecutionIdQuery(String name) {

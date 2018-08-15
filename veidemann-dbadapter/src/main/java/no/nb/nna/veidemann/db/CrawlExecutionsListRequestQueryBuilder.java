@@ -53,8 +53,8 @@ public class CrawlExecutionsListRequestQueryBuilder extends ConfigListQueryBuild
         }
     }
 
-    public ExecutionsListReply.Builder executeList(RethinkDbAdapter db) throws DbException {
-        return executeList(db, ExecutionsListReply.newBuilder());
+    public ExecutionsListReply.Builder executeList(RethinkDbConnection conn) throws DbException {
+        return executeList(conn, ExecutionsListReply.newBuilder());
     }
 
 }

@@ -81,7 +81,7 @@ public class CrawlExecution {
         ControllerProto.GetRequest jobRequest = ControllerProto.GetRequest.newBuilder()
                 .setId(status.getJobId())
                 .build();
-        CrawlJob job = DbService.getInstance().getDbAdapter().getCrawlJob(jobRequest);
+        CrawlJob job = DbService.getInstance().getConfigAdapter().getCrawlJob(jobRequest);
 
         try {
             this.qUri = QueuedUriWrapper.getQueuedUriWrapper(queuedUri).clearError();

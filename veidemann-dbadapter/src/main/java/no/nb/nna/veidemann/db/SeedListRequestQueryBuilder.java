@@ -47,8 +47,8 @@ public class SeedListRequestQueryBuilder extends ConfigListQueryBuilder<SeedList
         }
     }
 
-    public SeedListReply.Builder executeList(RethinkDbAdapter db) throws DbException {
-        return executeList(db, SeedListReply.newBuilder());
+    public SeedListReply.Builder executeList(RethinkDbConnection conn) throws DbException {
+        return executeList(conn, SeedListReply.newBuilder());
     }
 
 }

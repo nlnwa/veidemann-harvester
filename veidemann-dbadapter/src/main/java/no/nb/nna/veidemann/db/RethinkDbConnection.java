@@ -100,8 +100,10 @@ public class RethinkDbConnection implements DbServiceSPI {
                 }
                 return result;
             } catch (ReqlOpFailedError e) {
-                if (System.currentTimeMillis() < startTime + MAX_WAIT_FOR_DB_MILLIS
-                        && e.getMessage().contains("primary replica")) {
+                if (System.currentTimeMillis() < startTime + MAX_WAIT_FOR_DB_MILLIS && (
+                        e.getMessage().contains("primary replica")
+                                || e.getMessage().contains("java.net.SocketException: Operation timed out (Read failed)")
+                )) {
                     LOG.error("DB not available at attempt #{}, waiting. Cause: {}", retries, e.toString(), e);
                     r.db(conn.db().get()).wait_().optArg("wait_for", "ready_for_writes").run(conn);
                     retries++;

@@ -19,6 +19,7 @@ import no.nb.nna.veidemann.api.ConfigProto.CrawlEntity;
 import no.nb.nna.veidemann.api.ConfigProto.Meta;
 import no.nb.nna.veidemann.api.ControllerProto.CrawlEntityListReply;
 import no.nb.nna.veidemann.api.ControllerProto.ListRequest;
+import no.nb.nna.veidemann.commons.db.ConfigAdapter;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.commons.settings.CommonSettings;
@@ -35,7 +36,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * These tests are dependent on a running RethinkDB instance.
  */
 public class ConfigListQueryBuilderTestIT {
-    public static RethinkDbAdapter db;
+    public static ConfigAdapter db;
 
     static CrawlEntity e1, e2, e3, e4, e5;
 
@@ -62,7 +63,7 @@ public class ConfigListQueryBuilderTestIT {
         }
         DbService.getInstance().getDbInitializer().initialize();
 
-        db = (RethinkDbAdapter) DbService.getInstance().getDbAdapter();
+        db = DbService.getInstance().getConfigAdapter();
 
         e1 = db.saveCrawlEntity(CrawlEntity.newBuilder()
                 .setMeta(Meta.newBuilder()

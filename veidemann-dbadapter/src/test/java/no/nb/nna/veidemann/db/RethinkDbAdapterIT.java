@@ -81,7 +81,8 @@ import static org.assertj.core.api.Assertions.fail;
  */
 public class RethinkDbAdapterIT {
 
-    public static RethinkDbAdapter db;
+    public static RethinkDbConfigAdapter configAdapter;
+    public static RethinkDbAdapter dbAdapter;
 
     static RethinkDB r = RethinkDB.r;
 
@@ -112,7 +113,8 @@ public class RethinkDbAdapterIT {
         }
         DbService.getInstance().getDbInitializer().initialize();
 
-        db = (RethinkDbAdapter) DbService.getInstance().getDbAdapter();
+        dbAdapter = (RethinkDbAdapter) DbService.getInstance().getDbAdapter();
+        configAdapter = (RethinkDbConfigAdapter) DbService.getInstance().getConfigAdapter();
     }
 
     @AfterClass
@@ -124,7 +126,7 @@ public class RethinkDbAdapterIT {
     public void cleanDb() throws DbException {
         for (RethinkDbAdapter.TABLES table : RethinkDbAdapter.TABLES.values()) {
             if (table != RethinkDbAdapter.TABLES.SYSTEM) {
-                db.executeRequest("delete", r.table(table.name).delete());
+                dbAdapter.executeRequest("delete", r.table(table.name).delete());
             }
         }
     }
@@ -148,7 +150,7 @@ public class RethinkDbAdapterIT {
                 .build();
 
         OffsetDateTime start = OffsetDateTime.now();
-        CrawlEntity result = db.saveCrawlEntity(entity);
+        CrawlEntity result = configAdapter.saveCrawlEntity(entity);
 
         assertThat(result.getId()).isNotEmpty();
         assertThat(result.getMeta().getName()).isEqualTo("Nasjonalbiblioteket");
@@ -173,7 +175,7 @@ public class RethinkDbAdapterIT {
                 .setId(result.getId())
                 .build();
 
-        CrawlEntity overrideResult = db.saveCrawlEntity(override);
+        CrawlEntity overrideResult = configAdapter.saveCrawlEntity(override);
 
         assertThat(overrideResult.getId()).isEqualTo(result.getId());
         assertThat(overrideResult.getMeta().getName()).isEqualTo("Nasjonalbiblioteket");
@@ -203,7 +205,7 @@ public class RethinkDbAdapterIT {
                 .build();
 
         start = OffsetDateTime.now();
-        overrideResult = db.saveCrawlEntity(override);
+        overrideResult = configAdapter.saveCrawlEntity(override);
 
         assertThat(overrideResult.getId()).isEqualTo(result.getId());
         assertThat(overrideResult.getMeta().getName()).isEqualTo("Foo");
@@ -255,7 +257,7 @@ public class RethinkDbAdapterIT {
                         .addLabel(fooHigh)
                         .setCreated(ProtoUtils.odtToTs(OffsetDateTime.parse("2017-04-06T06:20:35.779Z"))))
                 .build();
-        entity1 = db.saveCrawlEntity(entity1);
+        entity1 = configAdapter.saveCrawlEntity(entity1);
 
         CrawlEntity entity2 = CrawlEntity.newBuilder()
                 .setMeta(Meta.newBuilder()
@@ -266,7 +268,7 @@ public class RethinkDbAdapterIT {
                         .addLabel(priHigh)
                         .setCreated(ProtoUtils.odtToTs(OffsetDateTime.parse("2017-04-06T06:20:35.779Z"))))
                 .build();
-        entity2 = db.saveCrawlEntity(entity2);
+        entity2 = configAdapter.saveCrawlEntity(entity2);
 
         CrawlEntity entity3 = CrawlEntity.newBuilder()
                 .setMeta(Meta.newBuilder()
@@ -276,71 +278,71 @@ public class RethinkDbAdapterIT {
                         .addLabel(fooLowest)
                         .setCreated(ProtoUtils.odtToTs(OffsetDateTime.parse("2017-04-06T06:20:35.779Z"))))
                 .build();
-        entity3 = db.saveCrawlEntity(entity3);
+        entity3 = configAdapter.saveCrawlEntity(entity3);
 
         ListRequest request = ListRequest.getDefaultInstance();
-        CrawlEntityListReply result = db.listCrawlEntities(request);
+        CrawlEntityListReply result = configAdapter.listCrawlEntities(request);
         assertThat(result.getValueCount()).isEqualTo(3);
         assertThat(result.getCount()).isEqualTo(3);
         assertThat(result.getValueList()).contains(entity1, entity2, entity3);
 
         GetRequest getId = GetRequest.newBuilder().setId(entity1.getId()).build();
-        CrawlEntity resultEntity = db.getCrawlEntity(getId);
+        CrawlEntity resultEntity = configAdapter.getCrawlEntity(getId);
         assertThat(resultEntity).isEqualTo(entity1);
 
         request = ListRequest.newBuilder().setName("^nasj.*").build();
-        result = db.listCrawlEntities(request);
+        result = configAdapter.listCrawlEntities(request);
         assertThat(result.getValueCount()).isEqualTo(2);
         assertThat(result.getCount()).isEqualTo(2);
         assertThat(result.getValueList()).contains(entity1, entity3);
 
         request = ListRequest.newBuilder().setName(".*biblioteket$").build();
-        result = db.listCrawlEntities(request);
+        result = configAdapter.listCrawlEntities(request);
         assertThat(result.getValueCount()).isEqualTo(1);
         assertThat(result.getCount()).isEqualTo(1);
         assertThat(result.getValueList()).contains(entity1);
 
         request = ListRequest.newBuilder().setName(".*ball.*").build();
-        result = db.listCrawlEntities(request);
+        result = configAdapter.listCrawlEntities(request);
         assertThat(result.getValueCount()).isEqualTo(1);
         assertThat(result.getCount()).isEqualTo(1);
         assertThat(result.getValueList()).contains(entity3);
 
         request = ListRequest.newBuilder().setPageSize(2).build();
-        result = db.listCrawlEntities(request);
+        result = configAdapter.listCrawlEntities(request);
         assertThat(result.getValueCount()).isEqualTo(2);
         assertThat(result.getCount()).isEqualTo(3);
         assertThat(result.getValueList()).contains(entity3, entity1);
 
         request = ListRequest.newBuilder().setPageSize(2).setPage(1).build();
-        result = db.listCrawlEntities(request);
+        result = configAdapter.listCrawlEntities(request);
         assertThat(result.getValueCount()).isEqualTo(1);
         assertThat(result.getCount()).isEqualTo(3);
         assertThat(result.getValueList()).contains(entity2);
 
         // Select on label
         request = ListRequest.newBuilder().addLabelSelector(freqHourlySelector).build();
-        result = db.listCrawlEntities(request);
+        result = configAdapter.listCrawlEntities(request);
         assertThat(result.getCount()).isEqualTo(2);
         assertThat(result.getValueList()).contains(entity2, entity3);
 
         request = ListRequest.newBuilder().addLabelSelector(freqHourlySelector).addLabelSelector(orgNewsSelector).build();
-        result = db.listCrawlEntities(request);
+        result = configAdapter.listCrawlEntities(request);
         assertThat(result.getCount()).isEqualTo(1);
         assertThat(result.getValueList()).contains(entity2);
 
         request = ListRequest.newBuilder().addLabelSelector(fooLowTruncSelector).build();
-        result = db.listCrawlEntities(request);
+        result = configAdapter.listCrawlEntities(request);
         assertThat(result.getCount()).isEqualTo(2);
         assertThat(result.getValueList()).contains(entity2, entity3);
 
         request = ListRequest.newBuilder().addLabelSelector(anyHighSelector).build();
-        result = db.listCrawlEntities(request);
+        result = configAdapter.listCrawlEntities(request);
         assertThat(result.getCount()).isEqualTo(2);
         assertThat(result.getValueList()).contains(entity1, entity2);
 
         request = ListRequest.newBuilder().addLabelSelector(anyLowTruncSelector).build();
-        result = db.listCrawlEntities(request);
+        result = configAdapter.listCrawlEntities(request);
         assertThat(result.getCount()).isEqualTo(2);
         assertThat(result.getValueList()).contains(entity2, entity3);
     }
@@ -364,7 +366,7 @@ public class RethinkDbAdapterIT {
                                 .setValue("Culture"))
                         .setCreated(ProtoUtils.odtToTs(OffsetDateTime.parse("2017-04-06T06:20:35.779Z"))))
                 .build();
-        entity1 = db.saveCrawlEntity(entity1);
+        entity1 = configAdapter.saveCrawlEntity(entity1);
 
         CrawlEntity entity2 = CrawlEntity.newBuilder()
                 .setMeta(Meta.newBuilder()
@@ -377,15 +379,15 @@ public class RethinkDbAdapterIT {
                                 .setValue("News"))
                         .setCreated(ProtoUtils.odtToTs(OffsetDateTime.parse("2017-04-06T06:20:35.779Z"))))
                 .build();
-        entity2 = db.saveCrawlEntity(entity2);
+        entity2 = configAdapter.saveCrawlEntity(entity2);
 
-        CrawlEntityListReply result = db.listCrawlEntities(ListRequest.getDefaultInstance());
+        CrawlEntityListReply result = configAdapter.listCrawlEntities(ListRequest.getDefaultInstance());
         assertThat(result.getValueCount()).isEqualTo(2);
         assertThat(result.getValueList()).contains(entity1, entity2);
 
-        db.deleteCrawlEntity(entity2);
+        configAdapter.deleteCrawlEntity(entity2);
 
-        result = db.listCrawlEntities(ListRequest.getDefaultInstance());
+        result = configAdapter.listCrawlEntities(ListRequest.getDefaultInstance());
         assertThat(result.getValueCount()).isEqualTo(1);
         assertThat(result.getValueList()).contains(entity1);
         assertThat(result.getValueList()).doesNotContain(entity2);
@@ -409,18 +411,18 @@ public class RethinkDbAdapterIT {
                 .setWarcId("warc-id3")
                 .build();
 
-        assertThat(db.hasCrawledContent(cc1).isPresent()).isFalse();
-        db.saveCrawlLog(CrawlLog.newBuilder()
+        assertThat(dbAdapter.hasCrawledContent(cc1).isPresent()).isFalse();
+        dbAdapter.saveCrawlLog(CrawlLog.newBuilder()
                 .setWarcId(cc1.getWarcId())
                 .setJobExecutionId("jeid")
                 .setExecutionId("ceid")
                 .build());
 
-        Optional<CrawledContent> r2 = db.hasCrawledContent(cc2);
+        Optional<CrawledContent> r2 = dbAdapter.hasCrawledContent(cc2);
         assertThat(r2.isPresent()).isTrue();
         assertThat(r2.get()).isEqualTo(cc1);
 
-        Optional<CrawledContent> r3 = db.hasCrawledContent(cc3);
+        Optional<CrawledContent> r3 = dbAdapter.hasCrawledContent(cc3);
         assertThat(r3.isPresent()).isTrue();
         assertThat(r3.get()).isEqualTo(cc1);
 
@@ -428,7 +430,7 @@ public class RethinkDbAdapterIT {
                 .setWarcId("warc-id4")
                 .build();
 
-        assertThatThrownBy(() -> db.hasCrawledContent(cc4))
+        assertThatThrownBy(() -> dbAdapter.hasCrawledContent(cc4))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("The required field 'digest' is missing from: 'CrawledContent");
     }
@@ -443,9 +445,9 @@ public class RethinkDbAdapterIT {
                 .setWarcId("warc-id")
                 .build();
 
-        db.hasCrawledContent(cc);
-        db.deleteCrawledContent(cc.getDigest());
-        db.deleteCrawledContent(cc.getDigest());
+        dbAdapter.hasCrawledContent(cc);
+        dbAdapter.deleteCrawledContent(cc.getDigest());
+        dbAdapter.deleteCrawledContent(cc.getDigest());
     }
 
     /**
@@ -458,10 +460,10 @@ public class RethinkDbAdapterIT {
                 .setText("text")
                 .build();
 
-        ExtractedText result1 = db.addExtractedText(et1);
+        ExtractedText result1 = dbAdapter.addExtractedText(et1);
         assertThat(result1).isEqualTo(et1);
 
-        assertThatThrownBy(() -> db.addExtractedText(et1))
+        assertThatThrownBy(() -> dbAdapter.addExtractedText(et1))
                 .isInstanceOf(DbException.class)
                 .hasMessageContaining("Duplicate primary key");
 
@@ -469,7 +471,7 @@ public class RethinkDbAdapterIT {
                 .setText("text")
                 .build();
 
-        assertThatThrownBy(() -> db.addExtractedText(et2))
+        assertThatThrownBy(() -> dbAdapter.addExtractedText(et2))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("The required field 'warc_id' is missing from: 'ExtractedText");
     }
@@ -484,7 +486,7 @@ public class RethinkDbAdapterIT {
                 .setJobExecutionId("jeid")
                 .setExecutionId("eid")
                 .build();
-        CrawlLog result = db.saveCrawlLog(cl);
+        CrawlLog result = dbAdapter.saveCrawlLog(cl);
         assertThat(result.getContentType()).isEqualTo("text/plain");
         assertThat(result.getWarcId()).isNotEmpty();
     }
@@ -499,7 +501,7 @@ public class RethinkDbAdapterIT {
                 .setScript("code")
                 .build();
 
-        BrowserScript result = db.saveBrowserScript(script);
+        BrowserScript result = configAdapter.saveBrowserScript(script);
         assertThat(result.getId()).isNotEmpty();
         assertThat(result.getScript()).isEqualTo("code");
         assertThat(ApiTools.hasLabel(result.getMeta(), ApiTools.buildLabel("type", "login"))).isTrue();
@@ -511,21 +513,21 @@ public class RethinkDbAdapterIT {
                 .setEmail("test")
                 .addRole(Role.ADMIN).build();
 
-        RoleMapping result = db.saveRoleMapping(rm);
+        RoleMapping result = configAdapter.saveRoleMapping(rm);
         assertThat(result.getId()).isNotEmpty();
         assertThat(result.getEmail()).isEqualTo("test");
         assertThat(result.getRoleList()).containsExactly(Role.ADMIN);
 
-        RoleMappingsListReply resultList = db.listRoleMappings(RoleMappingsListRequest.getDefaultInstance());
+        RoleMappingsListReply resultList = configAdapter.listRoleMappings(RoleMappingsListRequest.getDefaultInstance());
         assertThat(resultList.getValueCount()).isEqualTo((int) resultList.getCount()).isEqualTo(1);
         assertThat(resultList.getValue(0)).isEqualTo(result);
 
-        resultList = db.listRoleMappings(RoleMappingsListRequest.newBuilder().setId(result.getId()).build());
+        resultList = configAdapter.listRoleMappings(RoleMappingsListRequest.newBuilder().setId(result.getId()).build());
         assertThat(resultList.getValueCount()).isEqualTo((int) resultList.getCount()).isEqualTo(1);
         assertThat(resultList.getValue(0)).isEqualTo(result);
 
-        db.deleteRoleMapping(result);
-        resultList = db.listRoleMappings(RoleMappingsListRequest.getDefaultInstance());
+        configAdapter.deleteRoleMapping(result);
+        resultList = configAdapter.listRoleMappings(RoleMappingsListRequest.getDefaultInstance());
         assertThat(resultList.getValueCount()).isEqualTo((int) resultList.getCount()).isEqualTo(0);
     }
 
@@ -543,28 +545,28 @@ public class RethinkDbAdapterIT {
                         ApiTools.buildLabel("type", "extract_outlinks")))
                 .setScript("code")
                 .build();
-        script1 = db.saveBrowserScript(script1);
-        script2 = db.saveBrowserScript(script2);
+        script1 = configAdapter.saveBrowserScript(script1);
+        script2 = configAdapter.saveBrowserScript(script2);
 
         ListRequest request = ListRequest.getDefaultInstance();
-        BrowserScriptListReply result = db.listBrowserScripts(request);
+        BrowserScriptListReply result = configAdapter.listBrowserScripts(request);
         assertThat(result.getValueCount()).isEqualTo(2);
         assertThat(result.getCount()).isEqualTo(2);
         assertThat(result.getValueList()).containsExactly(script2, script1);
 
         request = ListRequest.newBuilder().addLabelSelector("type:extract_outlinks").build();
-        result = db.listBrowserScripts(request);
+        result = configAdapter.listBrowserScripts(request);
         assertThat(result.getValueCount()).isEqualTo(1);
         assertThat(result.getCount()).isEqualTo(1);
         assertThat(result.getValueList()).containsExactly(script2);
 
         request = ListRequest.newBuilder().addLabelSelector("type:behavior").build();
-        result = db.listBrowserScripts(request);
+        result = configAdapter.listBrowserScripts(request);
         assertThat(result.getValueCount()).isEqualTo(0);
         assertThat(result.getCount()).isEqualTo(0);
 
         request = ListRequest.newBuilder().setName("extr.*").build();
-        result = db.listBrowserScripts(request);
+        result = configAdapter.listBrowserScripts(request);
         assertThat(result.getValueCount()).isEqualTo(1);
         assertThat(result.getCount()).isEqualTo(1);
         assertThat(result.getValueList()).containsExactly(script2);
@@ -607,13 +609,13 @@ public class RethinkDbAdapterIT {
      */
     @Test
     public void testSaveAndListSeeds() throws DbException {
-        CrawlEntity entity1 = db.saveCrawlEntity(CrawlEntity.newBuilder()
+        CrawlEntity entity1 = configAdapter.saveCrawlEntity(CrawlEntity.newBuilder()
                 .setMeta(Meta.newBuilder()
                         .setName("Nasjonalbiblioteket")
                         .setCreated(ProtoUtils.odtToTs(OffsetDateTime.parse("2017-04-06T06:20:35.779Z"))))
                 .build());
 
-        CrawlEntity entity2 = db.saveCrawlEntity(CrawlEntity.newBuilder()
+        CrawlEntity entity2 = configAdapter.saveCrawlEntity(CrawlEntity.newBuilder()
                 .setMeta(Meta.newBuilder()
                         .setName("Foo")
                         .setCreated(ProtoUtils.odtToTs(OffsetDateTime.parse("2017-04-06T06:20:35.779Z"))))
@@ -624,7 +626,7 @@ public class RethinkDbAdapterIT {
                 .addJobId("job1")
                 .setEntityId(entity1.getId())
                 .build();
-        Seed savedSeed1 = db.saveSeed(seed1);
+        Seed savedSeed1 = configAdapter.saveSeed(seed1);
 
         Seed seed2 = Seed.newBuilder()
                 .setMeta(Meta.newBuilder().setName("http://seed2.foo"))
@@ -632,25 +634,25 @@ public class RethinkDbAdapterIT {
                 .addJobId("job2")
                 .setEntityId(entity2.getId())
                 .build();
-        Seed savedSeed2 = db.saveSeed(seed2);
+        Seed savedSeed2 = configAdapter.saveSeed(seed2);
 
         Seed seed3 = Seed.newBuilder()
                 .setMeta(Meta.newBuilder().setName("http://seed3.foo"))
                 .addJobId("job2")
                 .setEntityId(entity1.getId())
                 .build();
-        Seed savedSeed3 = db.saveSeed(seed3);
+        Seed savedSeed3 = configAdapter.saveSeed(seed3);
 
         SeedListRequest request = SeedListRequest.newBuilder().setCrawlJobId("job1").build();
-        SeedListReply result = db.listSeeds(request);
+        SeedListReply result = configAdapter.listSeeds(request);
         assertThat(result.getValueList()).containsOnly(savedSeed1, savedSeed2);
 
         request = SeedListRequest.newBuilder().setEntityId(entity1.getId()).build();
-        result = db.listSeeds(request);
+        result = configAdapter.listSeeds(request);
         assertThat(result.getValueList()).containsOnly(savedSeed1, savedSeed3);
 
         request = SeedListRequest.newBuilder().setEntityId(entity2.getId()).build();
-        result = db.listSeeds(request);
+        result = configAdapter.listSeeds(request);
         assertThat(result.getValueList()).containsOnly(savedSeed2);
     }
 
@@ -662,7 +664,7 @@ public class RethinkDbAdapterIT {
     public void testDeleteSeed() throws DbException {
         System.out.println("deleteSeed");
         ConfigProto.Seed seed = null;
-        RethinkDbAdapter instance = null;
+        RethinkDbConfigAdapter instance = null;
         Empty expResult = null;
         Empty result = instance.deleteSeed(seed);
 //        assertEquals(expResult, result);
@@ -675,19 +677,19 @@ public class RethinkDbAdapterIT {
      */
     @Test
     public void testSaveAndListCrawlJob() throws DbException {
-        CrawlScheduleConfig schedule = db.saveCrawlScheduleConfig(ConfigProto.CrawlScheduleConfig.newBuilder()
+        CrawlScheduleConfig schedule = configAdapter.saveCrawlScheduleConfig(ConfigProto.CrawlScheduleConfig.newBuilder()
                 .setCronExpression("* * * * *")
                 .setMeta(Meta.newBuilder().setName("Every minute")).build());
 
-        BrowserConfig browserConfig = db.saveBrowserConfig(ConfigProto.BrowserConfig.newBuilder()
+        BrowserConfig browserConfig = configAdapter.saveBrowserConfig(ConfigProto.BrowserConfig.newBuilder()
                 .setMeta(Meta.newBuilder().setName("Test browser config"))
                 .setWindowWidth(100).build());
 
-        PolitenessConfig politenessConfig = db.savePolitenessConfig(ConfigProto.PolitenessConfig.newBuilder()
+        PolitenessConfig politenessConfig = configAdapter.savePolitenessConfig(ConfigProto.PolitenessConfig.newBuilder()
                 .setMeta(Meta.newBuilder().setName("Test politeness config"))
                 .setMinTimeBetweenPageLoadMs(500).build());
 
-        CrawlConfig crawlConfig = db.saveCrawlConfig(ConfigProto.CrawlConfig.newBuilder()
+        CrawlConfig crawlConfig = configAdapter.saveCrawlConfig(ConfigProto.CrawlConfig.newBuilder()
                 .setMeta(Meta.newBuilder().setName("Test crawl config"))
                 .setBrowserConfigId(browserConfig.getId())
                 .setPolitenessId(politenessConfig.getId()).build());
@@ -698,10 +700,10 @@ public class RethinkDbAdapterIT {
                 .setCrawlConfigId(crawlConfig.getId())
                 .build();
 
-        CrawlJob result = db.saveCrawlJob(crawlJob);
+        CrawlJob result = configAdapter.saveCrawlJob(crawlJob);
         assertThat(result.getId()).isNotEmpty();
 
-        assertThat(db.listCrawlJobs(ListRequest.getDefaultInstance()))
+        assertThat(configAdapter.listCrawlJobs(ListRequest.getDefaultInstance()))
                 .satisfies(r -> {
                     assertThat(r.getCount()).isEqualTo(1);
                     assertThat(r.getValue(0).getMeta().getName()).isEqualTo("Test job");
@@ -709,7 +711,7 @@ public class RethinkDbAdapterIT {
                             .isEqualTo(schedule.getId());
                 });
 
-        assertThat(db.listCrawlScheduleConfigs(ListRequest.getDefaultInstance()))
+        assertThat(configAdapter.listCrawlScheduleConfigs(ListRequest.getDefaultInstance()))
                 .satisfies(r -> {
                     assertThat(r.getCount()).isEqualTo(1);
                     assertThat(r.getValue(0).getId()).isEqualTo(result.getScheduleId());
@@ -718,7 +720,7 @@ public class RethinkDbAdapterIT {
                 });
 
         Map<String, String> id = new HashMap<>();
-        assertThat(db.listCrawlConfigs(ListRequest.getDefaultInstance()))
+        assertThat(configAdapter.listCrawlConfigs(ListRequest.getDefaultInstance()))
                 .satisfies(r -> {
                     assertThat(r.getCount()).isEqualTo(1);
                     assertThat(r.getValue(0).getId()).isEqualTo(result.getCrawlConfigId());
@@ -727,7 +729,7 @@ public class RethinkDbAdapterIT {
                     id.put("politenessConfig", r.getValue(0).getPolitenessId());
                 });
 
-        assertThat(db.listBrowserConfigs(ListRequest.getDefaultInstance()))
+        assertThat(configAdapter.listBrowserConfigs(ListRequest.getDefaultInstance()))
                 .satisfies(r -> {
                     assertThat(r.getCount()).isEqualTo(1);
                     assertThat(r.getValue(0).getId()).isEqualTo(id.get("browserConfig"));
@@ -735,7 +737,7 @@ public class RethinkDbAdapterIT {
                     assertThat(r.getValue(0).getMeta().getName()).isEqualTo("Test browser config");
                 });
 
-        assertThat(db.listPolitenessConfigs(ListRequest.getDefaultInstance()))
+        assertThat(configAdapter.listPolitenessConfigs(ListRequest.getDefaultInstance()))
                 .satisfies(r -> {
                     assertThat(r.getCount()).isEqualTo(1);
                     assertThat(r.getValue(0).getId()).isEqualTo(id.get("politenessConfig"));
@@ -747,7 +749,7 @@ public class RethinkDbAdapterIT {
                 .setMeta(Meta.newBuilder().setName("Test job"))
                 .build();
 
-        assertThatThrownBy(() -> db.saveCrawlJob(badCrawlJob))
+        assertThatThrownBy(() -> configAdapter.saveCrawlJob(badCrawlJob))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("A crawl config is required for crawl jobs");
 
@@ -758,7 +760,7 @@ public class RethinkDbAdapterIT {
      */
     @Test
     public void testDeleteCrawlJob() throws DbException {
-        CrawlConfig crawlConfig = db.saveCrawlConfig(CrawlConfig.newBuilder()
+        CrawlConfig crawlConfig = configAdapter.saveCrawlConfig(CrawlConfig.newBuilder()
                 .setMeta(Meta.newBuilder().setName("Test crawl config")).build());
 
         CrawlJob crawlJob = CrawlJob.newBuilder()
@@ -766,27 +768,27 @@ public class RethinkDbAdapterIT {
                 .setCrawlConfigId(crawlConfig.getId())
                 .build();
 
-        CrawlJob result = db.saveCrawlJob(crawlJob);
-        assertThat(db.listCrawlJobs(ListRequest.getDefaultInstance()).getCount()).isEqualTo(1);
-        db.deleteCrawlJob(crawlJob);
-        assertThat(db.listCrawlJobs(ListRequest.getDefaultInstance()).getCount()).isEqualTo(1);
-        db.deleteCrawlJob(result);
-        assertThat(db.listCrawlJobs(ListRequest.getDefaultInstance()).getCount()).isEqualTo(0);
+        CrawlJob result = configAdapter.saveCrawlJob(crawlJob);
+        assertThat(configAdapter.listCrawlJobs(ListRequest.getDefaultInstance()).getCount()).isEqualTo(1);
+        configAdapter.deleteCrawlJob(crawlJob);
+        assertThat(configAdapter.listCrawlJobs(ListRequest.getDefaultInstance()).getCount()).isEqualTo(1);
+        configAdapter.deleteCrawlJob(result);
+        assertThat(configAdapter.listCrawlJobs(ListRequest.getDefaultInstance()).getCount()).isEqualTo(0);
 
-        CrawlJob toBeDeleted = db.saveCrawlJob(crawlJob);
+        CrawlJob toBeDeleted = configAdapter.saveCrawlJob(crawlJob);
         Seed seed = Seed.newBuilder()
                 .setMeta(Meta.newBuilder().setName("Test seed"))
                 .addJobId(toBeDeleted.getId())
                 .build();
 
-        seed = db.saveSeed(seed);
+        seed = configAdapter.saveSeed(seed);
 
-        assertThatThrownBy(() -> db.deleteCrawlJob(toBeDeleted))
+        assertThatThrownBy(() -> configAdapter.deleteCrawlJob(toBeDeleted))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Can't delete CrawlJob, there are 1 Seed(s) referring it");
 
-        db.deleteSeed(seed);
-        db.deleteCrawlJob(toBeDeleted);
+        configAdapter.deleteSeed(seed);
+        configAdapter.deleteCrawlJob(toBeDeleted);
     }
 
     /**
@@ -797,7 +799,7 @@ public class RethinkDbAdapterIT {
     public void testListCrawlConfigs() throws DbException {
         System.out.println("listCrawlConfigs");
         ListRequest request = null;
-        RethinkDbAdapter instance = null;
+        RethinkDbConfigAdapter instance = null;
         ControllerProto.CrawlConfigListReply expResult = null;
         ControllerProto.CrawlConfigListReply result = instance.listCrawlConfigs(request);
 //        assertEquals(expResult, result);
@@ -813,7 +815,7 @@ public class RethinkDbAdapterIT {
     public void testSaveCrawlConfig() throws DbException {
         System.out.println("saveCrawlConfig");
         ConfigProto.CrawlConfig crawlConfig = null;
-        RethinkDbAdapter instance = null;
+        RethinkDbConfigAdapter instance = null;
         ConfigProto.CrawlConfig expResult = null;
         ConfigProto.CrawlConfig result = instance.saveCrawlConfig(crawlConfig);
 //        assertEquals(expResult, result);
@@ -829,7 +831,7 @@ public class RethinkDbAdapterIT {
     public void testDeleteCrawlConfig() throws DbException {
         System.out.println("deleteCrawlConfig");
         ConfigProto.CrawlConfig crawlConfig = null;
-        RethinkDbAdapter instance = null;
+        RethinkDbConfigAdapter instance = null;
         Empty expResult = null;
         Empty result = instance.deleteCrawlConfig(crawlConfig);
 //        assertEquals(expResult, result);
@@ -845,7 +847,7 @@ public class RethinkDbAdapterIT {
     public void testListCrawlScheduleConfigs() throws DbException {
         System.out.println("listCrawlScheduleConfigs");
         ListRequest request = null;
-        RethinkDbAdapter instance = null;
+        RethinkDbConfigAdapter instance = null;
         ControllerProto.CrawlScheduleConfigListReply expResult = null;
         ControllerProto.CrawlScheduleConfigListReply result = instance.listCrawlScheduleConfigs(request);
 //        assertEquals(expResult, result);
@@ -861,7 +863,7 @@ public class RethinkDbAdapterIT {
     public void testSaveCrawlScheduleConfig() throws DbException {
         System.out.println("saveCrawlScheduleConfig");
         ConfigProto.CrawlScheduleConfig crawlScheduleConfig = null;
-        RethinkDbAdapter instance = null;
+        RethinkDbConfigAdapter instance = null;
         CrawlScheduleConfig expResult = null;
         ConfigProto.CrawlScheduleConfig result = instance.saveCrawlScheduleConfig(crawlScheduleConfig);
 //        assertEquals(expResult, result);
@@ -879,16 +881,16 @@ public class RethinkDbAdapterIT {
                 .setMeta(Meta.newBuilder().setName("Every minute"))
                 .build();
 
-        CrawlScheduleConfig result = db.saveCrawlScheduleConfig(scheduleConfig);
-        assertThat(db.listCrawlScheduleConfigs(ListRequest.getDefaultInstance()).getCount()).isEqualTo(1);
-        db.deleteCrawlScheduleConfig(scheduleConfig);
-        assertThat(db.listCrawlScheduleConfigs(ListRequest.getDefaultInstance()).getCount()).isEqualTo(1);
-        db.deleteCrawlScheduleConfig(result);
-        assertThat(db.listCrawlScheduleConfigs(ListRequest.getDefaultInstance()).getCount()).isEqualTo(0);
+        CrawlScheduleConfig result = configAdapter.saveCrawlScheduleConfig(scheduleConfig);
+        assertThat(configAdapter.listCrawlScheduleConfigs(ListRequest.getDefaultInstance()).getCount()).isEqualTo(1);
+        configAdapter.deleteCrawlScheduleConfig(scheduleConfig);
+        assertThat(configAdapter.listCrawlScheduleConfigs(ListRequest.getDefaultInstance()).getCount()).isEqualTo(1);
+        configAdapter.deleteCrawlScheduleConfig(result);
+        assertThat(configAdapter.listCrawlScheduleConfigs(ListRequest.getDefaultInstance()).getCount()).isEqualTo(0);
 
-        CrawlScheduleConfig toBeDeleted = db.saveCrawlScheduleConfig(scheduleConfig);
+        CrawlScheduleConfig toBeDeleted = configAdapter.saveCrawlScheduleConfig(scheduleConfig);
 
-        CrawlConfig crawlConfig = db.saveCrawlConfig(CrawlConfig.newBuilder()
+        CrawlConfig crawlConfig = configAdapter.saveCrawlConfig(CrawlConfig.newBuilder()
                 .setMeta(Meta.newBuilder().setName("Test crawl config")).build());
 
         CrawlJob crawlJob = CrawlJob.newBuilder()
@@ -897,15 +899,15 @@ public class RethinkDbAdapterIT {
                 .setCrawlConfigId(crawlConfig.getId())
                 .build();
 
-        crawlJob = db.saveCrawlJob(crawlJob);
-        assertThat(db.listCrawlScheduleConfigs(ListRequest.getDefaultInstance()).getCount()).isEqualTo(1);
+        crawlJob = configAdapter.saveCrawlJob(crawlJob);
+        assertThat(configAdapter.listCrawlScheduleConfigs(ListRequest.getDefaultInstance()).getCount()).isEqualTo(1);
 
-        assertThatThrownBy(() -> db.deleteCrawlScheduleConfig(toBeDeleted))
+        assertThatThrownBy(() -> configAdapter.deleteCrawlScheduleConfig(toBeDeleted))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Can't delete CrawlScheduleConfig, there are 1 CrawlJob(s) referring it");
 
-        db.deleteCrawlJob(crawlJob);
-        db.deleteCrawlScheduleConfig(toBeDeleted);
+        configAdapter.deleteCrawlJob(crawlJob);
+        configAdapter.deleteCrawlScheduleConfig(toBeDeleted);
     }
 
     @Test
@@ -915,19 +917,19 @@ public class RethinkDbAdapterIT {
         LogLevels logLevels = LogLevels.newBuilder().addLogLevel(l1).addLogLevel(l2).build();
         LogLevels response;
 
-        response = db.saveLogConfig(logLevels);
+        response = configAdapter.saveLogConfig(logLevels);
         assertThat(response).isEqualTo(logLevels);
 
-        response = db.getLogConfig();
+        response = configAdapter.getLogConfig();
         assertThat(response).isEqualTo(logLevels);
     }
 
     @Test
     public void testExecutions() throws DbException {
-        JobExecutionStatus jes1 = db.createJobExecutionStatus("jobId1");
-        JobExecutionStatus jes2 = db.createJobExecutionStatus("jobId2");
+        JobExecutionStatus jes1 = dbAdapter.createJobExecutionStatus("jobId1");
+        JobExecutionStatus jes2 = dbAdapter.createJobExecutionStatus("jobId2");
 
-        jes1 = db.getJobExecutionStatus(jes1.getId());
+        jes1 = dbAdapter.getJobExecutionStatus(jes1.getId());
         assertThat(jes1.getState()).isSameAs(State.RUNNING);
         assertThat(jes1.getExecutionsStateOrThrow("SLEEPING")).isEqualTo(0);
         assertThat(jes1.getExecutionsStateOrThrow("FINISHED")).isEqualTo(0);
@@ -944,9 +946,9 @@ public class RethinkDbAdapterIT {
                 .setUrisCrawled(4)
                 .setBytesCrawled(100)
                 .build();
-        ces1 = db.saveExecutionStatus(ces1);
+        ces1 = dbAdapter.saveExecutionStatus(ces1);
 
-        jes1 = db.getJobExecutionStatus(jes1.getId());
+        jes1 = dbAdapter.getJobExecutionStatus(jes1.getId());
         assertThat(jes1.getState()).isSameAs(State.RUNNING);
         assertThat(jes1.getExecutionsStateOrThrow("SLEEPING")).isEqualTo(1);
         assertThat(jes1.getExecutionsStateOrThrow("FINISHED")).isEqualTo(0);
@@ -963,9 +965,9 @@ public class RethinkDbAdapterIT {
                 .setUrisCrawled(3)
                 .setBytesCrawled(75)
                 .build();
-        ces2 = db.saveExecutionStatus(ces2);
+        ces2 = dbAdapter.saveExecutionStatus(ces2);
 
-        jes1 = db.getJobExecutionStatus(jes1.getId());
+        jes1 = dbAdapter.getJobExecutionStatus(jes1.getId());
         assertThat(jes1.getState()).isSameAs(State.RUNNING);
         assertThat(jes1.getExecutionsStateOrThrow("SLEEPING")).isEqualTo(2);
         assertThat(jes1.getExecutionsStateOrThrow("FINISHED")).isEqualTo(0);
@@ -981,9 +983,9 @@ public class RethinkDbAdapterIT {
                 .setUrisCrawled(6)
                 .setBytesCrawled(200)
                 .build();
-        ces1 = db.saveExecutionStatus(ces1);
+        ces1 = dbAdapter.saveExecutionStatus(ces1);
 
-        jes1 = db.getJobExecutionStatus(jes1.getId());
+        jes1 = dbAdapter.getJobExecutionStatus(jes1.getId());
         assertThat(jes1.getState()).isSameAs(State.RUNNING);
         assertThat(jes1.getExecutionsStateOrThrow("SLEEPING")).isEqualTo(1);
         assertThat(jes1.getExecutionsStateOrThrow("FINISHED")).isEqualTo(1);
@@ -1000,9 +1002,9 @@ public class RethinkDbAdapterIT {
                 .setDocumentsFailed(2)
                 .setBytesCrawled(100)
                 .build();
-        ces2 = db.saveExecutionStatus(ces2);
+        ces2 = dbAdapter.saveExecutionStatus(ces2);
 
-        jes1 = db.getJobExecutionStatus(jes1.getId());
+        jes1 = dbAdapter.getJobExecutionStatus(jes1.getId());
         assertThat(jes1.getState()).isSameAs(State.FINISHED);
         assertThat(jes1.getExecutionsStateOrThrow("SLEEPING")).isEqualTo(0);
         assertThat(jes1.getExecutionsStateOrThrow("FINISHED")).isEqualTo(2);
@@ -1012,18 +1014,18 @@ public class RethinkDbAdapterIT {
         assertThat(jes1.getBytesCrawled()).isEqualTo(300);
 
         // Check crawl executions list functions
-        ExecutionsListReply eList = db.listExecutionStatus(ListExecutionsRequest.getDefaultInstance());
+        ExecutionsListReply eList = dbAdapter.listExecutionStatus(ListExecutionsRequest.getDefaultInstance());
         assertThat(eList.getCount()).isEqualTo(2);
         assertThat(eList.getValueCount()).isEqualTo(2);
         assertThat(eList.getValueList()).containsExactlyInAnyOrder(ces1, ces2);
 
-        eList = db.listExecutionStatus(ListExecutionsRequest.newBuilder().addId(ces2.getId()).build());
+        eList = dbAdapter.listExecutionStatus(ListExecutionsRequest.newBuilder().addId(ces2.getId()).build());
         assertThat(eList.getCount()).isEqualTo(1);
         assertThat(eList.getValueCount()).isEqualTo(1);
         assertThat(eList.getValueList()).containsExactlyInAnyOrder(ces2);
 
         // Check job executions list functions
-        JobExecutionsListReply jList = db.listJobExecutionStatus(ListJobExecutionsRequest.getDefaultInstance());
+        JobExecutionsListReply jList = dbAdapter.listJobExecutionStatus(ListJobExecutionsRequest.getDefaultInstance());
         assertThat(jList.getCount()).isEqualTo(2);
         assertThat(jList.getValueCount()).isEqualTo(2);
         assertThat(jList.getValueList()).containsExactlyInAnyOrder(jes1, jes2);
@@ -1031,35 +1033,35 @@ public class RethinkDbAdapterIT {
 
     @Test
     public void testPaused() throws DbException {
-        assertThat(db.getDesiredPausedState()).isFalse();
-        assertThat(db.isPaused()).isFalse();
+        assertThat(dbAdapter.getDesiredPausedState()).isFalse();
+        assertThat(dbAdapter.isPaused()).isFalse();
 
-        assertThat(db.setDesiredPausedState(true)).isFalse();
+        assertThat(dbAdapter.setDesiredPausedState(true)).isFalse();
 
-        assertThat(db.getDesiredPausedState()).isTrue();
-        assertThat(db.isPaused()).isTrue();
+        assertThat(dbAdapter.getDesiredPausedState()).isTrue();
+        assertThat(dbAdapter.isPaused()).isTrue();
 
-        assertThat(db.setDesiredPausedState(true)).isTrue();
-        assertThat(db.isPaused()).isTrue();
+        assertThat(dbAdapter.setDesiredPausedState(true)).isTrue();
+        assertThat(dbAdapter.isPaused()).isTrue();
 
-        assertThat(db.getDesiredPausedState()).isTrue();
+        assertThat(dbAdapter.getDesiredPausedState()).isTrue();
 
-        assertThat(db.setDesiredPausedState(false)).isTrue();
-        assertThat(db.isPaused()).isFalse();
+        assertThat(dbAdapter.setDesiredPausedState(false)).isTrue();
+        assertThat(dbAdapter.isPaused()).isFalse();
 
         CrawlHostGroup chg = CrawlHostGroup.newBuilder().setId("chg").setBusy(true).build();
-        db.saveMessage(chg, TABLES.CRAWL_HOST_GROUP);
+        configAdapter.saveMessage(chg, TABLES.CRAWL_HOST_GROUP);
 
-        assertThat(db.getDesiredPausedState()).isFalse();
-        assertThat(db.isPaused()).isFalse();
+        assertThat(dbAdapter.getDesiredPausedState()).isFalse();
+        assertThat(dbAdapter.isPaused()).isFalse();
 
-        assertThat(db.setDesiredPausedState(true)).isFalse();
-        assertThat(db.isPaused()).isFalse();
+        assertThat(dbAdapter.setDesiredPausedState(true)).isFalse();
+        assertThat(dbAdapter.isPaused()).isFalse();
 
         chg = chg.toBuilder().setBusy(false).build();
-        db.saveMessage(chg, TABLES.CRAWL_HOST_GROUP);
+        configAdapter.saveMessage(chg, TABLES.CRAWL_HOST_GROUP);
 
-        assertThat(db.getDesiredPausedState()).isTrue();
-        assertThat(db.isPaused()).isTrue();
+        assertThat(dbAdapter.getDesiredPausedState()).isTrue();
+        assertThat(dbAdapter.isPaused()).isTrue();
     }
 }

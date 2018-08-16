@@ -290,7 +290,7 @@
                             </run>
                         </image>
                         <image>
-                            <name>browserless/chrome:release-puppeteer-1.5.0</name>
+                            <name>browserless/chrome:${browserless.chrome.version}</name>
                             <alias>browser</alias>
                             <run>
                                 <namingStrategy>alias</namingStrategy>

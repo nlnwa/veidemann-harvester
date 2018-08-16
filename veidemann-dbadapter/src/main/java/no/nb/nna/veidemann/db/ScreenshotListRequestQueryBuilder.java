@@ -52,8 +52,8 @@ public class ScreenshotListRequestQueryBuilder extends ConfigListQueryBuilder<Sc
         addFilter(request.getFilterList());
     }
 
-    public ScreenshotListReply.Builder executeList(RethinkDbAdapter db) throws DbException {
-        return executeList(db, ScreenshotListReply.newBuilder());
+    public ScreenshotListReply.Builder executeList(RethinkDbConnection conn) throws DbException {
+        return executeList(conn, ScreenshotListReply.newBuilder());
     }
 
     void buildExecutionIdQuery(String name) {

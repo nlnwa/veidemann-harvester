@@ -64,6 +64,11 @@
         <!--Properties for golang-->
         <go.sdk.version>1.9.2</go.sdk.version>
         <go.wrapper.plugin.version>2.1.6</go.wrapper.plugin.version>
+
+        <!-- Versions of external docker containers used in integration tests -->
+        <browserless.chrome.version>release-puppeteer-1.5.0</browserless.chrome.version>
+        <rethinkdb.version>2.3.6</rethinkdb.version>
+        <veidemann.cache.version>v0.1.0-alpha7</veidemann.cache.version>
     </properties>
 
     <repositories>

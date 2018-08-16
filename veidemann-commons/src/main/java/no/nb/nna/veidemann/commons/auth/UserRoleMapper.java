@@ -18,8 +18,8 @@ package no.nb.nna.veidemann.commons.auth;
 import no.nb.nna.veidemann.api.ConfigProto.Role;
 import no.nb.nna.veidemann.api.ConfigProto.RoleMapping;
 import no.nb.nna.veidemann.api.ControllerProto.RoleMappingsListRequest;
-import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.db.DbException;
+import no.nb.nna.veidemann.commons.db.DbService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,13 +42,9 @@ public class UserRoleMapper {
     Map<String, Set<Role>> rolesByEmail = new HashMap<>();
     Map<String, Set<Role>> rolesByGroup = new HashMap<>();
 
-    private final DbAdapter db;
-
     Lock roleUpdateLock = new ReentrantLock();
 
-    public UserRoleMapper(DbAdapter db) {
-        this.db = db;
-
+    public UserRoleMapper() {
         updaterService.scheduleAtFixedRate(() -> {
             updateRoleMappings();
         }, 0, 60, TimeUnit.SECONDS);
@@ -80,7 +76,7 @@ public class UserRoleMapper {
         Map<String, Set<Role>> rolesByGroupTmp = new HashMap<>();
 
         try {
-            db.listRoleMappings(RoleMappingsListRequest.getDefaultInstance())
+            DbService.getInstance().getConfigAdapter().listRoleMappings(RoleMappingsListRequest.getDefaultInstance())
                     .getValueList().forEach(rm -> addRoleMapping(rm, rolesByEmailTmp, rolesByGroupTmp));
         } catch (DbException e) {
             LOG.warn("Could not get role mappings from DB", e);

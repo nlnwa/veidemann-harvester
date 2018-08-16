@@ -23,8 +23,8 @@ import no.nb.nna.veidemann.api.ConfigProto.CrawlJob;
 import no.nb.nna.veidemann.api.ConfigProto.CrawlScheduleConfig;
 import no.nb.nna.veidemann.api.ControllerProto.GetRequest;
 import no.nb.nna.veidemann.api.ControllerProto.ListRequest;
-import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.db.DbException;
+import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.db.ProtoUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,12 +40,9 @@ public class CrawlJobCollector implements TaskCollector {
 
     private static final Logger LOG = LoggerFactory.getLogger(CrawlJobCollector.class);
 
-    final DbAdapter db;
-
     final ListRequest listRequest;
 
-    public CrawlJobCollector(DbAdapter db) {
-        this.db = db;
+    public CrawlJobCollector() {
         this.listRequest = ListRequest.newBuilder().build();
     }
 
@@ -56,11 +53,11 @@ public class CrawlJobCollector implements TaskCollector {
 
         try {
             // Do not schedule jobs if Veidemann is paused.
-            if (db.isPaused()) {
+            if (DbService.getInstance().getDbAdapter().isPaused()) {
                 return tasks;
             }
 
-            for (CrawlJob job : db.listCrawlJobs(listRequest).getValueList()) {
+            for (CrawlJob job : DbService.getInstance().getConfigAdapter().listCrawlJobs(listRequest).getValueList()) {
                 // Check if job is disabled
                 if (!job.getDisabled()) {
                     CrawlScheduleConfig schedule = schedules.computeIfAbsent(job.getScheduleId(),
@@ -69,7 +66,8 @@ public class CrawlJobCollector implements TaskCollector {
                                     return CrawlScheduleConfig.getDefaultInstance();
                                 } else {
                                     try {
-                                        return db.getCrawlScheduleConfig(GetRequest.newBuilder().setId(k).build());
+                                        return DbService.getInstance().getConfigAdapter()
+                                                .getCrawlScheduleConfig(GetRequest.newBuilder().setId(k).build());
                                     } catch (DbException e) {
                                         LOG.error("Failed getting tasks for scheduler", e);
                                         throw new RuntimeException(e);
@@ -89,7 +87,7 @@ public class CrawlJobCollector implements TaskCollector {
                         }
 
                         SchedulingPattern pattern = new SchedulingPattern(schedule.getCronExpression());
-                        Task task = new ScheduledCrawlJob(db, job);
+                        Task task = new ScheduledCrawlJob(job);
                         tasks.add(pattern, task);
                     }
                 }

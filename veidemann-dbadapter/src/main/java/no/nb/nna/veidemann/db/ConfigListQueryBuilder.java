@@ -251,7 +251,7 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
         return request;
     }
 
-    public long executeCount(RethinkDbAdapter db) throws DbException {
+    public long executeCount(RethinkDbConnection conn) throws DbException {
         if (listQry == null) {
             if (orderByIndex.isEmpty()) {
                 listQry = r.table(table.name);
@@ -260,10 +260,10 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
             }
         }
 
-        return db.executeRequest("db-countConfigObjects", listQry.count());
+        return conn.exec("db-countConfigObjects", listQry.count());
     }
 
-    public <R extends Message.Builder> R executeList(RethinkDbAdapter db, R resultBuilder) throws DbException {
+    public <R extends Message.Builder> R executeList(RethinkDbConnection conn, R resultBuilder) throws DbException {
         if (listQry == null) {
             if (orderByIndex.isEmpty()) {
                 listQry = r.table(table.name);
@@ -276,7 +276,7 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
 
         ReqlExpr qry = listQry.skip(page * pageSize).limit(pageSize);
 
-        Object res = db.executeRequest("db-listConfigObjects", qry);
+        Object res = conn.exec("db-listConfigObjects", qry);
 
         Descriptors.Descriptor resDescr = resultBuilder.getDescriptorForType();
         Descriptors.FieldDescriptor pageSizeField = resDescr.findFieldByName("page_size");
@@ -288,7 +288,7 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
         if (res instanceof Cursor) {
             if (pageSize > 0) {
                 // Set the count for the total resultset
-                count = executeCount(db);
+                count = executeCount(conn);
             }
 
             Cursor<Map<String, Object>> cursor = (Cursor) res;

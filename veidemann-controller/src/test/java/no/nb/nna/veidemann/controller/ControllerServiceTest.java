@@ -39,7 +39,7 @@ import no.nb.nna.veidemann.commons.auth.IdTokenAuAuServerInterceptor;
 import no.nb.nna.veidemann.commons.auth.IdTokenValidator;
 import no.nb.nna.veidemann.commons.auth.NoopAuAuServerInterceptor;
 import no.nb.nna.veidemann.commons.auth.UserRoleMapper;
-import no.nb.nna.veidemann.commons.db.DbAdapter;
+import no.nb.nna.veidemann.commons.db.ConfigAdapter;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.commons.db.DbServiceSPI;
@@ -107,8 +107,8 @@ public class ControllerServiceTest {
     @Test
     public void testSaveEntity() throws InterruptedException, DbException {
         DbServiceSPI dbProviderMock = mock(DbServiceSPI.class);
-        DbAdapter dbMock = mock(DbAdapter.class);
-        when(dbProviderMock.getDbAdapter()).thenReturn(dbMock);
+        ConfigAdapter dbMock = mock(ConfigAdapter.class);
+        when(dbProviderMock.getConfigAdapter()).thenReturn(dbMock);
         try (DbService db = DbService.configure(dbProviderMock)) {
             AuAuServerInterceptor auau = new NoopAuAuServerInterceptor();
             inProcessServer = new ControllerApiServer(settings, inProcessServerBuilder, auau).start();
@@ -172,8 +172,8 @@ public class ControllerServiceTest {
     @Test
     public void testListCrawlEntities() throws InterruptedException, DbException {
         DbServiceSPI dbProviderMock = mock(DbServiceSPI.class);
-        DbAdapter dbMock = mock(DbAdapter.class);
-        when(dbProviderMock.getDbAdapter()).thenReturn(dbMock);
+        ConfigAdapter dbMock = mock(ConfigAdapter.class);
+        when(dbProviderMock.getConfigAdapter()).thenReturn(dbMock);
         try (DbService db = DbService.configure(dbProviderMock)) {
             AuAuServerInterceptor auau = new NoopAuAuServerInterceptor();
             inProcessServer = new ControllerApiServer(settings, inProcessServerBuilder, auau).start();
@@ -229,8 +229,8 @@ public class ControllerServiceTest {
         };
 
         DbServiceSPI dbProviderMock = mock(DbServiceSPI.class);
-        DbAdapter dbMock = mock(DbAdapter.class);
-        when(dbProviderMock.getDbAdapter()).thenReturn(dbMock);
+        ConfigAdapter dbMock = mock(ConfigAdapter.class);
+        when(dbProviderMock.getConfigAdapter()).thenReturn(dbMock);
         try (DbService db = DbService.configure(dbProviderMock)) {
             IdTokenValidator idValidatorMock = mock(IdTokenValidator.class);
             UserRoleMapper roleMapperMock = mock(UserRoleMapper.class);

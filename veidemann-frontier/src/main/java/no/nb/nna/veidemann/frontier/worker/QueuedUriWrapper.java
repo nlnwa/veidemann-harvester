@@ -272,7 +272,7 @@ public class QueuedUriWrapper {
         }
 
         // Calculate CrawlHostGroup
-        List<CrawlHostGroupConfig> groupConfigs = DbService.getInstance().getDbAdapter()
+        List<CrawlHostGroupConfig> groupConfigs = DbService.getInstance().getConfigAdapter()
                 .listCrawlHostGroupConfigs(ControllerProto.ListRequest.newBuilder()
                         .addAllLabelSelector(politeness.getCrawlHostGroupSelectorList()).build()).getValueList();
         String crawlHostGroupId = CrawlHostGroupCalculator.calculateCrawlHostGroup(wrapped.getIp(), groupConfigs);

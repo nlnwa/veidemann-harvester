@@ -52,7 +52,7 @@ import no.nb.nna.veidemann.api.ControllerProto.SeedListRequest;
 import no.nb.nna.veidemann.api.MessagesProto.JobExecutionStatus;
 import no.nb.nna.veidemann.commons.auth.AllowedRoles;
 import no.nb.nna.veidemann.commons.auth.RolesContextKey;
-import no.nb.nna.veidemann.commons.db.DbAdapter;
+import no.nb.nna.veidemann.commons.db.ConfigAdapter;
 import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.commons.util.ApiTools.ListReplyWalker;
 import no.nb.nna.veidemann.commons.util.CrawlScopes;
@@ -72,13 +72,13 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
 
     private static final Logger LOG = LoggerFactory.getLogger(ControllerService.class);
 
-    private final DbAdapter db;
+    private final ConfigAdapter db;
 
     private final Settings settings;
 
     public ControllerService(Settings settings) {
         this.settings = settings;
-        this.db = DbService.getInstance().getDbAdapter();
+        this.db = DbService.getInstance().getConfigAdapter();
     }
 
     @Override
@@ -535,7 +535,8 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
             CrawlJob job = db.getCrawlJob(jobRequest);
             LOG.info("Job '{}' starting", job.getMeta().getName());
 
-            JobExecutionStatus jobExecutionStatus = db.createJobExecutionStatus(job.getId());
+            JobExecutionStatus jobExecutionStatus = DbService.getInstance().getDbAdapter()
+                    .createJobExecutionStatus(job.getId());
 
             if (!request.getSeedId().isEmpty()) {
                 Seed seed = db.getSeed(GetRequest.newBuilder()

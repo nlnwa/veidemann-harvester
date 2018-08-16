@@ -27,6 +27,7 @@ import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
 import no.nb.nna.veidemann.api.MessagesProto.PageLog;
 import no.nb.nna.veidemann.chrome.client.ChromeDebugProtocolConfig;
 import no.nb.nna.veidemann.commons.client.ContentWriterClient;
+import no.nb.nna.veidemann.commons.db.ConfigAdapter;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.util.ApiTools;
@@ -230,7 +231,9 @@ public class BrowserControllerIT {
 
     private DbAdapter getDbMock() throws DbException {
         DbAdapter db = mock(DbAdapter.class);
-        when(db.getBrowserConfig(any())).thenReturn(BrowserConfig.newBuilder()
+        ConfigAdapter configAdapter = mock(ConfigAdapter.class);
+
+        when(configAdapter.getBrowserConfig(any())).thenReturn(BrowserConfig.newBuilder()
                 .setWindowWidth(900)
                 .setWindowHeight(900)
                 .build());
@@ -252,7 +255,7 @@ public class BrowserControllerIT {
 //            System.out.println("::::PageLOG");
             return o;
         });
-        when(db.listBrowserScripts(any())).thenReturn(ControllerProto.BrowserScriptListReply.newBuilder()
+        when(configAdapter.listBrowserScripts(any())).thenReturn(ControllerProto.BrowserScriptListReply.newBuilder()
                 .addValue(ConfigProto.BrowserScript.newBuilder()
                         .setMeta(ApiTools.buildMeta("extract-outlinks.js", "", ApiTools
                                 .buildLabel("type", "extract_outlinks")))

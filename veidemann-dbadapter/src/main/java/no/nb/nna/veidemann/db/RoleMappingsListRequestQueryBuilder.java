@@ -37,7 +37,7 @@ public class RoleMappingsListRequestQueryBuilder extends ConfigListQueryBuilder<
 
     }
 
-    public RoleMappingsListReply.Builder executeList(RethinkDbAdapter db) throws DbException {
-        return executeList(db, RoleMappingsListReply.newBuilder());
+    public RoleMappingsListReply.Builder executeList(RethinkDbConnection conn) throws DbException {
+        return executeList(conn, RoleMappingsListReply.newBuilder());
     }
 }

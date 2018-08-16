@@ -45,8 +45,8 @@ public class JobExecutionsListRequestQueryBuilder extends ConfigListQueryBuilder
         }
     }
 
-    public JobExecutionsListReply.Builder executeList(RethinkDbAdapter db) throws DbException {
-        return executeList(db, JobExecutionsListReply.newBuilder());
+    public JobExecutionsListReply.Builder executeList(RethinkDbConnection conn) throws DbException {
+        return executeList(conn, JobExecutionsListReply.newBuilder());
     }
 
 }

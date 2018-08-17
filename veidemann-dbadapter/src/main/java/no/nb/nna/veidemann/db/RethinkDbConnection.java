@@ -105,7 +105,16 @@ public class RethinkDbConnection implements DbServiceSPI {
                                 || e.getMessage().contains("java.net.SocketException: Operation timed out (Read failed)")
                 )) {
                     LOG.error("DB not available at attempt #{}, waiting. Cause: {}", retries, e.toString(), e);
-                    r.db(conn.db().get()).wait_().optArg("wait_for", "ready_for_writes").run(conn);
+                    try {
+                        r.db(conn.db().get()).wait_().optArg("wait_for", "ready_for_writes").run(conn);
+                    } catch (Exception ex) {
+                        LOG.warn("Failed waiting for db to have state ready_for_writes. Sleeping for 5 seconds before retry", ex);
+                        try {
+                            Thread.sleep(5000);
+                        } catch (InterruptedException e1) {
+                            throw new RuntimeException(e1);
+                        }
+                    }
                     retries++;
                 } else {
                     LOG.warn(e.toString(), e);

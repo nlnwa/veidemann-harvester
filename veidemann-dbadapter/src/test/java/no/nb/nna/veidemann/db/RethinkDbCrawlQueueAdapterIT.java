@@ -24,7 +24,6 @@ import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.commons.db.FutureOptional;
 import no.nb.nna.veidemann.commons.settings.CommonSettings;
-import no.nb.nna.veidemann.db.RethinkDbAdapter.TABLES;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Ignore;
@@ -265,7 +264,7 @@ public class RethinkDbCrawlQueueAdapterIT {
         System.out.println();
 
         Cursor<Map<String, Object>> response = dbAdapter.executeRequest("test",
-                r.table(TABLES.CRAWL_HOST_GROUP.name));
+                r.table(Tables.CRAWL_HOST_GROUP.name));
         assertThat(finishLatch.getCount()).isZero();
         assertThat(response.iterator()).isEmpty();
 

@@ -20,12 +20,9 @@ import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.commons.settings.CommonSettings;
 import no.nb.nna.veidemann.db.RethinkDbAdapter;
-import no.nb.nna.veidemann.db.RethinkDbAdapter.TABLES;
-import no.nb.nna.veidemann.db.RethinkDbConnection;
+import no.nb.nna.veidemann.db.Tables;
 import org.junit.After;
-import org.junit.AfterClass;
 import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -68,7 +65,7 @@ public class DbInitializerTestIT {
     public void initialize() throws DbException {
         new CreateDbV0_1(db, "veidemann").run();
         DbService.getInstance().getDbInitializer().initialize();
-        String version = db.executeRequest("", RethinkDB.r.table(TABLES.SYSTEM.name).get("db_version").g("db_version"));
+        String version = db.executeRequest("", RethinkDB.r.table(Tables.SYSTEM.name).get("db_version").g("db_version"));
         assertThat(version).isEqualTo("0.2");
     }
 }

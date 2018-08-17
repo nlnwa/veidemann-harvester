@@ -19,7 +19,6 @@ import com.rethinkdb.gen.ast.ReqlExpr;
 import no.nb.nna.veidemann.api.ReportProto.PageLogListReply;
 import no.nb.nna.veidemann.api.ReportProto.PageLogListRequest;
 import no.nb.nna.veidemann.commons.db.DbException;
-import no.nb.nna.veidemann.db.RethinkDbAdapter.TABLES;
 
 import static no.nb.nna.veidemann.db.RethinkDbAdapter.r;
 
@@ -29,7 +28,7 @@ import static no.nb.nna.veidemann.db.RethinkDbAdapter.r;
 public class PageLogListRequestQueryBuilder extends ConfigListQueryBuilder<PageLogListRequest> {
 
     public PageLogListRequestQueryBuilder(PageLogListRequest request) {
-        super(request, TABLES.PAGE_LOG);
+        super(request, Tables.PAGE_LOG);
         setPaging(request.getPageSize(), request.getPage());
 
         if (request.getWarcIdCount() > 0) {

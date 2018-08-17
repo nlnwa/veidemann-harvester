@@ -28,7 +28,7 @@ import static no.nb.nna.veidemann.db.RethinkDbAdapter.r;
 public class SeedListRequestQueryBuilder extends ConfigListQueryBuilder<SeedListRequest> {
 
     public SeedListRequestQueryBuilder(SeedListRequest request) {
-        super(request, RethinkDbAdapter.TABLES.SEEDS);
+        super(request, Tables.SEEDS);
         setPaging(request.getPageSize(), request.getPage());
 
         if (request.getIdCount() > 0) {

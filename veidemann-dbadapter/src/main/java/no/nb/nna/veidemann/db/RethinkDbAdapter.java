@@ -22,26 +22,14 @@ import com.rethinkdb.ast.ReqlAst;
 import com.rethinkdb.gen.ast.Insert;
 import com.rethinkdb.model.MapObject;
 import com.rethinkdb.net.Cursor;
-import no.nb.nna.veidemann.api.ConfigProto.BrowserConfig;
-import no.nb.nna.veidemann.api.ConfigProto.BrowserScript;
-import no.nb.nna.veidemann.api.ConfigProto.CrawlConfig;
-import no.nb.nna.veidemann.api.ConfigProto.CrawlEntity;
-import no.nb.nna.veidemann.api.ConfigProto.CrawlHostGroupConfig;
-import no.nb.nna.veidemann.api.ConfigProto.CrawlJob;
-import no.nb.nna.veidemann.api.ConfigProto.CrawlScheduleConfig;
-import no.nb.nna.veidemann.api.ConfigProto.PolitenessConfig;
-import no.nb.nna.veidemann.api.ConfigProto.RoleMapping;
-import no.nb.nna.veidemann.api.ConfigProto.Seed;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus.State;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlHostGroup;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
 import no.nb.nna.veidemann.api.MessagesProto.CrawledContent;
 import no.nb.nna.veidemann.api.MessagesProto.ExtractedText;
 import no.nb.nna.veidemann.api.MessagesProto.JobExecutionStatus;
 import no.nb.nna.veidemann.api.MessagesProto.JobExecutionStatus.Builder;
 import no.nb.nna.veidemann.api.MessagesProto.PageLog;
-import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
 import no.nb.nna.veidemann.api.MessagesProto.Screenshot;
 import no.nb.nna.veidemann.api.ReportProto.CrawlLogListReply;
 import no.nb.nna.veidemann.api.ReportProto.CrawlLogListRequest;
@@ -75,40 +63,6 @@ public class RethinkDbAdapter implements DbAdapter {
 
     private static final Logger LOG = LoggerFactory.getLogger(RethinkDbAdapter.class);
 
-    public static enum TABLES {
-        SYSTEM("system", null),
-        CRAWL_LOG("crawl_log", CrawlLog.getDefaultInstance()),
-        PAGE_LOG("page_log", PageLog.getDefaultInstance()),
-        CRAWLED_CONTENT("crawled_content", CrawledContent.getDefaultInstance()),
-        EXTRACTED_TEXT("extracted_text", ExtractedText.getDefaultInstance()),
-        URI_QUEUE("uri_queue", QueuedUri.getDefaultInstance()),
-        SCREENSHOT("screenshot", Screenshot.getDefaultInstance()),
-        EXECUTIONS("executions", CrawlExecutionStatus.getDefaultInstance()),
-        JOB_EXECUTIONS("job_executions", JobExecutionStatus.getDefaultInstance()),
-        CRAWL_HOST_GROUP("crawl_host_group", CrawlHostGroup.getDefaultInstance()),
-        ALREADY_CRAWLED_CACHE("already_crawled_cache", null),
-        BROWSER_SCRIPTS("config_browser_scripts", BrowserScript.getDefaultInstance()),
-        CRAWL_ENTITIES("config_crawl_entities", CrawlEntity.getDefaultInstance()),
-        SEEDS("config_seeds", Seed.getDefaultInstance()),
-        CRAWL_JOBS("config_crawl_jobs", CrawlJob.getDefaultInstance()),
-        CRAWL_CONFIGS("config_crawl_configs", CrawlConfig.getDefaultInstance()),
-        CRAWL_SCHEDULE_CONFIGS("config_crawl_schedule_configs", CrawlScheduleConfig.getDefaultInstance()),
-        BROWSER_CONFIGS("config_browser_configs", BrowserConfig.getDefaultInstance()),
-        POLITENESS_CONFIGS("config_politeness_configs", PolitenessConfig.getDefaultInstance()),
-        CRAWL_HOST_GROUP_CONFIGS("config_crawl_host_group_configs", CrawlHostGroupConfig.getDefaultInstance()),
-        ROLE_MAPPINGS("config_role_mappings", RoleMapping.getDefaultInstance());
-
-        public final String name;
-
-        public final Message schema;
-
-        private TABLES(String name, Message schema) {
-            this.name = name;
-            this.schema = schema;
-        }
-
-    }
-
     static final RethinkDB r = RethinkDB.r;
 
     private final RethinkDbConnection conn;
@@ -124,7 +78,7 @@ public class RethinkDbAdapter implements DbAdapter {
 
         Map rMap = ProtoUtils.protoToRethink(cc);
         Map<String, Object> response = executeRequest("db-hasCrawledContent",
-                r.table(TABLES.CRAWLED_CONTENT.name)
+                r.table(Tables.CRAWLED_CONTENT.name)
                         .insert(rMap)
                         .optArg("conflict", (id, old_doc, new_doc) -> old_doc)
                         .optArg("return_changes", "always")
@@ -152,7 +106,7 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     public void deleteCrawledContent(String digest) throws DbException {
-        executeRequest("db-deleteCrawledContent", r.table(TABLES.CRAWLED_CONTENT.name).get(digest).delete());
+        executeRequest("db-deleteCrawledContent", r.table(Tables.CRAWLED_CONTENT.name).get(digest).delete());
     }
 
     @Override
@@ -162,7 +116,7 @@ public class RethinkDbAdapter implements DbAdapter {
 
         Map rMap = ProtoUtils.protoToRethink(et);
         Map<String, Object> response = executeRequest("db-addExtractedText",
-                r.table(TABLES.EXTRACTED_TEXT.name)
+                r.table(Tables.EXTRACTED_TEXT.name)
                         .insert(rMap)
                         .optArg("conflict", "error"));
 
@@ -185,7 +139,7 @@ public class RethinkDbAdapter implements DbAdapter {
 
         Map rMap = ProtoUtils.protoToRethink(cl);
         return conn.executeInsert("db-saveCrawlLog",
-                r.table(TABLES.CRAWL_LOG.name)
+                r.table(Tables.CRAWL_LOG.name)
                         .insert(rMap)
                         .optArg("conflict", "replace"),
                 CrawlLog.class
@@ -202,7 +156,7 @@ public class RethinkDbAdapter implements DbAdapter {
     public PageLog savePageLog(PageLog pageLog) throws DbException {
         Map rMap = ProtoUtils.protoToRethink(pageLog);
         return conn.executeInsert("db-savePageLog",
-                r.table(TABLES.PAGE_LOG.name)
+                r.table(Tables.PAGE_LOG.name)
                         .insert(rMap)
                         .optArg("conflict", "replace"),
                 PageLog.class
@@ -223,7 +177,7 @@ public class RethinkDbAdapter implements DbAdapter {
                 .setState(JobExecutionStatus.State.RUNNING));
 
         return conn.executeInsert("db-saveJobExecutionStatus",
-                r.table(TABLES.JOB_EXECUTIONS.name)
+                r.table(Tables.JOB_EXECUTIONS.name)
                         .insert(rMap)
                         .optArg("conflict", (id, oldDoc, newDoc) -> r.branch(
                                 oldDoc.hasFields("endTime"),
@@ -238,7 +192,7 @@ public class RethinkDbAdapter implements DbAdapter {
     @Override
     public JobExecutionStatus getJobExecutionStatus(String jobExecutionId) throws DbException {
         JobExecutionStatus jes = ProtoUtils.rethinkToProto(executeRequest("db-getJobExecutionStatus",
-                r.table(TABLES.JOB_EXECUTIONS.name)
+                r.table(Tables.JOB_EXECUTIONS.name)
                         .get(jobExecutionId)
         ), JobExecutionStatus.class);
 
@@ -274,7 +228,7 @@ public class RethinkDbAdapter implements DbAdapter {
     @Override
     public JobExecutionStatus setJobExecutionStateAborted(String jobExecutionId) throws DbException {
         JobExecutionStatus result = conn.executeUpdate("db-setJobExecutionStateAborted",
-                r.table(TABLES.JOB_EXECUTIONS.name)
+                r.table(Tables.JOB_EXECUTIONS.name)
                         .get(jobExecutionId)
                         .update(
                                 doc -> r.branch(
@@ -310,7 +264,7 @@ public class RethinkDbAdapter implements DbAdapter {
         Map rMap = ProtoUtils.protoToRethink(status);
 
         // Update the CrawlExecutionStatus, but keep the endTime if it is set
-        Insert qry = r.table(TABLES.EXECUTIONS.name)
+        Insert qry = r.table(Tables.EXECUTIONS.name)
                 .insert(rMap)
                 .optArg("conflict", (id, oldDoc, newDoc) -> r.branch(
                         oldDoc.hasFields("endTime"),
@@ -331,7 +285,7 @@ public class RethinkDbAdapter implements DbAdapter {
         if (wasNotEnded && newDoc.hasEndTime()) {
             // Get a count of still running CrawlExecutions for this execution's JobExecution
             Long notEndedCount = executeRequest("db-updateJobExecution",
-                    r.table(TABLES.EXECUTIONS.name)
+                    r.table(Tables.EXECUTIONS.name)
                             .getAll(newDoc.getJobExecutionId()).optArg("index", "jobExecutionId")
                             .filter(row -> row.g("state").match("UNDEFINED|CREATED|FETCHING|SLEEPING"))
                             .group("state").count()
@@ -344,7 +298,7 @@ public class RethinkDbAdapter implements DbAdapter {
 
                 // Fetch the JobExecutionStatus object this CrawlExecution is part of
                 JobExecutionStatus jes = ProtoUtils.rethinkToProto(executeRequest("db-getJobExecutionStatus",
-                        r.table(TABLES.JOB_EXECUTIONS.name)
+                        r.table(Tables.JOB_EXECUTIONS.name)
                                 .get(newDoc.getJobExecutionId())
                 ), JobExecutionStatus.class);
 
@@ -369,7 +323,7 @@ public class RethinkDbAdapter implements DbAdapter {
                 }
 
                 executeRequest("db-saveJobExecutionStatus",
-                        r.table(TABLES.JOB_EXECUTIONS.name).get(jesBuilder.getId()).update(ProtoUtils.protoToRethink(jesBuilder)));
+                        r.table(Tables.JOB_EXECUTIONS.name).get(jesBuilder.getId()).update(ProtoUtils.protoToRethink(jesBuilder)));
             }
         }
 
@@ -379,7 +333,7 @@ public class RethinkDbAdapter implements DbAdapter {
     @Override
     public CrawlExecutionStatus getExecutionStatus(String executionId) throws DbException {
         Map<String, Object> response = executeRequest("db-getExecutionStatus",
-                r.table(TABLES.EXECUTIONS.name)
+                r.table(Tables.EXECUTIONS.name)
                         .get(executionId)
         );
 
@@ -395,7 +349,7 @@ public class RethinkDbAdapter implements DbAdapter {
     @Override
     public CrawlExecutionStatus setExecutionStateAborted(String executionId) throws DbException {
         return conn.executeUpdate("db-setExecutionStateAborted",
-                r.table(TABLES.EXECUTIONS.name)
+                r.table(Tables.EXECUTIONS.name)
                         .get(executionId)
                         .update(
                                 doc -> r.branch(
@@ -411,7 +365,7 @@ public class RethinkDbAdapter implements DbAdapter {
         Map rMap = ProtoUtils.protoToRethink(s);
 
         Map<String, Object> response = executeRequest("db-addScreenshot",
-                r.table(TABLES.SCREENSHOT.name)
+                r.table(Tables.SCREENSHOT.name)
                         .insert(rMap)
                         .optArg("conflict", "error"));
 
@@ -429,7 +383,7 @@ public class RethinkDbAdapter implements DbAdapter {
     @Override
     public Empty deleteScreenshot(Screenshot screenshot) throws DbException {
         executeRequest("db-deleteScreenshot",
-                r.table(TABLES.SCREENSHOT.name).get(screenshot.getId()).delete());
+                r.table(Tables.SCREENSHOT.name).get(screenshot.getId()).delete());
         return Empty.getDefaultInstance();
     }
 
@@ -440,13 +394,13 @@ public class RethinkDbAdapter implements DbAdapter {
             limit = 100;
         }
         Cursor<Map> res = executeRequest("db-getExecutionStatusStream",
-                r.table(RethinkDbAdapter.TABLES.EXECUTIONS.name)
+                r.table(Tables.EXECUTIONS.name)
                         .orderBy().optArg("index", r.desc("startTime"))
                         .limit(limit)
                         .changes().optArg("include_initial", true).optArg("include_offsets", true).optArg("squash", 2)
                         .map(v -> v.g("new_val").merge(r.hashMap("newOffset", v.g("new_offset").default_((String) null))
                                 .with("oldOffset", v.g("old_offset").default_((String) null))))
-                        .eqJoin("seedId", r.table(TABLES.SEEDS.name))
+                        .eqJoin("seedId", r.table(Tables.SEEDS.name))
                         .map(v -> {
                             return v.g("left").merge(r.hashMap("seed", v.g("right").g("meta").g("name"))
                                     .with("queueSize",
@@ -487,7 +441,7 @@ public class RethinkDbAdapter implements DbAdapter {
         String id = "state";
         String key = "shouldPause";
         Map<String, List<Map<String, Map>>> state = executeRequest("set-paused",
-                r.table(TABLES.SYSTEM.name)
+                r.table(Tables.SYSTEM.name)
                         .insert(r.hashMap("id", id).with(key, value))
                         .optArg("conflict", "update")
                         .optArg("return_changes", "always")
@@ -505,7 +459,7 @@ public class RethinkDbAdapter implements DbAdapter {
         String id = "state";
         String key = "shouldPause";
         Map<String, Object> state = executeRequest("get-paused",
-                r.table(TABLES.SYSTEM.name)
+                r.table(Tables.SYSTEM.name)
                         .get(id)
         );
         if (state == null) {
@@ -518,7 +472,7 @@ public class RethinkDbAdapter implements DbAdapter {
     public boolean isPaused() throws DbException {
         if (getDesiredPausedState()) {
             long busyCount = executeRequest("is-paused",
-                    r.table(TABLES.CRAWL_HOST_GROUP.name)
+                    r.table(Tables.CRAWL_HOST_GROUP.name)
                             .filter(r.hashMap("busy", true))
                             .count()
             );
@@ -544,7 +498,7 @@ public class RethinkDbAdapter implements DbAdapter {
                 "documentsFailed", "documentsOutOfScope", "documentsRetried", "urisCrawled", "bytesCrawled"};
 
         return executeRequest("db-summarizeJobExecutionStats",
-                r.table(TABLES.EXECUTIONS.name)
+                r.table(Tables.EXECUTIONS.name)
                         .getAll(jobExecutionId).optArg("index", "jobExecutionId")
                         .map(doc -> {
                                     MapObject m = r.hashMap();

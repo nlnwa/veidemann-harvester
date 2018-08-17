@@ -33,7 +33,7 @@ import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.commons.settings.CommonSettings;
 import no.nb.nna.veidemann.db.RethinkDbAdapter;
-import no.nb.nna.veidemann.db.RethinkDbAdapter.TABLES;
+import no.nb.nna.veidemann.db.Tables;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -100,17 +100,17 @@ public abstract class CrawlTestBase {
     @After
     public void cleanup() throws DbException {
         contentWriterClient.delete(Empty.getDefaultInstance());
-        db.executeRequest("delete", r.table(TABLES.CRAWLED_CONTENT.name).delete());
-        db.executeRequest("delete", r.table(TABLES.CRAWL_LOG.name).delete());
-        db.executeRequest("delete", r.table(TABLES.PAGE_LOG.name).delete());
-        db.executeRequest("delete", r.table(TABLES.EXECUTIONS.name).delete());
-        db.executeRequest("delete", r.table(TABLES.JOB_EXECUTIONS.name).delete());
-        db.executeRequest("delete", r.table(TABLES.EXTRACTED_TEXT.name).delete());
-        db.executeRequest("delete", r.table(TABLES.SCREENSHOT.name).delete());
-        db.executeRequest("delete", r.table(TABLES.URI_QUEUE.name).delete());
-        db.executeRequest("delete", r.table(TABLES.CRAWL_HOST_GROUP.name).delete());
-        db.executeRequest("delete", r.table(TABLES.CRAWL_ENTITIES.name).delete());
-        db.executeRequest("delete", r.table(TABLES.SEEDS.name).delete());
+        db.executeRequest("delete", r.table(Tables.CRAWLED_CONTENT.name).delete());
+        db.executeRequest("delete", r.table(Tables.CRAWL_LOG.name).delete());
+        db.executeRequest("delete", r.table(Tables.PAGE_LOG.name).delete());
+        db.executeRequest("delete", r.table(Tables.EXECUTIONS.name).delete());
+        db.executeRequest("delete", r.table(Tables.JOB_EXECUTIONS.name).delete());
+        db.executeRequest("delete", r.table(Tables.EXTRACTED_TEXT.name).delete());
+        db.executeRequest("delete", r.table(Tables.SCREENSHOT.name).delete());
+        db.executeRequest("delete", r.table(Tables.URI_QUEUE.name).delete());
+        db.executeRequest("delete", r.table(Tables.CRAWL_HOST_GROUP.name).delete());
+        db.executeRequest("delete", r.table(Tables.CRAWL_ENTITIES.name).delete());
+        db.executeRequest("delete", r.table(Tables.SEEDS.name).delete());
     }
 
     CrawlEntity createEntity(String name) {

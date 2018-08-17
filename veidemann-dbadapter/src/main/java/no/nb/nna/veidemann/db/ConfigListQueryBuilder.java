@@ -51,20 +51,20 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
 
     private List<String> id;
 
-    final RethinkDbAdapter.TABLES table;
+    final Tables table;
 
     private final String orderByIndex;
 
     private final boolean descending;
 
-    public ConfigListQueryBuilder(T request, RethinkDbAdapter.TABLES table, String orderByIndex, boolean descending) {
+    public ConfigListQueryBuilder(T request, Tables table, String orderByIndex, boolean descending) {
         this.request = Objects.requireNonNull(request, "The request cannot be null");
         this.table = Objects.requireNonNull(table);
         this.orderByIndex = orderByIndex == null ? "" : orderByIndex;
         this.descending = descending;
     }
 
-    public ConfigListQueryBuilder(T request, RethinkDbAdapter.TABLES table) {
+    public ConfigListQueryBuilder(T request, Tables table) {
         this(request, table, "name", false);
     }
 

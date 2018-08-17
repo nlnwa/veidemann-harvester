@@ -20,7 +20,7 @@ import no.nb.nna.veidemann.commons.db.DbConnectionException;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbQueryException;
 import no.nb.nna.veidemann.commons.db.DbUpgradeException;
-import no.nb.nna.veidemann.db.RethinkDbAdapter.TABLES;
+import no.nb.nna.veidemann.db.Tables;
 import no.nb.nna.veidemann.db.RethinkDbConnection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,13 +44,13 @@ public abstract class UpgradeDbBase implements Runnable {
         LOG.info("Upgrading from {} to {}", fromVersion(), toVersion());
 
         try {
-            String version = conn.exec(r.table(TABLES.SYSTEM.name).get("db_version").g("db_version"));
+            String version = conn.exec(r.table(Tables.SYSTEM.name).get("db_version").g("db_version"));
             if (!fromVersion().equals(version)) {
                 throw new DbUpgradeException("Expected db to be version " + fromVersion() + ", but was " + version);
             }
 
             upgrade();
-            conn.exec(r.table(TABLES.SYSTEM.name).get("db_version").update(r.hashMap("db_version", toVersion())));
+            conn.exec(r.table(Tables.SYSTEM.name).get("db_version").update(r.hashMap("db_version", toVersion())));
         } catch (DbException e) {
             throw new RuntimeException(e);
         }

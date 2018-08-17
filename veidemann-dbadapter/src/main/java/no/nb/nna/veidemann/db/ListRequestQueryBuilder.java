@@ -22,7 +22,7 @@ import no.nb.nna.veidemann.api.ControllerProto.ListRequest;
  */
 public class ListRequestQueryBuilder extends ConfigListQueryBuilder<ListRequest> {
 
-    public ListRequestQueryBuilder(ListRequest request, RethinkDbAdapter.TABLES table) {
+    public ListRequestQueryBuilder(ListRequest request, Tables table) {
         super(request, table);
         setPaging(request.getPageSize(), request.getPage());
 

@@ -18,7 +18,7 @@ package no.nb.nna.veidemann.db.initializer;
 import com.rethinkdb.RethinkDB;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.db.RethinkDbAdapter;
-import no.nb.nna.veidemann.db.RethinkDbAdapter.TABLES;
+import no.nb.nna.veidemann.db.Tables;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,94 +48,94 @@ public class CreateDbV0_1 implements Runnable {
     private final void createDb() throws DbException {
         db.executeRequest("create-db", r.dbCreate(dbName));
 
-        db.executeRequest("", r.tableCreate(TABLES.SYSTEM.name));
-        db.executeRequest("", r.table(TABLES.SYSTEM.name).insert(r.hashMap("id", "db_version").with("db_version", "0.1")));
-        db.executeRequest("", r.table(TABLES.SYSTEM.name).insert(r.hashMap("id", "log_levels")
+        db.executeRequest("", r.tableCreate(Tables.SYSTEM.name));
+        db.executeRequest("", r.table(Tables.SYSTEM.name).insert(r.hashMap("id", "db_version").with("db_version", "0.1")));
+        db.executeRequest("", r.table(Tables.SYSTEM.name).insert(r.hashMap("id", "log_levels")
                 .with("logLevel",
                         r.array(r.hashMap("logger", "no.nb.nna.veidemann").with("level", "INFO"))
                 )));
 
-        db.executeRequest("", r.tableCreate(TABLES.CRAWL_LOG.name).optArg("primary_key", "warcId"));
-        db.executeRequest("", r.table(TABLES.CRAWL_LOG.name)
+        db.executeRequest("", r.tableCreate(Tables.CRAWL_LOG.name).optArg("primary_key", "warcId"));
+        db.executeRequest("", r.table(Tables.CRAWL_LOG.name)
                 .indexCreate("surt_time", row -> r.array(row.g("surt"), row.g("timeStamp"))));
-        db.executeRequest("", r.table(TABLES.CRAWL_LOG.name).indexCreate("executeRequestutionId"));
+        db.executeRequest("", r.table(Tables.CRAWL_LOG.name).indexCreate("executeRequestutionId"));
 
-        db.executeRequest("", r.tableCreate(TABLES.PAGE_LOG.name).optArg("primary_key", "warcId"));
-        db.executeRequest("", r.table(TABLES.PAGE_LOG.name).indexCreate("executeRequestutionId"));
+        db.executeRequest("", r.tableCreate(Tables.PAGE_LOG.name).optArg("primary_key", "warcId"));
+        db.executeRequest("", r.table(Tables.PAGE_LOG.name).indexCreate("executeRequestutionId"));
 
-        db.executeRequest("", r.tableCreate(TABLES.CRAWLED_CONTENT.name).optArg("primary_key", "digest"));
+        db.executeRequest("", r.tableCreate(Tables.CRAWLED_CONTENT.name).optArg("primary_key", "digest"));
 
-        db.executeRequest("", r.tableCreate(TABLES.EXTRACTED_TEXT.name).optArg("primary_key", "warcId"));
+        db.executeRequest("", r.tableCreate(Tables.EXTRACTED_TEXT.name).optArg("primary_key", "warcId"));
 
-        db.executeRequest("", r.tableCreate(TABLES.BROWSER_SCRIPTS.name));
+        db.executeRequest("", r.tableCreate(Tables.BROWSER_SCRIPTS.name));
 
-        db.executeRequest("", r.tableCreate(TABLES.URI_QUEUE.name));
-        db.executeRequest("", r.table(TABLES.URI_QUEUE.name).indexCreate("surt"));
-        db.executeRequest("", r.table(TABLES.URI_QUEUE.name).indexCreate("executeRequestutionId"));
-        db.executeRequest("", r.table(TABLES.URI_QUEUE.name).indexCreate("crawlHostGroupKey_sequence_earliestFetch",
+        db.executeRequest("", r.tableCreate(Tables.URI_QUEUE.name));
+        db.executeRequest("", r.table(Tables.URI_QUEUE.name).indexCreate("surt"));
+        db.executeRequest("", r.table(Tables.URI_QUEUE.name).indexCreate("executeRequestutionId"));
+        db.executeRequest("", r.table(Tables.URI_QUEUE.name).indexCreate("crawlHostGroupKey_sequence_earliestFetch",
                 uri -> r.array(uri.g("crawlHostGroupId"),
                         uri.g("politenessId"),
                         uri.g("sequence"),
                         uri.g("earliestFetchTimeStamp"))));
 
-        db.executeRequest("", r.tableCreate(TABLES.EXECUTIONS.name));
-        db.executeRequest("", r.table(TABLES.EXECUTIONS.name).indexCreate("startTime"));
+        db.executeRequest("", r.tableCreate(Tables.EXECUTIONS.name));
+        db.executeRequest("", r.table(Tables.EXECUTIONS.name).indexCreate("startTime"));
 
-        db.executeRequest("", r.tableCreate(TABLES.SCREENSHOT.name));
-        db.executeRequest("", r.table(TABLES.SCREENSHOT.name).indexCreate("executeRequestutionId"));
+        db.executeRequest("", r.tableCreate(Tables.SCREENSHOT.name));
+        db.executeRequest("", r.table(Tables.SCREENSHOT.name).indexCreate("executeRequestutionId"));
 
-        db.executeRequest("", r.tableCreate(TABLES.CRAWL_ENTITIES.name));
+        db.executeRequest("", r.tableCreate(Tables.CRAWL_ENTITIES.name));
 
-        db.executeRequest("", r.tableCreate(TABLES.SEEDS.name));
-        db.executeRequest("", r.table(TABLES.SEEDS.name).indexCreate("jobId").optArg("multi", true));
-        db.executeRequest("", r.table(TABLES.SEEDS.name).indexCreate("entityId"));
+        db.executeRequest("", r.tableCreate(Tables.SEEDS.name));
+        db.executeRequest("", r.table(Tables.SEEDS.name).indexCreate("jobId").optArg("multi", true));
+        db.executeRequest("", r.table(Tables.SEEDS.name).indexCreate("entityId"));
 
-        db.executeRequest("", r.tableCreate(TABLES.CRAWL_JOBS.name));
+        db.executeRequest("", r.tableCreate(Tables.CRAWL_JOBS.name));
 
-        db.executeRequest("", r.tableCreate(TABLES.CRAWL_CONFIGS.name));
+        db.executeRequest("", r.tableCreate(Tables.CRAWL_CONFIGS.name));
 
-        db.executeRequest("", r.tableCreate(TABLES.CRAWL_SCHEDULE_CONFIGS.name));
+        db.executeRequest("", r.tableCreate(Tables.CRAWL_SCHEDULE_CONFIGS.name));
 
-        db.executeRequest("", r.tableCreate(TABLES.BROWSER_CONFIGS.name));
+        db.executeRequest("", r.tableCreate(Tables.BROWSER_CONFIGS.name));
 
-        db.executeRequest("", r.tableCreate(TABLES.POLITENESS_CONFIGS.name));
+        db.executeRequest("", r.tableCreate(Tables.POLITENESS_CONFIGS.name));
 
-        db.executeRequest("", r.tableCreate(TABLES.CRAWL_HOST_GROUP_CONFIGS.name));
+        db.executeRequest("", r.tableCreate(Tables.CRAWL_HOST_GROUP_CONFIGS.name));
 
-        db.executeRequest("", r.tableCreate(TABLES.CRAWL_HOST_GROUP.name));
-        db.executeRequest("", r.table(TABLES.CRAWL_HOST_GROUP.name).indexCreate("nextFetchTime"));
+        db.executeRequest("", r.tableCreate(Tables.CRAWL_HOST_GROUP.name));
+        db.executeRequest("", r.table(Tables.CRAWL_HOST_GROUP.name).indexCreate("nextFetchTime"));
 
-        db.executeRequest("", r.tableCreate(TABLES.ALREADY_CRAWLED_CACHE.name)
+        db.executeRequest("", r.tableCreate(Tables.ALREADY_CRAWLED_CACHE.name)
                 .optArg("durability", "soft")
                 .optArg("shards", 3)
                 .optArg("replicas", 1));
 
-        db.executeRequest("", r.tableCreate(TABLES.ROLE_MAPPINGS.name));
+        db.executeRequest("", r.tableCreate(Tables.ROLE_MAPPINGS.name));
 
         createMetaIndexes(
-                TABLES.BROWSER_SCRIPTS,
-                TABLES.CRAWL_ENTITIES,
-                TABLES.SEEDS,
-                TABLES.CRAWL_JOBS,
-                TABLES.CRAWL_CONFIGS,
-                TABLES.CRAWL_SCHEDULE_CONFIGS,
-                TABLES.BROWSER_CONFIGS,
-                TABLES.POLITENESS_CONFIGS,
-                TABLES.CRAWL_HOST_GROUP_CONFIGS
+                Tables.BROWSER_SCRIPTS,
+                Tables.CRAWL_ENTITIES,
+                Tables.SEEDS,
+                Tables.CRAWL_JOBS,
+                Tables.CRAWL_CONFIGS,
+                Tables.CRAWL_SCHEDULE_CONFIGS,
+                Tables.BROWSER_CONFIGS,
+                Tables.POLITENESS_CONFIGS,
+                Tables.CRAWL_HOST_GROUP_CONFIGS
         );
 
-        db.executeRequest("", r.table(TABLES.URI_QUEUE.name)
+        db.executeRequest("", r.table(Tables.URI_QUEUE.name)
                 .indexWait("surt", "executeRequestutionId", "crawlHostGroupKey_sequence_earliestFetch"));
-        db.executeRequest("", r.table(TABLES.CRAWL_LOG.name).indexWait("surt_time", "executeRequestutionId"));
-        db.executeRequest("", r.table(TABLES.PAGE_LOG.name).indexWait("executeRequestutionId"));
-        db.executeRequest("", r.table(TABLES.SCREENSHOT.name).indexWait("executeRequestutionId"));
-        db.executeRequest("", r.table(TABLES.SEEDS.name).indexWait("jobId", "entityId"));
-        db.executeRequest("", r.table(TABLES.CRAWL_HOST_GROUP.name).indexWait("nextFetchTime"));
-        db.executeRequest("", r.table(TABLES.EXECUTIONS.name).indexWait("startTime"));
+        db.executeRequest("", r.table(Tables.CRAWL_LOG.name).indexWait("surt_time", "executeRequestutionId"));
+        db.executeRequest("", r.table(Tables.PAGE_LOG.name).indexWait("executeRequestutionId"));
+        db.executeRequest("", r.table(Tables.SCREENSHOT.name).indexWait("executeRequestutionId"));
+        db.executeRequest("", r.table(Tables.SEEDS.name).indexWait("jobId", "entityId"));
+        db.executeRequest("", r.table(Tables.CRAWL_HOST_GROUP.name).indexWait("nextFetchTime"));
+        db.executeRequest("", r.table(Tables.EXECUTIONS.name).indexWait("startTime"));
     }
 
-    private final void createMetaIndexes(TABLES... tables) throws DbException {
-        for (TABLES table : tables) {
+    private final void createMetaIndexes(Tables... tables) throws DbException {
+        for (Tables table : tables) {
             db.executeRequest("", r.table(table.name).indexCreate("name", row -> row.g("meta").g("name").downcase()));
             db.executeRequest("", r.table(table.name)
                     .indexCreate("label",
@@ -148,7 +148,7 @@ public class CreateDbV0_1 implements Runnable {
                                     label -> label.g("value").downcase()))
                     .optArg("multi", true));
         }
-        for (TABLES table : tables) {
+        for (Tables table : tables) {
             db.executeRequest("", r.table(table.name).indexWait("name", "label", "label_value"));
         }
     }

@@ -19,7 +19,6 @@ import com.rethinkdb.gen.ast.ReqlExpr;
 import no.nb.nna.veidemann.api.ReportProto.ScreenshotListReply;
 import no.nb.nna.veidemann.api.ReportProto.ScreenshotListRequest;
 import no.nb.nna.veidemann.commons.db.DbException;
-import no.nb.nna.veidemann.db.RethinkDbAdapter.TABLES;
 
 import static no.nb.nna.veidemann.db.RethinkDbAdapter.r;
 
@@ -29,7 +28,7 @@ import static no.nb.nna.veidemann.db.RethinkDbAdapter.r;
 public class ScreenshotListRequestQueryBuilder extends ConfigListQueryBuilder<ScreenshotListRequest> {
 
     public ScreenshotListRequestQueryBuilder(ScreenshotListRequest request) {
-        super(request, TABLES.SCREENSHOT);
+        super(request, Tables.SCREENSHOT);
         setPaging(request.getPageSize(), request.getPage());
 
         if (request.getIdCount() > 0) {

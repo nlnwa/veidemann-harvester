@@ -21,7 +21,7 @@ import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbInitializer;
 import no.nb.nna.veidemann.commons.db.DbQueryException;
 import no.nb.nna.veidemann.commons.db.DbUpgradeException;
-import no.nb.nna.veidemann.db.RethinkDbAdapter.TABLES;
+import no.nb.nna.veidemann.db.Tables;
 import no.nb.nna.veidemann.db.RethinkDbConnection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,7 +51,7 @@ public class RethinkDbInitializer implements DbInitializer {
             LOG.info("Populating database with default data");
             new PopulateDbWithDefaultData().run();
         } else {
-            String version = conn.exec(r.table(TABLES.SYSTEM.name).get("db_version").g("db_version"));
+            String version = conn.exec(r.table(Tables.SYSTEM.name).get("db_version").g("db_version"));
             if (CreateNewDb.DB_VERSION.equals(version)) {
                 LOG.info("Database found and is newest version: {}", version);
             } else {

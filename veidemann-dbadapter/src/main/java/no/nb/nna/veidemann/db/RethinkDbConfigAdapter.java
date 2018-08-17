@@ -33,7 +33,6 @@ import no.nb.nna.veidemann.api.ControllerProto.SeedListRequest;
 import no.nb.nna.veidemann.commons.auth.EmailContextKey;
 import no.nb.nna.veidemann.commons.db.ConfigAdapter;
 import no.nb.nna.veidemann.commons.db.DbException;
-import no.nb.nna.veidemann.db.RethinkDbAdapter.TABLES;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,72 +51,72 @@ public class RethinkDbConfigAdapter implements ConfigAdapter {
 
     @Override
     public BrowserScript getBrowserScript(GetRequest req) throws DbException {
-        return getMessage(req, BrowserScript.class, TABLES.BROWSER_SCRIPTS);
+        return getMessage(req, BrowserScript.class, Tables.BROWSER_SCRIPTS);
     }
 
     @Override
     public BrowserScript saveBrowserScript(BrowserScript script) throws DbException {
-        return saveMessage(script, TABLES.BROWSER_SCRIPTS);
+        return saveMessage(script, Tables.BROWSER_SCRIPTS);
     }
 
     @Override
     public Empty deleteBrowserScript(BrowserScript script) throws DbException {
-        checkDependencies(script, TABLES.BROWSER_CONFIGS, BrowserConfig.getDefaultInstance(), "script_id");
-        return deleteConfigMessage(script, TABLES.BROWSER_SCRIPTS);
+        checkDependencies(script, Tables.BROWSER_CONFIGS, BrowserConfig.getDefaultInstance(), "script_id");
+        return deleteConfigMessage(script, Tables.BROWSER_SCRIPTS);
     }
 
     @Override
     public BrowserScriptListReply listBrowserScripts(ListRequest request) throws DbException {
-        ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, TABLES.BROWSER_SCRIPTS);
+        ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, Tables.BROWSER_SCRIPTS);
         return queryBuilder.executeList(conn, BrowserScriptListReply.newBuilder()).build();
     }
 
     @Override
     public CrawlHostGroupConfig getCrawlHostGroupConfig(GetRequest req) throws DbException {
-        return getMessage(req, CrawlHostGroupConfig.class, TABLES.CRAWL_HOST_GROUP_CONFIGS);
+        return getMessage(req, CrawlHostGroupConfig.class, Tables.CRAWL_HOST_GROUP_CONFIGS);
     }
 
     @Override
     public CrawlHostGroupConfig saveCrawlHostGroupConfig(CrawlHostGroupConfig crawlHostGroupConfig) throws DbException {
-        return saveMessage(crawlHostGroupConfig, TABLES.CRAWL_HOST_GROUP_CONFIGS);
+        return saveMessage(crawlHostGroupConfig, Tables.CRAWL_HOST_GROUP_CONFIGS);
     }
 
     @Override
     public Empty deleteCrawlHostGroupConfig(CrawlHostGroupConfig crawlHostGroupConfig) throws DbException {
-        return deleteConfigMessage(crawlHostGroupConfig, TABLES.CRAWL_HOST_GROUP_CONFIGS);
+        return deleteConfigMessage(crawlHostGroupConfig, Tables.CRAWL_HOST_GROUP_CONFIGS);
     }
 
     @Override
     public CrawlHostGroupConfigListReply listCrawlHostGroupConfigs(ListRequest request) throws DbException {
-        ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, TABLES.CRAWL_HOST_GROUP_CONFIGS);
+        ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, Tables.CRAWL_HOST_GROUP_CONFIGS);
         return queryBuilder.executeList(conn, CrawlHostGroupConfigListReply.newBuilder()).build();
     }
 
     @Override
     public CrawlEntity getCrawlEntity(GetRequest req) throws DbException {
-        return getMessage(req, CrawlEntity.class, TABLES.CRAWL_ENTITIES);
+        return getMessage(req, CrawlEntity.class, Tables.CRAWL_ENTITIES);
     }
 
     @Override
     public CrawlEntity saveCrawlEntity(CrawlEntity entity) throws DbException {
-        return saveMessage(entity, TABLES.CRAWL_ENTITIES);
+        return saveMessage(entity, Tables.CRAWL_ENTITIES);
     }
 
     @Override
     public Empty deleteCrawlEntity(CrawlEntity entity) throws DbException {
-        checkDependencies(entity, TABLES.SEEDS, Seed.getDefaultInstance(), "entity_id");
-        return deleteConfigMessage(entity, TABLES.CRAWL_ENTITIES);
+        checkDependencies(entity, Tables.SEEDS, Seed.getDefaultInstance(), "entity_id");
+        return deleteConfigMessage(entity, Tables.CRAWL_ENTITIES);
     }
 
     @Override
     public CrawlEntityListReply listCrawlEntities(ListRequest request) throws DbException {
-        ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, TABLES.CRAWL_ENTITIES);
+        ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, Tables.CRAWL_ENTITIES);
         return queryBuilder.executeList(conn, CrawlEntityListReply.newBuilder()).build();
     }
 
     @Override
     public Seed getSeed(GetRequest req) throws DbException {
-        return getMessage(req, Seed.class, TABLES.SEEDS);
+        return getMessage(req, Seed.class, Tables.SEEDS);
     }
 
     @Override
@@ -128,22 +127,22 @@ public class RethinkDbConfigAdapter implements ConfigAdapter {
 
     @Override
     public Seed saveSeed(Seed seed) throws DbException {
-        return saveMessage(seed, TABLES.SEEDS);
+        return saveMessage(seed, Tables.SEEDS);
     }
 
     @Override
     public Empty deleteSeed(Seed seed) throws DbException {
-        return deleteConfigMessage(seed, TABLES.SEEDS);
+        return deleteConfigMessage(seed, Tables.SEEDS);
     }
 
     @Override
     public CrawlJob getCrawlJob(GetRequest req) throws DbException {
-        return getMessage(req, CrawlJob.class, TABLES.CRAWL_JOBS);
+        return getMessage(req, CrawlJob.class, Tables.CRAWL_JOBS);
     }
 
     @Override
     public CrawlJobListReply listCrawlJobs(ListRequest request) throws DbException {
-        ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, TABLES.CRAWL_JOBS);
+        ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, Tables.CRAWL_JOBS);
         return queryBuilder.executeList(conn, CrawlJobListReply.newBuilder()).build();
     }
 
@@ -153,101 +152,101 @@ public class RethinkDbConfigAdapter implements ConfigAdapter {
             throw new IllegalArgumentException("A crawl config is required for crawl jobs");
         }
 
-        return saveMessage(crawlJob, TABLES.CRAWL_JOBS);
+        return saveMessage(crawlJob, Tables.CRAWL_JOBS);
     }
 
     @Override
     public Empty deleteCrawlJob(CrawlJob crawlJob) throws DbException {
-        checkDependencies(crawlJob, TABLES.SEEDS, Seed.getDefaultInstance(), "job_id");
-        return deleteConfigMessage(crawlJob, TABLES.CRAWL_JOBS);
+        checkDependencies(crawlJob, Tables.SEEDS, Seed.getDefaultInstance(), "job_id");
+        return deleteConfigMessage(crawlJob, Tables.CRAWL_JOBS);
     }
 
     @Override
     public CrawlConfig getCrawlConfig(GetRequest req) throws DbException {
-        return getMessage(req, CrawlConfig.class, TABLES.CRAWL_CONFIGS);
+        return getMessage(req, CrawlConfig.class, Tables.CRAWL_CONFIGS);
     }
 
     @Override
     public CrawlConfigListReply listCrawlConfigs(ListRequest request) throws DbException {
-        ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, TABLES.CRAWL_CONFIGS);
+        ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, Tables.CRAWL_CONFIGS);
         return queryBuilder.executeList(conn, CrawlConfigListReply.newBuilder()).build();
     }
 
     @Override
     public CrawlConfig saveCrawlConfig(CrawlConfig crawlConfig) throws DbException {
-        return saveMessage(crawlConfig, TABLES.CRAWL_CONFIGS);
+        return saveMessage(crawlConfig, Tables.CRAWL_CONFIGS);
     }
 
     @Override
     public Empty deleteCrawlConfig(CrawlConfig crawlConfig) throws DbException {
-        checkDependencies(crawlConfig, TABLES.CRAWL_JOBS, CrawlJob.getDefaultInstance(), "crawl_config_id");
-        return deleteConfigMessage(crawlConfig, TABLES.CRAWL_CONFIGS);
+        checkDependencies(crawlConfig, Tables.CRAWL_JOBS, CrawlJob.getDefaultInstance(), "crawl_config_id");
+        return deleteConfigMessage(crawlConfig, Tables.CRAWL_CONFIGS);
     }
 
     @Override
     public CrawlScheduleConfig getCrawlScheduleConfig(GetRequest req) throws DbException {
-        return getMessage(req, CrawlScheduleConfig.class, TABLES.CRAWL_SCHEDULE_CONFIGS);
+        return getMessage(req, CrawlScheduleConfig.class, Tables.CRAWL_SCHEDULE_CONFIGS);
     }
 
     @Override
     public CrawlScheduleConfigListReply listCrawlScheduleConfigs(ListRequest request) throws DbException {
-        ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, TABLES.CRAWL_SCHEDULE_CONFIGS);
+        ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, Tables.CRAWL_SCHEDULE_CONFIGS);
         return queryBuilder.executeList(conn, CrawlScheduleConfigListReply.newBuilder()).build();
     }
 
     @Override
     public CrawlScheduleConfig saveCrawlScheduleConfig(CrawlScheduleConfig crawlScheduleConfig) throws DbException {
-        return saveMessage(crawlScheduleConfig, TABLES.CRAWL_SCHEDULE_CONFIGS);
+        return saveMessage(crawlScheduleConfig, Tables.CRAWL_SCHEDULE_CONFIGS);
     }
 
     @Override
     public Empty deleteCrawlScheduleConfig(CrawlScheduleConfig crawlScheduleConfig) throws DbException {
-        checkDependencies(crawlScheduleConfig, TABLES.CRAWL_JOBS, CrawlJob.getDefaultInstance(), "schedule_id");
-        return deleteConfigMessage(crawlScheduleConfig, TABLES.CRAWL_SCHEDULE_CONFIGS);
+        checkDependencies(crawlScheduleConfig, Tables.CRAWL_JOBS, CrawlJob.getDefaultInstance(), "schedule_id");
+        return deleteConfigMessage(crawlScheduleConfig, Tables.CRAWL_SCHEDULE_CONFIGS);
     }
 
     @Override
     public PolitenessConfig getPolitenessConfig(GetRequest req) throws DbException {
-        return getMessage(req, PolitenessConfig.class, TABLES.POLITENESS_CONFIGS);
+        return getMessage(req, PolitenessConfig.class, Tables.POLITENESS_CONFIGS);
     }
 
     @Override
     public PolitenessConfigListReply listPolitenessConfigs(ListRequest request) throws DbException {
-        ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, TABLES.POLITENESS_CONFIGS);
+        ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, Tables.POLITENESS_CONFIGS);
         return queryBuilder.executeList(conn, PolitenessConfigListReply.newBuilder()).build();
     }
 
     @Override
     public PolitenessConfig savePolitenessConfig(PolitenessConfig politenessConfig) throws DbException {
-        return saveMessage(politenessConfig, TABLES.POLITENESS_CONFIGS);
+        return saveMessage(politenessConfig, Tables.POLITENESS_CONFIGS);
     }
 
     @Override
     public Empty deletePolitenessConfig(PolitenessConfig politenessConfig) throws DbException {
-        checkDependencies(politenessConfig, TABLES.CRAWL_CONFIGS, CrawlConfig.getDefaultInstance(), "politeness_id");
-        return deleteConfigMessage(politenessConfig, TABLES.POLITENESS_CONFIGS);
+        checkDependencies(politenessConfig, Tables.CRAWL_CONFIGS, CrawlConfig.getDefaultInstance(), "politeness_id");
+        return deleteConfigMessage(politenessConfig, Tables.POLITENESS_CONFIGS);
     }
 
     @Override
     public BrowserConfig getBrowserConfig(GetRequest req) throws DbException {
-        return getMessage(req, BrowserConfig.class, TABLES.BROWSER_CONFIGS);
+        return getMessage(req, BrowserConfig.class, Tables.BROWSER_CONFIGS);
     }
 
     @Override
     public BrowserConfigListReply listBrowserConfigs(ListRequest request) throws DbException {
-        ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, TABLES.BROWSER_CONFIGS);
+        ListRequestQueryBuilder queryBuilder = new ListRequestQueryBuilder(request, Tables.BROWSER_CONFIGS);
         return queryBuilder.executeList(conn, BrowserConfigListReply.newBuilder()).build();
     }
 
     @Override
     public BrowserConfig saveBrowserConfig(BrowserConfig browserConfig) throws DbException {
-        return saveMessage(browserConfig, TABLES.BROWSER_CONFIGS);
+        return saveMessage(browserConfig, Tables.BROWSER_CONFIGS);
     }
 
     @Override
     public Empty deleteBrowserConfig(BrowserConfig browserConfig) throws DbException {
-        checkDependencies(browserConfig, TABLES.CRAWL_CONFIGS, CrawlConfig.getDefaultInstance(), "browser_config_id");
-        return deleteConfigMessage(browserConfig, TABLES.BROWSER_CONFIGS);
+        checkDependencies(browserConfig, Tables.CRAWL_CONFIGS, CrawlConfig.getDefaultInstance(), "browser_config_id");
+        return deleteConfigMessage(browserConfig, Tables.BROWSER_CONFIGS);
     }
 
     @Override
@@ -260,7 +259,7 @@ public class RethinkDbConfigAdapter implements ConfigAdapter {
     public RoleMapping saveRoleMapping(RoleMapping roleMapping) throws DbException {
         Map<String, Object> doc = ProtoUtils.protoToRethink(roleMapping);
         return conn.executeInsert("save-rolemapping",
-                r.table(TABLES.ROLE_MAPPINGS.name)
+                r.table(Tables.ROLE_MAPPINGS.name)
                         .insert(doc)
                         .optArg("conflict", "replace"),
                 RoleMapping.class
@@ -269,13 +268,13 @@ public class RethinkDbConfigAdapter implements ConfigAdapter {
 
     @Override
     public Empty deleteRoleMapping(RoleMapping roleMapping) throws DbException {
-        return deleteConfigMessage(roleMapping, TABLES.ROLE_MAPPINGS);
+        return deleteConfigMessage(roleMapping, Tables.ROLE_MAPPINGS);
     }
 
     @Override
     public LogLevels getLogConfig() throws DbException {
         Map<String, Object> response = conn.exec("get-logconfig",
-                r.table(RethinkDbAdapter.TABLES.SYSTEM.name)
+                r.table(Tables.SYSTEM.name)
                         .get("log_levels")
                         .pluck("logLevel")
         );
@@ -288,14 +287,14 @@ public class RethinkDbConfigAdapter implements ConfigAdapter {
         Map<String, Object> doc = ProtoUtils.protoToRethink(logLevels);
         doc.put("id", "log_levels");
         return conn.executeInsert("save-logconfig",
-                r.table(RethinkDbAdapter.TABLES.SYSTEM.name)
+                r.table(Tables.SYSTEM.name)
                         .insert(doc)
                         .optArg("conflict", "replace"),
                 LogLevels.class
         );
     }
 
-    public <T extends Message> T getMessage(GetRequest req, Class<T> type, TABLES table) throws DbException {
+    public <T extends Message> T getMessage(GetRequest req, Class<T> type, Tables table) throws DbException {
         Map<String, Object> response = conn.exec("db-get" + type.getSimpleName(),
                 r.table(table.name)
                         .get(req.getId())
@@ -308,7 +307,7 @@ public class RethinkDbConfigAdapter implements ConfigAdapter {
         return ProtoUtils.rethinkToProto(response, type);
     }
 
-    public <T extends Message> T saveMessage(T msg, TABLES table) throws DbException {
+    public <T extends Message> T saveMessage(T msg, Tables table) throws DbException {
         FieldDescriptor metaField = msg.getDescriptorForType().findFieldByName("meta");
         Map rMap = ProtoUtils.protoToRethink(msg);
 
@@ -345,7 +344,7 @@ public class RethinkDbConfigAdapter implements ConfigAdapter {
         }
     }
 
-    public <T extends Message> Empty deleteConfigMessage(T entity, TABLES table) throws DbException {
+    public <T extends Message> Empty deleteConfigMessage(T entity, Tables table) throws DbException {
         Descriptors.FieldDescriptor idDescriptor = entity.getDescriptorForType().findFieldByName("id");
 
         conn.exec("db-delete" + entity.getClass().getSimpleName(),
@@ -391,7 +390,7 @@ public class RethinkDbConfigAdapter implements ConfigAdapter {
      *                           in the object to check.
      * @throws IllegalStateException if there are dependencies.
      */
-    private void checkDependencies(Message messageToCheck, TABLES dependentTable,
+    private void checkDependencies(Message messageToCheck, Tables dependentTable,
                                    Message dependentMessage, String dependentFieldName) throws DbException {
 
         Descriptors.FieldDescriptor messageIdField = messageToCheck.getDescriptorForType().findFieldByName("id");

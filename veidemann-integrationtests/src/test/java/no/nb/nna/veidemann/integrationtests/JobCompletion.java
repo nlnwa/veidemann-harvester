@@ -12,7 +12,7 @@ import no.nb.nna.veidemann.api.StatusProto.ListExecutionsRequest;
 import no.nb.nna.veidemann.commons.util.ApiTools.ListReplyWalker;
 import no.nb.nna.veidemann.db.ProtoUtils;
 import no.nb.nna.veidemann.db.RethinkDbAdapter;
-import no.nb.nna.veidemann.db.RethinkDbAdapter.TABLES;
+import no.nb.nna.veidemann.db.Tables;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -76,7 +76,7 @@ public class JobCompletion extends ForkJoinTask<JobExecutionStatus> implements R
     @Override
     protected boolean exec() {
         try {
-            Cursor<Map<String, Object>> cursor = db.executeRequest("list", r.table(TABLES.JOB_EXECUTIONS.name)
+            Cursor<Map<String, Object>> cursor = db.executeRequest("list", r.table(Tables.JOB_EXECUTIONS.name)
                     .get(jobExecutionId)
                     .changes().optArg("include_initial", true));
 

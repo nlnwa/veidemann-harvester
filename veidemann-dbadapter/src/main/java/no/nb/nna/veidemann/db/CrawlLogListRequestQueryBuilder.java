@@ -19,7 +19,6 @@ import com.rethinkdb.gen.ast.ReqlExpr;
 import no.nb.nna.veidemann.api.ReportProto.CrawlLogListReply;
 import no.nb.nna.veidemann.api.ReportProto.CrawlLogListRequest;
 import no.nb.nna.veidemann.commons.db.DbException;
-import no.nb.nna.veidemann.db.RethinkDbAdapter.TABLES;
 
 import static no.nb.nna.veidemann.db.RethinkDbAdapter.r;
 
@@ -29,7 +28,7 @@ import static no.nb.nna.veidemann.db.RethinkDbAdapter.r;
 public class CrawlLogListRequestQueryBuilder extends ConfigListQueryBuilder<CrawlLogListRequest> {
 
     public CrawlLogListRequestQueryBuilder(CrawlLogListRequest request) {
-        super(request, TABLES.CRAWL_LOG);
+        super(request, Tables.CRAWL_LOG);
         setPaging(request.getPageSize(), request.getPage());
 
         if (request.getWarcIdCount() > 0) {

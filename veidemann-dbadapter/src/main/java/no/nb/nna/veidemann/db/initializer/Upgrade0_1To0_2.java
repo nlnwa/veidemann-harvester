@@ -17,7 +17,7 @@ package no.nb.nna.veidemann.db.initializer;
 
 import no.nb.nna.veidemann.commons.db.DbConnectionException;
 import no.nb.nna.veidemann.commons.db.DbQueryException;
-import no.nb.nna.veidemann.db.RethinkDbAdapter.TABLES;
+import no.nb.nna.veidemann.db.Tables;
 import no.nb.nna.veidemann.db.RethinkDbConnection;
 
 public class Upgrade0_1To0_2 extends UpgradeDbBase {
@@ -26,18 +26,18 @@ public class Upgrade0_1To0_2 extends UpgradeDbBase {
     }
 
     final void upgrade() throws DbQueryException, DbConnectionException {
-        conn.exec(r.table(TABLES.EXECUTIONS.name).indexCreate("jobId"));
-        conn.exec(r.table(TABLES.EXECUTIONS.name).indexCreate("state"));
-        conn.exec(r.table(TABLES.EXECUTIONS.name).indexCreate("seedId"));
-        conn.exec(r.table(TABLES.EXECUTIONS.name).indexCreate("jobExecutionId"));
+        conn.exec(r.table(Tables.EXECUTIONS.name).indexCreate("jobId"));
+        conn.exec(r.table(Tables.EXECUTIONS.name).indexCreate("state"));
+        conn.exec(r.table(Tables.EXECUTIONS.name).indexCreate("seedId"));
+        conn.exec(r.table(Tables.EXECUTIONS.name).indexCreate("jobExecutionId"));
 
-        conn.exec(r.tableCreate(TABLES.JOB_EXECUTIONS.name));
-        conn.exec(r.table(TABLES.JOB_EXECUTIONS.name).indexCreate("startTime"));
-        conn.exec(r.table(TABLES.JOB_EXECUTIONS.name).indexCreate("jobId"));
-        conn.exec(r.table(TABLES.JOB_EXECUTIONS.name).indexCreate("state"));
+        conn.exec(r.tableCreate(Tables.JOB_EXECUTIONS.name));
+        conn.exec(r.table(Tables.JOB_EXECUTIONS.name).indexCreate("startTime"));
+        conn.exec(r.table(Tables.JOB_EXECUTIONS.name).indexCreate("jobId"));
+        conn.exec(r.table(Tables.JOB_EXECUTIONS.name).indexCreate("state"));
 
-        conn.exec(r.table(TABLES.EXECUTIONS.name).indexWait("jobId", "state", "seedId", "jobExecutionId"));
-        conn.exec(r.table(TABLES.JOB_EXECUTIONS.name).indexWait("startTime", "jobId", "state"));
+        conn.exec(r.table(Tables.EXECUTIONS.name).indexWait("jobId", "state", "seedId", "jobExecutionId"));
+        conn.exec(r.table(Tables.JOB_EXECUTIONS.name).indexWait("startTime", "jobId", "state"));
     }
 
     @Override

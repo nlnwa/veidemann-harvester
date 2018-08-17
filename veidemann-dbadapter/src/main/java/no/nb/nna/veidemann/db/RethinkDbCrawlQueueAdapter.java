@@ -11,7 +11,6 @@ import no.nb.nna.veidemann.commons.db.DbConnectionException;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbQueryException;
 import no.nb.nna.veidemann.commons.db.FutureOptional;
-import no.nb.nna.veidemann.db.RethinkDbAdapter.TABLES;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,7 +46,7 @@ public class RethinkDbCrawlQueueAdapter implements CrawlQueueAdapter {
 
             Map rMap = ProtoUtils.protoToRethink(qUri);
             return conn.executeInsert("db-saveQueuedUri",
-                    r.table(TABLES.URI_QUEUE.name)
+                    r.table(Tables.URI_QUEUE.name)
                             .insert(rMap)
                             .optArg("conflict", "replace"),
                     QueuedUri.class
@@ -63,7 +62,7 @@ public class RethinkDbCrawlQueueAdapter implements CrawlQueueAdapter {
         OffsetDateTime nextReadyTime = null;
 
         try (Cursor<Map<String, Object>> response = conn.exec("db-borrowFirstReadyCrawlHostGroup",
-                r.table(TABLES.CRAWL_HOST_GROUP.name)
+                r.table(Tables.CRAWL_HOST_GROUP.name)
                         .orderBy().optArg("index", "nextFetchTime")
                         .between(r.minval(), r.now()).optArg("right_bound", "closed")
                         .filter(r.hashMap("busy", false))
@@ -139,7 +138,7 @@ public class RethinkDbCrawlQueueAdapter implements CrawlQueueAdapter {
         long deleted = 0;
 
         List<Map<String, Object>> chgKeys = conn.exec(
-                r.table(TABLES.URI_QUEUE.name).optArg("read_mode", "majority")
+                r.table(Tables.URI_QUEUE.name).optArg("read_mode", "majority")
                         .getAll(executionId).optArg("index", "executionId")
                         .pluck("crawlHostGroupId", "politenessId")
                         .distinct()
@@ -153,7 +152,7 @@ public class RethinkDbCrawlQueueAdapter implements CrawlQueueAdapter {
 
             try (Lock lock = aquireLock(chgKey)) {
                 long deleteResponse = conn.exec("db-deleteQueuedUrisForExecution",
-                        r.table(TABLES.URI_QUEUE.name)
+                        r.table(Tables.URI_QUEUE.name)
                                 .between(startKey, endKey)
                                 .optArg("index", "crawlHostGroupKey_sequence_earliestFetch")
                                 .filter(row -> row.g("executionId").eq(executionId))
@@ -173,7 +172,7 @@ public class RethinkDbCrawlQueueAdapter implements CrawlQueueAdapter {
     @Override
     public long queuedUriCount(String executionId) throws DbException {
         return conn.exec("db-queuedUriCount",
-                r.table(TABLES.URI_QUEUE.name).optArg("read_mode", "majority")
+                r.table(Tables.URI_QUEUE.name).optArg("read_mode", "majority")
                         .getAll(executionId).optArg("index", "executionId")
                         .count()
         );
@@ -182,13 +181,13 @@ public class RethinkDbCrawlQueueAdapter implements CrawlQueueAdapter {
     @Override
     public boolean uriNotIncludedInQueue(QueuedUri qu, Timestamp since) throws DbException {
         return conn.exec("db-uriNotIncludedInQueue",
-                r.table(RethinkDbAdapter.TABLES.CRAWL_LOG.name)
+                r.table(Tables.CRAWL_LOG.name)
                         .between(
                                 r.array(qu.getSurt(), ProtoUtils.tsToOdt(since)),
                                 r.array(qu.getSurt(), r.maxval()))
                         .optArg("index", "surt_time").filter(row -> row.g("statusCode").lt(500)).limit(1)
                         .union(
-                                r.table(RethinkDbAdapter.TABLES.URI_QUEUE.name).getAll(qu.getSurt())
+                                r.table(Tables.URI_QUEUE.name).getAll(qu.getSurt())
                                         .optArg("index", "surt")
                                         .limit(1)
                         ).isEmpty());
@@ -211,7 +210,7 @@ public class RethinkDbCrawlQueueAdapter implements CrawlQueueAdapter {
         );
 
         try (Cursor<Map<String, Object>> cursor = conn.exec("db-getNextQueuedUriToFetch",
-                r.table(TABLES.URI_QUEUE.name).optArg("read_mode", "majority")
+                r.table(Tables.URI_QUEUE.name).optArg("read_mode", "majority")
                         .orderBy().optArg("index", "crawlHostGroupKey_sequence_earliestFetch")
                         .between(fromKey, toKey)
                         .limit(1))) {
@@ -222,7 +221,7 @@ public class RethinkDbCrawlQueueAdapter implements CrawlQueueAdapter {
                     // URI is ready to be processed, remove it from queue
                     try (Lock lock = aquireLock(crawlHostGroup.getId(), crawlHostGroup.getPolitenessId())) {
                         conn.exec("db-deleteQueuedUri",
-                                r.table(TABLES.URI_QUEUE.name)
+                                r.table(Tables.URI_QUEUE.name)
                                         .get(qUri.getId())
                                         .delete()
                         );
@@ -251,7 +250,7 @@ public class RethinkDbCrawlQueueAdapter implements CrawlQueueAdapter {
     private Lock aquireLock(List key) throws DbQueryException, DbConnectionException, InterruptedException {
         while (true) {
             Map<String, Object> borrowResponse = conn.exec("db-aquireLock",
-                    r.table(TABLES.CRAWL_HOST_GROUP.name).optArg("read_mode", "majority")
+                    r.table(Tables.CRAWL_HOST_GROUP.name).optArg("read_mode", "majority")
                             .get(key)
                             .replace(d ->
                                     r.branch(
@@ -282,7 +281,7 @@ public class RethinkDbCrawlQueueAdapter implements CrawlQueueAdapter {
     private Lock aquireLockIfexists(List key) throws DbQueryException, DbConnectionException, InterruptedException {
         while (true) {
             Map<String, Object> borrowResponse = conn.exec("db-aquireLock",
-                    r.table(TABLES.CRAWL_HOST_GROUP.name).optArg("read_mode", "majority")
+                    r.table(Tables.CRAWL_HOST_GROUP.name).optArg("read_mode", "majority")
                             .get(key)
                             .replace(d ->
                                     r.branch(
@@ -351,7 +350,7 @@ public class RethinkDbCrawlQueueAdapter implements CrawlQueueAdapter {
                     r.maxval()
             );
 
-            long queueCount = conn.exec("", r.table(TABLES.URI_QUEUE.name)
+            long queueCount = conn.exec("", r.table(Tables.URI_QUEUE.name)
                     .optArg("read_mode", "majority")
                     .between(fromKey, toKey).optArg("index", "crawlHostGroupKey_sequence_earliestFetch")
                     .count());
@@ -372,7 +371,7 @@ public class RethinkDbCrawlQueueAdapter implements CrawlQueueAdapter {
             chgDoc.put("lock", false);
 
             Map<String, Object> borrowResponse = conn.exec("db-releaseLock",
-                    r.table(TABLES.CRAWL_HOST_GROUP.name).optArg("read_mode", "majority")
+                    r.table(Tables.CRAWL_HOST_GROUP.name).optArg("read_mode", "majority")
                             .get(key)
                             .replace(d ->
                                     r.branch(
@@ -401,7 +400,7 @@ public class RethinkDbCrawlQueueAdapter implements CrawlQueueAdapter {
 
         public void delete() throws DbQueryException, DbConnectionException {
             conn.exec("db-deleteLock",
-                    r.table(TABLES.CRAWL_HOST_GROUP.name).optArg("read_mode", "majority")
+                    r.table(Tables.CRAWL_HOST_GROUP.name).optArg("read_mode", "majority")
                             .get(key)
                             .delete()
                             .optArg("return_changes", false)

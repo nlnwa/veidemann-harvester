@@ -19,7 +19,6 @@ package no.nb.nna.veidemann.db;
 import no.nb.nna.veidemann.api.StatusProto.ExecutionsListReply;
 import no.nb.nna.veidemann.api.StatusProto.ListExecutionsRequest;
 import no.nb.nna.veidemann.commons.db.DbException;
-import no.nb.nna.veidemann.db.RethinkDbAdapter.TABLES;
 
 import static no.nb.nna.veidemann.db.RethinkDbAdapter.r;
 
@@ -29,7 +28,7 @@ import static no.nb.nna.veidemann.db.RethinkDbAdapter.r;
 public class CrawlExecutionsListRequestQueryBuilder extends ConfigListQueryBuilder<ListExecutionsRequest> {
 
     public CrawlExecutionsListRequestQueryBuilder(ListExecutionsRequest request) {
-        super(request, TABLES.EXECUTIONS, "startTime", true);
+        super(request, Tables.EXECUTIONS, "startTime", true);
         setPaging(request.getPageSize(), request.getPage());
 
         if (request.getIdCount() > 0) {

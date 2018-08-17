@@ -22,8 +22,8 @@ import com.rethinkdb.net.Connection;
 import com.typesafe.config.Config;
 import no.nb.nna.veidemann.commons.settings.ConfigServer;
 import no.nb.nna.veidemann.db.ProtoUtils;
-import no.nb.nna.veidemann.db.RethinkDbAdapter;
 import no.nb.nna.veidemann.api.ConfigProto.LogLevels;
+import no.nb.nna.veidemann.db.Tables;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,7 +48,7 @@ public class RethinkDbConfigServer implements ConfigServer {
         LOG.debug("Connecting Config Server to: {}:{}", dbHost, dbPort);
         LogLevels logLevels = LogLevels.getDefaultInstance();
         try (Connection conn = connect(dbHost, dbPort, dbName, dbUser, dbPassword);) {
-            Map msg = r.table(RethinkDbAdapter.TABLES.SYSTEM.name).get("log_levels").pluck("logLevel").run(conn);
+            Map msg = r.table(Tables.SYSTEM.name).get("log_levels").pluck("logLevel").run(conn);
             logLevels = ProtoUtils.rethinkToProto(msg, LogLevels.class);
         } catch (Exception ex) {
             LOG.debug("Failed reading logger config from db");

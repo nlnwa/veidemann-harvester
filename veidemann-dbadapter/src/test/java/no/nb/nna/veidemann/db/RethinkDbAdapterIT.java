@@ -58,7 +58,6 @@ import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.commons.settings.CommonSettings;
 import no.nb.nna.veidemann.commons.util.ApiTools;
-import no.nb.nna.veidemann.db.RethinkDbAdapter.TABLES;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -124,8 +123,8 @@ public class RethinkDbAdapterIT {
 
     @Before
     public void cleanDb() throws DbException {
-        for (RethinkDbAdapter.TABLES table : RethinkDbAdapter.TABLES.values()) {
-            if (table != RethinkDbAdapter.TABLES.SYSTEM) {
+        for (Tables table : Tables.values()) {
+            if (table != Tables.SYSTEM) {
                 dbAdapter.executeRequest("delete", r.table(table.name).delete());
             }
         }
@@ -1050,7 +1049,7 @@ public class RethinkDbAdapterIT {
         assertThat(dbAdapter.isPaused()).isFalse();
 
         CrawlHostGroup chg = CrawlHostGroup.newBuilder().setId("chg").setBusy(true).build();
-        configAdapter.saveMessage(chg, TABLES.CRAWL_HOST_GROUP);
+        configAdapter.saveMessage(chg, Tables.CRAWL_HOST_GROUP);
 
         assertThat(dbAdapter.getDesiredPausedState()).isFalse();
         assertThat(dbAdapter.isPaused()).isFalse();
@@ -1059,7 +1058,7 @@ public class RethinkDbAdapterIT {
         assertThat(dbAdapter.isPaused()).isFalse();
 
         chg = chg.toBuilder().setBusy(false).build();
-        configAdapter.saveMessage(chg, TABLES.CRAWL_HOST_GROUP);
+        configAdapter.saveMessage(chg, Tables.CRAWL_HOST_GROUP);
 
         assertThat(dbAdapter.getDesiredPausedState()).isTrue();
         assertThat(dbAdapter.isPaused()).isTrue();

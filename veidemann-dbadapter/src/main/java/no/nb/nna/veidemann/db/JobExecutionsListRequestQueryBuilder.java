@@ -19,7 +19,6 @@ package no.nb.nna.veidemann.db;
 import no.nb.nna.veidemann.api.StatusProto.JobExecutionsListReply;
 import no.nb.nna.veidemann.api.StatusProto.ListJobExecutionsRequest;
 import no.nb.nna.veidemann.commons.db.DbException;
-import no.nb.nna.veidemann.db.RethinkDbAdapter.TABLES;
 
 import static no.nb.nna.veidemann.db.RethinkDbAdapter.r;
 
@@ -29,7 +28,7 @@ import static no.nb.nna.veidemann.db.RethinkDbAdapter.r;
 public class JobExecutionsListRequestQueryBuilder extends ConfigListQueryBuilder<ListJobExecutionsRequest> {
 
     public JobExecutionsListRequestQueryBuilder(ListJobExecutionsRequest request) {
-        super(request, TABLES.JOB_EXECUTIONS, "startTime", true);
+        super(request, Tables.JOB_EXECUTIONS, "startTime", true);
         setPaging(request.getPageSize(), request.getPage());
 
         if (request.getIdCount() > 0) {

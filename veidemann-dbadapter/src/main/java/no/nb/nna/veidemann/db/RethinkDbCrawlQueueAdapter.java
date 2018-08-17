@@ -14,6 +14,7 @@ import no.nb.nna.veidemann.commons.db.FutureOptional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
@@ -24,6 +25,8 @@ public class RethinkDbCrawlQueueAdapter implements CrawlQueueAdapter {
     static final RethinkDB r = RethinkDB.r;
 
     private final RethinkDbConnection conn;
+
+    private final Duration expiration = Duration.ofHours(1);
 
     public RethinkDbCrawlQueueAdapter(RethinkDbConnection conn) {
         this.conn = conn;
@@ -65,7 +68,6 @@ public class RethinkDbCrawlQueueAdapter implements CrawlQueueAdapter {
                 r.table(Tables.CRAWL_HOST_GROUP.name)
                         .orderBy().optArg("index", "nextFetchTime")
                         .between(r.minval(), r.now()).optArg("right_bound", "closed")
-                        .filter(r.hashMap("busy", false))
         )) {
 
             for (Map<String, Object> chgDoc : response) {
@@ -321,11 +323,27 @@ public class RethinkDbCrawlQueueAdapter implements CrawlQueueAdapter {
         }
 
         public boolean isBusy() {
-            return (boolean) chgDoc.get("busy");
+            if ((boolean) chgDoc.get("busy")) {
+                if (chgDoc.get("busySince") != null) {
+                    OffsetDateTime busySince = (OffsetDateTime) chgDoc.get("busySince");
+                    if (ProtoUtils.getNowOdt().isAfter(busySince.plus(expiration))) {
+                        LOG.warn("Busy marker for CrawlHostGroup {} has expired. Probably caused by a container crash", key);
+                        return false;
+                    }
+                }
+                return true;
+            } else {
+                return false;
+            }
         }
 
         public void setBusy(boolean busy) {
             chgDoc.put("busy", busy);
+            if (busy) {
+                chgDoc.put("busySince", r.now());
+            } else {
+                chgDoc.put("busySince", null);
+            }
         }
 
         public void setFetchDelay(double nextFetchDelayS) {

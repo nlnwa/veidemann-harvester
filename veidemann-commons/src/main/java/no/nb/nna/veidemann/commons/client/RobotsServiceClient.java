@@ -76,7 +76,7 @@ public class RobotsServiceClient implements AutoCloseable {
             if (code.equals(Status.CANCELLED.getCode())
                     || code.equals(Status.DEADLINE_EXCEEDED.getCode())
                     || code.equals(Status.ABORTED.getCode())) {
-                LOG.debug("Request was aborted", ex);
+                LOG.warn("Request was aborted", ex);
             } else {
                 LOG.error("RPC failed: " + ex.getStatus(), ex);
             }

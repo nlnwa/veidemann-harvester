@@ -23,6 +23,7 @@ import no.nb.nna.veidemann.api.MessagesProto.Screenshot;
 
 public enum Tables {
     SYSTEM("system", null),
+    LOCKS("locks", null),
     CRAWL_LOG("crawl_log", CrawlLog.getDefaultInstance()),
     PAGE_LOG("page_log", PageLog.getDefaultInstance()),
     CRAWLED_CONTENT("crawled_content", CrawledContent.getDefaultInstance()),

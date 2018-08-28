@@ -73,12 +73,20 @@ public class RethinkDbInitializer implements DbInitializer {
         }
     }
 
+    public RethinkDbConnection getDbConnection() {
+        return conn;
+    }
+
     private void upgrade(String fromVersion) throws DbUpgradeException {
         String dbName = conn.getConnection().db().get();
 
         switch (fromVersion) {
             case "0.1":
                 new Upgrade0_1To0_2(dbName, conn).run();
+                new Upgrade0_2To0_3(dbName, conn).run();
+                break;
+            case "0.2":
+                new Upgrade0_2To0_3(dbName, conn).run();
                 break;
             default:
                 throw new DbUpgradeException("Unknown database version '" + fromVersion + "', unable to upgrade");

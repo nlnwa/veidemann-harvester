@@ -95,7 +95,7 @@ public class RethinkDbConnection implements DbServiceSPI {
                         && ((Map) result).containsKey("errors")
                         && !((Map) result).get("errors").equals(0L)) {
                     DbQueryException ex = new DbQueryException((String) ((Map) result).get("first_error"));
-                    LOG.debug(ex.toString(), ex);
+                    LOG.error(ex.toString(), ex);
                     throw ex;
                 }
                 return result;

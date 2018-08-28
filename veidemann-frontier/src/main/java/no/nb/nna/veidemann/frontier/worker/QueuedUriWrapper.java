@@ -27,6 +27,7 @@ import no.nb.nna.veidemann.api.MessagesProto.QueuedUriOrBuilder;
 import no.nb.nna.veidemann.commons.ExtraStatusCodes;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbService;
+import no.nb.nna.veidemann.commons.util.ApiTools;
 import no.nb.nna.veidemann.db.ProtoUtils;
 import org.netpreserve.commons.uri.Uri;
 import org.netpreserve.commons.uri.UriConfigs;
@@ -107,7 +108,7 @@ public class QueuedUriWrapper {
         }
 
         if (wrapped.getUnresolved() && wrapped.getCrawlHostGroupId().isEmpty()) {
-            wrapped.setCrawlHostGroupId(CrawlHostGroupCalculator.createSha1Digest(surt.getDecodedHost()));
+            wrapped.setCrawlHostGroupId(ApiTools.createSha1Digest(surt.getDecodedHost()));
         }
         requireNonEmpty(wrapped.getCrawlHostGroupId(), "Empty CrawlHostGroupId");
 

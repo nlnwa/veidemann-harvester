@@ -15,13 +15,12 @@
  */
 package no.nb.nna.veidemann.frontier.worker;
 
-import java.math.BigInteger;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.List;
-
 import com.google.common.net.InetAddresses;
 import no.nb.nna.veidemann.api.ConfigProto.CrawlHostGroupConfig;
+import no.nb.nna.veidemann.commons.util.ApiTools;
+
+import java.math.BigInteger;
+import java.util.List;
 
 /**
  *
@@ -37,7 +36,7 @@ public class CrawlHostGroupCalculator {
      * Check if uri's ip is within range of a crawl host group. If it is return the groups id. Otherwise return the
      * hashed ip address.
      *
-     * @param ip the ip for wich to calculate the group
+     * @param ip                    the ip for wich to calculate the group
      * @param crawlHostGroupConfigs the CrawlHostGroup configs to check
      * @return id of a CrawlHostGroup or the hashed IP
      */
@@ -51,7 +50,7 @@ public class CrawlHostGroupCalculator {
                 })
                 .findFirst()
                 .map(g -> g.getId())
-                .orElse(createSha1Digest(ip));
+                .orElse(ApiTools.createSha1Digest(ip));
 
         return hostGroupHash;
     }
@@ -62,16 +61,6 @@ public class CrawlHostGroupCalculator {
 
     private static boolean inRange(BigInteger rangeStart, BigInteger rangeEnd, BigInteger toCheck) {
         return (toCheck.compareTo(rangeStart) >= 0 && toCheck.compareTo(rangeEnd) <= 0);
-    }
-
-    public static String createSha1Digest(String val) {
-        try {
-            MessageDigest md = MessageDigest.getInstance("SHA-1");
-            md.update(val.getBytes());
-            return new BigInteger(1, md.digest()).toString(16);
-        } catch (NoSuchAlgorithmException ex) {
-            throw new RuntimeException(ex);
-        }
     }
 
 }

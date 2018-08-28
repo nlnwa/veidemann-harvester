@@ -21,6 +21,9 @@ import com.google.protobuf.Message;
 import no.nb.nna.veidemann.api.ConfigProto.Label;
 import no.nb.nna.veidemann.api.ConfigProto.Meta;
 
+import java.math.BigInteger;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -86,6 +89,16 @@ public class ApiTools {
                 .setKey(key)
                 .setValue(value)
                 .build();
+    }
+
+    public static String createSha1Digest(String val) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-1");
+            md.update(val.getBytes());
+            return new BigInteger(1, md.digest()).toString(16);
+        } catch (NoSuchAlgorithmException ex) {
+            throw new RuntimeException(ex);
+        }
     }
 
     /**

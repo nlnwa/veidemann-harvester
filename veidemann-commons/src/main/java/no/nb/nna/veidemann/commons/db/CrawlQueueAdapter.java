@@ -23,6 +23,6 @@ public interface CrawlQueueAdapter {
 
     FutureOptional<CrawlHostGroup> borrowFirstReadyCrawlHostGroup() throws DbException;
 
-    CrawlHostGroup releaseCrawlHostGroup(CrawlHostGroup crawlHostGroup, long nextFetchDelayMs) throws DbException;
+    void releaseCrawlHostGroup(CrawlHostGroup crawlHostGroup, long nextFetchDelayMs) throws DbException;
 
 }

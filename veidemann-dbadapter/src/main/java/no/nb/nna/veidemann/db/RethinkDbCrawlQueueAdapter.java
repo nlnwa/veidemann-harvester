@@ -25,8 +25,18 @@ public class RethinkDbCrawlQueueAdapter implements CrawlQueueAdapter {
 
     private final RethinkDbConnection conn;
 
+    private final long expirationSeconds = 3600;
+
     public RethinkDbCrawlQueueAdapter(RethinkDbConnection conn) {
         this.conn = conn;
+    }
+
+    private String createKey(String crawlHostGroupId, String politenessId) {
+        return crawlHostGroupId + ":" + politenessId;
+    }
+
+    private String createKey(List<String> crawlHostGroupId) {
+        return createKey(crawlHostGroupId.get(0), crawlHostGroupId.get(1));
     }
 
     @Override
@@ -39,10 +49,24 @@ public class RethinkDbCrawlQueueAdapter implements CrawlQueueAdapter {
             throw new IllegalArgumentException("Sequence must be a positive number");
         }
 
-        try (Lock lock = aquireLock(crawlHostGroupId, politenessId)) {
+        DistributedLock lock = new DistributedLock(conn, createKey(crawlHostGroupId, politenessId));
+        lock.lock();
+        try {
             if (!qUri.hasEarliestFetchTimeStamp()) {
                 qUri = qUri.toBuilder().setEarliestFetchTimeStamp(ProtoUtils.getNowTs()).build();
             }
+            OffsetDateTime earliestFetchTimeStamp = ProtoUtils.tsToOdt(qUri.getEarliestFetchTimeStamp());
+
+            List key = r.array(crawlHostGroupId, politenessId);
+            conn.exec("db-addToCrawlHostGroup",
+                    r.table(Tables.CRAWL_HOST_GROUP.name).optArg("read_mode", "majority")
+                            .insert(r.hashMap("id", key)
+                                    .with("nextFetchTime", earliestFetchTimeStamp)
+                                    .with("busy", false))
+                            .optArg("return_changes", false)
+                            .optArg("conflict", (id, old_doc, new_doc) -> old_doc)
+                            .optArg("durability", "hard")
+            );
 
             Map rMap = ProtoUtils.protoToRethink(qUri);
             return conn.executeInsert("db-saveQueuedUri",
@@ -51,93 +75,131 @@ public class RethinkDbCrawlQueueAdapter implements CrawlQueueAdapter {
                             .optArg("conflict", "replace"),
                     QueuedUri.class
             );
-        } catch (InterruptedException e) {
-            LOG.info("addToCrawlHostGroup was interrupted");
-            throw new RuntimeException(e);
+        } finally {
+            lock.unlock();
         }
     }
 
     @Override
     public FutureOptional<CrawlHostGroup> borrowFirstReadyCrawlHostGroup() throws DbException {
-        OffsetDateTime nextReadyTime = null;
-
         try (Cursor<Map<String, Object>> response = conn.exec("db-borrowFirstReadyCrawlHostGroup",
                 r.table(Tables.CRAWL_HOST_GROUP.name)
                         .orderBy().optArg("index", "nextFetchTime")
                         .between(r.minval(), r.now()).optArg("right_bound", "closed")
-                        .filter(r.hashMap("busy", false))
         )) {
 
             for (Map<String, Object> chgDoc : response) {
-                nextReadyTime = null;
-                List key = (List) chgDoc.get("id");
+                List chgId = (List) chgDoc.get("id");
 
-                try (Lock lock = aquireLockIfexists(key)) {
-                    if (lock.key == null) {
+                DistributedLock lock = new DistributedLock(conn, createKey(chgId));
+                lock.lock();
+                try {
+                    Map<String, Object> borrowResponse = conn.exec("db-borrowFirstReadyCrawlHostGroup",
+                            r.table(Tables.CRAWL_HOST_GROUP.name).optArg("read_mode", "majority")
+                                    .get(chgId)
+                                    .replace(d ->
+                                            r.branch(
+                                                    // CrawlHostGroup doesn't exist, return null
+                                                    d.eq(null),
+                                                    null,
+
+                                                    // Busy is false or expired. This is the one we want, ensure busy is false and return it
+                                                    d.g("busy").eq(false).or(d.g("expires").lt(r.now())),
+                                                    d.merge(r.hashMap("busy", false).with("expires", r.now())),
+
+                                                    // The CrawlHostGroup is busy, return it unchanged
+                                                    d
+                                            ))
+                                    .optArg("return_changes", true)
+                                    .optArg("durability", "hard")
+                    );
+
+                    if (borrowResponse == null) {
                         return FutureOptional.empty();
-                    }
-
-                    long queueCount = lock.queueCount();
-
-                    if (!lock.isBusy() && queueCount == 0L) {
-                        lock.delete();
-                    } else if (!lock.isBusy()) {
-                        lock.setBusy(true);
-                        CrawlHostGroup chg = buildCrawlHostGroup(lock.chgDoc, queueCount);
-                        return FutureOptional.of(chg);
                     } else {
-                        if (nextReadyTime == null) {
-                            nextReadyTime = (OffsetDateTime) chgDoc.get("nextFetchTime");
+                        long replaced = (long) borrowResponse.get("replaced");
+                        if (replaced == 1L) {
+                            Map<String, Object> newDoc = ((List<Map<String, Map>>) borrowResponse.get("changes")).get(0).get("new_val");
+                            long queueCount = crawlHostGroupQueueCount(chgId);
+
+                            if (queueCount == 0L) {
+                                // No more URIs in queue for this CrawlHostGroup, delete it
+                                conn.exec("db-deleteCrawlHostGroup",
+                                        r.table(Tables.CRAWL_HOST_GROUP.name).optArg("read_mode", "majority")
+                                                .get(chgId)
+                                                .delete()
+                                                .optArg("return_changes", false)
+                                                .optArg("durability", "hard")
+                                );
+                            } else {
+                                newDoc.put("busy", true);
+                                newDoc.put("expires", r.now().add(expirationSeconds));
+                                CrawlHostGroup chg = buildCrawlHostGroup(newDoc, queueCount);
+
+                                conn.exec("db-saveCrawlHostGroup",
+                                        r.table(Tables.CRAWL_HOST_GROUP.name).optArg("read_mode", "majority")
+                                                .get(chgId)
+                                                .replace(newDoc)
+                                                .optArg("return_changes", false)
+                                                .optArg("durability", "hard")
+                                );
+                                return FutureOptional.of(chg);
+                            }
                         }
                     }
-                } catch (InterruptedException e) {
-                    LOG.info("borrowFirstReadyCrawlHostGroup was interrupted");
-                    return FutureOptional.empty();
+                } finally {
+                    lock.unlock();
                 }
             }
         }
 
-        if (nextReadyTime == null) {
-            return FutureOptional.empty();
-        } else {
-            return FutureOptional.emptyUntil(nextReadyTime);
-        }
+        return FutureOptional.empty();
     }
 
     @Override
-    public CrawlHostGroup releaseCrawlHostGroup(CrawlHostGroup crawlHostGroup, long nextFetchDelayMs) throws DbException {
+    public void releaseCrawlHostGroup(CrawlHostGroup crawlHostGroup, long nextFetchDelayMs) throws DbException {
         List key = r.array(crawlHostGroup.getId(), crawlHostGroup.getPolitenessId());
         double nextFetchDelayS = nextFetchDelayMs / 1000.0;
 
-        Map<String, Object> response = null;
+        DistributedLock lock = new DistributedLock(conn, createKey(crawlHostGroup.getId(), crawlHostGroup.getPolitenessId()));
+        lock.lock();
+        try {
+            Map<String, Object> response = conn.exec("db-releaseCrawlHostGroup",
+                    r.table(Tables.CRAWL_HOST_GROUP.name).optArg("read_mode", "majority")
+                            .get(key)
+                            .replace(d ->
+                                    r.branch(
+                                            // CrawlHostGroup doesn't exist, return null
+                                            d.eq(null),
+                                            null,
 
-        try (Lock lock = aquireLock(key)) {
-            lock.setBusy(false);
-            lock.setFetchDelay(nextFetchDelayS);
-            response = lock.release(true);
-            return buildCrawlHostGroup(response, 0L);
-        } catch (InterruptedException e) {
-            LOG.info("releaseCrawlHostGroup was interrupted");
-            throw new RuntimeException(e);
+                                            // CrawlHostGroup is busy, release it
+                                            d.g("busy").eq(true),
+                                            d.merge(r.hashMap("busy", false)
+                                                    .with("expires", null)
+                                                    .with("nextFetchTime", r.now().add(nextFetchDelayS))),
+
+                                            // The CrawlHostGroup is already released probably because it was expired.
+                                            d
+                                    ))
+                            .optArg("return_changes", false)
+                            .optArg("durability", "hard")
+            );
+
+            long replaced = (long) response.get("replaced");
+            if (replaced != 1L) {
+                LOG.warn("Could not release crawl host group");
+            }
+        } finally {
+            lock.unlock();
         }
-    }
-
-    private CrawlHostGroup buildCrawlHostGroup(Map<String, Object> resultDoc, long queueCount) throws DbException {
-        CrawlHostGroup.Builder chg = CrawlHostGroup.newBuilder()
-                .setId(((List<String>) resultDoc.get("id")).get(0))
-                .setPolitenessId(((List<String>) resultDoc.get("id")).get(1))
-                .setNextFetchTime(ProtoUtils.odtToTs((OffsetDateTime) resultDoc.get("nextFetchTime")))
-                .setBusy((boolean) resultDoc.get("busy"))
-                .setQueuedUriCount(queueCount);
-
-        return chg.build();
     }
 
     @Override
     public long deleteQueuedUrisForExecution(String executionId) throws DbException {
         long deleted = 0;
 
-        List<Map<String, Object>> chgKeys = conn.exec(
+        List<Map<String, String>> chgKeys = conn.exec(
                 r.table(Tables.URI_QUEUE.name).optArg("read_mode", "majority")
                         .getAll(executionId).optArg("index", "executionId")
                         .pluck("crawlHostGroupId", "politenessId")
@@ -145,12 +207,13 @@ public class RethinkDbCrawlQueueAdapter implements CrawlQueueAdapter {
         );
 
 
-        for (Map<String, Object> group : chgKeys) {
-            List<String> chgKey = r.array(group.get("crawlHostGroupId"), group.get("politenessId"));
+        for (Map<String, String> group : chgKeys) {
             List<String> startKey = r.array(group.get("crawlHostGroupId"), group.get("politenessId"), r.minval(), r.minval());
             List<String> endKey = r.array(group.get("crawlHostGroupId"), group.get("politenessId"), r.maxval(), r.maxval());
 
-            try (Lock lock = aquireLock(chgKey)) {
+            DistributedLock lock = new DistributedLock(conn, createKey(group.get("crawlHostGroupId"), group.get("politenessId")));
+            lock.lock();
+            try {
                 long deleteResponse = conn.exec("db-deleteQueuedUrisForExecution",
                         r.table(Tables.URI_QUEUE.name)
                                 .between(startKey, endKey)
@@ -160,9 +223,8 @@ public class RethinkDbCrawlQueueAdapter implements CrawlQueueAdapter {
                                 .g("deleted")
                 );
                 deleted += deleteResponse;
-            } catch (InterruptedException e) {
-                LOG.info("getNextQueuedUriToFetch was interrupted");
-                throw new RuntimeException(e);
+            } finally {
+                lock.unlock();
             }
         }
 
@@ -209,25 +271,55 @@ public class RethinkDbCrawlQueueAdapter implements CrawlQueueAdapter {
                 r.maxval()
         );
 
+        List<Map<String, String>> eids = conn.exec("db-getNextQueuedUriToFetch",
+                r.table(Tables.URI_QUEUE.name).optArg("read_mode", "majority")
+                        .orderBy().optArg("index", "crawlHostGroupKey_sequence_earliestFetch")
+                        .between(fromKey, toKey)
+                        .pluck("executionId")
+                        .distinct());
+
+        // Compute the total weight of all items together
+        // TODO: For now all executions have same weight. That should be configurable on a per job basis
+        double totalWeight = 0.0d;
+        for (Map<String, String> i : eids) {
+//            totalWeight += i.getWeight();
+            totalWeight += 1;
+        }
+        // Now choose a random item
+        int randomIndex = -1;
+        double random = Math.random() * totalWeight;
+        for (int i = 0; i < eids.size(); ++i) {
+//            random -= items[i].getWeight();
+            random -= 1;
+            if (random <= 0.0d) {
+                randomIndex = i;
+                break;
+            }
+        }
+        String randomExecutionId = eids.get(randomIndex).get("executionId");
+
+
         try (Cursor<Map<String, Object>> cursor = conn.exec("db-getNextQueuedUriToFetch",
                 r.table(Tables.URI_QUEUE.name).optArg("read_mode", "majority")
                         .orderBy().optArg("index", "crawlHostGroupKey_sequence_earliestFetch")
                         .between(fromKey, toKey)
+                        .filter(r.hashMap("executionId", randomExecutionId))
                         .limit(1))) {
 
             if (cursor.hasNext()) {
                 QueuedUri qUri = ProtoUtils.rethinkToProto(cursor.next(), QueuedUri.class);
                 if (Timestamps.comparator().compare(qUri.getEarliestFetchTimeStamp(), ProtoUtils.getNowTs()) <= 0) {
                     // URI is ready to be processed, remove it from queue
-                    try (Lock lock = aquireLock(crawlHostGroup.getId(), crawlHostGroup.getPolitenessId())) {
+                    DistributedLock lock = new DistributedLock(conn, createKey(crawlHostGroup.getId(), crawlHostGroup.getPolitenessId()));
+                    lock.lock();
+                    try {
                         conn.exec("db-deleteQueuedUri",
                                 r.table(Tables.URI_QUEUE.name)
                                         .get(qUri.getId())
                                         .delete()
                         );
-                    } catch (InterruptedException e) {
-                        LOG.info("getNextQueuedUriToFetch was interrupted");
-                        throw new RuntimeException(e);
+                    } finally {
+                        lock.unlock();
                     }
 
                     return FutureOptional.of(qUri);
@@ -239,174 +331,39 @@ public class RethinkDbCrawlQueueAdapter implements CrawlQueueAdapter {
         return FutureOptional.empty();
     }
 
-    private Lock aquireLock(String crawlHostGroupId, String politenessId) throws DbQueryException, DbConnectionException, InterruptedException {
-        Objects.requireNonNull(crawlHostGroupId, "CrawlHostGroupId cannot be null");
-        Objects.requireNonNull(politenessId, "PolitenessId cannot be null");
+    private CrawlHostGroup buildCrawlHostGroup(Map<String, Object> resultDoc, long queueCount) throws DbException {
+        CrawlHostGroup.Builder chg = CrawlHostGroup.newBuilder()
+                .setId(((List<String>) resultDoc.get("id")).get(0))
+                .setPolitenessId(((List<String>) resultDoc.get("id")).get(1))
+                .setNextFetchTime(ProtoUtils.odtToTs((OffsetDateTime) resultDoc.get("nextFetchTime")))
+                .setBusy((boolean) resultDoc.get("busy"))
+                .setQueuedUriCount(queueCount);
 
-        List key = r.array(crawlHostGroupId, politenessId);
-        return aquireLock(key);
+        return chg.build();
     }
 
-    private Lock aquireLock(List key) throws DbQueryException, DbConnectionException, InterruptedException {
-        while (true) {
-            Map<String, Object> borrowResponse = conn.exec("db-aquireLock",
-                    r.table(Tables.CRAWL_HOST_GROUP.name).optArg("read_mode", "majority")
-                            .get(key)
-                            .replace(d ->
-                                    r.branch(
-                                            // CrawlHostGroup doesn't exist, create new
-                                            r.not(d), r.hashMap("id", key)
-                                                    .with("nextFetchTime", r.now())
-                                                    .with("busy", false)
-                                                    .with("lock", true),
+    public long crawlHostGroupQueueCount(List<String> crawlHostGroupId) throws DbQueryException, DbConnectionException {
+        String chgId = crawlHostGroupId.get(0);
+        String politenessId = crawlHostGroupId.get(1);
 
-                                            // This is the one we want, set lock to true and return it
-                                            d.g("lock").eq(false), d.merge(r.hashMap("lock", true)),
-                                            // The CrawlHostGroup is locked, return it unchanged
-                                            d
-                                    ))
-                            .optArg("return_changes", true)
-                            .optArg("durability", "hard")
-            );
+        List fromKey = r.array(
+                chgId,
+                politenessId,
+                r.minval(),
+                r.minval()
+        );
 
-            long replaced = (long) borrowResponse.get("replaced");
-            long created = (long) borrowResponse.get("inserted");
-            if (replaced == 1L || created == 1L) {
-                return new Lock(key, ((List<Map<String, Map>>) borrowResponse.get("changes")).get(0).get("new_val"));
-            }
-            Thread.sleep(100);
-        }
+        List toKey = r.array(
+                chgId,
+                politenessId,
+                r.maxval(),
+                r.maxval()
+        );
+
+        return conn.exec("", r.table(Tables.URI_QUEUE.name)
+                .optArg("read_mode", "majority")
+                .between(fromKey, toKey).optArg("index", "crawlHostGroupKey_sequence_earliestFetch")
+                .count());
     }
 
-    private Lock aquireLockIfexists(List key) throws DbQueryException, DbConnectionException, InterruptedException {
-        while (true) {
-            Map<String, Object> borrowResponse = conn.exec("db-aquireLock",
-                    r.table(Tables.CRAWL_HOST_GROUP.name).optArg("read_mode", "majority")
-                            .get(key)
-                            .replace(d ->
-                                    r.branch(
-                                            // CrawlHostGroup doesn't exist, return null
-                                            r.not(d), null,
-
-                                            // This is the one we want, set lock to true and return it
-                                            d.g("lock").eq(false), d.merge(r.hashMap("lock", true)),
-                                            // The CrawlHostGroup is locked, return it unchanged
-                                            d
-                                    ))
-                            .optArg("return_changes", true)
-                            .optArg("durability", "hard")
-            );
-
-            if (borrowResponse != null) {
-                long replaced = (long) borrowResponse.get("replaced");
-                long created = (long) borrowResponse.get("inserted");
-                if (replaced == 1L || created == 1L) {
-                    return new Lock(key, ((List<Map<String, Map>>) borrowResponse.get("changes")).get(0).get("new_val"));
-                }
-            } else {
-                return new Lock(null, null);
-            }
-            Thread.sleep(100);
-        }
-    }
-
-    private class Lock implements AutoCloseable {
-        final List key;
-        final Map<String, Object> chgDoc;
-        boolean processed = false;
-
-        public Lock(List key, Map<String, Object> chgDoc) {
-            this.key = key;
-            this.chgDoc = chgDoc;
-        }
-
-        public boolean isBusy() {
-            return (boolean) chgDoc.get("busy");
-        }
-
-        public void setBusy(boolean busy) {
-            chgDoc.put("busy", busy);
-        }
-
-        public void setFetchDelay(double nextFetchDelayS) {
-            chgDoc.put("nextFetchTime", r.now().add(nextFetchDelayS));
-        }
-
-        public long queueCount() throws DbQueryException, DbConnectionException {
-            String chgId = ((List<String>) chgDoc.get("id")).get(0);
-            String politenessId = ((List<String>) chgDoc.get("id")).get(1);
-
-            List fromKey = r.array(
-                    chgId,
-                    politenessId,
-                    r.minval(),
-                    r.minval()
-            );
-
-            List toKey = r.array(
-                    chgId,
-                    politenessId,
-                    r.maxval(),
-                    r.maxval()
-            );
-
-            long queueCount = conn.exec("", r.table(Tables.URI_QUEUE.name)
-                    .optArg("read_mode", "majority")
-                    .between(fromKey, toKey).optArg("index", "crawlHostGroupKey_sequence_earliestFetch")
-                    .count());
-
-            return queueCount;
-        }
-
-        @Override
-        public void close() throws DbQueryException, DbConnectionException {
-            release(false);
-        }
-
-        public Map<String, Object> release(boolean returnChanges) throws DbQueryException, DbConnectionException {
-            if (key == null || processed) {
-                return null;
-            }
-
-            chgDoc.put("lock", false);
-
-            Map<String, Object> borrowResponse = conn.exec("db-releaseLock",
-                    r.table(Tables.CRAWL_HOST_GROUP.name).optArg("read_mode", "majority")
-                            .get(key)
-                            .replace(d ->
-                                    r.branch(
-                                            // This is the one we want, set lock to true and return it
-                                            d.g("lock").eq(true), d.merge(chgDoc),
-                                            // The CrawlHostGroup is locked, return it unchanged
-                                            d
-                                    ))
-                            .optArg("return_changes", returnChanges ? "always" : false)
-                            .optArg("durability", "hard")
-            );
-
-            long replaced = (long) borrowResponse.get("replaced");
-            if (replaced != 1L) {
-                throw new DbQueryException("Failed releasing lock for " + key.toString());
-            }
-
-            processed = true;
-
-            if (returnChanges) {
-                return ((List<Map<String, Map>>) borrowResponse.get("changes")).get(0).get("new_val");
-            } else {
-                return null;
-            }
-        }
-
-        public void delete() throws DbQueryException, DbConnectionException {
-            conn.exec("db-deleteLock",
-                    r.table(Tables.CRAWL_HOST_GROUP.name).optArg("read_mode", "majority")
-                            .get(key)
-                            .delete()
-                            .optArg("return_changes", false)
-                            .optArg("durability", "hard")
-            );
-            processed = true;
-        }
-    }
 }

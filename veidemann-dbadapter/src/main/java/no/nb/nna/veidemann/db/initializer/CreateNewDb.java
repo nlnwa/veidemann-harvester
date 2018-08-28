@@ -27,7 +27,7 @@ import org.slf4j.LoggerFactory;
 public class CreateNewDb implements Runnable {
     private static final Logger LOG = LoggerFactory.getLogger(CreateNewDb.class);
 
-    public static final String DB_VERSION = "0.2";
+    public static final String DB_VERSION = "0.3";
 
     static final RethinkDB r = RethinkDB.r;
 
@@ -58,6 +58,7 @@ public class CreateNewDb implements Runnable {
                 .with("logLevel",
                         r.array(r.hashMap("logger", "no.nb.nna.veidemann").with("level", "INFO"))
                 )));
+        conn.exec(r.tableCreate(Tables.LOCKS.name));
 
         conn.exec(r.tableCreate(Tables.CRAWL_LOG.name).optArg("primary_key", "warcId"));
         conn.exec(r.table(Tables.CRAWL_LOG.name)

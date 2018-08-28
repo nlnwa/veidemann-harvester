@@ -24,12 +24,13 @@ import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.commons.db.FutureOptional;
 import no.nb.nna.veidemann.commons.settings.CommonSettings;
+import no.nb.nna.veidemann.db.initializer.RethinkDbInitializer;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.CountDownLatch;
@@ -44,7 +45,6 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p>
  * These tests are dependent on a running RethinkDB instance.
  */
-//@Ignore
 public class RethinkDbCrawlQueueAdapterIT {
     public static RethinkDbCrawlQueueAdapter queueAdapter;
     public static RethinkDbAdapter dbAdapter;
@@ -93,38 +93,39 @@ public class RethinkDbCrawlQueueAdapterIT {
     }
 
     @Test
-    @Ignore
-    public void testReleaseCrawlHostGroup() throws InterruptedException, DbException {
-        QueuedUri qUri1 = QueuedUri.newBuilder().setCrawlHostGroupId("crawlHostGroupId1").setPolitenessId("politenessId").build();
-        QueuedUri qUri2 = QueuedUri.newBuilder().setCrawlHostGroupId("crawlHostGroupId2").setPolitenessId("politenessId").build();
+    public void testReleaseCrawlHostGroup() throws DbException, InterruptedException {
+        RethinkDbConnection conn = ((RethinkDbInitializer) DbService.getInstance().getDbInitializer()).getDbConnection();
+
+        QueuedUri qUri1 = QueuedUri.newBuilder().setCrawlHostGroupId("crawlHostGroupId1").setPolitenessId("politenessId").setSequence(1).build();
+        QueuedUri qUri2 = QueuedUri.newBuilder().setCrawlHostGroupId("crawlHostGroupId2").setPolitenessId("politenessId").setSequence(1).build();
         queueAdapter.addToCrawlHostGroup(qUri1);
         queueAdapter.addToCrawlHostGroup(qUri2);
 
         FutureOptional<CrawlHostGroup> b1 = queueAdapter.borrowFirstReadyCrawlHostGroup();
         FutureOptional<CrawlHostGroup> b2 = queueAdapter.borrowFirstReadyCrawlHostGroup();
 
-        CrawlHostGroup r1 = queueAdapter.releaseCrawlHostGroup(b1.get(), 2000);
+        queueAdapter.releaseCrawlHostGroup(b1.get(), 2000);
         OffsetDateTime now = OffsetDateTime.now();
-        CrawlHostGroup r2 = queueAdapter.releaseCrawlHostGroup(b2.get(), 0);
+        queueAdapter.releaseCrawlHostGroup(b2.get(), 0);
 
         FutureOptional<CrawlHostGroup> b3 = queueAdapter.borrowFirstReadyCrawlHostGroup();
         FutureOptional<CrawlHostGroup> b4 = queueAdapter.borrowFirstReadyCrawlHostGroup();
 
-        assertThat(r1.getId()).isEqualTo("crawlHostGroupId1");
-        assertThat(r1.getBusy()).isFalse();
-        assertThat(ProtoUtils.tsToOdt(r1.getNextFetchTime())).isAfter(now);
+        Map<String, Object> r1 = conn.exec(r.table(Tables.CRAWL_HOST_GROUP.name).get(r.array("crawlHostGroupId1", "politenessId")));
+        assertThat(r1.get("busy")).isEqualTo(false);
+        assertThat((OffsetDateTime) r1.get("nextFetchTime")).isAfter(now);
 
-        assertThat(r2.getId()).isEqualTo("crawlHostGroupId2");
-        assertThat(r2.getBusy()).isFalse();
-        assertThat(ProtoUtils.tsToOdt(r2.getNextFetchTime())).isBeforeOrEqualTo(OffsetDateTime.now());
+        Map<String, Object> r2 = conn.exec(r.table(Tables.CRAWL_HOST_GROUP.name).get(r.array("crawlHostGroupId2", "politenessId")));
+        assertThat(r2.get("busy")).isEqualTo(true);
+        assertThat((OffsetDateTime) r2.get("nextFetchTime")).isBeforeOrEqualTo(OffsetDateTime.now(ZoneId.of("UTC")));
 
         assertThat(b3.isPresent()).isTrue();
         assertThat(b3.get().getId()).isEqualTo("crawlHostGroupId2");
         assertThat(b4.isPresent()).isFalse();
         assertThat(b4.isMaybeInFuture()).isFalse();
-//        assertThat(b4.getWhen()).isBetween(now, now.plusSeconds(2));
 
-//        Thread.sleep(b4.getDelayMs());
+        // Sleep enough to ensure next crawl host group is ready for fetch
+        Thread.sleep(2000);
 
         FutureOptional<CrawlHostGroup> b5 = queueAdapter.borrowFirstReadyCrawlHostGroup();
         FutureOptional<CrawlHostGroup> b6 = queueAdapter.borrowFirstReadyCrawlHostGroup();
@@ -134,6 +135,21 @@ public class RethinkDbCrawlQueueAdapterIT {
         assertThat(b6.isPresent()).isFalse();
         assertThat(b6.isMaybeInFuture()).isFalse();
         assertThat(b6.isEmpty()).isTrue();
+
+        // Set expires to now() to check that stale crawl host groups would be reused
+        conn.exec(r.table(Tables.CRAWL_HOST_GROUP.name)
+                .get(r.array("crawlHostGroupId2", "politenessId"))
+                .update(r.hashMap("expires", r.now())));
+
+        FutureOptional<CrawlHostGroup> b7 = queueAdapter.borrowFirstReadyCrawlHostGroup();
+        FutureOptional<CrawlHostGroup> b8 = queueAdapter.borrowFirstReadyCrawlHostGroup();
+
+        assertThat(b7.isPresent()).isTrue();
+        assertThat(b7.get().getId()).isEqualTo("crawlHostGroupId2");
+        assertThat(b8.isPresent()).isFalse();
+        assertThat(b8.isMaybeInFuture()).isFalse();
+        assertThat(b8.isEmpty()).isTrue();
+
     }
 
     @Test
@@ -247,13 +263,17 @@ public class RethinkDbCrawlQueueAdapterIT {
 
         crawlLoop();
         int qc = 0;
+        int eidc = 0;
         while (qc < QURI_COUNT) {
+            eidc++;
             for (int i = 0; i < CRAWL_HOST_GROUP_COUNT && qc++ < QURI_COUNT; i++) {
                 String chgId = "chg" + i;
+                String eid = "executionId" + eidc;
                 QueuedUri qUri = QueuedUri.newBuilder()
                         .setCrawlHostGroupId(chgId)
                         .setPolitenessId(politenessId)
                         .setSequence(1)
+                        .setExecutionId(eid)
                         .build();
                 qUri = queueAdapter.addToCrawlHostGroup(qUri);
             }
@@ -330,8 +350,8 @@ public class RethinkDbCrawlQueueAdapterIT {
                     long crawlTime = rnd.nextInt(200) + 20L;
                     Thread.sleep(crawlTime);
 
-                    CrawlHostGroup chg = queueAdapter.releaseCrawlHostGroup(exe.chg, crawlTime);
-                    assertThat(chg.getQueuedUriCount()).isGreaterThan(-1L);
+                    queueAdapter.releaseCrawlHostGroup(exe.chg, crawlTime);
+//                    assertThat(chg.getQueuedUriCount()).isGreaterThan(-1L);
 
                     assertThat(finishLatch.getCount()).isGreaterThan(0);
                     finishLatch.countDown();

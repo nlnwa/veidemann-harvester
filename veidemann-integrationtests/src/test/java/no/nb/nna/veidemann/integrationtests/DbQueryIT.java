@@ -75,14 +75,14 @@ public class DbQueryIT extends CrawlTestBase implements VeidemannHeaderConstants
         QueryObserver observer = new QueryObserver();
         reportClient.executeDbQuery(ExecuteDbQueryRequest.newBuilder()
                 .setQuery("r.table('config_seeds').changes()").build(), observer);
-        Thread.sleep(500);
+        Thread.sleep(1000);
         for (int i = 0; i < 10; i++) {
             QueryObserver insertObserver = new QueryObserver();
             reportClient.executeDbQuery(ExecuteDbQueryRequest.newBuilder()
                     .setQuery("r.table('config_seeds').insert({foo:'bar'})").build(), insertObserver);
             insertObserver.await();
         }
-        Thread.sleep(500);
+        Thread.sleep(1000);
         observer.cancel();
         for (int i = 0; i < 10; i++) {
             QueryObserver insertObserver = new QueryObserver();

@@ -18,6 +18,7 @@ package no.nb.nna.veidemann.commons.client;
 
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.opentracing.contrib.ClientTracingInterceptor;
 import io.opentracing.util.GlobalTracer;
@@ -72,7 +73,11 @@ public class DnsServiceClient implements AutoCloseable {
                     InetAddress.getByAddress(reply.getHost(), reply.getRawIp().toByteArray()), reply.getPort());
             return address;
         } catch (StatusRuntimeException ex) {
-            LOG.debug("RPC failed: " + ex.getStatus(), ex);
+            if (ex.getStatus().getCode() == Status.UNAVAILABLE.getCode()) {
+                LOG.error("RPC failed: " + ex.getStatus(), ex);
+            } else {
+                LOG.debug("RPC failed: " + ex.getStatus(), ex);
+            }
             throw new UnknownHostException(host);
         }
     }

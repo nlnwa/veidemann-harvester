@@ -53,7 +53,7 @@ public class MultiSiteCrawlIT extends CrawlTestBase implements VeidemannHeaderCo
                 .build();
         politeness = controllerClient.savePolitenessConfig(politeness);
 
-        CrawlLimitsConfig limits = job.getLimits().toBuilder().setDepth(10).setMaxDurationS(300).build();
+        CrawlLimitsConfig limits = job.getLimits().toBuilder().setDepth(10).setMaxDurationS(300).setMaxBytes(0).build();
         job = job.toBuilder().setLimits(limits).build();
         job = controllerClient.saveCrawlJob(job);
         String jobId = job.getId();

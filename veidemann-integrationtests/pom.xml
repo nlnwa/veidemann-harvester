@@ -242,7 +242,7 @@
                                             <CONTENT_WRITER_HOST>contentwriter</CONTENT_WRITER_HOST>
                                             <CONTENT_WRITER_PORT>8080</CONTENT_WRITER_PORT>
                                             <DNS_RESOLVER_HOST>dnsresolver</DNS_RESOLVER_HOST>
-                                            <DNS_RESOLVER_PORT>50052</DNS_RESOLVER_PORT>
+                                            <DNS_RESOLVER_PORT>8053</DNS_RESOLVER_PORT>
                                             <CACHE_HOST>cache</CACHE_HOST>
                                             <MAX_OPEN_SESSIONS>3</MAX_OPEN_SESSIONS>
                                             <JAVA_OPTS>-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005</JAVA_OPTS>
@@ -284,7 +284,7 @@
                                             </from>
                                         </volumes>
                                         <env>
-                                            <DNS_SERVERS>${test.dns.server}</DNS_SERVERS>
+                                            <DNS_SERVERS>dnsresolver</DNS_SERVERS>
                                             <!--<DNS_SERVERS>8.8.8.8 8.8.4.4</DNS_SERVERS>-->
                                         </env>
                                         <log>
@@ -292,6 +292,7 @@
                                         </log>
                                         <dependsOn>
                                             <container>testsites</container>
+                                            <container>dnsresolver</container>
                                         </dependsOn>
                                         <wait>
                                             <tcp>
@@ -393,7 +394,7 @@
                                             <ROBOTS_EVALUATOR_PORT>50053</ROBOTS_EVALUATOR_PORT>
                                             <ROBOTS_EVALUATOR_HOST>robots</ROBOTS_EVALUATOR_HOST>
                                             <DNS_RESOLVER_HOST>dnsresolver</DNS_RESOLVER_HOST>
-                                            <DNS_RESOLVER_PORT>50052</DNS_RESOLVER_PORT>
+                                            <DNS_RESOLVER_PORT>8053</DNS_RESOLVER_PORT>
                                         </env>
                                         <log>
                                             <enabled>true</enabled>
@@ -439,7 +440,7 @@
                                     </run>
                                 </image>
                                 <image>
-                                    <name>norsknettarkiv/veidemann-dnsresolver</name>
+                                    <name>norsknettarkiv/veidemann-dns-resolver:${veidemann.dns.resolver.version}</name>
                                     <alias>dnsresolver</alias>
                                     <run>
                                         <network>
@@ -448,13 +449,15 @@
                                             <alias>dnsresolver</alias>
                                         </network>
                                         <ports>
-                                            <port>+dns.host:dns.port:50052</port>
+                                            <port>+dns.host:dns.port:53</port>
                                         </ports>
                                         <dependsOn>
                                             <container>db-initializer</container>
                                         </dependsOn>
                                         <env>
                                             <DB_HOST>db</DB_HOST>
+                                            <DB_USER>admin</DB_USER>
+                                            <DB_PASSWORD></DB_PASSWORD>
                                             <CONTENT_WRITER_HOST>contentwriter</CONTENT_WRITER_HOST>
                                             <CONTENT_WRITER_PORT>8080</CONTENT_WRITER_PORT>
                                             <DNS_SERVER>${test.dns.server}</DNS_SERVER>
@@ -463,7 +466,7 @@
                                             <enabled>true</enabled>
                                         </log>
                                         <wait>
-                                            <log>Veidemann Dns Service .* started</log>
+                                            <log>CoreDNS.*</log>
                                             <time>30000</time>
                                         </wait>
                                     </run>

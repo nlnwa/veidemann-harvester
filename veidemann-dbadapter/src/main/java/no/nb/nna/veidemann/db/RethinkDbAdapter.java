@@ -288,8 +288,7 @@ public class RethinkDbAdapter implements DbAdapter {
                     r.table(Tables.EXECUTIONS.name)
                             .getAll(newDoc.getJobExecutionId()).optArg("index", "jobExecutionId")
                             .filter(row -> row.g("state").match("UNDEFINED|CREATED|FETCHING|SLEEPING"))
-                            .group("state").count()
-                            .ungroup().sum("reduction")
+                            .count()
             );
 
             // If all CrawlExecutions are done for this JobExectuion, update the JobExecution with end statistics

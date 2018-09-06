@@ -50,11 +50,6 @@
             <artifactId>veidemann-robotsevaluator-service</artifactId>
             <version>${project.version}</version>
         </dependency>
-        <dependency>
-            <groupId>${project.groupId}</groupId>
-            <artifactId>veidemann-dnsresolver</artifactId>
-            <version>${project.version}</version>
-        </dependency>
 
         <!-- ARC/WARC libraries -->
         <dependency>

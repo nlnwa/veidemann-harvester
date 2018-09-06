@@ -30,7 +30,6 @@
         <module>veidemann-controller</module>
         <module>veidemann-api</module>
         <module>veidemann-commons</module>
-        <module>veidemann-dnsresolver</module>
         <module>veidemann-robotsevaluator</module>
     </modules>
 

@@ -30,7 +30,6 @@
         <module>veidemann-controller</module>
         <module>veidemann-api</module>
         <module>veidemann-commons</module>
-        <module>veidemann-dnsresolver</module>
         <module>veidemann-robotsevaluator</module>
     </modules>
 
@@ -69,6 +68,7 @@
         <browserless.chrome.version>release-puppeteer-1.5.0</browserless.chrome.version>
         <rethinkdb.version>2.3.6</rethinkdb.version>
         <veidemann.cache.version>v0.1.0-alpha7</veidemann.cache.version>
+        <veidemann.dns.resolver.version>v0.1.0</veidemann.dns.resolver.version>
     </properties>
 
     <repositories>

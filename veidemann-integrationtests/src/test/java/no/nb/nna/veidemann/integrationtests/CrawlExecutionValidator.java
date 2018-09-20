@@ -268,7 +268,7 @@ public class CrawlExecutionValidator {
     private void init() throws DbException {
         crawlLogs = new CrawlLogHelper(db);
         pageLogs = db.listPageLogs(PageLogListRequest.newBuilder().setPageSize(500).build()).getValueList();
-        crawlExecutions = new CrawlExecutionsHelper(db);
+        crawlExecutions = new CrawlExecutionsHelper();
         warcRecords = new HashMap<>();
 
         WarcInspector.getWarcFiles().getRecordStream()

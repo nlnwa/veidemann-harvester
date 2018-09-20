@@ -37,6 +37,8 @@ import no.nb.nna.veidemann.commons.ExtraStatusCodes;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbHelper;
 import no.nb.nna.veidemann.commons.db.DbService;
+import no.nb.nna.veidemann.commons.db.DistributedLock;
+import no.nb.nna.veidemann.commons.db.DistributedLock.Key;
 import no.nb.nna.veidemann.frontier.worker.Preconditions.PreconditionState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -74,20 +76,22 @@ public class CrawlExecution {
 
     private Span span;
 
+    private DistributedLock lock;
+
     public CrawlExecution(QueuedUri queuedUri, CrawlHostGroup crawlHostGroup, Frontier frontier) throws DbException {
         this.status = StatusWrapper.getStatusWrapper(queuedUri.getExecutionId());
-        this.status.setCurrentUri(queuedUri.getUri());
+        try {
+            this.qUri = QueuedUriWrapper.getQueuedUriWrapper(queuedUri).clearError();
+        } catch (URISyntaxException ex) {
+            throw new RuntimeException(ex);
+        }
+        this.status.addCurrentUri(this.qUri).saveStatus();
 
         ControllerProto.GetRequest jobRequest = ControllerProto.GetRequest.newBuilder()
                 .setId(status.getJobId())
                 .build();
         CrawlJob job = DbService.getInstance().getConfigAdapter().getCrawlJob(jobRequest);
 
-        try {
-            this.qUri = QueuedUriWrapper.getQueuedUriWrapper(queuedUri).clearError();
-        } catch (URISyntaxException ex) {
-            throw new RuntimeException(ex);
-        }
         this.crawlHostGroup = crawlHostGroup;
         this.frontier = frontier;
         this.crawlConfig = DbHelper.getCrawlConfigForJob(job);
@@ -127,15 +131,10 @@ public class CrawlExecution {
 
         try {
             try {
-                status.setStartTimeIfUnset();
-
                 if (isManualAbort() || LimitsCheck.isLimitReached(frontier, limits, status, qUri)) {
                     delayMs = -1L;
                     return null;
                 }
-
-                status.setState(CrawlExecutionStatus.State.FETCHING)
-                        .saveStatus();
 
                 if (qUri.isUnresolved()) {
                     PreconditionState check = Preconditions.checkPreconditions(frontier, crawlConfig, status, qUri);
@@ -235,6 +234,7 @@ public class CrawlExecution {
         MDC.put("uri", qUri.getUri());
 
         try {
+            status.removeCurrentUri(qUri).saveStatus();
             long fetchEnd = System.currentTimeMillis();
             fetchTimeMs = fetchEnd - fetchStart;
             calculateDelay();
@@ -249,16 +249,15 @@ public class CrawlExecution {
                 }
             } else if (DbService.getInstance().getCrawlQueueAdapter().queuedUriCount(getId()) == 0) {
                 endCrawl(State.FINISHED);
-            } else if (status.getState() == State.FETCHING) {
-                status.setState(State.SLEEPING);
             }
+
+            // Save updated status
+            status.saveStatus();
 
             // Recheck if user aborted crawl while fetching last uri.
             if (isManualAbort()) {
                 delayMs = 0L;
             }
-            // Save updated status
-            status.saveStatus();
         } catch (DbException e) {
             // An error here indicates problems with DB communication. No idea how to handle that yet.
             LOG.error("Error updating status after fetch: {}", e.toString(), e);
@@ -284,23 +283,30 @@ public class CrawlExecution {
         try {
             QueuedUriWrapper outUri = QueuedUriWrapper.getQueuedUriWrapper(qUri, outlink);
 
-            if (shouldInclude(outUri)) {
-                outUri.setSequence(outUri.getDiscoveryPath().length());
+            DistributedLock lock = DbService.getInstance()
+                    .createDistributedLock(new Key("quri", outUri.getQueuedUri().getSurt()), 10);
+            lock.lock();
+            try {
+                if (shouldInclude(outUri)) {
+                    outUri.setSequence(outUri.getDiscoveryPath().length());
 
-                PreconditionState check = Preconditions.checkPreconditions(frontier, crawlConfig, status, outUri);
-                switch (check) {
-                    case OK:
-                        LOG.debug("Found new URI: {}, queueing.", outUri.getSurt());
-                        outUri.addUriToQueue();
-                        break;
-                    case RETRY:
-                        LOG.debug("Failed preconditions for: {}, queueing for retry.", outUri.getSurt());
-                        outUri.addUriToQueue();
-                        break;
-                    case FAIL:
-                    case DENIED:
-                        break;
+                    PreconditionState check = Preconditions.checkPreconditions(frontier, crawlConfig, status, outUri);
+                    switch (check) {
+                        case OK:
+                            LOG.debug("Found new URI: {}, queueing.", outUri.getSurt());
+                            outUri.addUriToQueue();
+                            break;
+                        case RETRY:
+                            LOG.debug("Failed preconditions for: {}, queueing for retry.", outUri.getSurt());
+                            outUri.addUriToQueue();
+                            break;
+                        case FAIL:
+                        case DENIED:
+                            break;
+                    }
                 }
+            } finally {
+                lock.unlock();
             }
         } catch (URISyntaxException ex) {
             status.incrementDocumentsFailed();
@@ -366,29 +372,25 @@ public class CrawlExecution {
         }
     }
 
-    private void endCrawl(CrawlExecutionStatus.State state) {
-        if (!status.isEnded()) {
-            status.setEndState(state)
-                    .clearCurrentUri();
-        }
+    private void endCrawl(CrawlExecutionStatus.State state) throws DbException {
+        status.setEndState(state)
+                .removeCurrentUri(qUri).saveStatus();
     }
 
-    private void endCrawl(CrawlExecutionStatus.State state, Error error) {
-        if (!status.isEnded()) {
-            status.setEndState(state)
-                    .setError(error)
-                    .clearCurrentUri();
-        }
+    private void endCrawl(CrawlExecutionStatus.State state, Error error) throws DbException {
+        status.setEndState(state)
+                .setError(error)
+                .removeCurrentUri(qUri).saveStatus();
     }
 
     private boolean isManualAbort() throws DbException {
         if (status.getState() == CrawlExecutionStatus.State.ABORTED_MANUAL) {
-            status.clearCurrentUri()
+            status.removeCurrentUri(qUri)
                     .incrementDocumentsDenied(DbService.getInstance().getCrawlQueueAdapter()
                             .deleteQueuedUrisForExecution(status.getId()));
 
             // Re-set end state to ensure end time is updated
-            status.setEndState(status.getState());
+            status.setEndState(status.getState()).saveStatus();
             return true;
         }
         return false;

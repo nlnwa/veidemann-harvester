@@ -19,16 +19,9 @@ import com.google.protobuf.Empty;
 import com.google.protobuf.Message;
 import com.rethinkdb.RethinkDB;
 import com.rethinkdb.ast.ReqlAst;
-import com.rethinkdb.gen.ast.Insert;
-import com.rethinkdb.model.MapObject;
-import com.rethinkdb.net.Cursor;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus.State;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
 import no.nb.nna.veidemann.api.MessagesProto.CrawledContent;
 import no.nb.nna.veidemann.api.MessagesProto.ExtractedText;
-import no.nb.nna.veidemann.api.MessagesProto.JobExecutionStatus;
-import no.nb.nna.veidemann.api.MessagesProto.JobExecutionStatus.Builder;
 import no.nb.nna.veidemann.api.MessagesProto.PageLog;
 import no.nb.nna.veidemann.api.MessagesProto.Screenshot;
 import no.nb.nna.veidemann.api.ReportProto.CrawlLogListReply;
@@ -37,24 +30,14 @@ import no.nb.nna.veidemann.api.ReportProto.PageLogListReply;
 import no.nb.nna.veidemann.api.ReportProto.PageLogListRequest;
 import no.nb.nna.veidemann.api.ReportProto.ScreenshotListReply;
 import no.nb.nna.veidemann.api.ReportProto.ScreenshotListRequest;
-import no.nb.nna.veidemann.api.StatusProto;
-import no.nb.nna.veidemann.api.StatusProto.ExecutionsListReply;
-import no.nb.nna.veidemann.api.StatusProto.JobExecutionsListReply;
-import no.nb.nna.veidemann.api.StatusProto.ListExecutionsRequest;
-import no.nb.nna.veidemann.api.StatusProto.ListJobExecutionsRequest;
-import no.nb.nna.veidemann.api.StatusProto.RunningExecutionsListReply;
-import no.nb.nna.veidemann.api.StatusProto.RunningExecutionsRequest;
-import no.nb.nna.veidemann.commons.db.ChangeFeed;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.db.DbException;
-import no.nb.nna.veidemann.commons.util.ApiTools.ListReplyWalker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.Function;
 
 /**
  * An implementation of DbAdapter for RethinkDb.
@@ -170,196 +153,6 @@ public class RethinkDbAdapter implements DbAdapter {
     }
 
     @Override
-    public JobExecutionStatus createJobExecutionStatus(String jobId) throws DbException {
-        Map rMap = ProtoUtils.protoToRethink(JobExecutionStatus.newBuilder()
-                .setJobId(jobId)
-                .setStartTime(ProtoUtils.getNowTs())
-                .setState(JobExecutionStatus.State.RUNNING));
-
-        return conn.executeInsert("db-saveJobExecutionStatus",
-                r.table(Tables.JOB_EXECUTIONS.name)
-                        .insert(rMap)
-                        .optArg("conflict", (id, oldDoc, newDoc) -> r.branch(
-                                oldDoc.hasFields("endTime"),
-                                newDoc.merge(
-                                        r.hashMap("state", oldDoc.g("state")).with("endTime", oldDoc.g("endTime"))
-                                ),
-                                newDoc
-                        )),
-                JobExecutionStatus.class);
-    }
-
-    @Override
-    public JobExecutionStatus getJobExecutionStatus(String jobExecutionId) throws DbException {
-        JobExecutionStatus jes = ProtoUtils.rethinkToProto(executeRequest("db-getJobExecutionStatus",
-                r.table(Tables.JOB_EXECUTIONS.name)
-                        .get(jobExecutionId)
-        ), JobExecutionStatus.class);
-
-        if (!jes.hasEndTime()) {
-            LOG.debug("JobExecution '{}' is still running. Aggregating stats snapshot", jobExecutionId);
-            Map sums = summarizeJobExecutionStats(jes.getId());
-
-            JobExecutionStatus.Builder jesBuilder = jes.toBuilder()
-                    .setDocumentsCrawled((long) sums.get("documentsCrawled"))
-                    .setDocumentsDenied((long) sums.get("documentsDenied"))
-                    .setDocumentsFailed((long) sums.get("documentsFailed"))
-                    .setDocumentsOutOfScope((long) sums.get("documentsOutOfScope"))
-                    .setDocumentsRetried((long) sums.get("documentsRetried"))
-                    .setUrisCrawled((long) sums.get("urisCrawled"))
-                    .setBytesCrawled((long) sums.get("bytesCrawled"));
-
-            for (State s : State.values()) {
-                jesBuilder.putExecutionsState(s.name(), ((Long) sums.get(s.name())).intValue());
-            }
-
-            jes = jesBuilder.build();
-        }
-
-        return jes;
-    }
-
-    @Override
-    public JobExecutionsListReply listJobExecutionStatus(ListJobExecutionsRequest request) throws DbException {
-        JobExecutionsListRequestQueryBuilder queryBuilder = new JobExecutionsListRequestQueryBuilder(request);
-        return queryBuilder.executeList(conn).build();
-    }
-
-    @Override
-    public JobExecutionStatus setJobExecutionStateAborted(String jobExecutionId) throws DbException {
-        JobExecutionStatus result = conn.executeUpdate("db-setJobExecutionStateAborted",
-                r.table(Tables.JOB_EXECUTIONS.name)
-                        .get(jobExecutionId)
-                        .update(
-                                doc -> r.branch(
-                                        doc.hasFields("endTime"),
-                                        r.hashMap(),
-                                        r.hashMap("state", State.ABORTED_MANUAL.name()))
-                        ),
-                JobExecutionStatus.class);
-
-        // Set all Crawl Executions which are part of this Job Execution to aborted
-        ListReplyWalker<ListExecutionsRequest, CrawlExecutionStatus> walker = new ListReplyWalker<>();
-        ListExecutionsRequest.Builder executionsRequest = ListExecutionsRequest.newBuilder().setJobExecutionId(jobExecutionId);
-
-        walker.walk(executionsRequest,
-                req -> listExecutionStatus(req),
-                exe -> {
-                    try {
-                        setExecutionStateAborted(exe.getId());
-                    } catch (DbException e) {
-                        LOG.error("Failed to abort Crawl Execution {}", exe.getId(), e);
-                    }
-                });
-
-        return result;
-    }
-
-    @Override
-    public CrawlExecutionStatus saveExecutionStatus(CrawlExecutionStatus status) throws DbException {
-        if (status.getJobExecutionId().isEmpty()) {
-            LOG.error("Missing JobExecutionId in CrawlExecutionStatus: {}", status, new IllegalStateException());
-        }
-
-        Map rMap = ProtoUtils.protoToRethink(status);
-
-        // Update the CrawlExecutionStatus, but keep the endTime if it is set
-        Insert qry = r.table(Tables.EXECUTIONS.name)
-                .insert(rMap)
-                .optArg("conflict", (id, oldDoc, newDoc) -> r.branch(
-                        oldDoc.hasFields("endTime"),
-                        newDoc.merge(
-                                r.hashMap("state", oldDoc.g("state")).with("endTime", oldDoc.g("endTime"))
-                        ),
-                        newDoc
-                ));
-
-        // Return both the new and the old values
-        qry = qry.optArg("return_changes", "always");
-        Map<String, Object> response = executeRequest("db-saveExecutionStatus", qry);
-        List<Map<String, Map>> changes = (List<Map<String, Map>>) response.get("changes");
-
-        // Check if this update was setting the end time
-        boolean wasNotEnded = changes.get(0).get("old_val") == null || changes.get(0).get("old_val").get("endTime") == null;
-        CrawlExecutionStatus newDoc = ProtoUtils.rethinkToProto(changes.get(0).get("new_val"), CrawlExecutionStatus.class);
-        if (wasNotEnded && newDoc.hasEndTime()) {
-            // Get a count of still running CrawlExecutions for this execution's JobExecution
-            Long notEndedCount = executeRequest("db-updateJobExecution",
-                    r.table(Tables.EXECUTIONS.name)
-                            .getAll(newDoc.getJobExecutionId()).optArg("index", "jobExecutionId")
-                            .filter(row -> row.g("state").match("UNDEFINED|CREATED|FETCHING|SLEEPING"))
-                            .count()
-            );
-
-            // If all CrawlExecutions are done for this JobExectuion, update the JobExecution with end statistics
-            if (notEndedCount == 0) {
-                LOG.debug("JobExecution '{}' finished, saving stats", newDoc.getJobExecutionId());
-
-                // Fetch the JobExecutionStatus object this CrawlExecution is part of
-                JobExecutionStatus jes = ProtoUtils.rethinkToProto(executeRequest("db-getJobExecutionStatus",
-                        r.table(Tables.JOB_EXECUTIONS.name)
-                                .get(newDoc.getJobExecutionId())
-                ), JobExecutionStatus.class);
-
-                // Set JobExecution's status to FINISHED if it wasn't already aborted
-                JobExecutionStatus.State state = jes.getState() == JobExecutionStatus.State.ABORTED_MANUAL ? jes.getState() : JobExecutionStatus.State.FINISHED;
-
-                // Update aggregated statistics
-                Map sums = summarizeJobExecutionStats(newDoc.getJobExecutionId());
-                Builder jesBuilder = jes.toBuilder()
-                        .setState(state)
-                        .setEndTime(ProtoUtils.getNowTs())
-                        .setDocumentsCrawled((long) sums.get("documentsCrawled"))
-                        .setDocumentsDenied((long) sums.get("documentsDenied"))
-                        .setDocumentsFailed((long) sums.get("documentsFailed"))
-                        .setDocumentsOutOfScope((long) sums.get("documentsOutOfScope"))
-                        .setDocumentsRetried((long) sums.get("documentsRetried"))
-                        .setUrisCrawled((long) sums.get("urisCrawled"))
-                        .setBytesCrawled((long) sums.get("bytesCrawled"));
-
-                for (State s : State.values()) {
-                    jesBuilder.putExecutionsState(s.name(), ((Long) sums.get(s.name())).intValue());
-                }
-
-                executeRequest("db-saveJobExecutionStatus",
-                        r.table(Tables.JOB_EXECUTIONS.name).get(jesBuilder.getId()).update(ProtoUtils.protoToRethink(jesBuilder)));
-            }
-        }
-
-        return newDoc;
-    }
-
-    @Override
-    public CrawlExecutionStatus getExecutionStatus(String executionId) throws DbException {
-        Map<String, Object> response = executeRequest("db-getExecutionStatus",
-                r.table(Tables.EXECUTIONS.name)
-                        .get(executionId)
-        );
-
-        return ProtoUtils.rethinkToProto(response, CrawlExecutionStatus.class);
-    }
-
-    @Override
-    public ExecutionsListReply listExecutionStatus(ListExecutionsRequest request) throws DbException {
-        CrawlExecutionsListRequestQueryBuilder queryBuilder = new CrawlExecutionsListRequestQueryBuilder(request);
-        return queryBuilder.executeList(conn).build();
-    }
-
-    @Override
-    public CrawlExecutionStatus setExecutionStateAborted(String executionId) throws DbException {
-        return conn.executeUpdate("db-setExecutionStateAborted",
-                r.table(Tables.EXECUTIONS.name)
-                        .get(executionId)
-                        .update(
-                                doc -> r.branch(
-                                        doc.hasFields("endTime"),
-                                        r.hashMap(),
-                                        r.hashMap("state", State.ABORTED_MANUAL.name()))
-                        ),
-                CrawlExecutionStatus.class);
-    }
-
-    @Override
     public Screenshot saveScreenshot(Screenshot s) throws DbException {
         Map rMap = ProtoUtils.protoToRethink(s);
 
@@ -384,55 +177,6 @@ public class RethinkDbAdapter implements DbAdapter {
         executeRequest("db-deleteScreenshot",
                 r.table(Tables.SCREENSHOT.name).get(screenshot.getId()).delete());
         return Empty.getDefaultInstance();
-    }
-
-    @Override
-    public ChangeFeed<RunningExecutionsListReply> getExecutionStatusStream(RunningExecutionsRequest request) throws DbException {
-        int limit = request.getPageSize();
-        if (limit == 0) {
-            limit = 100;
-        }
-        Cursor<Map> res = executeRequest("db-getExecutionStatusStream",
-                r.table(Tables.EXECUTIONS.name)
-                        .orderBy().optArg("index", r.desc("startTime"))
-                        .limit(limit)
-                        .changes().optArg("include_initial", true).optArg("include_offsets", true).optArg("squash", 2)
-                        .map(v -> v.g("new_val").merge(r.hashMap("newOffset", v.g("new_offset").default_((String) null))
-                                .with("oldOffset", v.g("old_offset").default_((String) null))))
-                        .eqJoin("seedId", r.table(Tables.SEEDS.name))
-                        .map(v -> {
-                            return v.g("left").merge(r.hashMap("seed", v.g("right").g("meta").g("name"))
-                                    .with("queueSize",
-                                            r.table("uri_queue")
-                                                    .getAll(v.g("left").g("id")).optArg("index", "executionId")
-                                                    .count()));
-                        })
-                        .without("seedId")
-        );
-
-        return new ChangeFeedBase<RunningExecutionsListReply>(res) {
-            RunningExecutionsListReply.Builder reply = RunningExecutionsListReply.newBuilder();
-
-            @Override
-            protected Function<Map<String, Object>, RunningExecutionsListReply> mapper() {
-                return t -> {
-                    Long newOffset = (Long) t.remove("newOffset");
-                    Long oldOffset = (Long) t.remove("oldOffset");
-                    StatusProto.StatusDetail resp = ProtoUtils.rethinkToProto(t, StatusProto.StatusDetail.class);
-                    if (oldOffset != null) {
-                        reply.removeValue(oldOffset.intValue());
-                    }
-                    if (newOffset != null) {
-                        if (newOffset > reply.getValueCount()) {
-                            newOffset = (long) reply.getValueCount();
-                        }
-                        reply.addValue(newOffset.intValue(), resp);
-                    }
-                    return reply.build();
-                };
-            }
-
-        };
     }
 
     @Override
@@ -490,48 +234,6 @@ public class RethinkDbAdapter implements DbAdapter {
             throw new IllegalArgumentException("The required field '" + fieldName + "' is missing from: '" + msg
                     .getClass().getSimpleName() + "'");
         }
-    }
-
-    private Map summarizeJobExecutionStats(String jobExecutionId) throws DbException {
-        String[] EXECUTIONS_STAT_FIELDS = new String[]{"documentsCrawled", "documentsDenied",
-                "documentsFailed", "documentsOutOfScope", "documentsRetried", "urisCrawled", "bytesCrawled"};
-
-        return executeRequest("db-summarizeJobExecutionStats",
-                r.table(Tables.EXECUTIONS.name)
-                        .getAll(jobExecutionId).optArg("index", "jobExecutionId")
-                        .map(doc -> {
-                                    MapObject m = r.hashMap();
-                                    for (String f : EXECUTIONS_STAT_FIELDS) {
-                                        m.with(f, doc.getField(f).default_(0));
-                                    }
-                                    for (State s : State.values()) {
-                                        m.with(s.name(), r.branch(doc.getField("state").eq(s.name()), 1, 0));
-                                    }
-                                    return m;
-                                }
-                        )
-                        .reduce((left, right) -> {
-                                    MapObject m = r.hashMap();
-                                    for (String f : EXECUTIONS_STAT_FIELDS) {
-                                        m.with(f, left.getField(f).add(right.getField(f)));
-                                    }
-                                    for (State s : State.values()) {
-                                        m.with(s.name(), left.getField(s.name()).add(right.getField(s.name())));
-                                    }
-                                    return m;
-                                }
-                        ).default_((doc) -> {
-                            MapObject m = r.hashMap();
-                            for (String f : EXECUTIONS_STAT_FIELDS) {
-                                m.with(f, 0);
-                            }
-                            for (State s : State.values()) {
-                                m.with(s.name(), 0);
-                            }
-                            return m;
-                        }
-                )
-        );
     }
 
 }

@@ -1,49 +1,58 @@
 package no.nb.nna.veidemann.db;
 
 import com.rethinkdb.RethinkDB;
+import com.rethinkdb.net.Cursor;
 import no.nb.nna.veidemann.commons.db.DbConnectionException;
 import no.nb.nna.veidemann.commons.db.DbQueryException;
+import no.nb.nna.veidemann.commons.db.DistributedLock;
 import no.nb.nna.veidemann.commons.util.ApiTools;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-public class DistributedLock {
-    private static final Logger LOG = LoggerFactory.getLogger(DistributedLock.class);
+public class RethinkDbDistributedLock implements DistributedLock {
+    private static final Logger LOG = LoggerFactory.getLogger(RethinkDbDistributedLock.class);
     static final RethinkDB r = RethinkDB.r;
 
     private final RethinkDbConnection conn;
-    private final String key;
-    private final String hashedKey;
+    private final Key key;
+    private final List<String> dbKey;
     private final int expireSeconds;
     private final String instanceId;
 
 
-    public DistributedLock(RethinkDbConnection conn, String key, int expireSeconds) {
+    public RethinkDbDistributedLock(RethinkDbConnection conn, Key key, int expireSeconds) {
         Objects.requireNonNull(conn, "Database connection cannot be null");
         Objects.requireNonNull(key, "Lock key cannot be null");
         this.conn = conn;
         this.key = key;
-        this.hashedKey = ApiTools.createSha1Digest(key);
+        this.dbKey = r.array(key.getDomain());
+        if ((key.getDomain().getBytes().length + key.getKey().getBytes().length) > 120) {
+            this.dbKey.add(ApiTools.createSha1Digest(key.getKey()));
+        } else {
+            this.dbKey.add(key.getKey());
+        }
         this.expireSeconds = expireSeconds;
         this.instanceId = UUID.randomUUID().toString();
     }
 
-    public DistributedLock(RethinkDbConnection conn, String key) {
-        this(conn, key, 60 * 60);
-    }
-
     public void lock() throws DbQueryException, DbConnectionException {
+        long start = System.currentTimeMillis();
         while (true) {
             if (tryLock()) {
                 return;
             }
             try {
+                if ((System.currentTimeMillis() - start) > 15000) {
+                    LOG.warn("Object has been locked for more than 15s. Lock: {}:{}", key.getDomain(), key.getKey(), new RuntimeException());
+                    start = System.currentTimeMillis();
+                }
                 Thread.sleep(200);
             } catch (InterruptedException e) {
             }
@@ -62,12 +71,13 @@ public class DistributedLock {
     public boolean tryLock() throws DbQueryException, DbConnectionException {
         Map<String, Object> borrowResponse = conn.exec("db-aquireLock",
                 r.table(Tables.LOCKS.name).optArg("read_mode", "majority")
-                        .get(hashedKey)
+                        .get(dbKey)
                         .replace(d ->
                                 r.branch(
                                         // Lock doesn't exist, create new
                                         d.eq(null),
-                                        r.hashMap("id", hashedKey)
+                                        r.hashMap("id", dbKey)
+                                                .with("key", key)
                                                 .with("expires", r.now().add(expireSeconds))
                                                 .with("instanceId", instanceId),
 
@@ -125,7 +135,7 @@ public class DistributedLock {
     public void unlock() throws DbQueryException, DbConnectionException {
         Map<String, Object> borrowResponse = conn.exec("db-releaseLock",
                 r.table(Tables.LOCKS.name).optArg("read_mode", "majority")
-                        .get(hashedKey)
+                        .get(dbKey)
                         .replace(d ->
                                 r.branch(
                                         // Lock is already released, return null
@@ -162,24 +172,40 @@ public class DistributedLock {
         return instanceId;
     }
 
-    public String getKey() {
+    public Key getKey() {
         return key;
     }
 
-    public static class NotOwnerException extends DbQueryException {
-        public NotOwnerException() {
-        }
+    public static List<Key> listExpiredDistributedLocks(RethinkDbConnection conn) throws DbQueryException, DbConnectionException {
+        Cursor<List<String>> listResponse = conn.exec("db-listExpiredLocks",
+                r.table(Tables.LOCKS.name).optArg("read_mode", "majority")
+                        .optArg("durability", "hard")
+                        .filter(l -> l.g("expires").ge(r.now()))
+                        .pluck("id")
+        );
 
-        public NotOwnerException(String message) {
-            super(message);
-        }
+        List<Key> result = new ArrayList<>();
 
-        public NotOwnerException(String message, Throwable cause) {
-            super(message, cause);
+        for (List<String> l : listResponse) {
+            result.add(new Key(l.get(0), l.get(1)));
         }
+        return result;
+    }
 
-        public NotOwnerException(Throwable cause) {
-            super(cause);
+    public static List<Key> listExpiredDistributedLocks(RethinkDbConnection conn, String domain) throws DbQueryException, DbConnectionException {
+        Cursor<List<String>> listResponse = conn.exec("db-listExpiredLocks",
+                r.table(Tables.LOCKS.name).optArg("read_mode", "majority")
+                        .between(r.array(domain, r.minval()), r.array(domain, r.maxval()))
+                        .optArg("durability", "hard")
+                        .filter(l -> l.g("expires").ge(r.now()))
+                        .pluck("id")
+        );
+
+        List<Key> result = new ArrayList<>();
+
+        for (List<String> l : listResponse) {
+            result.add(new Key(l.get(0), l.get(1)));
         }
+        return result;
     }
 }

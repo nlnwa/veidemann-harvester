@@ -30,8 +30,8 @@ import no.nb.nna.veidemann.api.StatusProto.RunningExecutionsListReply;
 import no.nb.nna.veidemann.api.StatusProto.RunningExecutionsRequest;
 import no.nb.nna.veidemann.commons.auth.AllowedRoles;
 import no.nb.nna.veidemann.commons.db.ChangeFeed;
-import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.db.DbService;
+import no.nb.nna.veidemann.commons.db.ExecutionsAdapter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,10 +44,10 @@ public class StatusService extends StatusGrpc.StatusImplBase {
 
     private static final Logger LOG = LoggerFactory.getLogger(StatusService.class);
 
-    private final DbAdapter db;
+    private final ExecutionsAdapter db;
 
     public StatusService() {
-        this.db = DbService.getInstance().getDbAdapter();
+        this.db = DbService.getInstance().getExecutionsAdapter();
     }
 
     @Override
@@ -58,7 +58,7 @@ public class StatusService extends StatusGrpc.StatusImplBase {
             public void run() {
                 // Initially send an empty state in case the change feed is empty
                 responseObserver.onNext(RunningExecutionsListReply.getDefaultInstance());
-                try (ChangeFeed<RunningExecutionsListReply> c = db.getExecutionStatusStream(request);) {
+                try (ChangeFeed<RunningExecutionsListReply> c = db.getCrawlExecutionStatusStream(request);) {
                     c.stream().forEach(o -> responseObserver.onNext(o));
                 } catch (Exception ex) {
                     LOG.error(ex.getMessage(), ex);
@@ -73,14 +73,14 @@ public class StatusService extends StatusGrpc.StatusImplBase {
     @Override
     @AllowedRoles({Role.READONLY, Role.CURATOR, Role.ADMIN})
     public void getExecution(ExecutionId request, StreamObserver<CrawlExecutionStatus> responseObserver) {
-        handleGet(() -> db.getExecutionStatus(request.getId()), responseObserver);
+        handleGet(() -> db.getCrawlExecutionStatus(request.getId()), responseObserver);
     }
 
     @Override
     @AllowedRoles({Role.READONLY, Role.CURATOR, Role.ADMIN})
     public void listExecutions(ListExecutionsRequest request, StreamObserver<ExecutionsListReply> responseObserver) {
         try {
-            responseObserver.onNext(db.listExecutionStatus(request));
+            responseObserver.onNext(db.listCrawlExecutionStatus(request));
             responseObserver.onCompleted();
         } catch (Exception ex) {
             LOG.error(ex.getMessage(), ex);
@@ -93,7 +93,7 @@ public class StatusService extends StatusGrpc.StatusImplBase {
     @AllowedRoles({Role.CURATOR, Role.ADMIN})
     public void abortExecution(ExecutionId request, StreamObserver<CrawlExecutionStatus> responseObserver) {
         try {
-            CrawlExecutionStatus status = db.setExecutionStateAborted(request.getId());
+            CrawlExecutionStatus status = db.setCrawlExecutionStateAborted(request.getId());
 
             responseObserver.onNext(status);
             responseObserver.onCompleted();

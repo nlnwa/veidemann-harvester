@@ -18,6 +18,7 @@ package no.nb.nna.veidemann.frontier.worker;
 import com.google.protobuf.Timestamp;
 import no.nb.nna.veidemann.api.ConfigProto;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus;
+import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatusChange;
 import no.nb.nna.veidemann.api.MessagesProto.Error;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbService;
@@ -34,6 +35,10 @@ public class StatusWrapper {
 
     private CrawlExecutionStatus.Builder status;
 
+    private CrawlExecutionStatusChange.Builder change;
+
+    private boolean dirty;
+
     private StatusWrapper(CrawlExecutionStatus status) {
         this.status = status.toBuilder();
     }
@@ -43,7 +48,7 @@ public class StatusWrapper {
     }
 
     public static StatusWrapper getStatusWrapper(String executionId) throws DbException {
-        return new StatusWrapper(DbService.getInstance().getDbAdapter().getExecutionStatus(executionId));
+        return new StatusWrapper(DbService.getInstance().getExecutionsAdapter().getCrawlExecutionStatus(executionId));
     }
 
     public static StatusWrapper getStatusWrapper(CrawlExecutionStatus status) {
@@ -54,8 +59,14 @@ public class StatusWrapper {
         return new StatusWrapper(status);
     }
 
-    public StatusWrapper saveStatus() throws DbException {
-        status = DbService.getInstance().getDbAdapter().saveExecutionStatus(status.build()).toBuilder();
+    public synchronized StatusWrapper saveStatus() throws DbException {
+        if (change != null) {
+            status = DbService.getInstance().getExecutionsAdapter().updateCrawlExecutionStatus(
+                    change.setId(status.getId()).build())
+                    .toBuilder();
+            change = null;
+            dirty = false;
+        }
         return this;
     }
 
@@ -72,15 +83,19 @@ public class StatusWrapper {
     }
 
     public Timestamp getStartTime() {
-        return status.getStartTime();
+        return getCrawlExecutionStatus().getStartTime();
+    }
+
+    public Timestamp getCreatedTime() {
+        return getCrawlExecutionStatus().getCreatedTime();
     }
 
     public Timestamp getEndTime() {
-        return status.getEndTime();
+        return getCrawlExecutionStatus().getEndTime();
     }
 
     public boolean isEnded() {
-        return status.hasEndTime();
+        return getCrawlExecutionStatus().hasEndTime();
     }
 
     public ConfigProto.CrawlScope getScope() {
@@ -88,112 +103,118 @@ public class StatusWrapper {
     }
 
     public CrawlExecutionStatus.State getState() {
-        return status.getState();
+        return getCrawlExecutionStatus().getState();
     }
 
     public StatusWrapper setState(CrawlExecutionStatus.State state) {
-        status.setState(state);
-        return this;
-    }
-
-    public StatusWrapper setStartTimeIfUnset() {
-        if (!status.hasStartTime()) {
-            // Start execution
-            status.setStartTime(ProtoUtils.getNowTs());
-        }
+        dirty = true;
+        getChange().setState(state);
         return this;
     }
 
     public StatusWrapper setEndState(CrawlExecutionStatus.State state) {
         LOG.info("Reached end of crawl '{}' with state: {}", getId(), state);
-        status.setState(state).setEndTime(ProtoUtils.getNowTs());
+        dirty = true;
+        getChange().setState(state).setEndTime(ProtoUtils.getNowTs());
         return this;
     }
 
     public long getDocumentsCrawled() {
-        return status.getDocumentsCrawled();
+        return getCrawlExecutionStatus().getDocumentsCrawled();
     }
 
     public StatusWrapper incrementDocumentsCrawled() {
-        status.setDocumentsCrawled(status.getDocumentsCrawled() + 1);
+        getChange().setAddDocumentsCrawled(1);
         return this;
     }
 
     public long getBytesCrawled() {
-        return status.getBytesCrawled();
+        return getCrawlExecutionStatus().getBytesCrawled();
     }
 
     public StatusWrapper incrementBytesCrawled(long val) {
-        status.setBytesCrawled(status.getBytesCrawled() + val);
+        getChange().setAddBytesCrawled(val);
         return this;
     }
 
     public long getUrisCrawled() {
-        return status.getUrisCrawled();
+        return getCrawlExecutionStatus().getUrisCrawled();
     }
 
     public StatusWrapper incrementUrisCrawled(long val) {
-        status.setUrisCrawled(status.getUrisCrawled() + val);
+        getChange().setAddUrisCrawled(val);
         return this;
     }
 
     public long getDocumentsFailed() {
-        return status.getDocumentsFailed();
+        return getCrawlExecutionStatus().getDocumentsFailed();
     }
 
     public StatusWrapper incrementDocumentsFailed() {
-        status.setDocumentsFailed(status.getDocumentsFailed() + 1);
+        getChange().setAddDocumentsFailed(1);
         return this;
     }
 
     public long getDocumentsOutOfScope() {
-        return status.getDocumentsOutOfScope();
+        return getCrawlExecutionStatus().getDocumentsOutOfScope();
     }
 
     public StatusWrapper incrementDocumentsOutOfScope() {
-        status.setDocumentsOutOfScope(status.getDocumentsOutOfScope() + 1);
+        getChange().setAddDocumentsOutOfScope(1);
         return this;
     }
 
     public long getDocumentsRetried() {
-        return status.getDocumentsRetried();
+        return getCrawlExecutionStatus().getDocumentsRetried();
     }
 
     public StatusWrapper incrementDocumentsRetried() {
-        status.setDocumentsRetried(status.getDocumentsRetried() + 1);
+        getChange().setAddDocumentsRetried(1);
         return this;
     }
 
     public long getDocumentsDenied() {
-        return status.getDocumentsDenied();
+        return getCrawlExecutionStatus().getDocumentsDenied();
     }
 
     public StatusWrapper incrementDocumentsDenied(long val) {
-        status.setDocumentsDenied(status.getDocumentsDenied() + val);
+        getChange().setAddDocumentsDenied(val);
         return this;
     }
 
     public CrawlExecutionStatus getCrawlExecutionStatus() {
+        if (dirty) {
+            throw new IllegalStateException("CES is dirty " + change);
+        }
         return status.build();
     }
 
-    public StatusWrapper setCurrentUri(String uri) {
-        status.setCurrentUri(uri);
+    public StatusWrapper addCurrentUri(QueuedUriWrapper uri) {
+        getChange().setAddCurrentUri(uri.getQueuedUri());
         return this;
     }
 
-    public StatusWrapper clearCurrentUri() {
-        status.clearCurrentUri();
+    public StatusWrapper removeCurrentUri(QueuedUriWrapper uri) {
+        if (!uri.justAdded) {
+            getChange().setDeleteCurrentUri(uri.getQueuedUri());
+        }
         return this;
     }
 
     public StatusWrapper setError(Error error) {
-        status.setError(error);
+        getChange().setError(error);
         return this;
     }
 
     public StatusWrapper setError(int code, String message) {
-        status.setError(Error.newBuilder().setCode(code).setMsg(message).build());
+        getChange().setError(Error.newBuilder().setCode(code).setMsg(message).build());
         return this;
+    }
+
+    private CrawlExecutionStatusChange.Builder getChange() {
+        if (change == null) {
+            change = CrawlExecutionStatusChange.newBuilder();
+        }
+        return change;
     }
 }

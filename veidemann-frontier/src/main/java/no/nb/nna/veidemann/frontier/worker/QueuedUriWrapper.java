@@ -48,6 +48,8 @@ public class QueuedUriWrapper {
 
     private Uri surt;
 
+    boolean justAdded = false;
+
     private QueuedUriWrapper(QueuedUriOrBuilder uri) throws URISyntaxException, DbException {
         if (uri instanceof QueuedUri.Builder) {
             wrapped = (QueuedUri.Builder) uri;
@@ -115,6 +117,7 @@ public class QueuedUriWrapper {
         QueuedUri q = wrapped.build();
         q = DbService.getInstance().getCrawlQueueAdapter().addToCrawlHostGroup(q);
         wrapped = q.toBuilder();
+        justAdded = true;
 
         return this;
     }
@@ -180,6 +183,15 @@ public class QueuedUriWrapper {
 
     QueuedUriWrapper setRetries(int value) {
         wrapped.setRetries(value);
+        return this;
+    }
+
+    public Timestamp getFetchStartTimeStamp() {
+        return wrapped.getFetchStartTimeStamp();
+    }
+
+    QueuedUriWrapper setFetchStartTimeStamp(Timestamp value) {
+        wrapped.setFetchStartTimeStamp(value);
         return this;
     }
 
@@ -272,11 +284,19 @@ public class QueuedUriWrapper {
             throw new IllegalStateException(msg);
         }
 
-        // Calculate CrawlHostGroup
-        List<CrawlHostGroupConfig> groupConfigs = DbService.getInstance().getConfigAdapter()
-                .listCrawlHostGroupConfigs(ControllerProto.ListRequest.newBuilder()
-                        .addAllLabelSelector(politeness.getCrawlHostGroupSelectorList()).build()).getValueList();
-        String crawlHostGroupId = CrawlHostGroupCalculator.calculateCrawlHostGroup(wrapped.getIp(), groupConfigs);
+        String crawlHostGroupId;
+        if (politeness.getUseHostname()) {
+            // Use host name for politeness
+            crawlHostGroupId = ApiTools.createSha1Digest(getHost());
+        } else {
+            // Use IP for politeness
+            // Calculate CrawlHostGroup
+            List<CrawlHostGroupConfig> groupConfigs = DbService.getInstance().getConfigAdapter()
+                    .listCrawlHostGroupConfigs(ControllerProto.ListRequest.newBuilder()
+                            .addAllLabelSelector(politeness.getCrawlHostGroupSelectorList()).build()).getValueList();
+            crawlHostGroupId = CrawlHostGroupCalculator.calculateCrawlHostGroup(wrapped.getIp(), groupConfigs);
+        }
+
         wrapped.setCrawlHostGroupId(crawlHostGroupId);
 
         wrapped.setUnresolved(false);

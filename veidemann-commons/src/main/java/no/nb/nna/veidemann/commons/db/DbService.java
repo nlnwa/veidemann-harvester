@@ -1,8 +1,10 @@
 package no.nb.nna.veidemann.commons.db;
 
+import no.nb.nna.veidemann.commons.db.DistributedLock.Key;
 import no.nb.nna.veidemann.commons.settings.CommonSettings;
 
 import java.util.Iterator;
+import java.util.List;
 import java.util.ServiceLoader;
 
 public class DbService implements AutoCloseable {
@@ -87,8 +89,24 @@ public class DbService implements AutoCloseable {
         return service.getCrawlQueueAdapter();
     }
 
+    public ExecutionsAdapter getExecutionsAdapter() {
+        return service.getExecutionsAdapter();
+    }
+
     public DbInitializer getDbInitializer() {
         return service.getDbInitializer();
+    }
+
+    public DistributedLock createDistributedLock(Key key, int expireSeconds) {
+        return service.createDistributedLock(key, expireSeconds);
+    }
+
+    public List<Key> listExpiredDistributedLocks(String domain) throws DbQueryException, DbConnectionException {
+        return service.listExpiredDistributedLocks(domain);
+    }
+
+    public List<Key> listExpiredDistributedLocks() throws DbQueryException, DbConnectionException {
+        return service.listExpiredDistributedLocks();
     }
 
     @Override

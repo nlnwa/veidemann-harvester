@@ -18,8 +18,8 @@ package no.nb.nna.veidemann.integrationtests;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus;
 import no.nb.nna.veidemann.api.StatusProto.ExecutionsListReply;
 import no.nb.nna.veidemann.api.StatusProto.ListExecutionsRequest;
-import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.db.DbException;
+import no.nb.nna.veidemann.commons.db.DbService;
 
 import java.util.List;
 
@@ -29,8 +29,9 @@ public class CrawlExecutionsHelper {
     final ExecutionsListReply executionsListReply;
     int reportedCount;
 
-    public CrawlExecutionsHelper(DbAdapter db) throws DbException {
-        executionsListReply = db.listExecutionStatus(ListExecutionsRequest.newBuilder().setPageSize(500).build());
+    public CrawlExecutionsHelper() throws DbException {
+        executionsListReply = DbService.getInstance().getExecutionsAdapter()
+                .listCrawlExecutionStatus(ListExecutionsRequest.newBuilder().setPageSize(500).build());
         reportedCount = (int) executionsListReply.getCount();
         checkCount();
     }
@@ -62,7 +63,7 @@ public class CrawlExecutionsHelper {
     }
 
     public static String formatCrawlExecution(CrawlExecutionStatus crawlExecutionStatus) {
-        return  new StringBuilder(crawlExecutionStatus.getId())
+        return new StringBuilder(crawlExecutionStatus.getId())
                 .append(", Scope: ").append(crawlExecutionStatus.getScope().getSurtPrefix())
                 .append(", State: ").append(crawlExecutionStatus.getState())
                 .append(", Docs: ").append(crawlExecutionStatus.getDocumentsCrawled())

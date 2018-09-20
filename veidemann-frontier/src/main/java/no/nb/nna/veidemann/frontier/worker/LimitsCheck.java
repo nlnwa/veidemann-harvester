@@ -78,13 +78,13 @@ public class LimitsCheck {
                             .incrementDocumentsDenied(
                                     DbService.getInstance().getCrawlQueueAdapter()
                                             .deleteQueuedUrisForExecution(status.getId())
-                            );
+                            ).saveStatus();
             }
             return true;
         }
 
         if (limits.getMaxDurationS() > 0
-                && Timestamps.between(status.getStartTime(), ProtoUtils.getNowTs()).getSeconds() > limits
+                && Timestamps.between(status.getCreatedTime(), ProtoUtils.getNowTs()).getSeconds() > limits
                 .getMaxDurationS()) {
 
             switch (status.getState()) {
@@ -97,7 +97,7 @@ public class LimitsCheck {
                     status.incrementDocumentsDenied(
                             DbService.getInstance().getCrawlQueueAdapter()
                                     .deleteQueuedUrisForExecution(status.getId())
-                    );
+                    ).saveStatus();
             }
             return true;
         }

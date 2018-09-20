@@ -1,7 +1,6 @@
 package no.nb.nna.veidemann.db;
 
 import com.google.protobuf.Timestamp;
-import com.google.protobuf.util.Timestamps;
 import com.rethinkdb.RethinkDB;
 import com.rethinkdb.net.Cursor;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlHostGroup;
@@ -10,6 +9,8 @@ import no.nb.nna.veidemann.commons.db.CrawlQueueAdapter;
 import no.nb.nna.veidemann.commons.db.DbConnectionException;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbQueryException;
+import no.nb.nna.veidemann.commons.db.DistributedLock;
+import no.nb.nna.veidemann.commons.db.DistributedLock.Key;
 import no.nb.nna.veidemann.commons.db.FutureOptional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,16 +27,17 @@ public class RethinkDbCrawlQueueAdapter implements CrawlQueueAdapter {
     private final RethinkDbConnection conn;
 
     private final long expirationSeconds = 3600;
+    private final int lockExpirationSeconds = 3600;
 
     public RethinkDbCrawlQueueAdapter(RethinkDbConnection conn) {
         this.conn = conn;
     }
 
-    private String createKey(String crawlHostGroupId, String politenessId) {
-        return crawlHostGroupId + ":" + politenessId;
+    private Key createKey(String crawlHostGroupId, String politenessId) {
+        return new Key("chg", crawlHostGroupId + ":" + politenessId);
     }
 
-    private String createKey(List<String> crawlHostGroupId) {
+    private Key createKey(List<String> crawlHostGroupId) {
         return createKey(crawlHostGroupId.get(0), crawlHostGroupId.get(1));
     }
 
@@ -49,7 +51,7 @@ public class RethinkDbCrawlQueueAdapter implements CrawlQueueAdapter {
             throw new IllegalArgumentException("Sequence must be a positive number");
         }
 
-        DistributedLock lock = new DistributedLock(conn, createKey(crawlHostGroupId, politenessId));
+        DistributedLock lock = conn.createDistributedLock(createKey(crawlHostGroupId, politenessId), lockExpirationSeconds);
         lock.lock();
         try {
             if (!qUri.hasEarliestFetchTimeStamp()) {
@@ -91,7 +93,7 @@ public class RethinkDbCrawlQueueAdapter implements CrawlQueueAdapter {
             for (Map<String, Object> chgDoc : response) {
                 List chgId = (List) chgDoc.get("id");
 
-                DistributedLock lock = new DistributedLock(conn, createKey(chgId));
+                DistributedLock lock = conn.createDistributedLock(createKey(chgId), lockExpirationSeconds);
                 lock.lock();
                 try {
                     Map<String, Object> borrowResponse = conn.exec("db-borrowFirstReadyCrawlHostGroup",
@@ -161,7 +163,7 @@ public class RethinkDbCrawlQueueAdapter implements CrawlQueueAdapter {
         List key = r.array(crawlHostGroup.getId(), crawlHostGroup.getPolitenessId());
         double nextFetchDelayS = nextFetchDelayMs / 1000.0;
 
-        DistributedLock lock = new DistributedLock(conn, createKey(crawlHostGroup.getId(), crawlHostGroup.getPolitenessId()));
+        DistributedLock lock = conn.createDistributedLock(createKey(crawlHostGroup.getId(), crawlHostGroup.getPolitenessId()), lockExpirationSeconds);
         lock.lock();
         try {
             Map<String, Object> response = conn.exec("db-releaseCrawlHostGroup",
@@ -211,7 +213,7 @@ public class RethinkDbCrawlQueueAdapter implements CrawlQueueAdapter {
             List<String> startKey = r.array(group.get("crawlHostGroupId"), group.get("politenessId"), r.minval(), r.minval());
             List<String> endKey = r.array(group.get("crawlHostGroupId"), group.get("politenessId"), r.maxval(), r.maxval());
 
-            DistributedLock lock = new DistributedLock(conn, createKey(group.get("crawlHostGroupId"), group.get("politenessId")));
+            DistributedLock lock = conn.createDistributedLock(createKey(group.get("crawlHostGroupId"), group.get("politenessId")), lockExpirationSeconds);
             lock.lock();
             try {
                 long deleteResponse = conn.exec("db-deleteQueuedUrisForExecution",
@@ -268,7 +270,7 @@ public class RethinkDbCrawlQueueAdapter implements CrawlQueueAdapter {
                 crawlHostGroup.getId(),
                 crawlHostGroup.getPolitenessId(),
                 r.maxval(),
-                r.maxval()
+                r.now()
         );
 
         List<Map<String, String>> eids = conn.exec("db-getNextQueuedUriToFetch",
@@ -308,24 +310,20 @@ public class RethinkDbCrawlQueueAdapter implements CrawlQueueAdapter {
 
             if (cursor.hasNext()) {
                 QueuedUri qUri = ProtoUtils.rethinkToProto(cursor.next(), QueuedUri.class);
-                if (Timestamps.comparator().compare(qUri.getEarliestFetchTimeStamp(), ProtoUtils.getNowTs()) <= 0) {
-                    // URI is ready to be processed, remove it from queue
-                    DistributedLock lock = new DistributedLock(conn, createKey(crawlHostGroup.getId(), crawlHostGroup.getPolitenessId()));
-                    lock.lock();
-                    try {
-                        conn.exec("db-deleteQueuedUri",
-                                r.table(Tables.URI_QUEUE.name)
-                                        .get(qUri.getId())
-                                        .delete()
-                        );
-                    } finally {
-                        lock.unlock();
-                    }
-
-                    return FutureOptional.of(qUri);
-                } else {
-                    return FutureOptional.emptyUntil(ProtoUtils.tsToOdt(qUri.getEarliestFetchTimeStamp()));
+                // URI is ready to be processed, remove it from queue
+                DistributedLock lock = conn.createDistributedLock(createKey(crawlHostGroup.getId(), crawlHostGroup.getPolitenessId()), lockExpirationSeconds);
+                lock.lock();
+                try {
+                    conn.exec("db-setTimeoutForQueuedUri",
+                            r.table(Tables.URI_QUEUE.name)
+                                    .get(qUri.getId())
+                                    .update(r.hashMap("earliestFetchTimeStamp", r.now().add(1800)))
+                    );
+                } finally {
+                    lock.unlock();
                 }
+
+                return FutureOptional.of(qUri);
             }
         }
         return FutureOptional.empty();

@@ -27,7 +27,7 @@ import org.slf4j.LoggerFactory;
 public class CreateNewDb implements Runnable {
     private static final Logger LOG = LoggerFactory.getLogger(CreateNewDb.class);
 
-    public static final String DB_VERSION = "0.3";
+    public static final String DB_VERSION = "0.4";
 
     static final RethinkDB r = RethinkDB.r;
 
@@ -84,7 +84,7 @@ public class CreateNewDb implements Runnable {
                         uri.g("earliestFetchTimeStamp"))));
 
         conn.exec(r.tableCreate(Tables.EXECUTIONS.name));
-        conn.exec(r.table(Tables.EXECUTIONS.name).indexCreate("startTime"));
+        conn.exec(r.table(Tables.EXECUTIONS.name).indexCreate("createdTime"));
         conn.exec(r.table(Tables.EXECUTIONS.name).indexCreate("jobId"));
         conn.exec(r.table(Tables.EXECUTIONS.name).indexCreate("state"));
         conn.exec(r.table(Tables.EXECUTIONS.name).indexCreate("seedId"));
@@ -145,7 +145,7 @@ public class CreateNewDb implements Runnable {
         conn.exec(r.table(Tables.SCREENSHOT.name).indexWait("executionId"));
         conn.exec(r.table(Tables.SEEDS.name).indexWait("jobId", "entityId"));
         conn.exec(r.table(Tables.CRAWL_HOST_GROUP.name).indexWait("nextFetchTime"));
-        conn.exec(r.table(Tables.EXECUTIONS.name).indexWait("startTime", "jobId", "state", "seedId", "jobExecutionId"));
+        conn.exec(r.table(Tables.EXECUTIONS.name).indexWait("createdTime", "jobId", "state", "seedId", "jobExecutionId"));
         conn.exec(r.table(Tables.JOB_EXECUTIONS.name).indexWait("startTime", "jobId", "state"));
     }
 

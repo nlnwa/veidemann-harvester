@@ -18,11 +18,14 @@ package no.nb.nna.veidemann.frontier.worker;
 import no.nb.nna.veidemann.api.ConfigProto.CrawlConfig;
 import no.nb.nna.veidemann.api.FrontierProto.CrawlSeedRequest;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus;
+import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatusChange;
 import no.nb.nna.veidemann.commons.ExtraStatusCodes;
 import no.nb.nna.veidemann.commons.client.DnsServiceClient;
 import no.nb.nna.veidemann.commons.client.RobotsServiceClient;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbHelper;
+import no.nb.nna.veidemann.commons.db.DbService;
+import no.nb.nna.veidemann.db.ProtoUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,13 +52,13 @@ public class Frontier implements AutoCloseable {
 
     public CrawlExecutionStatus scheduleSeed(CrawlSeedRequest request) throws DbException {
         // Create execution
-        StatusWrapper status = StatusWrapper.getStatusWrapper(CrawlExecutionStatus.newBuilder()
-                .setJobId(request.getJob().getId())
-                .setJobExecutionId(request.getJobExecutionId())
-                .setSeedId(request.getSeed().getId())
-                .setState(CrawlExecutionStatus.State.CREATED)
-                .setScope(request.getSeed().getScope()));
-        status.saveStatus();
+        StatusWrapper status = StatusWrapper.getStatusWrapper(
+                DbService.getInstance().getExecutionsAdapter().createCrawlExecutionStatus(
+                        request.getJob().getId(),
+                        request.getJobExecutionId(),
+                        request.getSeed().getId(),
+                        request.getSeed().getScope()));
+
         LOG.debug("New crawl execution: " + status.getId());
 
         String uri = request.getSeed().getMeta().getName();
@@ -64,18 +67,20 @@ public class Frontier implements AutoCloseable {
             CrawlConfig crawlConfig = DbHelper.getCrawlConfigForJob(request.getJob());
             QueuedUriWrapper qUri = QueuedUriWrapper.getQueuedUriWrapper(uri, request.getJobExecutionId(),
                     status.getId(), crawlConfig.getPolitenessId());
+            qUri.setPriorityWeight(crawlConfig.getPriorityWeight());
             qUri.addUriToQueue();
             LOG.debug("Seed '{}' added to queue", qUri.getUri());
         } catch (URISyntaxException ex) {
             status.incrementDocumentsFailed()
                     .setEndState(CrawlExecutionStatus.State.FAILED)
-                    .setError(ExtraStatusCodes.ILLEGAL_URI.toFetchError(ex.toString()));
+                    .setError(ExtraStatusCodes.ILLEGAL_URI.toFetchError(ex.toString()))
+                    .saveStatus();
         } catch (Exception ex) {
             status.incrementDocumentsFailed()
                     .setEndState(CrawlExecutionStatus.State.FAILED)
-                    .setError(ExtraStatusCodes.RUNTIME_EXCEPTION.toFetchError(ex.toString()));
+                    .setError(ExtraStatusCodes.RUNTIME_EXCEPTION.toFetchError(ex.toString()))
+                    .saveStatus();
         }
-        status.saveStatus();
 
         return status.getCrawlExecutionStatus();
     }

@@ -51,7 +51,7 @@ public class RethinkDbInitializer implements DbInitializer {
             LOG.info("Populating database with default data");
             new PopulateDbWithDefaultData().run();
         } else {
-            String version = conn.exec(r.table(Tables.SYSTEM.name).get("db_version").g("db_version"));
+            String version = getCurrentDbVersion();
             if (CreateNewDb.DB_VERSION.equals(version)) {
                 LOG.info("Database found and is newest version: {}", version);
             } else {
@@ -77,20 +77,32 @@ public class RethinkDbInitializer implements DbInitializer {
         return conn;
     }
 
-    private void upgrade(String fromVersion) throws DbUpgradeException {
+    private void upgrade(String fromVersion) throws DbUpgradeException, DbQueryException, DbConnectionException {
         String dbName = conn.getConnection().db().get();
 
         switch (fromVersion) {
             case "0.1":
                 new Upgrade0_1To0_2(dbName, conn).run();
-                new Upgrade0_2To0_3(dbName, conn).run();
                 break;
             case "0.2":
                 new Upgrade0_2To0_3(dbName, conn).run();
                 break;
+            case "0.3":
+                new Upgrade0_3To0_4(dbName, conn).run();
+                break;
             default:
                 throw new DbUpgradeException("Unknown database version '" + fromVersion + "', unable to upgrade");
         }
+
+        String currentVersion = getCurrentDbVersion();
+        String targetVersion = CreateNewDb.DB_VERSION;
+        if (!currentVersion.equals(targetVersion)) {
+            upgrade(currentVersion);
+        }
+    }
+
+    private String getCurrentDbVersion() throws DbQueryException, DbConnectionException {
+        return conn.exec(r.table(Tables.SYSTEM.name).get("db_version").g("db_version"));
     }
 
 }

@@ -51,7 +51,7 @@ public class ScheduledCrawlJob extends Task {
 
         try {
             if (DbService.getInstance().getConfigAdapter().listSeeds(seedRequest.build()).getCount() > 0) {
-                JobExecutionStatus jobExecutionStatus = DbService.getInstance().getDbAdapter()
+                JobExecutionStatus jobExecutionStatus = DbService.getInstance().getExecutionsAdapter()
                         .createJobExecutionStatus(job.getId());
 
                 walker.walk(seedRequest,

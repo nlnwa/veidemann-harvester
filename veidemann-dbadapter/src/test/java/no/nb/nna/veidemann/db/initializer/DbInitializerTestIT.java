@@ -66,6 +66,6 @@ public class DbInitializerTestIT {
         new CreateDbV0_1(db, "veidemann").run();
         DbService.getInstance().getDbInitializer().initialize();
         String version = db.executeRequest("", RethinkDB.r.table(Tables.SYSTEM.name).get("db_version").g("db_version"));
-        assertThat(version).isEqualTo("0.3");
+        assertThat(version).isEqualTo("0.4");
     }
 }

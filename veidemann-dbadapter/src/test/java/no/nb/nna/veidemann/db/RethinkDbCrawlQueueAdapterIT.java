@@ -17,7 +17,10 @@ package no.nb.nna.veidemann.db;
 
 import com.rethinkdb.RethinkDB;
 import com.rethinkdb.net.Cursor;
+import no.nb.nna.veidemann.api.ConfigProto.CrawlScope;
 import no.nb.nna.veidemann.api.MessagesProto;
+import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus;
+import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatusChange;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlHostGroup;
 import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
 import no.nb.nna.veidemann.commons.db.DbException;
@@ -161,6 +164,7 @@ public class RethinkDbCrawlQueueAdapterIT {
                 .setCrawlHostGroupId("CHGID")
                 .setPolitenessId("PID")
                 .setExecutionId("EID")
+                .setPriorityWeight(1.0)
                 .build();
 
         queueAdapter.addToCrawlHostGroup(qUri);
@@ -196,11 +200,13 @@ public class RethinkDbCrawlQueueAdapterIT {
                 .setCrawlHostGroupId("crawlHostGroupId1")
                 .setPolitenessId("politenessId")
                 .setSequence(1)
+                .setPriorityWeight(1.0)
                 .build();
         QueuedUri qUri2 = QueuedUri.newBuilder()
                 .setCrawlHostGroupId("crawlHostGroupId2")
                 .setPolitenessId("politenessId")
                 .setSequence(1)
+                .setPriorityWeight(1.0)
                 .build();
         queueAdapter.addToCrawlHostGroup(qUri1);
         queueAdapter.addToCrawlHostGroup(qUri2);
@@ -263,17 +269,18 @@ public class RethinkDbCrawlQueueAdapterIT {
 
         crawlLoop();
         int qc = 0;
-        int eidc = 0;
         while (qc < QURI_COUNT) {
-            eidc++;
             for (int i = 0; i < CRAWL_HOST_GROUP_COUNT && qc++ < QURI_COUNT; i++) {
                 String chgId = "chg" + i;
-                String eid = "executionId" + eidc;
+                CrawlExecutionStatus ces = DbService.getInstance().getExecutionsAdapter().createCrawlExecutionStatus(
+                        "jobId", "jobExecutionId", "seedId", CrawlScope.getDefaultInstance());
                 QueuedUri qUri = QueuedUri.newBuilder()
                         .setCrawlHostGroupId(chgId)
                         .setPolitenessId(politenessId)
                         .setSequence(1)
-                        .setExecutionId(eid)
+                        .setExecutionId(ces.getId())
+                        .setJobExecutionId(ces.getJobExecutionId())
+                        .setPriorityWeight(1.0)
                         .build();
                 qUri = queueAdapter.addToCrawlHostGroup(qUri);
             }
@@ -317,7 +324,7 @@ public class RethinkDbCrawlQueueAdapterIT {
 
                         if (foqu.isPresent()) {
                             // A fetchabel URI was found, return it
-                            return new Exe(crawlHostGroup.get(), foqu.get());
+                            return new Exe(crawlHostGroup.get(), foqu.get(), foqu.get().getExecutionId());
                         } else if (foqu.isMaybeInFuture()) {
                             // A URI was found, but isn't fetchable yet. Wait for it
                             sleep = (foqu.getDelayMs());
@@ -350,8 +357,12 @@ public class RethinkDbCrawlQueueAdapterIT {
                     long crawlTime = rnd.nextInt(200) + 20L;
                     Thread.sleep(crawlTime);
 
+                    DbService.getInstance().getExecutionsAdapter().updateCrawlExecutionStatus(
+                            CrawlExecutionStatusChange.newBuilder()
+                                    .setId(exe.exeId)
+                                    .setDeleteCurrentUri(exe.qUri)
+                                    .build());
                     queueAdapter.releaseCrawlHostGroup(exe.chg, crawlTime);
-//                    assertThat(chg.getQueuedUriCount()).isGreaterThan(-1L);
 
                     assertThat(finishLatch.getCount()).isGreaterThan(0);
                     finishLatch.countDown();
@@ -366,10 +377,12 @@ public class RethinkDbCrawlQueueAdapterIT {
         private class Exe {
             private final CrawlHostGroup chg;
             private final QueuedUri qUri;
+            private final String exeId;
 
-            public Exe(CrawlHostGroup chg, QueuedUri qUri) {
+            public Exe(CrawlHostGroup chg, QueuedUri qUri, String exeId) {
                 this.chg = chg;
                 this.qUri = qUri;
+                this.exeId = exeId;
             }
         }
     }

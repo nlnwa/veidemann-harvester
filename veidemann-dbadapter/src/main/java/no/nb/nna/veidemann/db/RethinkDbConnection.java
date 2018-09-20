@@ -18,6 +18,7 @@ package no.nb.nna.veidemann.db;
 import com.google.protobuf.Message;
 import com.rethinkdb.RethinkDB;
 import com.rethinkdb.ast.ReqlAst;
+import com.rethinkdb.gen.ast.Get;
 import com.rethinkdb.gen.ast.Insert;
 import com.rethinkdb.gen.ast.ReqlExpr;
 import com.rethinkdb.gen.ast.Update;
@@ -34,6 +35,9 @@ import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbInitializer;
 import no.nb.nna.veidemann.commons.db.DbQueryException;
 import no.nb.nna.veidemann.commons.db.DbServiceSPI;
+import no.nb.nna.veidemann.commons.db.DistributedLock;
+import no.nb.nna.veidemann.commons.db.DistributedLock.Key;
+import no.nb.nna.veidemann.commons.db.ExecutionsAdapter;
 import no.nb.nna.veidemann.commons.settings.CommonSettings;
 import no.nb.nna.veidemann.db.initializer.RethinkDbInitializer;
 import no.nb.nna.veidemann.db.opentracing.ConnectionTracingInterceptor;
@@ -60,6 +64,8 @@ public class RethinkDbConnection implements DbServiceSPI {
     private RethinkDbConfigAdapter configAdapter;
 
     private RethinkDbCrawlQueueAdapter queueAdapter;
+
+    private RethinkDbExecutionsAdapter executionsAdapter;
 
     private RethinkDbInitializer dbInitializer;
 
@@ -149,6 +155,16 @@ public class RethinkDbConnection implements DbServiceSPI {
         return ProtoUtils.rethinkToProto(newDoc, type);
     }
 
+    public <T extends Message> T executeGet(String operationName, Get qry, Class<T> type) throws DbException {
+        Map<String, Object> response = exec(operationName, qry);
+
+        if (response == null) {
+            return null;
+        }
+
+        return ProtoUtils.rethinkToProto(response, type);
+    }
+
     @Override
     public void close() {
         conn.close();
@@ -174,8 +190,28 @@ public class RethinkDbConnection implements DbServiceSPI {
     }
 
     @Override
+    public ExecutionsAdapter getExecutionsAdapter() {
+        return executionsAdapter;
+    }
+
+    @Override
     public DbInitializer getDbInitializer() {
         return dbInitializer;
+    }
+
+    @Override
+    public DistributedLock createDistributedLock(Key key, int expireSeconds) {
+        return new RethinkDbDistributedLock(this, key, expireSeconds);
+    }
+
+    @Override
+    public List<Key> listExpiredDistributedLocks(String domain) throws DbQueryException, DbConnectionException {
+        return RethinkDbDistributedLock.listExpiredDistributedLocks(this, domain);
+    }
+
+    @Override
+    public List<Key> listExpiredDistributedLocks() throws DbQueryException, DbConnectionException {
+        return RethinkDbDistributedLock.listExpiredDistributedLocks(this);
     }
 
     public void connect(CommonSettings settings) throws DbConnectionException {
@@ -185,6 +221,7 @@ public class RethinkDbConnection implements DbServiceSPI {
         dbAdapter = new RethinkDbAdapter(this);
         configAdapter = new RethinkDbConfigAdapter(this);
         queueAdapter = new RethinkDbCrawlQueueAdapter(this);
+        executionsAdapter = new RethinkDbExecutionsAdapter(this);
         dbInitializer = new RethinkDbInitializer(this);
     }
 

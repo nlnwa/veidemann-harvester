@@ -535,7 +535,7 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
             CrawlJob job = db.getCrawlJob(jobRequest);
             LOG.info("Job '{}' starting", job.getMeta().getName());
 
-            JobExecutionStatus jobExecutionStatus = DbService.getInstance().getDbAdapter()
+            JobExecutionStatus jobExecutionStatus = DbService.getInstance().getExecutionsAdapter()
                     .createJobExecutionStatus(job.getId());
 
             if (!request.getSeedId().isEmpty()) {

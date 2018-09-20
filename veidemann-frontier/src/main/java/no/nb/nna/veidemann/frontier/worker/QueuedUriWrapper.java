@@ -48,6 +48,8 @@ public class QueuedUriWrapper {
 
     private Uri surt;
 
+    boolean justAdded = false;
+
     private QueuedUriWrapper(QueuedUriOrBuilder uri) throws URISyntaxException, DbException {
         if (uri instanceof QueuedUri.Builder) {
             wrapped = (QueuedUri.Builder) uri;
@@ -106,6 +108,12 @@ public class QueuedUriWrapper {
             LOG.error(msg, ex);
             throw ex;
         }
+        if (wrapped.getPriorityWeight() <= 0d) {
+            String msg = "Priority weight must be greater than zero. Uri: " + wrapped.getUri();
+            IllegalStateException ex = new IllegalStateException(msg);
+            LOG.error(msg, ex);
+            throw ex;
+        }
 
         if (wrapped.getUnresolved() && wrapped.getCrawlHostGroupId().isEmpty()) {
             wrapped.setCrawlHostGroupId(ApiTools.createSha1Digest(surt.getDecodedHost()));
@@ -115,6 +123,7 @@ public class QueuedUriWrapper {
         QueuedUri q = wrapped.build();
         q = DbService.getInstance().getCrawlQueueAdapter().addToCrawlHostGroup(q);
         wrapped = q.toBuilder();
+        justAdded = true;
 
         return this;
     }
@@ -180,6 +189,15 @@ public class QueuedUriWrapper {
 
     QueuedUriWrapper setRetries(int value) {
         wrapped.setRetries(value);
+        return this;
+    }
+
+    public Timestamp getFetchStartTimeStamp() {
+        return wrapped.getFetchStartTimeStamp();
+    }
+
+    QueuedUriWrapper setFetchStartTimeStamp(Timestamp value) {
+        wrapped.setFetchStartTimeStamp(value);
         return this;
     }
 
@@ -252,6 +270,20 @@ public class QueuedUriWrapper {
         return this;
     }
 
+    public double getPriorityWeight() {
+        return wrapped.getPriorityWeight();
+    }
+
+    QueuedUriWrapper setPriorityWeight(double value) {
+        if (value <= 0d) {
+            value = 1.0d;
+            LOG.debug("Priority weight should be greater than zero. Using default of 1.0 for uri: {}", wrapped.getUri());
+        }
+
+        wrapped.setPriorityWeight(value);
+        return this;
+    }
+
     QueuedUriWrapper incrementRetries() {
         wrapped.setRetries(wrapped.getRetries() + 1);
         return this;
@@ -272,11 +304,19 @@ public class QueuedUriWrapper {
             throw new IllegalStateException(msg);
         }
 
-        // Calculate CrawlHostGroup
-        List<CrawlHostGroupConfig> groupConfigs = DbService.getInstance().getConfigAdapter()
-                .listCrawlHostGroupConfigs(ControllerProto.ListRequest.newBuilder()
-                        .addAllLabelSelector(politeness.getCrawlHostGroupSelectorList()).build()).getValueList();
-        String crawlHostGroupId = CrawlHostGroupCalculator.calculateCrawlHostGroup(wrapped.getIp(), groupConfigs);
+        String crawlHostGroupId;
+        if (politeness.getUseHostname()) {
+            // Use host name for politeness
+            crawlHostGroupId = ApiTools.createSha1Digest(getHost());
+        } else {
+            // Use IP for politeness
+            // Calculate CrawlHostGroup
+            List<CrawlHostGroupConfig> groupConfigs = DbService.getInstance().getConfigAdapter()
+                    .listCrawlHostGroupConfigs(ControllerProto.ListRequest.newBuilder()
+                            .addAllLabelSelector(politeness.getCrawlHostGroupSelectorList()).build()).getValueList();
+            crawlHostGroupId = CrawlHostGroupCalculator.calculateCrawlHostGroup(wrapped.getIp(), groupConfigs);
+        }
+
         wrapped.setCrawlHostGroupId(crawlHostGroupId);
 
         wrapped.setUnresolved(false);

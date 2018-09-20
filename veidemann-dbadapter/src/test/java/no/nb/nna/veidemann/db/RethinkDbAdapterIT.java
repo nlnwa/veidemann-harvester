@@ -42,18 +42,11 @@ import no.nb.nna.veidemann.api.ControllerProto.RoleMappingsListReply;
 import no.nb.nna.veidemann.api.ControllerProto.RoleMappingsListRequest;
 import no.nb.nna.veidemann.api.ControllerProto.SeedListReply;
 import no.nb.nna.veidemann.api.ControllerProto.SeedListRequest;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlHostGroup;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
 import no.nb.nna.veidemann.api.MessagesProto.CrawledContent;
 import no.nb.nna.veidemann.api.MessagesProto.ExtractedText;
-import no.nb.nna.veidemann.api.MessagesProto.JobExecutionStatus;
-import no.nb.nna.veidemann.api.MessagesProto.JobExecutionStatus.State;
 import no.nb.nna.veidemann.api.MessagesProto.Screenshot;
-import no.nb.nna.veidemann.api.StatusProto.ExecutionsListReply;
-import no.nb.nna.veidemann.api.StatusProto.JobExecutionsListReply;
-import no.nb.nna.veidemann.api.StatusProto.ListExecutionsRequest;
-import no.nb.nna.veidemann.api.StatusProto.ListJobExecutionsRequest;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.commons.settings.CommonSettings;
@@ -572,22 +565,6 @@ public class RethinkDbAdapterIT {
     }
 
     /**
-     * Test of addExecutionStatus method, of class RethinkDbAdapter.
-     */
-    @Test
-    @Ignore
-    public void testSaveExecutionStatus() throws DbException {
-        System.out.println("addExecutionStatus");
-        CrawlExecutionStatus status = null;
-        RethinkDbAdapter instance = null;
-        CrawlExecutionStatus expResult = null;
-        CrawlExecutionStatus result = instance.saveExecutionStatus(status);
-//        assertEquals(expResult, result);
-        // TODO review the generated test code and remove the default call to fail.
-        fail("The test case is a prototype.");
-    }
-
-    /**
      * Test of addScreenshot method, of class RethinkDbAdapter.
      */
     @Test
@@ -921,113 +898,6 @@ public class RethinkDbAdapterIT {
 
         response = configAdapter.getLogConfig();
         assertThat(response).isEqualTo(logLevels);
-    }
-
-    @Test
-    public void testExecutions() throws DbException {
-        JobExecutionStatus jes1 = dbAdapter.createJobExecutionStatus("jobId1");
-        JobExecutionStatus jes2 = dbAdapter.createJobExecutionStatus("jobId2");
-
-        jes1 = dbAdapter.getJobExecutionStatus(jes1.getId());
-        assertThat(jes1.getState()).isSameAs(State.RUNNING);
-        assertThat(jes1.getExecutionsStateOrThrow("SLEEPING")).isEqualTo(0);
-        assertThat(jes1.getExecutionsStateOrThrow("FINISHED")).isEqualTo(0);
-        assertThat(jes1.getDocumentsCrawled()).isEqualTo(0);
-        assertThat(jes1.getDocumentsFailed()).isEqualTo(0);
-        assertThat(jes1.getUrisCrawled()).isEqualTo(0);
-        assertThat(jes1.getBytesCrawled()).isEqualTo(0);
-
-        CrawlExecutionStatus ces1 = CrawlExecutionStatus.newBuilder()
-                .setJobExecutionId(jes1.getId())
-                .setState(CrawlExecutionStatus.State.SLEEPING)
-                .setStartTime(ProtoUtils.getNowTs())
-                .setDocumentsCrawled(1)
-                .setUrisCrawled(4)
-                .setBytesCrawled(100)
-                .build();
-        ces1 = dbAdapter.saveExecutionStatus(ces1);
-
-        jes1 = dbAdapter.getJobExecutionStatus(jes1.getId());
-        assertThat(jes1.getState()).isSameAs(State.RUNNING);
-        assertThat(jes1.getExecutionsStateOrThrow("SLEEPING")).isEqualTo(1);
-        assertThat(jes1.getExecutionsStateOrThrow("FINISHED")).isEqualTo(0);
-        assertThat(jes1.getDocumentsCrawled()).isEqualTo(1);
-        assertThat(jes1.getDocumentsFailed()).isEqualTo(0);
-        assertThat(jes1.getUrisCrawled()).isEqualTo(4);
-        assertThat(jes1.getBytesCrawled()).isEqualTo(100);
-
-        CrawlExecutionStatus ces2 = CrawlExecutionStatus.newBuilder()
-                .setJobExecutionId(jes1.getId())
-                .setState(CrawlExecutionStatus.State.SLEEPING)
-                .setStartTime(ProtoUtils.getNowTs())
-                .setDocumentsCrawled(1)
-                .setUrisCrawled(3)
-                .setBytesCrawled(75)
-                .build();
-        ces2 = dbAdapter.saveExecutionStatus(ces2);
-
-        jes1 = dbAdapter.getJobExecutionStatus(jes1.getId());
-        assertThat(jes1.getState()).isSameAs(State.RUNNING);
-        assertThat(jes1.getExecutionsStateOrThrow("SLEEPING")).isEqualTo(2);
-        assertThat(jes1.getExecutionsStateOrThrow("FINISHED")).isEqualTo(0);
-        assertThat(jes1.getDocumentsCrawled()).isEqualTo(2);
-        assertThat(jes1.getDocumentsFailed()).isEqualTo(0);
-        assertThat(jes1.getUrisCrawled()).isEqualTo(7);
-        assertThat(jes1.getBytesCrawled()).isEqualTo(175);
-
-        ces1 = ces1.toBuilder()
-                .setState(CrawlExecutionStatus.State.FINISHED)
-                .setEndTime(ProtoUtils.getNowTs())
-                .setDocumentsCrawled(2)
-                .setUrisCrawled(6)
-                .setBytesCrawled(200)
-                .build();
-        ces1 = dbAdapter.saveExecutionStatus(ces1);
-
-        jes1 = dbAdapter.getJobExecutionStatus(jes1.getId());
-        assertThat(jes1.getState()).isSameAs(State.RUNNING);
-        assertThat(jes1.getExecutionsStateOrThrow("SLEEPING")).isEqualTo(1);
-        assertThat(jes1.getExecutionsStateOrThrow("FINISHED")).isEqualTo(1);
-        assertThat(jes1.getDocumentsCrawled()).isEqualTo(3);
-        assertThat(jes1.getDocumentsFailed()).isEqualTo(0);
-        assertThat(jes1.getUrisCrawled()).isEqualTo(9);
-        assertThat(jes1.getBytesCrawled()).isEqualTo(275);
-
-        ces2 = ces2.toBuilder()
-                .setState(CrawlExecutionStatus.State.FINISHED)
-                .setEndTime(ProtoUtils.getNowTs())
-                .setDocumentsCrawled(2)
-                .setUrisCrawled(12)
-                .setDocumentsFailed(2)
-                .setBytesCrawled(100)
-                .build();
-        ces2 = dbAdapter.saveExecutionStatus(ces2);
-
-        jes1 = dbAdapter.getJobExecutionStatus(jes1.getId());
-        assertThat(jes1.getState()).isSameAs(State.FINISHED);
-        assertThat(jes1.getExecutionsStateOrThrow("SLEEPING")).isEqualTo(0);
-        assertThat(jes1.getExecutionsStateOrThrow("FINISHED")).isEqualTo(2);
-        assertThat(jes1.getDocumentsCrawled()).isEqualTo(4);
-        assertThat(jes1.getDocumentsFailed()).isEqualTo(2);
-        assertThat(jes1.getUrisCrawled()).isEqualTo(18);
-        assertThat(jes1.getBytesCrawled()).isEqualTo(300);
-
-        // Check crawl executions list functions
-        ExecutionsListReply eList = dbAdapter.listExecutionStatus(ListExecutionsRequest.getDefaultInstance());
-        assertThat(eList.getCount()).isEqualTo(2);
-        assertThat(eList.getValueCount()).isEqualTo(2);
-        assertThat(eList.getValueList()).containsExactlyInAnyOrder(ces1, ces2);
-
-        eList = dbAdapter.listExecutionStatus(ListExecutionsRequest.newBuilder().addId(ces2.getId()).build());
-        assertThat(eList.getCount()).isEqualTo(1);
-        assertThat(eList.getValueCount()).isEqualTo(1);
-        assertThat(eList.getValueList()).containsExactlyInAnyOrder(ces2);
-
-        // Check job executions list functions
-        JobExecutionsListReply jList = dbAdapter.listJobExecutionStatus(ListJobExecutionsRequest.getDefaultInstance());
-        assertThat(jList.getCount()).isEqualTo(2);
-        assertThat(jList.getValueCount()).isEqualTo(2);
-        assertThat(jList.getValueList()).containsExactlyInAnyOrder(jes1, jes2);
     }
 
     @Test

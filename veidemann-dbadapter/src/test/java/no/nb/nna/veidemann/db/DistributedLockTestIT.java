@@ -4,8 +4,10 @@ import no.nb.nna.veidemann.commons.db.DbConnectionException;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbQueryException;
 import no.nb.nna.veidemann.commons.db.DbService;
+import no.nb.nna.veidemann.commons.db.DistributedLock;
+import no.nb.nna.veidemann.commons.db.DistributedLock.Key;
+import no.nb.nna.veidemann.commons.db.DistributedLock.NotOwnerException;
 import no.nb.nna.veidemann.commons.settings.CommonSettings;
-import no.nb.nna.veidemann.db.DistributedLock.NotOwnerException;
 import no.nb.nna.veidemann.db.initializer.RethinkDbInitializer;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -26,7 +28,6 @@ public class DistributedLockTestIT {
         int dbPort = Integer.parseInt(System.getProperty("db.port"));
 
         if (!DbService.isConfigured()) {
-            CommonSettings settings = new CommonSettings();
             DbService.configure(new CommonSettings()
                     .withDbHost(dbHost)
                     .withDbPort(dbPort)
@@ -53,8 +54,8 @@ public class DistributedLockTestIT {
 
     @Test
     public void lockUnlock() throws DbConnectionException, DbQueryException, InterruptedException {
-        String key = UUID.randomUUID().toString();
-        DistributedLock lock1 = new DistributedLock(db, key, 2);
+        Key key = new Key("d", UUID.randomUUID().toString());
+        DistributedLock lock1 = db.createDistributedLock(key, 2);
         lock1.lock();
         try {
             Thread.sleep(10);
@@ -65,8 +66,8 @@ public class DistributedLockTestIT {
 
     @Test
     public void doubleLockUnlock() throws DbConnectionException, DbQueryException, InterruptedException {
-        String key = UUID.randomUUID().toString();
-        DistributedLock lock1 = new DistributedLock(db, key, 2);
+        Key key = new Key("d", UUID.randomUUID().toString());
+        DistributedLock lock1 = db.createDistributedLock(key, 2);
         lock1.lock();
         try {
             lock1.lock();
@@ -78,8 +79,8 @@ public class DistributedLockTestIT {
 
     @Test
     public void lockDoubleUnlock() throws DbConnectionException, DbQueryException, InterruptedException {
-        String key = UUID.randomUUID().toString();
-        DistributedLock lock1 = new DistributedLock(db, key, 2);
+        Key key = new Key("d", UUID.randomUUID().toString());
+        DistributedLock lock1 = db.createDistributedLock(key, 2);
         lock1.lock();
         try {
             Thread.sleep(10);
@@ -91,9 +92,10 @@ public class DistributedLockTestIT {
 
     @Test
     public void lockAndWaitForTimeout() throws DbConnectionException, DbQueryException, InterruptedException {
-        String key = UUID.randomUUID().toString();
-        DistributedLock lock1 = new DistributedLock(db, key, 1);
-        DistributedLock lock2 = new DistributedLock(db, key, 1);
+        Key key = new Key("d", UUID.randomUUID().toString());
+
+        DistributedLock lock1 = db.createDistributedLock(key, 1);
+        DistributedLock lock2 = db.createDistributedLock(key, 1);
         lock1.lock();
         try {
             lock2.lock();
@@ -105,9 +107,9 @@ public class DistributedLockTestIT {
 
     @Test
     public void tryLock() throws DbQueryException, DbConnectionException {
-        String key = UUID.randomUUID().toString();
-        DistributedLock lock1 = new DistributedLock(db, key, 2);
-        DistributedLock lock2 = new DistributedLock(db, key, 2);
+        Key key = new Key("d", UUID.randomUUID().toString());
+        DistributedLock lock1 = db.createDistributedLock(key, 2);
+        DistributedLock lock2 = db.createDistributedLock(key, 2);
         assertThat(lock1.tryLock()).isTrue();
         assertThat(lock1.tryLock()).isTrue();
         try {
@@ -121,9 +123,9 @@ public class DistributedLockTestIT {
 
     @Test
     public void tryLockTimeout() throws DbConnectionException, DbQueryException, InterruptedException {
-        String key = UUID.randomUUID().toString();
-        DistributedLock lock1 = new DistributedLock(db, key, 1);
-        DistributedLock lock2 = new DistributedLock(db, key, 1);
+        Key key = new Key("d", UUID.randomUUID().toString());
+        DistributedLock lock1 = db.createDistributedLock(key, 1);
+        DistributedLock lock2 = db.createDistributedLock(key, 1);
         assertThat(lock1.tryLock(500, TimeUnit.MILLISECONDS)).isTrue();
         assertThat(lock1.tryLock(500, TimeUnit.MILLISECONDS)).isTrue();
         try {

@@ -108,6 +108,12 @@ public class QueuedUriWrapper {
             LOG.error(msg, ex);
             throw ex;
         }
+        if (wrapped.getPriorityWeight() <= 0d) {
+            String msg = "Priority weight must be greater than zero. Uri: " + wrapped.getUri();
+            IllegalStateException ex = new IllegalStateException(msg);
+            LOG.error(msg, ex);
+            throw ex;
+        }
 
         if (wrapped.getUnresolved() && wrapped.getCrawlHostGroupId().isEmpty()) {
             wrapped.setCrawlHostGroupId(ApiTools.createSha1Digest(surt.getDecodedHost()));
@@ -261,6 +267,20 @@ public class QueuedUriWrapper {
 
         // Internally use a sequence with base 1 to avoid the value beeing deleted from the protobuf object.
         wrapped.setSequence(value + 1L);
+        return this;
+    }
+
+    public double getPriorityWeight() {
+        return wrapped.getPriorityWeight();
+    }
+
+    QueuedUriWrapper setPriorityWeight(double value) {
+        if (value <= 0d) {
+            value = 1.0d;
+            LOG.debug("Priority weight should be greater than zero. Using default of 1.0 for uri: {}", wrapped.getUri());
+        }
+
+        wrapped.setPriorityWeight(value);
         return this;
     }
 

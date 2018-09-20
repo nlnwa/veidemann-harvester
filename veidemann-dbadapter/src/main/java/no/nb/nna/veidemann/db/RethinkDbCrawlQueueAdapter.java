@@ -273,33 +273,14 @@ public class RethinkDbCrawlQueueAdapter implements CrawlQueueAdapter {
                 r.now()
         );
 
-        List<Map<String, String>> eids = conn.exec("db-getNextQueuedUriToFetch",
+        List<Map<String, Object>> eids = conn.exec("db-getNextQueuedUriToFetch",
                 r.table(Tables.URI_QUEUE.name).optArg("read_mode", "majority")
                         .orderBy().optArg("index", "crawlHostGroupKey_sequence_earliestFetch")
                         .between(fromKey, toKey)
-                        .pluck("executionId")
+                        .pluck("executionId", "priorityWeight")
                         .distinct());
 
-        // Compute the total weight of all items together
-        // TODO: For now all executions have same weight. That should be configurable on a per job basis
-        double totalWeight = 0.0d;
-        for (Map<String, String> i : eids) {
-//            totalWeight += i.getWeight();
-            totalWeight += 1;
-        }
-        // Now choose a random item
-        int randomIndex = -1;
-        double random = Math.random() * totalWeight;
-        for (int i = 0; i < eids.size(); ++i) {
-//            random -= items[i].getWeight();
-            random -= 1;
-            if (random <= 0.0d) {
-                randomIndex = i;
-                break;
-            }
-        }
-        String randomExecutionId = eids.get(randomIndex).get("executionId");
-
+        String randomExecutionId = getWeightedRandomExecutionId(eids);
 
         try (Cursor<Map<String, Object>> cursor = conn.exec("db-getNextQueuedUriToFetch",
                 r.table(Tables.URI_QUEUE.name).optArg("read_mode", "majority")
@@ -327,6 +308,39 @@ public class RethinkDbCrawlQueueAdapter implements CrawlQueueAdapter {
             }
         }
         return FutureOptional.empty();
+    }
+
+    static class IdWeight {
+        final String id;
+        final double weight;
+
+        public IdWeight(String id, double weight) {
+            this.id = id;
+            this.weight = weight;
+        }
+    }
+
+    static String getWeightedRandomExecutionId(List<Map<String, Object>> executionIds) {
+        // Compute the total weight of all items together
+        double totalWeight = 0.0d;
+        IdWeight[] items = new IdWeight[executionIds.size()];
+        for (int i = 0; i < executionIds.size(); ++i) {
+            items[i] = new IdWeight(
+                    (String) executionIds.get(i).get("executionId"),
+                    ((Number) executionIds.get(i).get("priorityWeight")).doubleValue());
+            totalWeight += items[i].weight;
+        }
+        // Choose a random item
+        int randomIndex = -1;
+        double random = Math.random() * totalWeight;
+        for (int i = 0; i < executionIds.size(); ++i) {
+            random -= items[i].weight;
+            if (random <= 0.0d) {
+                randomIndex = i;
+                break;
+            }
+        }
+        return items[randomIndex].id;
     }
 
     private CrawlHostGroup buildCrawlHostGroup(Map<String, Object> resultDoc, long queueCount) throws DbException {

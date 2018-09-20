@@ -144,10 +144,12 @@ public class CrawlExecution {
                             delayMs = -1L;
                             return null;
                         case RETRY:
+                            qUri.setPriorityWeight(this.crawlConfig.getPriorityWeight());
                             qUri.addUriToQueue();
                             return null;
                         case OK:
                             // IP resolution done, requeue to account for politeness
+                            qUri.setPriorityWeight(this.crawlConfig.getPriorityWeight());
                             qUri.addUriToQueue();
                             return null;
                     }
@@ -167,6 +169,7 @@ public class CrawlExecution {
                         || code.equals(Status.DEADLINE_EXCEEDED.getCode())
                         || code.equals(Status.ABORTED.getCode())) {
                     LOG.info("Request was aborted", e);
+                    qUri.setPriorityWeight(this.crawlConfig.getPriorityWeight());
                     qUri.addUriToQueue();
                 } else {
                     LOG.error("Unexpected error", e);
@@ -294,10 +297,12 @@ public class CrawlExecution {
                     switch (check) {
                         case OK:
                             LOG.debug("Found new URI: {}, queueing.", outUri.getSurt());
+                            outUri.setPriorityWeight(this.crawlConfig.getPriorityWeight());
                             outUri.addUriToQueue();
                             break;
                         case RETRY:
                             LOG.debug("Failed preconditions for: {}, queueing for retry.", outUri.getSurt());
+                            outUri.setPriorityWeight(this.crawlConfig.getPriorityWeight());
                             outUri.addUriToQueue();
                             break;
                         case FAIL:
@@ -368,6 +373,7 @@ public class CrawlExecution {
             LOG.info("Failed fetching '{}' due to retry limit", qUri);
             status.incrementDocumentsFailed();
         } else {
+            qUri.setPriorityWeight(this.crawlConfig.getPriorityWeight());
             qUri.addUriToQueue();
         }
     }

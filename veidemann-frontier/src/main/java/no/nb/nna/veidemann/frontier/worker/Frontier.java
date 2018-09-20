@@ -67,6 +67,7 @@ public class Frontier implements AutoCloseable {
             CrawlConfig crawlConfig = DbHelper.getCrawlConfigForJob(request.getJob());
             QueuedUriWrapper qUri = QueuedUriWrapper.getQueuedUriWrapper(uri, request.getJobExecutionId(),
                     status.getId(), crawlConfig.getPolitenessId());
+            qUri.setPriorityWeight(crawlConfig.getPriorityWeight());
             qUri.addUriToQueue();
             LOG.debug("Seed '{}' added to queue", qUri.getUri());
         } catch (URISyntaxException ex) {

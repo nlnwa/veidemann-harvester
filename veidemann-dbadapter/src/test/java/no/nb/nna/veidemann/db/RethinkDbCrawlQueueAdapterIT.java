@@ -164,6 +164,7 @@ public class RethinkDbCrawlQueueAdapterIT {
                 .setCrawlHostGroupId("CHGID")
                 .setPolitenessId("PID")
                 .setExecutionId("EID")
+                .setPriorityWeight(1.0)
                 .build();
 
         queueAdapter.addToCrawlHostGroup(qUri);
@@ -199,11 +200,13 @@ public class RethinkDbCrawlQueueAdapterIT {
                 .setCrawlHostGroupId("crawlHostGroupId1")
                 .setPolitenessId("politenessId")
                 .setSequence(1)
+                .setPriorityWeight(1.0)
                 .build();
         QueuedUri qUri2 = QueuedUri.newBuilder()
                 .setCrawlHostGroupId("crawlHostGroupId2")
                 .setPolitenessId("politenessId")
                 .setSequence(1)
+                .setPriorityWeight(1.0)
                 .build();
         queueAdapter.addToCrawlHostGroup(qUri1);
         queueAdapter.addToCrawlHostGroup(qUri2);
@@ -277,6 +280,7 @@ public class RethinkDbCrawlQueueAdapterIT {
                         .setSequence(1)
                         .setExecutionId(ces.getId())
                         .setJobExecutionId(ces.getJobExecutionId())
+                        .setPriorityWeight(1.0)
                         .build();
                 qUri = queueAdapter.addToCrawlHostGroup(qUri);
             }

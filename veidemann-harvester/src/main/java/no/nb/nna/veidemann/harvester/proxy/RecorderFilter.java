@@ -208,134 +208,135 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
 
         try {
             responseSpan = buildSpan("serverToProxyResponse");
-            GlobalTracer.get().makeActive(requestSpan);
+            try (ActiveSpan span = GlobalTracer.get().makeActive(responseSpan)) {
 
-            boolean handled = false;
+                boolean handled = false;
 
-            if (httpObject instanceof HttpResponse) {
-                try {
-                    HttpResponse res = (HttpResponse) httpObject;
-                    LOG.trace("Got response headers {}", res.status());
-
-                    httpResponseStatus = res.status();
-                    httpResponseProtocolVersion = res.protocolVersion();
-                    responseCollector.setHeaders(ContentCollector.createResponsePreamble(res), res.headers(), getContentWriterSession());
-                    responseSpan.log("Got response headers");
-
-                    crawlLog = buildCrawlLog()
-                            .setStatusCode(httpResponseStatus.code())
-                            .setContentType(res.headers().get(HttpHeaderNames.CONTENT_TYPE, ""));
-
-                    if (res.headers().get("X-Cache-Lookup", "MISS").contains("HIT")) {
-                        foundInCache = true;
-
-                        LOG.debug("Found in cache");
-                        requestSpan.log("Loaded from cache");
-                    }
-
-                    handled = true;
-                    LOG.trace("Handled response headers");
-                } catch (Exception ex) {
-                    LOG.error("Error handling response headers", ex);
-                    responseSpan.log("Error handling response headers: " + ex.toString());
-                    return ProxyUtils.createFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_GATEWAY);
-                }
-            }
-
-            if (httpObject instanceof HttpContent) {
-                LOG.trace("Got response content");
-                if (foundInCache) {
-                    handled = true;
-                } else {
+                if (httpObject instanceof HttpResponse) {
                     try {
-                        HttpContent res = (HttpContent) httpObject;
-                        responseSpan.log("Got response content. Size: " + res.content().readableBytes());
-                        responseCollector.addPayload(res.content(), getContentWriterSession());
+                        HttpResponse res = (HttpResponse) httpObject;
+                        LOG.trace("Got response headers {}", res.status());
+
+                        httpResponseStatus = res.status();
+                        httpResponseProtocolVersion = res.protocolVersion();
+                        responseCollector.setHeaders(ContentCollector.createResponsePreamble(res), res.headers(), getContentWriterSession());
+                        responseSpan.log("Got response headers");
+
+                        crawlLog = buildCrawlLog()
+                                .setStatusCode(httpResponseStatus.code())
+                                .setContentType(res.headers().get(HttpHeaderNames.CONTENT_TYPE, ""));
+
+                        if (res.headers().get("X-Cache-Lookup", "MISS").contains("HIT")) {
+                            foundInCache = true;
+
+                            LOG.debug("Found in cache");
+                            requestSpan.log("Loaded from cache");
+                        }
 
                         handled = true;
-                        LOG.trace("Handled response content");
+                        LOG.trace("Handled response headers");
                     } catch (Exception ex) {
-                        LOG.error("Error handling response content", ex);
-                        responseSpan.log("Error handling response content: " + ex.toString());
-                        contentWriterSession.cancel("Got error while writing response content");
+                        LOG.error("Error handling response headers", ex);
+                        responseSpan.log("Error handling response headers: " + ex.toString());
                         return ProxyUtils.createFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_GATEWAY);
                     }
                 }
-            }
 
-            if (ProxyUtils.isLastChunk(httpObject)) {
-                LOG.debug("Got last response chunk. Response status: {}", httpResponseStatus);
-                if (foundInCache) {
-                    writeCrawlLog(crawlLog);
-                    responseSpan.log("Last response chunk");
-                    responseSpan.finish();
-                    LOG.debug("Handled last response chunk");
-                    try {
-                        if (contentWriterSession != null && contentWriterSession.isOpen()) {
-                            contentWriterSession.cancel("OK: Loaded from cache");
+                if (httpObject instanceof HttpContent) {
+                    LOG.trace("Got response content");
+                    if (foundInCache) {
+                        handled = true;
+                    } else {
+                        try {
+                            HttpContent res = (HttpContent) httpObject;
+                            responseSpan.log("Got response content. Size: " + res.content().readableBytes());
+                            responseCollector.addPayload(res.content(), getContentWriterSession());
+
+                            handled = true;
+                            LOG.trace("Handled response content");
+                        } catch (Exception ex) {
+                            LOG.error("Error handling response content", ex);
+                            responseSpan.log("Error handling response content: " + ex.toString());
+                            contentWriterSession.cancel("Got error while writing response content");
+                            return ProxyUtils.createFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_GATEWAY);
                         }
-                    } catch (Exception e) {
-                        LOG.error(e.getMessage(), e);
                     }
-                } else {
-                    ContentWriterProto.WriteResponseMeta.RecordMeta responseRecordMeta = null;
-                    try {
-                        Duration fetchDuration = Timestamps.between(fetchTimeStamp, ProtoUtils.getNowTs());
-
-                        String ipAddress = "";
-                        if (resolvedRemoteAddress != null) {
-                            ipAddress = resolvedRemoteAddress.getAddress().getHostAddress();
-                        }
-
-                        ContentWriterProto.WriteRequestMeta meta = ContentWriterProto.WriteRequestMeta.newBuilder()
-                                .setExecutionId(executionId)
-                                .setFetchTimeStamp(fetchTimeStamp)
-                                .setTargetUri(uri)
-                                .setStatusCode(httpResponseStatus.code())
-                                .setIpAddress(ipAddress)
-                                .putRecordMeta(requestCollector.getRecordNum(), requestCollector.getRecordMeta())
-                                .putRecordMeta(responseCollector.getRecordNum(), responseCollector.getRecordMeta())
-                                .build();
-
-                        // Finish ContentWriter session
-                        getContentWriterSession().sendMetadata(meta);
-                        ContentWriterProto.WriteResponseMeta writeResponse = getContentWriterSession().finish();
-                        contentWriterSession = null;
-
-                        // Write CrawlLog
-                        responseRecordMeta = writeResponse.getRecordMetaOrDefault(1, null);
-                        crawlLog.setIpAddress(ipAddress)
-                                .setWarcId(responseRecordMeta.getWarcId())
-                                .setStorageRef(responseRecordMeta.getStorageRef())
-                                .setRecordType(responseRecordMeta.getType().name().toLowerCase())
-                                .setBlockDigest(responseRecordMeta.getBlockDigest())
-                                .setPayloadDigest(responseRecordMeta.getPayloadDigest())
-                                .setFetchTimeMs(Durations.toMillis(fetchDuration))
-                                .setSize(responseCollector.getSize())
-                                .setWarcRefersTo(responseRecordMeta.getWarcRefersTo());
-
-                        writeCrawlLog(crawlLog);
-
-                    } catch (Exception ex) {
-                        LOG.error("Error writing response", ex);
-                        responseSpan.log("Error writing response: " + ex.toString());
-                        if (contentWriterSession != null && contentWriterSession.isOpen()) {
-                            contentWriterSession.cancel("Got error while writing response metadata");
-                        }
-                        crawlLog.setError(ExtraStatusCodes.RUNTIME_EXCEPTION.toFetchError(ex.toString()));
-                        writeCrawlLog(crawlLog);
-                        return ProxyUtils.createFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_GATEWAY);
-                    }
-
-                    responseSpan.log("Last response chunk");
-                    responseSpan.finish();
-                    LOG.debug("Handled last response chunk");
                 }
-            }
 
-            if (!handled) {
-                // If we get here, handling for the response type should be added
-                LOG.error("Got unknown response type '{}', this is a bug", httpObject.getClass());
+                if (ProxyUtils.isLastChunk(httpObject)) {
+                    LOG.debug("Got last response chunk. Response status: {}", httpResponseStatus);
+                    if (foundInCache) {
+                        writeCrawlLog(crawlLog);
+                        responseSpan.log("Last response chunk");
+                        responseSpan.finish();
+                        LOG.debug("Handled last response chunk");
+                        try {
+                            if (contentWriterSession != null && contentWriterSession.isOpen()) {
+                                contentWriterSession.cancel("OK: Loaded from cache");
+                            }
+                        } catch (Exception e) {
+                            LOG.error(e.getMessage(), e);
+                        }
+                    } else {
+                        ContentWriterProto.WriteResponseMeta.RecordMeta responseRecordMeta = null;
+                        try {
+                            Duration fetchDuration = Timestamps.between(fetchTimeStamp, ProtoUtils.getNowTs());
+
+                            String ipAddress = "";
+                            if (resolvedRemoteAddress != null) {
+                                ipAddress = resolvedRemoteAddress.getAddress().getHostAddress();
+                            }
+
+                            ContentWriterProto.WriteRequestMeta meta = ContentWriterProto.WriteRequestMeta.newBuilder()
+                                    .setExecutionId(executionId)
+                                    .setFetchTimeStamp(fetchTimeStamp)
+                                    .setTargetUri(uri)
+                                    .setStatusCode(httpResponseStatus.code())
+                                    .setIpAddress(ipAddress)
+                                    .putRecordMeta(requestCollector.getRecordNum(), requestCollector.getRecordMeta())
+                                    .putRecordMeta(responseCollector.getRecordNum(), responseCollector.getRecordMeta())
+                                    .build();
+
+                            // Finish ContentWriter session
+                            getContentWriterSession().sendMetadata(meta);
+                            ContentWriterProto.WriteResponseMeta writeResponse = getContentWriterSession().finish();
+                            contentWriterSession = null;
+
+                            // Write CrawlLog
+                            responseRecordMeta = writeResponse.getRecordMetaOrDefault(1, null);
+                            crawlLog.setIpAddress(ipAddress)
+                                    .setWarcId(responseRecordMeta.getWarcId())
+                                    .setStorageRef(responseRecordMeta.getStorageRef())
+                                    .setRecordType(responseRecordMeta.getType().name().toLowerCase())
+                                    .setBlockDigest(responseRecordMeta.getBlockDigest())
+                                    .setPayloadDigest(responseRecordMeta.getPayloadDigest())
+                                    .setFetchTimeMs(Durations.toMillis(fetchDuration))
+                                    .setSize(responseCollector.getSize())
+                                    .setWarcRefersTo(responseRecordMeta.getWarcRefersTo());
+
+                            writeCrawlLog(crawlLog);
+
+                        } catch (Exception ex) {
+                            LOG.error("Error writing response", ex);
+                            responseSpan.log("Error writing response: " + ex.toString());
+                            if (contentWriterSession != null && contentWriterSession.isOpen()) {
+                                contentWriterSession.cancel("Got error while writing response metadata");
+                            }
+                            crawlLog.setError(ExtraStatusCodes.RUNTIME_EXCEPTION.toFetchError(ex.toString()));
+                            writeCrawlLog(crawlLog);
+                            return ProxyUtils.createFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_GATEWAY);
+                        }
+
+                        responseSpan.log("Last response chunk");
+                        responseSpan.finish();
+                        LOG.debug("Handled last response chunk");
+                    }
+                }
+
+                if (!handled) {
+                    // If we get here, handling for the response type should be added
+                    LOG.error("Got unknown response type '{}', this is a bug", httpObject.getClass());
+                }
             }
         } catch (Exception ex) {
             LOG.error("Error handling response", ex);

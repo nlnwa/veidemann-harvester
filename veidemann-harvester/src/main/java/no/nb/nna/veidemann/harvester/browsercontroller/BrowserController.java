@@ -167,9 +167,12 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
             result.withError(ExtraStatusCodes.RUNTIME_EXCEPTION.toFetchError(t.toString()));
         }
 
-        session.close();
-        sessionRegistry.remove(session);
-        span.finish();
+        try {
+            session.close();
+            sessionRegistry.remove(session);
+        } finally {
+            span.finish();
+        }
 
         return result;
     }

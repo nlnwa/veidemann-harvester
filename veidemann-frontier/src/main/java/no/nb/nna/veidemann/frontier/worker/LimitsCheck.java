@@ -118,7 +118,7 @@ public class LimitsCheck {
 
     private static int calculateDepth(QueuedUriWrapper qUri) {
         // Remove redirects from discovery path before calculating depth
-        return qUri.getDiscoveryPath().replace("r", "").length();
+        return qUri.getDiscoveryPath().replace("R", "").length();
     }
 
 }

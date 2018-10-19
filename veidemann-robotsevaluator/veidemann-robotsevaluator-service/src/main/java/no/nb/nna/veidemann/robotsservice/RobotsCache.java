@@ -17,6 +17,7 @@ package no.nb.nna.veidemann.robotsservice;
 
 import java.net.InetSocketAddress;
 import java.net.Proxy;
+import java.security.cert.CertificateException;
 import java.util.Objects;
 
 import no.nb.nna.veidemann.robotsparser.RobotsTxt;
@@ -32,6 +33,13 @@ import org.cache2k.integration.CacheLoader;
 import org.netpreserve.commons.uri.Uri;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.net.ssl.HostnameVerifier;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSession;
+import javax.net.ssl.SSLSocketFactory;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
 
 import static no.nb.nna.veidemann.commons.VeidemannHeaderConstants.EXECUTION_ID;
 import static no.nb.nna.veidemann.commons.VeidemannHeaderConstants.JOB_EXECUTION_ID;
@@ -52,7 +60,7 @@ public class RobotsCache {
     private static final RobotsTxt EMPTY_ROBOTS = new RobotsTxt();
 
     public RobotsCache(final String proxyHost, final int proxyPort) {
-        client = new OkHttpClient.Builder()
+        client = getUnsafeOkHttpClient()
                 .proxy(new Proxy(Proxy.Type.HTTP, new InetSocketAddress(proxyHost, proxyPort)))
                 .build();
         cache = new Cache2kBuilder<CacheKey, RobotsTxt>() {
@@ -180,5 +188,46 @@ public class RobotsCache {
             return true;
         }
 
+    }
+
+    private static OkHttpClient.Builder getUnsafeOkHttpClient() {
+        try {
+            // Create a trust manager that does not validate certificate chains
+            final TrustManager[] trustAllCerts = new TrustManager[] {
+                    new X509TrustManager() {
+                        @Override
+                        public void checkClientTrusted(java.security.cert.X509Certificate[] chain, String authType) throws CertificateException {
+                        }
+
+                        @Override
+                        public void checkServerTrusted(java.security.cert.X509Certificate[] chain, String authType) throws CertificateException {
+                        }
+
+                        @Override
+                        public java.security.cert.X509Certificate[] getAcceptedIssuers() {
+                            return new java.security.cert.X509Certificate[]{};
+                        }
+                    }
+            };
+
+            // Install the all-trusting trust manager
+            final SSLContext sslContext = SSLContext.getInstance("SSL");
+            sslContext.init(null, trustAllCerts, new java.security.SecureRandom());
+            // Create an ssl socket factory with our all-trusting manager
+            final SSLSocketFactory sslSocketFactory = sslContext.getSocketFactory();
+
+            OkHttpClient.Builder builder = new OkHttpClient.Builder();
+            builder.sslSocketFactory(sslSocketFactory, (X509TrustManager)trustAllCerts[0]);
+            builder.hostnameVerifier(new HostnameVerifier() {
+                @Override
+                public boolean verify(String hostname, SSLSession session) {
+                    return true;
+                }
+            });
+
+            return builder;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 }

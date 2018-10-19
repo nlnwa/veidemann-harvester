@@ -332,6 +332,11 @@ public class UriRequest {
     //    }
 
     public CrawlLog setCrawlLog(CrawlLog.Builder crawlLogBuilder) {
+        // If request fails in client to proxy step, then status code is not set and we pick it up from the error
+        if (crawlLogBuilder.getStatusCode() == 0) {
+            crawlLogBuilder.setStatusCode(crawlLogBuilder.getError().getCode());
+        }
+
         this.crawlLog = crawlLogBuilder
                 .setReferrer(referrer)
                 .setDiscoveryPath(discoveryPath)

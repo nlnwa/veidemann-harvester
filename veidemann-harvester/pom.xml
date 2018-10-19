@@ -12,7 +12,6 @@
     <packaging>jar</packaging>
 
     <properties>
-        <veidemann.cache.version>v0.1.0-alpha7</veidemann.cache.version>
         <test.dns.server>testsites</test.dns.server>
         <!--<test.dns.server>8.8.8.8</test.dns.server>-->
     </properties>

@@ -26,6 +26,8 @@ import org.netpreserve.commons.uri.UriConfigs;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Objects;
+
 /**
  *
  */
@@ -43,6 +45,11 @@ public class RobotsService extends RobotsEvaluatorGrpc.RobotsEvaluatorImplBase {
 
     @Override
     public void isAllowed(IsAllowedRequest request, StreamObserver<IsAllowedReply> respObserver) {
+        Objects.requireNonNull(request.getExecutionId());
+        Objects.requireNonNull(request.getJobExecutionId());
+        Objects.requireNonNull(request.getPoliteness());
+        Objects.requireNonNull(request.getUnknownFields());
+        Objects.requireNonNull(request.getUserAgent());
         try {
             Uri uri = UriConfigs.WHATWG.buildUri(request.getUri());
             int ttlSeconds = request.getPoliteness().getMinimumRobotsValidityDurationS();

@@ -221,6 +221,7 @@
                                         </ports>
                                         <dependsOn>
                                             <container>db-initializer</container>
+                                            <container>dnsresolver</container>
                                         </dependsOn>
                                         <volumes>
                                             <bind>

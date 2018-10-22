@@ -56,6 +56,7 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
 import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -139,9 +140,6 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
             if (httpObject instanceof HttpRequest) {
                 HttpRequest request = (HttpRequest) httpObject;
 
-                Uri parsedUri = UriConfigs.WHATWG.buildUri(uri);
-                resolvedRemoteAddress = hostResolver.resolve(parsedUri.getHost(), parsedUri.getDecodedPort());
-
                 // Lookup browser session, but skip if it is a robots.txt request since that is not coming from browser.
                 if (!uri.endsWith("robots.txt")) {
                     browserSession = sessionRegistry.get(proxyId);
@@ -168,8 +166,30 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
 
                 LOG.debug("Proxy got request");
 
-                requestSpan = buildSpan("clientToProxyRequest");
-                try (ActiveSpan span = GlobalTracer.get().makeActive(requestSpan)) {
+                Uri parsedUri;
+                try {
+                    parsedUri = UriConfigs.WHATWG.buildUri(uri);
+                } catch (Exception e) {
+                    crawlLog = buildCrawlLog()
+                            .setIpAddress("")
+                            .setError(ExtraStatusCodes.ILLEGAL_URI.toFetchError());
+                    writeCrawlLog(crawlLog);
+                    LOG.debug("URI parsing failed");
+                    return new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.SERVICE_UNAVAILABLE);
+                }
+
+                try {
+                    resolvedRemoteAddress = hostResolver.resolve(parsedUri.getHost(), parsedUri.getDecodedPort());
+                } catch (UnknownHostException e) {
+                    crawlLog = buildCrawlLog()
+                            .setIpAddress("")
+                            .setError(ExtraStatusCodes.DOMAIN_LOOKUP_FAILED.toFetchError());
+                    writeCrawlLog(crawlLog);
+                    LOG.debug("DNS lookup failed");
+                    return new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.SERVICE_UNAVAILABLE);
+                }
+
+                try (ActiveSpan span = GlobalTracer.get().makeActive(getRequestSpan())) {
                     // Fix headers before sending to final destination
                     request.headers().set("Accept-Encoding", "identity");
 
@@ -207,8 +227,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
         }
 
         try {
-            responseSpan = buildSpan("serverToProxyResponse");
-            try (ActiveSpan span = GlobalTracer.get().makeActive(responseSpan)) {
+            try (ActiveSpan span = GlobalTracer.get().makeActive(getResponseSpan())) {
 
                 boolean handled = false;
 
@@ -220,7 +239,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                         httpResponseStatus = res.status();
                         httpResponseProtocolVersion = res.protocolVersion();
                         responseCollector.setHeaders(ContentCollector.createResponsePreamble(res), res.headers(), getContentWriterSession());
-                        responseSpan.log("Got response headers");
+                        span.log("Got response headers");
 
                         crawlLog = buildCrawlLog()
                                 .setStatusCode(httpResponseStatus.code())
@@ -230,14 +249,14 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                             foundInCache = true;
 
                             LOG.debug("Found in cache");
-                            requestSpan.log("Loaded from cache");
+                            span.log("Loaded from cache");
                         }
 
                         handled = true;
                         LOG.trace("Handled response headers");
                     } catch (Exception ex) {
                         LOG.error("Error handling response headers", ex);
-                        responseSpan.log("Error handling response headers: " + ex.toString());
+                        span.log("Error handling response headers: " + ex.toString());
                         return ProxyUtils.createFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_GATEWAY);
                     }
                 }
@@ -249,14 +268,14 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                     } else {
                         try {
                             HttpContent res = (HttpContent) httpObject;
-                            responseSpan.log("Got response content. Size: " + res.content().readableBytes());
+                            span.log("Got response content. Size: " + res.content().readableBytes());
                             responseCollector.addPayload(res.content(), getContentWriterSession());
 
                             handled = true;
                             LOG.trace("Handled response content");
                         } catch (Exception ex) {
                             LOG.error("Error handling response content", ex);
-                            responseSpan.log("Error handling response content: " + ex.toString());
+                            span.log("Error handling response content: " + ex.toString());
                             contentWriterSession.cancel("Got error while writing response content");
                             return ProxyUtils.createFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_GATEWAY);
                         }
@@ -267,8 +286,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                     LOG.debug("Got last response chunk. Response status: {}", httpResponseStatus);
                     if (foundInCache) {
                         writeCrawlLog(crawlLog);
-                        responseSpan.log("Last response chunk");
-                        responseSpan.finish();
+                        span.log("Last response chunk");
                         LOG.debug("Handled last response chunk");
                         try {
                             if (contentWriterSession != null && contentWriterSession.isOpen()) {
@@ -282,10 +300,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                         try {
                             Duration fetchDuration = Timestamps.between(fetchTimeStamp, ProtoUtils.getNowTs());
 
-                            String ipAddress = "";
-                            if (resolvedRemoteAddress != null) {
-                                ipAddress = resolvedRemoteAddress.getAddress().getHostAddress();
-                            }
+                            String ipAddress = resolvedRemoteAddress.getAddress().getHostAddress();
 
                             ContentWriterProto.WriteRequestMeta meta = ContentWriterProto.WriteRequestMeta.newBuilder()
                                     .setExecutionId(executionId)
@@ -318,7 +333,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
 
                         } catch (Exception ex) {
                             LOG.error("Error writing response", ex);
-                            responseSpan.log("Error writing response: " + ex.toString());
+                            span.log("Error writing response: " + ex.toString());
                             if (contentWriterSession != null && contentWriterSession.isOpen()) {
                                 contentWriterSession.cancel("Got error while writing response metadata");
                             }
@@ -327,8 +342,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                             return ProxyUtils.createFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_GATEWAY);
                         }
 
-                        responseSpan.log("Last response chunk");
-                        responseSpan.finish();
+                        span.log("Last response chunk");
                         LOG.debug("Handled last response chunk");
                     }
                 }
@@ -434,6 +448,20 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                 .setFetchTimeStamp(fetchTimeStamp)
                 .setFetchTimeMs(Durations.toMillis(fetchDuration));
         return crawlLog;
+    }
+
+    private Span getRequestSpan() {
+        if (requestSpan != null) {
+            return requestSpan;
+        }
+        return buildSpan("clientToProxyRequest");
+    }
+
+    private Span getResponseSpan() {
+        if (responseSpan != null) {
+            return responseSpan;
+        }
+        return buildSpan("serverToProxyResponse");
     }
 
     private Span buildSpan(String operationName) {

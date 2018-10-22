@@ -44,12 +44,15 @@ public class MultiSiteCrawlIT extends CrawlTestBase implements VeidemannHeaderCo
                 .getValue(0);
 
         CrawlConfig crawlConfig = DbHelper.getCrawlConfigForJob(job);
+        controllerClient.saveBrowserConfig(
+                DbHelper.getBrowserConfigForCrawlConfig(crawlConfig).toBuilder().setPageLoadTimeoutMs(10000).build());
 
         PolitenessConfig politeness = DbHelper.getPolitenessConfigForCrawlConfig(crawlConfig).toBuilder()
                 .setMaxTimeBetweenPageLoadMs(100)
                 .setMinTimeBetweenPageLoadMs(1)
                 .setDelayFactor(.01f)
                 .setRetryDelaySeconds(1)
+                .setUseHostname(false)
                 .build();
         politeness = controllerClient.savePolitenessConfig(politeness);
 

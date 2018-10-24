@@ -385,9 +385,9 @@ public class UriRequest {
     public void finish(CrawlLogRegistry crawlLogRegistry) {
         if (!finished) {
             span.finish();
-            crawlLogRegistry.signalRequestsUpdated();
             LOG.debug("Request {} finished", requestId);
             finished = true;
+            crawlLogRegistry.signalRequestsUpdated();
         }
     }
 

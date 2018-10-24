@@ -320,6 +320,11 @@ public class CrawlLogRegistry {
                 } else {
                     requestFound = true;
                 }
+            } else if (r.getStatusCode() == 504 && crawlLogEntry.getCrawlLog().getStatusCode() == ExtraStatusCodes.HTTP_TIMEOUT.getCode()) {
+                // If http times out, the proxy will return 504, but proxy sets crawllogstatus to -4 which is the underlying status.
+                // Update request to match crawllog
+                r.setStatusCode(crawlLogEntry.getCrawlLog().getStatusCode());
+                requestFound = true;
             }
         }
 
@@ -390,7 +395,7 @@ public class CrawlLogRegistry {
                 crawlLogsLock.unlock();
             }
 
-            sb.append("}, unhandledRequests={");
+            sb.append("},\nunhandledRequests={");
             unhandledRequests.forEach(r -> {
                 sb.append("\n    [").append(r.getStatusCode()).append(", ");
                 if (r.isFromCache()) {

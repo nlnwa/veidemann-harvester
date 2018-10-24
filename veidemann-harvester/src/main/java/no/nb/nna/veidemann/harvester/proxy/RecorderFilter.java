@@ -204,7 +204,16 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                 LOG.debug("Got something else than http request: {}", httpObject);
             }
         } catch (Throwable t) {
+            String ipAddress = "";
+            if (resolvedRemoteAddress != null) {
+                ipAddress = resolvedRemoteAddress.getAddress().getHostAddress();
+            }
+            crawlLog = buildCrawlLog()
+                    .setIpAddress(ipAddress)
+                    .setError(ExtraStatusCodes.RUNTIME_EXCEPTION.toFetchError(t.toString()));
+            writeCrawlLog(crawlLog);
             LOG.error("Error handling request", t);
+            return new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.SERVICE_UNAVAILABLE);
         }
         return null;
     }

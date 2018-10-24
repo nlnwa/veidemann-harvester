@@ -204,14 +204,13 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
         // net::ERR_CONTENT_LENGTH_MISMATCH
         // net::ERR_TUNNEL_CONNECTION_FAILED
         // net::ERR_ABORTED
+        // net::ERR_UNKNOWN_URL_SCHEME
+        // net::ERR_FAILED
+        // net::ERR_INCOMPLETE_CHUNKED_ENCODING
+        // net::ERR_TIMED_OUT
+
         resolveCurrentUriRequest(f.requestId())
                 .ifPresent(request -> {
-                    if (!f.canceled()) {
-                        LOG.error(
-                                "Failed fetching page: Error '{}', Blocked reason '{}', Resource type: '{}', Canceled: {}, Req: {}",
-                                f.errorText(), f.blockedReason(), f.type(), f.canceled(), request.getUrl());
-                    }
-
                     // Only set status code if not set from proxy already
                     if (request.getStatusCode() == 0) {
                         if ("mixed-content".equals(f.blockedReason())) {
@@ -220,6 +219,9 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
                         } else if (f.canceled()) {
                             LOG.debug("Resource canceled by browser: Error '{}', Blocked reason '{}'", f.errorText(), f.blockedReason());
                             request.setStatusCode(ExtraStatusCodes.CANCELED_BY_BROWSER.getCode());
+                        } else if ("net::ERR_UNKNOWN_URL_SCHEME".equals(f.errorText())) {
+                            LOG.debug("Resource has unknown URL Scheme: Error '{}', Blocked reason '{}'", f.errorText(), f.blockedReason());
+                            request.setStatusCode(ExtraStatusCodes.ILLEGAL_URI.getCode());
                         } else {
                             request.setStatusCode(ExtraStatusCodes.BLOCKED_BY_CUSTOM_PROCESSOR.getCode());
                             LOG.error(

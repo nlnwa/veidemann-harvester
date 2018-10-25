@@ -6,12 +6,13 @@ import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import io.opentracing.contrib.ClientTracingInterceptor;
 import io.opentracing.util.GlobalTracer;
+import io.prometheus.client.Counter;
+import io.prometheus.client.Gauge;
+import io.prometheus.client.Histogram;
 import no.nb.nna.veidemann.api.FrontierGrpc;
 import no.nb.nna.veidemann.api.FrontierProto.PageHarvest;
 import no.nb.nna.veidemann.api.FrontierProto.PageHarvestSpec;
 import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
-import no.nb.nna.veidemann.chrome.client.ClientClosedException;
-import no.nb.nna.veidemann.chrome.client.MaxActiveSessionsExceededException;
 import no.nb.nna.veidemann.commons.ExtraStatusCodes;
 import no.nb.nna.veidemann.commons.util.Pool;
 import no.nb.nna.veidemann.commons.util.Pool.Lease;
@@ -44,6 +45,45 @@ public class FrontierClient implements AutoCloseable {
 
     private final Pool<ProxySession> pool;
 
+    private static final String METRICS_NS = "veidemann";
+    private static final String METRICS_SUBSYSTEM = "harvester";
+
+    private static final Gauge activeBrowserSessions = Gauge.build()
+            .namespace(METRICS_NS)
+            .subsystem(METRICS_SUBSYSTEM)
+            .name("active_browser_sessions")
+            .help("Active browser sessions")
+            .register();
+
+    private static final Gauge browserSessions = Gauge.build()
+            .namespace(METRICS_NS)
+            .subsystem(METRICS_SUBSYSTEM)
+            .name("browser_sessions")
+            .help("Available browser sessions")
+            .register();
+
+    private static final Counter pagesTotal = Counter.build()
+            .namespace(METRICS_NS)
+            .subsystem(METRICS_SUBSYSTEM)
+            .name("pages_total")
+            .help("Total pages processed")
+            .register();
+
+    private static final Counter pagesFailedTotal = Counter.build()
+            .namespace(METRICS_NS)
+            .subsystem(METRICS_SUBSYSTEM)
+            .name("pages_failed_total")
+            .help("Total pages failed processing")
+            .labelNames("code")
+            .register();
+
+    private static final Histogram pageFetchSeconds = Histogram.build()
+            .namespace(METRICS_NS)
+            .subsystem(METRICS_SUBSYSTEM)
+            .name("pages_fetch_seconds")
+            .help("Time for fetching a complete page in seconds")
+            .register();
+
     public FrontierClient(BrowserController controller, String host, int port, int maxOpenSessions,
                           String browserWsEndpoint, int firstProxyPort) {
         this(controller, ManagedChannelBuilder.forAddress(host, port).usePlaintext(), maxOpenSessions,
@@ -61,7 +101,8 @@ public class FrontierClient implements AutoCloseable {
         channel = channelBuilder.intercept(tracingInterceptor).build();
         asyncStub = FrontierGrpc.newStub(channel).withWaitForReady();
         pool = new Pool<>(maxOpenSessions, () -> new ProxySession(idx.getAndIncrement(),
-                browserWsEndpoint, firstProxyPort), null, p -> p.reset());
+                browserWsEndpoint, firstProxyPort), null, p -> p.reset(),
+                p -> activeBrowserSessions.inc(), p -> activeBrowserSessions.dec());
     }
 
     public void requestNextPage() throws InterruptedException {
@@ -86,6 +127,7 @@ public class FrontierClient implements AutoCloseable {
     @Override
     public void close() {
         try {
+            pool.close();
             boolean isTerminated = channel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
             if (!isTerminated) {
                 LOG.warn("Harvester client has open connections after close");
@@ -112,7 +154,9 @@ public class FrontierClient implements AutoCloseable {
             QueuedUri fetchUri = pageHarvestSpec.getQueuedUri();
             MDC.put("eid", fetchUri.getExecutionId());
             MDC.put("uri", fetchUri.getUri());
+            pagesTotal.inc();
 
+            Histogram.Timer pageFetchTimer = pageFetchSeconds.startTimer();
             try {
                 LOG.debug("Start page rendering");
 
@@ -123,6 +167,7 @@ public class FrontierClient implements AutoCloseable {
                 if (result.hasError()) {
                     reply.setError(result.getError());
                     requestObserver.onNext(reply.build());
+                    pagesFailedTotal.labels(String.valueOf(result.getError().getCode())).inc();
                 } else {
                     reply.getMetricsBuilder()
                             .setBytesDownloaded(result.getBytesDownloaded())
@@ -143,7 +188,9 @@ public class FrontierClient implements AutoCloseable {
                 reply.setError(ExtraStatusCodes.RUNTIME_EXCEPTION.toFetchError(t.toString()));
                 requestObserver.onNext(reply.build());
                 requestObserver.onCompleted();
+                pagesFailedTotal.labels(String.valueOf(ExtraStatusCodes.RUNTIME_EXCEPTION.getCode())).inc();
             } finally {
+                pageFetchTimer.observeDuration();
                 MDC.clear();
             }
         }
@@ -187,7 +234,8 @@ public class FrontierClient implements AutoCloseable {
                 query = query.add(proxyEntry);
             }
             browserWsEndpoint = UriConfigs.WHATWG.builder(ws).parsedQuery(query).build().toString();
-            System.out.println("CREATED session :  " + this);
+            browserSessions.inc();
+            LOG.info("Created session:  " + this);
         }
 
         public int getProxyId() {
@@ -211,6 +259,7 @@ public class FrontierClient implements AutoCloseable {
         }
 
         private void reset() {
+            browserSessions.dec();
             session = null;
         }
 

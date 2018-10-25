@@ -75,6 +75,7 @@ public class RecorderFilterSourceAdapter extends HttpFiltersSourceAdapter {
             return new RecorderFilter(proxyId, uri, originalRequest, clientCtx,
                     contentWriterClient, sessionRegistry, hostResolver);
         }
+        MDC.put("uri", connectedUrl + uri);
         return new RecorderFilter(proxyId, connectedUrl + uri, originalRequest, clientCtx,
                 contentWriterClient, sessionRegistry, hostResolver);
     }

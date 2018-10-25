@@ -76,7 +76,7 @@ public class CrawlExecution {
 
     private Span span;
 
-    private DistributedLock lock;
+    private boolean finalized = false;
 
     public CrawlExecution(QueuedUri queuedUri, CrawlHostGroup crawlHostGroup, Frontier frontier) throws DbException {
         this.status = StatusWrapper.getStatusWrapper(queuedUri.getExecutionId());
@@ -233,6 +233,10 @@ public class CrawlExecution {
      * This should be run regardless of if we fetched anything or if the fetch failed in any way.
      */
     public void postFetchFinally() {
+        if (finalized) {
+            return;
+        }
+
         MDC.put("eid", qUri.getExecutionId());
         MDC.put("uri", qUri.getUri());
 
@@ -279,6 +283,7 @@ public class CrawlExecution {
             LOG.error("Error releasing CrawlHostGroup: {}", t.toString(), t);
         }
 
+        finalized = true;
         span.finish();
     }
 

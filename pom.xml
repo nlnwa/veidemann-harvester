@@ -59,6 +59,7 @@
         <io.zipkin.brave.version>4.3.4</io.zipkin.brave.version>
         <antlr.version>4.7</antlr.version>
         <antlr4test-maven-plugin.version>1.8</antlr4test-maven-plugin.version>
+        <io.prometheus.version>0.5.0</io.prometheus.version>
 
         <!--Properties for golang-->
         <go.sdk.version>1.9.2</go.sdk.version>
@@ -207,26 +208,6 @@
                 <artifactId>jaeger-context</artifactId>
                 <version>${com.uber.jaeger.version}</version>
             </dependency>
-<!--            <dependency>
-                <groupId>io.zipkin.reporter</groupId>
-                <artifactId>zipkin-reporter</artifactId>
-                <version>${io.zipkin.reporter.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.zipkin.reporter</groupId>
-                <artifactId>zipkin-sender-okhttp3</artifactId>
-                <version>${io.zipkin.reporter.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.zipkin.brave</groupId>
-                <artifactId>brave</artifactId>
-                <version>${io.zipkin.brave.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.opentracing.brave</groupId>
-                <artifactId>brave-opentracing</artifactId>
-                <version>${io.opentracing.brave.version}</version>
-            </dependency>-->
             <dependency>
                 <groupId>com.squareup.okhttp3</groupId>
                 <artifactId>okhttp</artifactId>
@@ -322,6 +303,23 @@
                 <groupId>org.jwat</groupId>
                 <artifactId>jwat-archive</artifactId>
                 <version>${org.jwat.version}</version>
+            </dependency>
+
+            <!-- Prometheus metrics -->
+            <dependency>
+                <groupId>io.prometheus</groupId>
+                <artifactId>simpleclient</artifactId>
+                <version>${io.prometheus.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.prometheus</groupId>
+                <artifactId>simpleclient_hotspot</artifactId>
+                <version>${io.prometheus.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.prometheus</groupId>
+                <artifactId>simpleclient_httpserver</artifactId>
+                <version>${io.prometheus.version}</version>
             </dependency>
 
             <!-- Configuration framework -->

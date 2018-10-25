@@ -50,6 +50,8 @@ public class Settings extends CommonSettings {
 
     private int maxOpenSessions;
 
+    private int prometheusPort;
+
     public int getProxyPort() {
         return proxyPort;
     }
@@ -160,5 +162,13 @@ public class Settings extends CommonSettings {
 
     public void setMaxOpenSessions(int maxOpenSessions) {
         this.maxOpenSessions = maxOpenSessions;
+    }
+
+    public int getPrometheusPort() {
+        return prometheusPort;
+    }
+
+    public void setPrometheusPort(int prometheusPort) {
+        this.prometheusPort = prometheusPort;
     }
 }

@@ -19,15 +19,24 @@ public class Pool<T> implements AutoCloseable {
     private final Supplier<T> objectFactory;
     private final Predicate<T> verifier;
     private final Consumer<T> objectFinalizer;
+    private final Consumer<Lease<T>> beforeLeaseFunc;
+    private final Consumer<Lease<T>> afterReturnFunc;
 
     private final Lock lock = new ReentrantLock();
     private final Condition notEmpty = lock.newCondition();
 
     public Pool(int size, Supplier<T> objectFactory, Predicate<T> verifier, Consumer<T> objectFinalizer) {
+        this(size, objectFactory, verifier, objectFinalizer, null, null);
+    }
+
+    public Pool(int size, Supplier<T> objectFactory, Predicate<T> verifier, Consumer<T> objectFinalizer,
+                Consumer<Lease<T>> beforeLeaseFunc, Consumer<Lease<T>> afterReturnFunc) {
         this.size = size;
         this.objectFactory = objectFactory;
         this.verifier = verifier;
         this.objectFinalizer = objectFinalizer;
+        this.beforeLeaseFunc = beforeLeaseFunc;
+        this.afterReturnFunc = afterReturnFunc;
         leases = new BitSet(size);
 
         pool = new Lease[size];
@@ -52,6 +61,9 @@ public class Pool<T> implements AutoCloseable {
 
         Lease<T> result = findAvailableLease(time, unit);
         result.beforeLease(objectFactory, verifier, objectFinalizer);
+        if (beforeLeaseFunc != null) {
+            beforeLeaseFunc.accept(result);
+        }
         return result;
     }
 
@@ -76,8 +88,20 @@ public class Pool<T> implements AutoCloseable {
         }
     }
 
-    public void close() {
+    @Override
+    public void close() throws InterruptedException {
         if (closed.compareAndSet(false, true)) {
+            // Wait for leases to be closed
+            while (leases.cardinality() > 0) {
+                lock.lock();
+                try {
+                    notEmpty.await();
+                } finally {
+                    lock.unlock();
+                }
+            }
+
+            // Run finalizers
             for (int i = 0; i < size; i++) {
                 pool[i].finalizeObject(objectFinalizer);
             }
@@ -119,7 +143,11 @@ public class Pool<T> implements AutoCloseable {
             }
         }
 
+        @Override
         public void close() {
+            if (pool.afterReturnFunc != null) {
+                pool.afterReturnFunc.accept(this);
+            }
             leased.compareAndSet(true, false);
             pool.lock.lock();
             try {

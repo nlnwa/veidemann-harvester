@@ -51,6 +51,7 @@ import org.littleshoot.proxy.HttpFiltersAdapter;
 import org.littleshoot.proxy.impl.ProxyUtils;
 import org.netpreserve.commons.uri.Uri;
 import org.netpreserve.commons.uri.UriConfigs;
+import org.netpreserve.commons.uri.UriException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -171,8 +172,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                     parsedUri = UriConfigs.WHATWG.buildUri(uri);
                 } catch (Exception e) {
                     crawlLog = buildCrawlLog()
-                            .setIpAddress("")
-                            .setError(ExtraStatusCodes.ILLEGAL_URI.toFetchError());
+                            .setError(ExtraStatusCodes.ILLEGAL_URI.toFetchError(e.getMessage()));
                     writeCrawlLog(crawlLog);
                     LOG.debug("URI parsing failed");
                     return new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.SERVICE_UNAVAILABLE);
@@ -182,7 +182,6 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                     resolvedRemoteAddress = hostResolver.resolve(parsedUri.getHost(), parsedUri.getDecodedPort());
                 } catch (UnknownHostException e) {
                     crawlLog = buildCrawlLog()
-                            .setIpAddress("")
                             .setError(ExtraStatusCodes.DOMAIN_LOOKUP_FAILED.toFetchError());
                     writeCrawlLog(crawlLog);
                     LOG.debug("DNS lookup failed");
@@ -266,6 +265,10 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                     } catch (Exception ex) {
                         LOG.error("Error handling response headers", ex);
                         span.log("Error handling response headers: " + ex.toString());
+                        if (crawlLog != null) {
+                            crawlLog.setError(ExtraStatusCodes.RUNTIME_EXCEPTION.toFetchError(ex.getMessage()));
+                            writeCrawlLog(crawlLog);
+                        }
                         return ProxyUtils.createFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_GATEWAY);
                     }
                 }
@@ -286,6 +289,10 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                             LOG.error("Error handling response content", ex);
                             span.log("Error handling response content: " + ex.toString());
                             contentWriterSession.cancel("Got error while writing response content");
+                            if (crawlLog != null) {
+                                crawlLog.setError(ExtraStatusCodes.RUNTIME_EXCEPTION.toFetchError(ex.getMessage()));
+                                writeCrawlLog(crawlLog);
+                            }
                             return ProxyUtils.createFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_GATEWAY);
                         }
                     }
@@ -363,6 +370,11 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
             }
         } catch (Exception ex) {
             LOG.error("Error handling response", ex);
+            if (crawlLog != null) {
+                crawlLog.setError(ExtraStatusCodes.RUNTIME_EXCEPTION.toFetchError(ex.getMessage()));
+                writeCrawlLog(crawlLog);
+                return ProxyUtils.createFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_GATEWAY);
+            }
         }
         return httpObject;
     }
@@ -385,10 +397,6 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                 .setStatusCode(ExtraStatusCodes.FAILED_DNS.getCode());
         writeCrawlLog(crawlLog);
 
-//        if (db != null) {
-//            db.saveCrawlLog(crawlLog.build());
-//        }
-
         LOG.debug("DNS lookup failed for {}", hostAndPort);
     }
 
@@ -402,12 +410,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                 .setStatusCode(ExtraStatusCodes.CONNECT_FAILED.getCode());
         writeCrawlLog(crawlLog);
 
-//        if (db != null) {
-//            db.saveCrawlLog(crawlLog.build());
-//        }
-
         LOG.info("Http connect failed");
-//        finishSpan(uriRequest);
     }
 
     @Override
@@ -420,12 +423,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                 .setStatusCode(ExtraStatusCodes.HTTP_TIMEOUT.getCode());
         writeCrawlLog(crawlLog);
 
-//        if (db != null) {
-//            db.saveCrawlLog(crawlLog.build());
-//        }
-
         LOG.info("Http connect timed out");
-//        finishSpan(uriRequest);
     }
 
     private void writeCrawlLog(CrawlLog.Builder crawlLog) {
@@ -444,7 +442,6 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
     }
 
     private CrawlLog.Builder buildCrawlLog() {
-        Uri surtUri = UriConfigs.SURT_KEY.buildUri(uri);
         Timestamp now = ProtoUtils.getNowTs();
         Duration fetchDuration = Timestamps.between(fetchTimeStamp, now);
 
@@ -453,9 +450,16 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                 .setExecutionId(executionId)
                 .setJobExecutionId(jobExecutionId)
                 .setRequestedUri(uri)
-                .setSurt(surtUri.toString())
                 .setFetchTimeStamp(fetchTimeStamp)
                 .setFetchTimeMs(Durations.toMillis(fetchDuration));
+
+        try {
+            Uri surtUri = UriConfigs.SURT_KEY.buildUri(uri);
+            crawlLog.setSurt(surtUri.toString());
+        } catch (UriException ex) {
+            crawlLog.setError(ExtraStatusCodes.ILLEGAL_URI.toFetchError(ex.getMessage()));
+        }
+
         return crawlLog;
     }
 

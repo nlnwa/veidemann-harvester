@@ -83,7 +83,7 @@ public class WebsocketClient {
             try {
                 connect();
                 connected = true;
-            } catch (Throwable t) {
+            } catch (Exception t) {
                 LOG.error("Connection failed: {}", t.toString(), t);
                 try {
                     Thread.sleep(config.getReconnectDelay());
@@ -161,7 +161,7 @@ public class WebsocketClient {
                     } else {
                         callback.onClose(closeReason.toString());
                     }
-                } catch (Throwable t) {
+                } catch (Exception t) {
                     LOG.error("Callback is throwing an exception", t);
                 }
             });

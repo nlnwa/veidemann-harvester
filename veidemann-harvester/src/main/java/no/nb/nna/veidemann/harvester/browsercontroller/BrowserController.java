@@ -100,7 +100,7 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
             browserConfig = DbHelper.getBrowserConfigForCrawlConfig(config);
             session = new BrowserSession(proxyId, chrome.connect(protocolConfig),
                     browserConfig, queuedUri, span);
-        } catch (Throwable t) {
+        } catch (Exception t) {
             if (session != null) {
                 session.close();
             }
@@ -130,7 +130,7 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
                 try {
                     List<BrowserScript> scripts = getScripts(browserConfig);
                     result.withOutlinks(session.extractOutlinks(scripts));
-                } catch (Throwable t) {
+                } catch (Exception t) {
                     LOG.error("Failed extracting outlinks", t);
                 }
 
@@ -156,13 +156,13 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
                 session.getUriRequests().getPageLogResources().forEach(r -> pageLog.addResource(r));
                 result.getOutlinks().forEach(o -> pageLog.addOutlink(o.getUri()));
                 DbService.getInstance().getDbAdapter().savePageLog(pageLog.build());
-            } catch (Throwable t) {
+            } catch (Exception t) {
                 LOG.error("Failed writing pagelog", t);
             }
 
             result.withBytesDownloaded(session.getUriRequests().getBytesDownloaded())
                     .withUriCount(session.getUriRequests().getUriDownloadedCount());
-        } catch (Throwable t) {
+        } catch (Exception t) {
             LOG.error("Failed loading page", t);
             result.withError(ExtraStatusCodes.RUNTIME_EXCEPTION.toFetchError(t.toString()));
         }

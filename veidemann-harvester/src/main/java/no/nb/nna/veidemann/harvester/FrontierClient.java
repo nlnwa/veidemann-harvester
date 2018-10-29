@@ -82,6 +82,7 @@ public class FrontierClient implements AutoCloseable {
             .subsystem(METRICS_SUBSYSTEM)
             .name("pages_fetch_seconds")
             .help("Time for fetching a complete page in seconds")
+            .buckets(.005, .01, .025, .05, .075, .1, .25, .5, .75, 1, 2.5, 5, 7.5, 10, 20, 30, 40, 50, 60, 120, 180, 240)
             .register();
 
     public FrontierClient(BrowserController controller, String host, int port, int maxOpenSessions,
@@ -101,8 +102,7 @@ public class FrontierClient implements AutoCloseable {
         channel = channelBuilder.intercept(tracingInterceptor).build();
         asyncStub = FrontierGrpc.newStub(channel).withWaitForReady();
         pool = new Pool<>(maxOpenSessions, () -> new ProxySession(idx.getAndIncrement(),
-                browserWsEndpoint, firstProxyPort), null, p -> p.reset(),
-                p -> activeBrowserSessions.inc(), p -> activeBrowserSessions.dec());
+                browserWsEndpoint, firstProxyPort), null, p -> p.reset());
     }
 
     public void requestNextPage() throws InterruptedException {
@@ -156,6 +156,7 @@ public class FrontierClient implements AutoCloseable {
             MDC.put("uri", fetchUri.getUri());
             pagesTotal.inc();
 
+            activeBrowserSessions.inc();
             Histogram.Timer pageFetchTimer = pageFetchSeconds.startTimer();
             try {
                 LOG.debug("Start page rendering");
@@ -182,7 +183,7 @@ public class FrontierClient implements AutoCloseable {
                 requestObserver.onCompleted();
 
                 LOG.debug("Page rendering completed");
-            } catch (Throwable t) {
+            } catch (Exception t) {
                 LOG.error("Page rendering failed: {}", t.getMessage(), t);
                 PageHarvest.Builder reply = PageHarvest.newBuilder();
                 reply.setError(ExtraStatusCodes.RUNTIME_EXCEPTION.toFetchError(t.toString()));
@@ -191,6 +192,7 @@ public class FrontierClient implements AutoCloseable {
                 pagesFailedTotal.labels(String.valueOf(ExtraStatusCodes.RUNTIME_EXCEPTION.getCode())).inc();
             } finally {
                 pageFetchTimer.observeDuration();
+                activeBrowserSessions.dec();
                 MDC.clear();
             }
         }

@@ -133,7 +133,7 @@ public class QueuedUriWrapper {
         try {
             surt = UriConfigs.SURT_KEY.buildUri(wrapped.getUri());
             wrapped.setSurt(surt.toString());
-        } catch (Throwable t) {
+        } catch (Exception t) {
             LOG.info("Unparseable URI '{}'", wrapped.getUri());
             wrapped = wrapped.setError(ExtraStatusCodes.ILLEGAL_URI.toFetchError());
             DbUtil.writeLog(this);

@@ -127,7 +127,7 @@ public class CdpConnection extends Cdp implements WebSocketCallback {
 
             try {
                 websocketClient.sendMessage(command.serialize());
-            } catch (Throwable t) {
+            } catch (Exception t) {
                 methodFutures.remove(command.getRequestId());
                 future.completeExceptionally(t);
             }

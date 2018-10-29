@@ -47,7 +47,7 @@ public abstract class Command<T extends Object> {
     String serialize() {
         try {
             return Cdp.GSON.toJson(request);
-        } catch (Throwable t) {
+        } catch (Exception t) {
             throw new RuntimeException(t);
         }
     }

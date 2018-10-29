@@ -202,7 +202,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
             } else {
                 LOG.debug("Got something else than http request: {}", httpObject);
             }
-        } catch (Throwable t) {
+        } catch (Exception t) {
             String ipAddress = "";
             if (resolvedRemoteAddress != null) {
                 ipAddress = resolvedRemoteAddress.getAddress().getHostAddress();

@@ -43,7 +43,7 @@ public class CdpSession extends Cdp {
                 // Force the exception to be thrown
                 f.get();
             }
-        } catch (Throwable t) {
+        } catch (Exception t) {
             methodFutures.remove(command.getRequestId());
             future.completeExceptionally(new CdpException("Calling method " + command.getMethod() + " failed", t));
         }

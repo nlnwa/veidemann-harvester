@@ -302,7 +302,7 @@
                                     </run>
                                 </image>
                                 <image>
-                                    <name>norsknettarkiv/veidemann-contentwriter</name>
+                                    <name>norsknettarkiv/veidemann-contentwriter:${veidemann.contentwriter.version}</name>
                                     <alias>contentwriter</alias>
                                     <run>
                                         <network>

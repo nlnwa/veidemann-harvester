@@ -40,7 +40,7 @@ public final class CdpResponse {
     String serialize() {
         try {
             return Cdp.GSON.toJson(this);
-        } catch (Throwable t) {
+        } catch (Exception t) {
             throw new RuntimeException(t);
         }
     }

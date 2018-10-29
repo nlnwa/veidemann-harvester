@@ -225,7 +225,7 @@ public class ContentWriterService extends ContentWriterGrpc.ContentWriterImplBas
                         } catch (StatusException ex) {
                             LOG.error("Failed write: {}", ex.getMessage(), ex);
                             responseObserver.onError(ex);
-                        } catch (Throwable ex) {
+                        } catch (Exception ex) {
                             LOG.error("Failed write: {}", ex.getMessage(), ex);
                             responseObserver.onError(Status.fromThrowable(ex).asException());
                         } finally {

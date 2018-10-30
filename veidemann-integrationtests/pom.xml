@@ -17,11 +17,6 @@
     <dependencies>
         <dependency>
             <groupId>${project.groupId}</groupId>
-            <artifactId>veidemann-api</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>${project.groupId}</groupId>
             <artifactId>veidemann-commons</artifactId>
             <version>${project.version}</version>
         </dependency>

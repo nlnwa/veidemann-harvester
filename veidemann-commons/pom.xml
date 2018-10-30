@@ -11,9 +11,8 @@
 
     <dependencies>
         <dependency>
-            <groupId>${project.groupId}</groupId>
+            <groupId>com.github.nlnwa</groupId>
             <artifactId>veidemann-api</artifactId>
-            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>org.netpreserve.commons</groupId>

@@ -64,14 +64,6 @@
                             <protocArtifact>com.google.protobuf:protoc:${com.google.protobuf.protoc.version}:exe:${os.detected.classifier}</protocArtifact>
                             <pluginId>grpc-java</pluginId>
                             <pluginArtifact>io.grpc:protoc-gen-grpc-java:${io.grpc.protoc-gen-grpc-java.version}:exe:${os.detected.classifier}</pluginArtifact>
-                            <!--<additionalProtoPathElements>-->
-                                <!--<protoPathElement>${project.build.directory}/veidemann-api-${veidemann.api.version}/include</protoPathElement>-->
-                                <!--&lt;!&ndash;<protoPathElement>${project.build.directory}/veidemann-api-${veidemann.api.version}/include/grpc-gateway/</protoPathElement>&ndash;&gt;-->
-                            <!--</additionalProtoPathElements>-->
-                            <!--<excludes>-->
-                                <!--<exclude>**/openapiv2.proto</exclude>-->
-                                <!--<exclude>**/http.proto</exclude>-->
-                            <!--</excludes>-->
                         </configuration>
                     </execution>
                 </executions>

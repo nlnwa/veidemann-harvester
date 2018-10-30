@@ -40,10 +40,16 @@
             <groupId>org.netpreserve.commons</groupId>
             <artifactId>webarchive-commons-util</artifactId>
         </dependency>
+        <!--<dependency>-->
+            <!--<groupId>org.littleshoot</groupId>-->
+            <!--<artifactId>littleproxy</artifactId>-->
+        <!--</dependency>-->
         <dependency>
-            <groupId>org.littleshoot</groupId>
+            <groupId>com.github.michalsvec</groupId>
             <artifactId>littleproxy</artifactId>
+            <version>master-SNAPSHOT</version>
         </dependency>
+
         <dependency>
             <groupId>net.lightbody.bmp</groupId>
             <artifactId>mitm</artifactId>

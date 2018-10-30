@@ -171,7 +171,6 @@ public class CdpConnection extends Cdp implements WebSocketCallback {
 
     public void dispose() {
         onClose("Closed by client");
-        workerGroup.shutdownGracefully();
-        websocketClient.close();
+        workerGroup.shutdownGracefully().awaitUninterruptibly();
     }
 }

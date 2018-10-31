@@ -19,7 +19,6 @@ import com.google.gson.JsonObject;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.opentracing.ActiveSpan;
-import no.nb.nna.veidemann.chrome.client.ChromeDebugProtocolBase;
 import no.nb.nna.veidemann.chrome.client.ChromeDebugProtocolConfig;
 import no.nb.nna.veidemann.chrome.client.ClientClosedException;
 import org.slf4j.Logger;
@@ -170,7 +169,10 @@ public class CdpConnection extends Cdp implements WebSocketCallback {
     }
 
     public void dispose() {
-        onClose("Closed by client");
-        workerGroup.shutdownGracefully().awaitUninterruptibly();
+        try {
+            onClose("Closed by client");
+        } finally {
+            workerGroup.shutdownGracefully().awaitUninterruptibly();
+        }
     }
 }

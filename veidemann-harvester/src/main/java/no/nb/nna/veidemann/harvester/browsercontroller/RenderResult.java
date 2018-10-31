@@ -26,6 +26,7 @@ public class RenderResult {
     private int uriCount;
     private List<QueuedUri> outlinks;
     private Error error;
+    private long pageFetchTimeMs;
 
     public long getBytesDownloaded() {
         return bytesDownloaded;
@@ -67,6 +68,15 @@ public class RenderResult {
 
     public RenderResult withError(Error error) {
         this.error = error;
+        return this;
+    }
+
+    public long getPageFetchTimeMs() {
+        return pageFetchTimeMs;
+    }
+
+    public RenderResult withPageFetchTimeMs(long pageFetchTimeMs) {
+        this.pageFetchTimeMs = pageFetchTimeMs;
         return this;
     }
 }

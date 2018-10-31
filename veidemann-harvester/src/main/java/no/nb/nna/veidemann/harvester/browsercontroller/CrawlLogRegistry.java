@@ -132,6 +132,10 @@ public class CrawlLogRegistry {
         }
     }
 
+    public long getFetchTimeMs() {
+        return lastActivityTime - startTime;
+    }
+
     private boolean isCrawlLogsResolved() {
         crawlLogsLock.lock();
         try {

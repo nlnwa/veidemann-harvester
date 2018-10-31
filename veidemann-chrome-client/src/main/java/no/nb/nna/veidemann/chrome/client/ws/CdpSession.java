@@ -25,6 +25,7 @@ public class CdpSession extends Cdp {
             LOG.info("Calling {} on closed session. {}", command.getMethod(), getClosedReason());
             CompletableFuture<JsonObject> future = new CompletableFuture<>();
             future.completeExceptionally(new ClientClosedException(getClosedReason()));
+            return future.thenApply(result -> parseResult(result, command.resultType));
         }
 
         CompletableFuture<JsonObject> future = new CompletableFuture<>();

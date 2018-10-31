@@ -67,8 +67,6 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
 
     final PageSession session;
 
-    final long protocolTimeout;
-
     final Map<String, List<DebuggerDomain.Location>> breakpoints = new HashMap<>();
 
     final UriRequestRegistry uriRequests;
@@ -88,7 +86,6 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
         long maxIdleTime = Math.max(browserConfig.getSleepAfterPageloadMs(), 1000);
         crawlLogs = new CrawlLogRegistry(this, browserConfig.getPageLoadTimeoutMs(), maxIdleTime);
         uriRequests = new UriRequestRegistry(crawlLogs, queuedUri, span);
-        protocolTimeout = browserConfig.getPageLoadTimeoutMs();
 
         session = browser.newPage(browserConfig.getWindowWidth(), browserConfig.getWindowHeight());
 
@@ -145,10 +142,6 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
 
     public int getProxyId() {
         return proxyId;
-    }
-
-    public long getProtocolTimeout() {
-        return protocolTimeout;
     }
 
     public UriRequestRegistry getUriRequests() {

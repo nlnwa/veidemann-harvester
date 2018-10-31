@@ -157,11 +157,14 @@ public class FrontierClient implements AutoCloseable {
             pagesTotal.inc();
 
             activeBrowserSessions.inc();
-            Histogram.Timer pageFetchTimer = pageFetchSeconds.startTimer();
+            long startTime = System.currentTimeMillis();
+
             try {
                 LOG.debug("Start page rendering");
 
                 RenderResult result = controller.render(proxySessionLease.getObject(), fetchUri, pageHarvestSpec.getCrawlConfig());
+
+                pageFetchSeconds.observe((double) result.getPageFetchTimeMs() / 1000d);
 
                 PageHarvest.Builder reply = PageHarvest.newBuilder();
 
@@ -185,13 +188,14 @@ public class FrontierClient implements AutoCloseable {
                 LOG.debug("Page rendering completed");
             } catch (Exception t) {
                 LOG.error("Page rendering failed: {}", t.getMessage(), t);
+                pageFetchSeconds.observe((double) (System.currentTimeMillis() - startTime) / 1000d);
+
                 PageHarvest.Builder reply = PageHarvest.newBuilder();
                 reply.setError(ExtraStatusCodes.RUNTIME_EXCEPTION.toFetchError(t.toString()));
                 requestObserver.onNext(reply.build());
                 requestObserver.onCompleted();
                 pagesFailedTotal.labels(String.valueOf(ExtraStatusCodes.RUNTIME_EXCEPTION.getCode())).inc();
             } finally {
-                pageFetchTimer.observeDuration();
                 activeBrowserSessions.dec();
                 MDC.clear();
             }

@@ -161,7 +161,8 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
             }
 
             result.withBytesDownloaded(session.getUriRequests().getBytesDownloaded())
-                    .withUriCount(session.getUriRequests().getUriDownloadedCount());
+                    .withUriCount(session.getUriRequests().getUriDownloadedCount())
+                    .withPageFetchTimeMs(session.getCrawlLogs().getFetchTimeMs());
         } catch (Exception t) {
             LOG.error("Failed loading page", t);
             result.withError(ExtraStatusCodes.RUNTIME_EXCEPTION.toFetchError(t.toString()));

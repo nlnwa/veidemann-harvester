@@ -162,10 +162,8 @@ public class CdpConnection extends Cdp implements WebSocketCallback {
         if (clientClosedListener != null) {
             clientClosedListener.clientClosed(reason);
         }
-        for (CdpSession session : sessions.values()) {
-            session.onClose(reason);
-        }
-        sessions.clear();
+
+        super.onClose(reason);
     }
 
     public void dispose() {

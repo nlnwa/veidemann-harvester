@@ -22,6 +22,7 @@ import io.opentracing.NoopActiveSpanSource;
 import io.opentracing.Tracer;
 import io.opentracing.tag.Tags;
 import no.nb.nna.veidemann.chrome.client.ChromeDebugProtocolConfig;
+import no.nb.nna.veidemann.chrome.client.ClientClosedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -127,7 +128,7 @@ public abstract class Cdp implements WebSocketCallback {
             } else if ("Target.detachedFromTarget".equals(response.method)) {
                 CdpSession session = sessions.get(response.params.get("sessionId").getAsString());
                 if (session != null) {
-                    session.onClose("");
+                    session.onClose("Detached from target");
                 }
                 sessions.remove(session.sessionId);
             } else {
@@ -196,5 +197,24 @@ public abstract class Cdp implements WebSocketCallback {
 
     public long getNextRequestId() {
         return idSeq.getAndIncrement();
+    }
+
+    @Override
+    public void onClose(String reason) {
+        Exception ex = new ClientClosedException(reason);
+        for (CompletableFuture<JsonObject> m : methodFutures.values()) {
+            m.obtrudeException(ex);
+        }
+        for (List<CompletableFuture<JsonObject>> e : eventFutures.values()) {
+            for (CompletableFuture<JsonObject> f : e) {
+                f.obtrudeException(ex);
+            }
+        }
+        for (CdpSession s : sessions.values()) {
+            s.onClose(reason);
+        }
+        methodFutures.clear();
+        eventListeners.clear();
+        eventFutures.clear();
     }
 }

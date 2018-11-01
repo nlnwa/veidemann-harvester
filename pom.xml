@@ -104,11 +104,11 @@
                 <artifactId>webarchive-commons-util</artifactId>
                 <version>2.0.0-SNAPSHOT</version>
             </dependency>
-            <dependency>
-                <groupId>org.littleshoot</groupId>
-                <artifactId>littleproxy</artifactId>
-                <version>1.1.2</version>
-            </dependency>
+            <!--<dependency>-->
+                <!--<groupId>org.littleshoot</groupId>-->
+                <!--<artifactId>littleproxy</artifactId>-->
+                <!--<version>1.1.2</version>-->
+            <!--</dependency>-->
             <dependency>
                 <groupId>net.lightbody.bmp</groupId>
                 <artifactId>mitm</artifactId>
@@ -118,13 +118,6 @@
                 <groupId>io.netty</groupId>
                 <artifactId>netty-all</artifactId>
                 <version>4.1.30.Final</version>
-            </dependency>
-            <dependency>
-                <groupId>io.netty</groupId>
-                <!--<artifactId>netty-tcnative-boringssl-static</artifactId>-->
-                <artifactId>netty-tcnative</artifactId>
-                <version>2.0.7.Final</version>
-                <classifier>linux-x86_64</classifier>
             </dependency>
             <dependency>
                 <groupId>org.apache.commons</groupId>

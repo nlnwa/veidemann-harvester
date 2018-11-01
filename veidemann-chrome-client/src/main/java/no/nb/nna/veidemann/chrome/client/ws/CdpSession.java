@@ -68,14 +68,9 @@ public class CdpSession extends Cdp {
 
     @Override
     public void onClose(String reason) {
-        Exception ex = new ClientClosedException(reason);
-        for (CompletableFuture<JsonObject> m : methodFutures.values()) {
-            m.obtrudeException(ex);
-        }
-        methodFutures.clear();
-        eventListeners.clear();
+        super.onClose(reason);
         client.removeSessionClient(sessionId);
-        LOG.debug("Session closed. Session id: {}", sessionId);
+        LOG.debug("Session closed. Reason: '{}', Session id: {}", reason, sessionId);
     }
 
     public void detach() throws TimeoutException, ExecutionException {

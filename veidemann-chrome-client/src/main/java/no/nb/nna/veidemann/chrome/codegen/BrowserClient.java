@@ -25,6 +25,7 @@ import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
 import no.nb.nna.veidemann.chrome.client.BrowserClientBase;
+import no.nb.nna.veidemann.chrome.client.ChromeDebugProtocolBase;
 import no.nb.nna.veidemann.chrome.client.ChromeDebugProtocolConfig;
 import no.nb.nna.veidemann.chrome.client.ClientClosedException;
 import no.nb.nna.veidemann.chrome.client.ws.CdpSession;
@@ -101,9 +102,15 @@ public class BrowserClient {
     }
 
     void genInitMethod() {
+        final FieldSpec chromeDebugProtocol = FieldSpec.builder(
+                ParameterizedTypeName.get(ClassName.get(ChromeDebugProtocolBase.class),
+                        ClassName.get(BrowserClientBase.class)),
+                "chromeDebugProtocol", Modifier.FINAL).build();
+
         MethodSpec.Builder init = MethodSpec.methodBuilder("init")
+                .addParameter(chromeDebugProtocol.type, chromeDebugProtocol.name, Modifier.FINAL)
                 .addParameter(config.type, config.name, Modifier.FINAL)
-                .addStatement("super.init($N)", config)
+                .addStatement("super.init($N, $N)", chromeDebugProtocol, config)
                 .addStatement("$N.setClientClosedListener(this)", protocolClient);
 
         for (Domain domain : domains) {

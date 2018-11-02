@@ -25,6 +25,8 @@ import static no.nb.nna.veidemann.chrome.client.ChromeDebugProtocolBase.CLIENT_E
 public abstract class BrowserClientBase<T extends BrowserPage> implements Closeable {
     private static final Logger LOG = LoggerFactory.getLogger(BrowserClientBase.class);
 
+    ChromeDebugProtocolBase<BrowserClientBase> chromeDebugProtocol;
+
     CdpConnection protocolClient;
 
     Map<String, BrowserContext> contexts = new ConcurrentHashMap<>();
@@ -50,7 +52,8 @@ public abstract class BrowserClientBase<T extends BrowserPage> implements Closea
         return result;
     }
 
-    void init(ChromeDebugProtocolConfig config) {
+    void init(ChromeDebugProtocolBase<BrowserClientBase> chromeDebugProtocol, ChromeDebugProtocolConfig config) {
+        this.chromeDebugProtocol = chromeDebugProtocol;
         this.protocolClient = new CdpConnection(config);
         checkVersion();
         try {
@@ -222,6 +225,7 @@ public abstract class BrowserClientBase<T extends BrowserPage> implements Closea
     @Override
     public void close() {
         protocolClient.dispose();
+        chromeDebugProtocol.clients.remove(this);
     }
 
     public interface BrowserPage extends AutoCloseable {
@@ -269,7 +273,11 @@ public abstract class BrowserClientBase<T extends BrowserPage> implements Closea
         @Override
         public void close() throws Exception {
             if (isIncognito()) {
-                new DisposeBrowserContextCmd(protocolClient, id).run();
+                try {
+                    new DisposeBrowserContextCmd(protocolClient, id).run();
+                } catch (Exception ex) {
+                    LOG.warn("Failed closing Chrome context", ex);
+                }
                 contexts.remove(id);
             } else {
                 throw new IllegalStateException("Non-incognito profiles cannot be closed!");

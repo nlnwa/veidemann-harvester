@@ -461,6 +461,7 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
     @Override
     public void close() {
         closed = true;
+        session.close();
         if (browser != null) {
             browser.close();
         }

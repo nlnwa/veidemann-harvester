@@ -14,5 +14,7 @@ mkdir -p /workdir/certificates
 cp /ca-certificates/cache-selfsignedCA.crt /workdir/certificates/cache-selfsignedCA.crt
 chmod -R 777 /workdir/certificates
 
+mkdir -p /workdir/heapdump
+chmod -R 777 /workdir/heapdump
 
 su-exec operator /veidemann/bin/veidemann-harvester

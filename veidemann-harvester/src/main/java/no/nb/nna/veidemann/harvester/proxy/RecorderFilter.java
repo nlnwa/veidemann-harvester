@@ -104,6 +104,8 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
 
     private boolean foundInCache = false;
 
+    private boolean finalResponseSent = false;
+
     public RecorderFilter(final int proxyId, final String uri, final HttpRequest originalRequest,
                           final ChannelHandlerContext ctx, final ContentWriterClient contentWriterClient,
                           final BrowserSessionRegistry sessionRegistry, final HostResolver hostResolver) {
@@ -147,11 +149,13 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
 
                 if (executionId == null || executionId.isEmpty()) {
                     LOG.error("Missing executionId for {}", uri);
+                    finalResponseSent = true;
                     return ProxyUtils.createFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_GATEWAY);
                 }
 
                 if (jobExecutionId == null || jobExecutionId.isEmpty()) {
                     LOG.error("Missing jobExecutionId for {}", uri);
+                    finalResponseSent = true;
                     return ProxyUtils.createFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_GATEWAY);
                 }
 
@@ -168,6 +172,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                             .setError(ExtraStatusCodes.ILLEGAL_URI.toFetchError(e.getMessage()));
                     writeCrawlLog(crawlLog);
                     LOG.debug("URI parsing failed");
+                    finalResponseSent = true;
                     return ProxyUtils.createFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.SERVICE_UNAVAILABLE);
                 }
 
@@ -178,6 +183,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                             .setError(ExtraStatusCodes.DOMAIN_LOOKUP_FAILED.toFetchError());
                     writeCrawlLog(crawlLog);
                     LOG.debug("DNS lookup failed");
+                    finalResponseSent = true;
                     return ProxyUtils.createFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.SERVICE_UNAVAILABLE);
                 }
 
@@ -205,6 +211,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                     .setError(ExtraStatusCodes.RUNTIME_EXCEPTION.toFetchError(t.toString()));
             writeCrawlLog(crawlLog);
             LOG.error("Error handling request", t);
+            finalResponseSent = true;
             return ProxyUtils.createFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.SERVICE_UNAVAILABLE);
         }
         return null;
@@ -212,13 +219,17 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
 
     @Override
     public HttpObject proxyToClientResponse(HttpObject httpObject) {
-//    public HttpObject serverToProxyResponse(HttpObject httpObject) {
         MDC.put("eid", executionId);
         MDC.put("uri", uri);
+        if (finalResponseSent) {
+            LOG.info("Already sent final response");
+            return null;
+        }
 
         if (browserSession != null && browserSession.isClosed()) {
             LOG.warn("Browser session was closed, aborting request");
             cancelContentWriterSession("Session was aborted");
+            finalResponseSent = true;
             return ProxyUtils.createFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_GATEWAY);
         }
 
@@ -256,6 +267,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                             crawlLog.setError(ExtraStatusCodes.RUNTIME_EXCEPTION.toFetchError(ex.getMessage()));
                             writeCrawlLog(crawlLog);
                         }
+                        finalResponseSent = true;
                         return ProxyUtils.createFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_GATEWAY);
                     }
                 }
@@ -280,6 +292,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                                 crawlLog.setError(ExtraStatusCodes.RUNTIME_EXCEPTION.toFetchError(ex.getMessage()));
                                 writeCrawlLog(crawlLog);
                             }
+                            finalResponseSent = true;
                             return ProxyUtils.createFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_GATEWAY);
                         }
                     }
@@ -334,6 +347,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
                             cancelContentWriterSession("Got error while writing response metadata");
                             crawlLog.setError(ExtraStatusCodes.RUNTIME_EXCEPTION.toFetchError(ex.toString()));
                             writeCrawlLog(crawlLog);
+                            finalResponseSent = true;
                             return ProxyUtils.createFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_GATEWAY);
                         }
 
@@ -352,6 +366,7 @@ public class RecorderFilter extends HttpFiltersAdapter implements VeidemannHeade
             if (crawlLog != null) {
                 crawlLog.setError(ExtraStatusCodes.RUNTIME_EXCEPTION.toFetchError(ex.getMessage()));
                 writeCrawlLog(crawlLog);
+                finalResponseSent = true;
                 return ProxyUtils.createFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_GATEWAY);
             }
         }

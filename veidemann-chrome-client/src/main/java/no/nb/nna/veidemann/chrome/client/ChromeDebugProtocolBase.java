@@ -10,7 +10,7 @@ public class ChromeDebugProtocolBase<T extends BrowserClientBase> implements Aut
     List<T> clients = new ArrayList<>();
 
     T connect(ChromeDebugProtocolConfig config, T browser) {
-        browser.init(config);
+        browser.init(this, config);
         clients.add(browser);
         return browser;
     }
@@ -23,6 +23,10 @@ public class ChromeDebugProtocolBase<T extends BrowserClientBase> implements Aut
             } catch (Exception e) {
             }
         }
+    }
+
+    public int getClientCount() {
+        return clients.size();
     }
 
     private void ensureInitialPage(BrowserClientBase browser) {

@@ -20,7 +20,18 @@ import com.google.protobuf.Message;
 import com.rethinkdb.gen.ast.ReqlExpr;
 import com.rethinkdb.gen.ast.ReqlFunction1;
 import com.rethinkdb.net.Cursor;
+import no.nb.nna.veidemann.api.ConfigProto.BrowserConfig;
+import no.nb.nna.veidemann.api.ConfigProto.BrowserScript;
+import no.nb.nna.veidemann.api.ConfigProto.CrawlConfig;
+import no.nb.nna.veidemann.api.ConfigProto.CrawlEntity;
+import no.nb.nna.veidemann.api.ConfigProto.CrawlHostGroupConfig;
+import no.nb.nna.veidemann.api.ConfigProto.CrawlJob;
+import no.nb.nna.veidemann.api.ConfigProto.CrawlScheduleConfig;
+import no.nb.nna.veidemann.api.ConfigProto.PolitenessConfig;
+import no.nb.nna.veidemann.api.ConfigProto.RoleMapping;
+import no.nb.nna.veidemann.api.ConfigProto.Seed;
 import no.nb.nna.veidemann.api.ReportProto.Filter;
+import no.nb.nna.veidemann.api.config.v1.Kind;
 import no.nb.nna.veidemann.commons.db.DbException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,15 +64,30 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
 
     final Tables table;
 
+    final Kind kind;
+
     private final String orderByIndex;
 
     private final boolean descending;
 
+    public ConfigListQueryBuilder(T request, Kind kind, String orderByIndex, boolean descending) {
+        this.request = Objects.requireNonNull(request, "The request cannot be null");
+        this.table = RethinkDbConfigAdapter.getTableForKind(kind);
+        this.kind = kind;
+        this.orderByIndex = orderByIndex == null ? "" : orderByIndex;
+        this.descending = descending;
+    }
+
     public ConfigListQueryBuilder(T request, Tables table, String orderByIndex, boolean descending) {
         this.request = Objects.requireNonNull(request, "The request cannot be null");
         this.table = Objects.requireNonNull(table);
+        this.kind = Kind.undefined;
         this.orderByIndex = orderByIndex == null ? "" : orderByIndex;
         this.descending = descending;
+    }
+
+    public ConfigListQueryBuilder(T request, Kind kind) {
+        this(request, kind, "name", false);
     }
 
     public ConfigListQueryBuilder(T request, Tables table) {
@@ -75,7 +101,7 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
      */
     void buildIdQuery(List<String> id) {
         this.id = id.stream().filter(i -> !i.isEmpty()).collect(Collectors.toList());
-        listQry = r.table(table.name).getAll(this.id.toArray());
+        listQry = addKindFilter(r.table(table.name).getAll(this.id.toArray()));
     }
 
     /**
@@ -87,7 +113,7 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
         if (id != null && !id.isEmpty()) {
             this.id = Collections.singletonList(id);
         }
-        listQry = r.table(table.name).getAll(this.id.toArray());
+        listQry = addKindFilter(r.table(table.name).getAll(this.id.toArray()));
     }
 
     /**
@@ -175,6 +201,7 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
     }
 
     public ReqlExpr addQuery(ReqlExpr qry) {
+        qry = addKindFilter(qry);
         if (listQry == null) {
             listQry = qry;
         } else {
@@ -187,15 +214,15 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
      * Build a query returning all values.
      */
     void buildAllQuery() {
-        listQry = r.table(table.name);
+        listQry = addKindFilter(r.table(table.name));
     }
 
     void addFilter(ReqlFunction1... filter) {
         if (listQry == null) {
             if (orderByIndex.isEmpty()) {
-                listQry = r.table(table.name);
+                listQry = addKindFilter(r.table(table.name));
             } else {
-                listQry = r.table(table.name).orderBy().optArg("index", orderByIndex);
+                listQry = addKindFilter(r.table(table.name).orderBy().optArg("index", orderByIndex));
             }
         }
 
@@ -254,9 +281,9 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
     public long executeCount(RethinkDbConnection conn) throws DbException {
         if (listQry == null) {
             if (orderByIndex.isEmpty()) {
-                listQry = r.table(table.name);
+                listQry = addKindFilter(r.table(table.name));
             } else {
-                listQry = r.table(table.name).orderBy().optArg("index", orderByIndex);
+                listQry = addKindFilter(r.table(table.name).orderBy().optArg("index", orderByIndex));
             }
         }
 
@@ -266,11 +293,11 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
     public <R extends Message.Builder> R executeList(RethinkDbConnection conn, R resultBuilder) throws DbException {
         if (listQry == null) {
             if (orderByIndex.isEmpty()) {
-                listQry = r.table(table.name);
+                listQry = addKindFilter(r.table(table.name));
             } else if (descending) {
-                listQry = r.table(table.name).orderBy().optArg("index", r.desc(orderByIndex));
+                listQry = addKindFilter(r.table(table.name).orderBy().optArg("index", r.desc(orderByIndex)));
             } else {
-                listQry = r.table(table.name).orderBy().optArg("index", orderByIndex);
+                listQry = addKindFilter(r.table(table.name).orderBy().optArg("index", orderByIndex));
             }
         }
 
@@ -293,8 +320,7 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
 
             Cursor<Map<String, Object>> cursor = (Cursor) res;
             for (Map<String, Object> entity : cursor) {
-                resultBuilder.addRepeatedField(valueField,
-                        ProtoUtils.rethinkToProto(entity, table.schema.newBuilderForType()));
+                resultBuilder.addRepeatedField(valueField, convertObject(entity));
                 if (pageSize == 0) {
                     // No paging, so separate query for count is not necessary.
                     count++;
@@ -302,8 +328,7 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
             }
         } else if (res != null) {
             count = 1L;
-            resultBuilder.addRepeatedField(valueField,
-                    ProtoUtils.rethinkToProto((Map<String, Object>) res, table.schema.newBuilderForType()));
+            resultBuilder.addRepeatedField(valueField, convertObject((Map) res));
         }
 
         resultBuilder
@@ -312,5 +337,57 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
                 .setField(countField, count);
 
         return (R) resultBuilder;
+    }
+
+    private Message convertObject(Map<String, Object> entity) {
+        Message.Builder b;
+        if (kind != Kind.undefined) {
+            entity.putAll((Map) entity.remove(kind.name()));
+            entity.remove("apiVersion");
+            entity.remove("kind");
+        }
+        switch (kind) {
+            case crawlConfig:
+                b = CrawlConfig.newBuilder();
+                break;
+            case browserConfig:
+                b = BrowserConfig.newBuilder();
+                break;
+            case browserScript:
+                b = BrowserScript.newBuilder();
+                break;
+            case crawlEntity:
+                b = CrawlEntity.newBuilder();
+                break;
+            case crawlHostGroupConfig:
+                b = CrawlHostGroupConfig.newBuilder();
+                break;
+            case crawlJob:
+                b = CrawlJob.newBuilder();
+                break;
+            case crawlScheduleConfig:
+                b = CrawlScheduleConfig.newBuilder();
+                break;
+            case politenessConfig:
+                b = PolitenessConfig.newBuilder();
+                break;
+            case seed:
+                b = Seed.newBuilder();
+                break;
+            case roleMapping:
+                b = RoleMapping.newBuilder();
+                break;
+            default:
+                b = table.schema.newBuilderForType();
+        }
+        return ProtoUtils.rethinkToProto(entity, b);
+    }
+
+    private ReqlExpr addKindFilter(ReqlExpr q) {
+        if (kind == Kind.undefined) {
+            return q;
+        } else {
+            return q.filter(r.hashMap("kind", kind.name()));
+        }
     }
 }

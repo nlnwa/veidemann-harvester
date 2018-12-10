@@ -15,9 +15,10 @@
  */
 package no.nb.nna.veidemann.commons.auth;
 
-import no.nb.nna.veidemann.api.ConfigProto.Role;
-import no.nb.nna.veidemann.api.ConfigProto.RoleMapping;
-import no.nb.nna.veidemann.api.ControllerProto.RoleMappingsListRequest;
+import no.nb.nna.veidemann.api.config.v1.Kind;
+import no.nb.nna.veidemann.api.config.v1.ListRequest;
+import no.nb.nna.veidemann.api.config.v1.Role;
+import no.nb.nna.veidemann.api.config.v1.RoleMapping;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbService;
 import org.slf4j.Logger;
@@ -76,8 +77,9 @@ public class UserRoleMapper {
         Map<String, Set<Role>> rolesByGroupTmp = new HashMap<>();
 
         try {
-            DbService.getInstance().getConfigAdapter().listRoleMappings(RoleMappingsListRequest.getDefaultInstance())
-                    .getValueList().forEach(rm -> addRoleMapping(rm, rolesByEmailTmp, rolesByGroupTmp));
+            DbService.getInstance().getConfigAdapter()
+                    .listConfigObjects(ListRequest.newBuilder().setKind(Kind.roleMapping).build())
+                    .stream().forEach(rm -> addRoleMapping(rm.getRoleMapping(), rolesByEmailTmp, rolesByGroupTmp));
         } catch (DbException e) {
             LOG.warn("Could not get role mappings from DB", e);
         }

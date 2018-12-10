@@ -15,7 +15,7 @@
  */
 package no.nb.nna.veidemann.db.initializer;
 
-import com.rethinkdb.RethinkDB;
+import com.rethinkdb.net.Cursor;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.commons.settings.CommonSettings;
@@ -25,6 +25,9 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.util.Map;
+
+import static com.rethinkdb.RethinkDB.r;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class DbInitializerTestIT {
@@ -63,9 +66,67 @@ public class DbInitializerTestIT {
 
     @Test
     public void initialize() throws DbException {
-        new CreateDbV0_1(db, "veidemann").run();
-        DbService.getInstance().getDbInitializer().initialize();
-        String version = db.executeRequest("", RethinkDB.r.table(Tables.SYSTEM.name).get("db_version").g("db_version"));
-        assertThat(version).isEqualTo("0.4");
+        try {
+            new CreateDbV0_1(db, "veidemann").run();
+            DbService.getInstance().getDbInitializer().initialize();
+
+            String version = db.executeRequest("", r.table(Tables.SYSTEM.name).get("db_version").g("db_version"));
+            assertThat(version).isEqualTo("1.0");
+
+            long configObjectCount = db.executeRequest("", r.table(Tables.CONFIG.name).count());
+            assertThat(configObjectCount).isGreaterThan(0);
+
+            Map o = db.executeRequest("", r.table(Tables.CONFIG.name)
+                    .group("kind")
+                    .count()
+                    .ungroup()
+                    .map(doc -> r.array(doc.g("group").coerceTo("string"), doc.g("reduction")))
+                    .coerceTo("object")
+            );
+            assertThat(o.get("politenessConfig")).isEqualTo(1L);
+            assertThat(o.get("browserScript")).isEqualTo(1L);
+            assertThat(o.get("crawlJob")).isEqualTo(4L);
+            assertThat(o.get("browserConfig")).isEqualTo(1L);
+            assertThat(o.get("crawlConfig")).isEqualTo(1L);
+            assertThat(o.get("crawlScheduleConfig")).isEqualTo(3L);
+
+            try (Cursor<Map> configObjects = db.executeRequest("", r.table(Tables.CONFIG.name))) {
+                assertThat(configObjects.iterator())
+                        .hasSize(12)
+                        .allSatisfy(r -> {
+                            assertThat(r.get("apiVersion")).isEqualTo("v1");
+                            assertThat(r).containsKey("kind");
+                            assertThat(r).containsKey(r.get("kind"));
+                            assertThat(r).containsKey("meta");
+                            assertThat((Map) r.get("meta")).containsKey("name");
+                        });
+            }
+
+            try (Cursor<Map> configObjects = db.executeRequest("", r.table(Tables.SEEDS.name))) {
+                assertThat(configObjects.iterator())
+                        .hasSize(4)
+                        .allSatisfy(r -> {
+                            assertThat(r.get("apiVersion")).isEqualTo("v1");
+                            assertThat(r.get("kind")).isEqualTo("seed");
+                            assertThat(r).containsKey("seed");
+                            assertThat(r).containsKey("meta");
+                            assertThat((Map) r.get("meta")).containsKey("name");
+                        });
+            }
+
+            try (Cursor<Map> configObjects = db.executeRequest("", r.table(Tables.CRAWL_ENTITIES.name))) {
+                assertThat(configObjects.iterator())
+                        .hasSize(4)
+                        .allSatisfy(r -> {
+                            assertThat(r.get("apiVersion")).isEqualTo("v1");
+                            assertThat(r.get("kind")).isEqualTo("crawlEntity");
+                            assertThat(r).containsKey("crawlEntity");
+                            assertThat(r).containsKey("meta");
+                            assertThat((Map) r.get("meta")).containsKey("name");
+                        });
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }

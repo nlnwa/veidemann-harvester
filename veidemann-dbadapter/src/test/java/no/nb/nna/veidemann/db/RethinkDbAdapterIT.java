@@ -17,7 +17,9 @@ package no.nb.nna.veidemann.db;
 
 import com.google.protobuf.Empty;
 import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.Message;
 import com.rethinkdb.RethinkDB;
+import io.grpc.Context;
 import no.nb.nna.veidemann.api.ConfigProto;
 import no.nb.nna.veidemann.api.ConfigProto.BrowserConfig;
 import no.nb.nna.veidemann.api.ConfigProto.BrowserScript;
@@ -47,10 +49,14 @@ import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
 import no.nb.nna.veidemann.api.MessagesProto.CrawledContent;
 import no.nb.nna.veidemann.api.MessagesProto.ExtractedText;
 import no.nb.nna.veidemann.api.MessagesProto.Screenshot;
+import no.nb.nna.veidemann.commons.auth.EmailContextKey;
+import no.nb.nna.veidemann.commons.auth.RolesContextKey;
 import no.nb.nna.veidemann.commons.db.DbException;
+import no.nb.nna.veidemann.commons.db.DbQueryException;
 import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.commons.settings.CommonSettings;
 import no.nb.nna.veidemann.commons.util.ApiTools;
+import no.nb.nna.veidemann.db.initializer.RethinkDbInitializer;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -75,6 +81,7 @@ public class RethinkDbAdapterIT {
 
     public static RethinkDbConfigAdapter configAdapter;
     public static RethinkDbAdapter dbAdapter;
+    public static RethinkDbConnection conn;
 
     static RethinkDB r = RethinkDB.r;
 
@@ -107,6 +114,7 @@ public class RethinkDbAdapterIT {
 
         dbAdapter = (RethinkDbAdapter) DbService.getInstance().getDbAdapter();
         configAdapter = (RethinkDbConfigAdapter) DbService.getInstance().getConfigAdapter();
+        conn = ((RethinkDbInitializer) DbService.getInstance().getDbInitializer()).getDbConnection();
     }
 
     @AfterClass
@@ -118,7 +126,11 @@ public class RethinkDbAdapterIT {
     public void cleanDb() throws DbException {
         for (Tables table : Tables.values()) {
             if (table != Tables.SYSTEM) {
-                dbAdapter.executeRequest("delete", r.table(table.name).delete());
+                try {
+                    dbAdapter.executeRequest("delete", r.table(table.name).delete());
+                } catch (Exception e) {
+                    System.out.println(e.getMessage());
+                }
             }
         }
     }
@@ -127,7 +139,7 @@ public class RethinkDbAdapterIT {
      * Test of saveCrawlEntity method, of class RethinkDbAdapter.
      */
     @Test
-    public void testSaveCrawlEntity() throws InvalidProtocolBufferException, DbException {
+    public void testSaveCrawlEntity() throws Exception {
         CrawlEntity entity = CrawlEntity.newBuilder()
                 .setMeta(Meta.newBuilder()
                         .setName("Nasjonalbiblioteket")
@@ -183,21 +195,20 @@ public class RethinkDbAdapterIT {
         assertThat(overrideResult.getMeta().getLabelList()).isEmpty();
 
         // override
-        override = CrawlEntity.newBuilder()
+        CrawlEntity override2 = CrawlEntity.newBuilder()
                 .setId(result.getId())
                 .setMeta(Meta.newBuilder()
                         .setName("Foo")
                         .setCreated(ProtoUtils.getNowTs())
                         .setCreatedBy("Bar")
-                        .setLastModified(ProtoUtils.odtToTs(OffsetDateTime.parse("2017-04-06T06:20:35.779Z")))
-                        .setLastModifiedBy("person")
                         .addLabel(Label.newBuilder()
                                 .setKey("orgType")
                                 .setValue("Media")))
                 .build();
 
         start = OffsetDateTime.now();
-        overrideResult = configAdapter.saveCrawlEntity(override);
+        overrideResult = Context.current().withValues(EmailContextKey.getKey(), "person", RolesContextKey.getKey(), null)
+                .call(() -> configAdapter.saveCrawlEntity(override2));
 
         assertThat(overrideResult.getId()).isEqualTo(result.getId());
         assertThat(overrideResult.getMeta().getName()).isEqualTo("Foo");
@@ -728,7 +739,6 @@ public class RethinkDbAdapterIT {
         assertThatThrownBy(() -> configAdapter.saveCrawlJob(badCrawlJob))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("A crawl config is required for crawl jobs");
-
     }
 
     /**
@@ -760,8 +770,8 @@ public class RethinkDbAdapterIT {
         seed = configAdapter.saveSeed(seed);
 
         assertThatThrownBy(() -> configAdapter.deleteCrawlJob(toBeDeleted))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Can't delete CrawlJob, there are 1 Seed(s) referring it");
+                .isInstanceOf(DbQueryException.class)
+                .hasMessageContaining("Can't delete crawlJob, there are 1 seed(s) referring it");
 
         configAdapter.deleteSeed(seed);
         configAdapter.deleteCrawlJob(toBeDeleted);
@@ -879,8 +889,8 @@ public class RethinkDbAdapterIT {
         assertThat(configAdapter.listCrawlScheduleConfigs(ListRequest.getDefaultInstance()).getCount()).isEqualTo(1);
 
         assertThatThrownBy(() -> configAdapter.deleteCrawlScheduleConfig(toBeDeleted))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Can't delete CrawlScheduleConfig, there are 1 CrawlJob(s) referring it");
+                .isInstanceOf(DbQueryException.class)
+                .hasMessageContaining("Can't delete crawlScheduleConfig, there are 1 crawlJob(s) referring it");
 
         configAdapter.deleteCrawlJob(crawlJob);
         configAdapter.deleteCrawlScheduleConfig(toBeDeleted);
@@ -919,7 +929,7 @@ public class RethinkDbAdapterIT {
         assertThat(dbAdapter.isPaused()).isFalse();
 
         CrawlHostGroup chg = CrawlHostGroup.newBuilder().setId("chg").setBusy(true).build();
-        configAdapter.saveMessage(chg, Tables.CRAWL_HOST_GROUP);
+        saveMessage(chg, Tables.CRAWL_HOST_GROUP);
 
         assertThat(dbAdapter.getDesiredPausedState()).isFalse();
         assertThat(dbAdapter.isPaused()).isFalse();
@@ -928,9 +938,21 @@ public class RethinkDbAdapterIT {
         assertThat(dbAdapter.isPaused()).isFalse();
 
         chg = chg.toBuilder().setBusy(false).build();
-        configAdapter.saveMessage(chg, Tables.CRAWL_HOST_GROUP);
+        saveMessage(chg, Tables.CRAWL_HOST_GROUP);
 
         assertThat(dbAdapter.getDesiredPausedState()).isTrue();
         assertThat(dbAdapter.isPaused()).isTrue();
+    }
+
+    public <T extends Message> T saveMessage(T msg, Tables table) throws DbException {
+        Map rMap = ProtoUtils.protoToRethink(msg);
+
+        return conn.executeInsert("db-save" + msg.getClass().getSimpleName(),
+                r.table(table.name)
+                        .insert(rMap)
+                        .optArg("conflict", "replace"),
+                (Class<T>) msg.getClass()
+        );
+
     }
 }

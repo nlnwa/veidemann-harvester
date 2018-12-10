@@ -1,17 +1,26 @@
+apiVersion: "v1"
+kind: "crawlScheduleConfig"
 id: "5604f0cc-315d-4091-8d6e-1b17a7eb990b"
 meta:
-    name: "Every hour"
-    description: "A schedule which triggers once an hour"
-cronExpression: "0 * * * *"
+  name: "Every hour"
+  description: "A schedule which triggers once an hour"
+crawlScheduleConfig:
+  cronExpression: "0 * * * *"
 ---
+apiVersion: "v1"
+kind: "crawlScheduleConfig"
 id: "1960663c-4bfa-4002-bc1b-24338bb66aa4"
 meta:
-    name: "Every day"
-    description: "A schedule which triggers every day"
-cronExpression: "0 6 * * *"
+  name: "Every day"
+  description: "A schedule which triggers every day"
+crawlScheduleConfig:
+  cronExpression: "0 6 * * *"
 ---
+apiVersion: "v1"
+kind: "crawlScheduleConfig"
 id: "846cbc1e-540b-460b-bc75-2d2a2d4193c5"
 meta:
-    name: "Work hours"
-    description: "A schedule which triggers every hour between 7 and 15 UTC, Monday through Friday"
-cronExpression: "0 7-15 * * 1-5"
+  name: "Work hours"
+  description: "A schedule which triggers every hour between 7 and 15 UTC, Monday through Friday"
+crawlScheduleConfig:
+  cronExpression: "0 7-15 * * 1-5"

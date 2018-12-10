@@ -18,6 +18,7 @@ package no.nb.nna.veidemann.db;
 
 import no.nb.nna.veidemann.api.ControllerProto.SeedListReply;
 import no.nb.nna.veidemann.api.ControllerProto.SeedListRequest;
+import no.nb.nna.veidemann.api.config.v1.Kind;
 import no.nb.nna.veidemann.commons.db.DbException;
 
 import static no.nb.nna.veidemann.db.RethinkDbAdapter.r;
@@ -28,7 +29,7 @@ import static no.nb.nna.veidemann.db.RethinkDbAdapter.r;
 public class SeedListRequestQueryBuilder extends ConfigListQueryBuilder<SeedListRequest> {
 
     public SeedListRequestQueryBuilder(SeedListRequest request) {
-        super(request, Tables.SEEDS);
+        super(request, Kind.seed);
         setPaging(request.getPageSize(), request.getPage());
 
         if (request.getIdCount() > 0) {

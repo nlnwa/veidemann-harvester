@@ -21,8 +21,8 @@ import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbInitializer;
 import no.nb.nna.veidemann.commons.db.DbQueryException;
 import no.nb.nna.veidemann.commons.db.DbUpgradeException;
-import no.nb.nna.veidemann.db.Tables;
 import no.nb.nna.veidemann.db.RethinkDbConnection;
+import no.nb.nna.veidemann.db.Tables;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -89,6 +89,9 @@ public class RethinkDbInitializer implements DbInitializer {
                 break;
             case "0.3":
                 new Upgrade0_3To0_4(dbName, conn).run();
+                break;
+            case "0.4":
+                new Upgrade0_4To1_0(dbName, conn).run();
                 break;
             default:
                 throw new DbUpgradeException("Unknown database version '" + fromVersion + "', unable to upgrade");

@@ -24,13 +24,11 @@ import io.grpc.ServerCall.Listener;
 import io.grpc.ServerCallHandler;
 import io.grpc.ServerInterceptors;
 import io.grpc.ServerServiceDefinition;
-import no.nb.nna.veidemann.api.ConfigProto.Role;
+import no.nb.nna.veidemann.api.config.v1.Role;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashSet;
 
 public class NoopAuAuServerInterceptor implements AuAuServerInterceptor {

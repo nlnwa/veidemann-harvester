@@ -1,15 +1,12 @@
-apiVersion: "v1"
-kind: "browserScript"
 meta:
-  name: "extract-outlinks.js"
-  description: "Script which extracts outlinks from <a href> tags"
-  label:
-  - key: "scope"
-    value: "default"
-  - key: "type"
-    value: "extract_outlinks"
-browserScript:
-  script: |
+    name: "extract-outlinks.js"
+    description: "Script which extracts outlinks from <a href> tags"
+    label:
+    - key: "scope"
+      value: "default"
+    - key: "type"
+      value: "extract_outlinks"
+script: |
     var __brzl_framesDone = new Set();
     var __brzl_compileOutlinks = function(frame) {
         __brzl_framesDone.add(frame);

@@ -514,11 +514,49 @@ public class RethinkDbConfigAdapter implements ConfigAdapter {
             return null;
         }
 
-        response.putAll((Map) response.remove(kind.name()));
-        response.remove("apiVersion");
-        response.remove("kind");
+        response = convertV1ToOldApi(kind, response);
 
         return ProtoUtils.rethinkToProto(response, type);
+    }
+
+    public static Map<String, Object> convertOldToV1Api(Kind kind, Map<String, Object> old) {
+        String[] fieldNames = old.keySet().toArray(new String[0]);
+        MapObject spec = r.hashMap();
+        for (String key : fieldNames) {
+            switch (key) {
+                case "id":
+                case "meta":
+                case "kind":
+                case "apiVersion":
+                    break;
+                case "sleepAfterPageloadMs":
+                    spec.put("maxInactivityTimeMs", old.remove(key));
+                    break;
+                default:
+                    spec.put(key, old.remove(key));
+                    break;
+            }
+        }
+        old.put("apiVersion", "v1");
+        old.put("kind", kind.name());
+        old.put(kind.name(), spec);
+        return old;
+    }
+
+    public static Map<String, Object> convertV1ToOldApi(Kind kind, Map<String, Object> v1) {
+        if (v1.containsKey(kind.name())) {
+            v1.putAll((Map) v1.get(kind.name()));
+        }
+        switch (kind) {
+            case browserConfig:
+                if (v1.containsKey("maxInactivityTimeMs")) {
+                    v1.put("sleepAfterPageloadMs", v1.remove("maxInactivityTimeMs"));
+                }
+                break;
+        }
+        v1.remove("apiVersion");
+        v1.remove("kind");
+        return v1;
     }
 
     public <T extends Message> T saveMessage(T msg, Kind kind) throws DbException {
@@ -529,23 +567,7 @@ public class RethinkDbConfigAdapter implements ConfigAdapter {
         }
         Map<String, Object> rMap = ProtoUtils.protoToRethink(msg);
 
-        String[] fieldNames = rMap.keySet().toArray(new String[0]);
-        MapObject spec = r.hashMap();
-        for (String key : fieldNames) {
-            switch (key) {
-                case "id":
-                case "meta":
-                case "kind":
-                case "apiVersion":
-                    break;
-                default:
-                    spec.put(key, rMap.remove(key));
-                    break;
-            }
-        }
-        rMap.put("apiVersion", "v1");
-        rMap.put("kind", kind.name());
-        rMap.put(kind.name(), spec);
+        rMap = convertOldToV1Api(kind, rMap);
 
         // Check that name is set if this is a new object
         if (!rMap.containsKey("id") && (!rMap.containsKey("meta") || !((Map) rMap.get("meta")).containsKey("name"))) {
@@ -569,11 +591,7 @@ public class RethinkDbConfigAdapter implements ConfigAdapter {
                                 )))
         );
 
-        if (response.containsKey(kind.name())) {
-            response.putAll((Map) response.get(kind.name()));
-        }
-        response.put("apiVersion", "v1");
-        response.put("kind", kind.name());
+        response = convertV1ToOldApi(kind, response);
 
         return ProtoUtils.rethinkToProto(response, (Class<T>) msg.getClass());
     }

@@ -342,9 +342,7 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
     private Message convertObject(Map<String, Object> entity) {
         Message.Builder b;
         if (kind != Kind.undefined) {
-            entity.putAll((Map) entity.remove(kind.name()));
-            entity.remove("apiVersion");
-            entity.remove("kind");
+            entity = RethinkDbConfigAdapter.convertV1ToOldApi(kind, entity);
         }
         switch (kind) {
             case crawlConfig:

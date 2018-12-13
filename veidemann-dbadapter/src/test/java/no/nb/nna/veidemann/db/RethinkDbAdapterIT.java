@@ -49,6 +49,8 @@ import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
 import no.nb.nna.veidemann.api.MessagesProto.CrawledContent;
 import no.nb.nna.veidemann.api.MessagesProto.ExtractedText;
 import no.nb.nna.veidemann.api.MessagesProto.Screenshot;
+import no.nb.nna.veidemann.api.config.v1.ConfigObject;
+import no.nb.nna.veidemann.api.config.v1.Kind;
 import no.nb.nna.veidemann.commons.auth.EmailContextKey;
 import no.nb.nna.veidemann.commons.auth.RolesContextKey;
 import no.nb.nna.veidemann.commons.db.DbException;
@@ -140,6 +142,9 @@ public class RethinkDbAdapterIT {
      */
     @Test
     public void testSaveCrawlEntity() throws Exception {
+        OffsetDateTime start = OffsetDateTime.now();
+        Thread.sleep(1);
+
         CrawlEntity entity = CrawlEntity.newBuilder()
                 .setMeta(Meta.newBuilder()
                         .setName("Nasjonalbiblioteket")
@@ -153,7 +158,6 @@ public class RethinkDbAdapterIT {
                         .setCreatedBy("anonymous"))
                 .build();
 
-        OffsetDateTime start = OffsetDateTime.now();
         CrawlEntity result = configAdapter.saveCrawlEntity(entity);
 
         assertThat(result.getId()).isNotEmpty();
@@ -195,6 +199,8 @@ public class RethinkDbAdapterIT {
         assertThat(overrideResult.getMeta().getLabelList()).isEmpty();
 
         // override
+        start = OffsetDateTime.now();
+        Thread.sleep(1);
         CrawlEntity override2 = CrawlEntity.newBuilder()
                 .setId(result.getId())
                 .setMeta(Meta.newBuilder()
@@ -206,7 +212,6 @@ public class RethinkDbAdapterIT {
                                 .setValue("Media")))
                 .build();
 
-        start = OffsetDateTime.now();
         overrideResult = Context.current().withValues(EmailContextKey.getKey(), "person", RolesContextKey.getKey(), null)
                 .call(() -> configAdapter.saveCrawlEntity(override2));
 
@@ -739,6 +744,42 @@ public class RethinkDbAdapterIT {
         assertThatThrownBy(() -> configAdapter.saveCrawlJob(badCrawlJob))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("A crawl config is required for crawl jobs");
+    }
+
+    @Test
+    public void testSaveAndListBrowserConfig() throws DbException {
+        BrowserConfig browserConfig = configAdapter.saveBrowserConfig(ConfigProto.BrowserConfig.newBuilder()
+                .setMeta(Meta.newBuilder().setName("Test browser config"))
+                .setWindowWidth(100)
+                .setSleepAfterPageloadMs(3000)
+                .build());
+
+        BrowserConfig result = configAdapter.saveBrowserConfig(browserConfig);
+        assertThat(result.getId()).isNotEmpty();
+        assertThat(result.getSleepAfterPageloadMs()).isEqualTo(3000);
+
+        assertThat(configAdapter.listBrowserConfigs(ListRequest.getDefaultInstance()))
+                .satisfies(r -> {
+                    assertThat(r.getCount()).isEqualTo(1);
+                    assertThat(r.getValue(0).getMeta().getName()).isNotEmpty();
+                    assertThat(r.getValue(0).getSleepAfterPageloadMs()).isGreaterThan(0);
+                });
+
+        ConfigObject coResult = configAdapter.getConfigObject(no.nb.nna.veidemann.api.config.v1.GetRequest.newBuilder()
+                .setKind(Kind.browserConfig)
+                .setId(result.getId()).build());
+
+        assertThat(coResult.getBrowserConfig().getMaxInactivityTimeMs()).isEqualTo(3000);
+
+        ConfigObject.Builder co = ConfigObject.newBuilder().setApiVersion("v1").setKind(Kind.browserConfig);
+        co.getMetaBuilder().setName("Test2");
+        co.getBrowserConfigBuilder().setMaxInactivityTimeMs(3500);
+
+        coResult = configAdapter.saveConfigObject(co.build());
+        assertThat(coResult.getBrowserConfig().getMaxInactivityTimeMs()).isEqualTo(3500);
+
+        result = configAdapter.getBrowserConfig(GetRequest.newBuilder().setId(coResult.getId()).build());
+        assertThat(result.getSleepAfterPageloadMs()).isEqualTo(3500);
     }
 
     /**

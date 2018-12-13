@@ -61,6 +61,7 @@ public class Upgrade0_4To1_0 extends UpgradeDbBase {
         convertTable("config_browser_configs", "browserConfig");
         convertTable("config_politeness_configs", "politenessConfig");
         convertTable("config_crawl_host_group_configs", "crawlHostGroupConfig");
+        renameBrowserConfigField();
         convertSeeds();
         convertCrawlEntities();
         convertRoleMappings();
@@ -95,6 +96,14 @@ public class Upgrade0_4To1_0 extends UpgradeDbBase {
                         .pluck("id", "meta", kind)
                         .merge(r.hashMap("apiVersion", "v1").with("kind", kind))
                 )
+        ));
+    }
+
+    private void renameBrowserConfigField() throws DbQueryException, DbConnectionException {
+        String kind = "browserConfig";
+        conn.exec(r.table(Tables.CONFIG.name).filter(r.hashMap("kind", kind)).replace(o -> o
+                .merge(r.hashMap(kind, r.hashMap("maxInactivityTimeMs", o.g(kind).g("sleepAfterPageloadMs"))))
+                .without(r.hashMap(kind, "sleepAfterPageloadMs"))
         ));
     }
 

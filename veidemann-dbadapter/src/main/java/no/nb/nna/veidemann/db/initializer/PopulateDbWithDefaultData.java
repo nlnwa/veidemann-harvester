@@ -109,10 +109,10 @@ public class PopulateDbWithDefaultData implements Runnable {
             }
             try (InputStream in = getClass().getClassLoader()
                     .getResourceAsStream("default_objects/rolemappings.yaml")) {
-                readYamlFile(in, RoleMapping.class)
+                readYamlFile(in, ConfigObject.class)
                         .forEach(o -> {
                             try {
-                                db.saveRoleMapping(o);
+                                db.saveConfigObject(o);
                             } catch (DbException e) {
                                 throw new RuntimeException(e);
                             }

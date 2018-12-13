@@ -9,6 +9,6 @@ browserConfig:
   windowWidth: 1280
   windowHeight: 1024
   pageLoadTimeoutMs: 180000
-  sleepAfterPageloadMs: 2000
+  maxInactivityTimeMs: 2000
   scriptSelector:
   - "scope:default"

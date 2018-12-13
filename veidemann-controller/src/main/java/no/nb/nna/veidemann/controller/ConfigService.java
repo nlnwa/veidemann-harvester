@@ -32,7 +32,6 @@ import no.nb.nna.veidemann.commons.auth.AllowedRoles;
 import no.nb.nna.veidemann.commons.db.ChangeFeed;
 import no.nb.nna.veidemann.commons.db.ConfigAdapter;
 import no.nb.nna.veidemann.commons.db.DbService;
-import no.nb.nna.veidemann.controller.settings.Settings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,10 +43,7 @@ public class ConfigService extends ConfigGrpc.ConfigImplBase {
 
     private final ConfigAdapter db;
 
-    private final Settings settings;
-
-    public ConfigService(Settings settings) {
-        this.settings = settings;
+    public ConfigService() {
         this.db = DbService.getInstance().getConfigAdapter();
     }
 

@@ -75,10 +75,9 @@ public class JobCompletion extends ForkJoinTask<JobExecutionStatus> implements R
 
     @Override
     protected boolean exec() {
-        try {
-            Cursor<Map<String, Object>> cursor = db.executeRequest("list", r.table(Tables.JOB_EXECUTIONS.name)
-                    .get(jobExecutionId)
-                    .changes().optArg("include_initial", true));
+        try (Cursor<Map<String, Object>> cursor = db.executeRequest("list", r.table(Tables.JOB_EXECUTIONS.name)
+                .get(jobExecutionId)
+                .changes().optArg("include_initial", true))) {
 
             StreamSupport.stream(cursor.spliterator(), false)
                     .filter(e -> e.containsKey("new_val"))

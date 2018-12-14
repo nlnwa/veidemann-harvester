@@ -18,6 +18,7 @@ package no.nb.nna.veidemann.controller;
 import com.google.protobuf.Empty;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
+import no.nb.nna.veidemann.api.ConfigProto;
 import no.nb.nna.veidemann.api.ConfigProto.BrowserConfig;
 import no.nb.nna.veidemann.api.ConfigProto.BrowserScript;
 import no.nb.nna.veidemann.api.ConfigProto.CrawlConfig;
@@ -27,7 +28,6 @@ import no.nb.nna.veidemann.api.ConfigProto.CrawlJob;
 import no.nb.nna.veidemann.api.ConfigProto.CrawlScheduleConfig;
 import no.nb.nna.veidemann.api.ConfigProto.LogLevels;
 import no.nb.nna.veidemann.api.ConfigProto.PolitenessConfig;
-import no.nb.nna.veidemann.api.ConfigProto.Role;
 import no.nb.nna.veidemann.api.ConfigProto.RoleMapping;
 import no.nb.nna.veidemann.api.ConfigProto.Seed;
 import no.nb.nna.veidemann.api.ControllerGrpc;
@@ -50,6 +50,7 @@ import no.nb.nna.veidemann.api.ControllerProto.RunCrawlRequest;
 import no.nb.nna.veidemann.api.ControllerProto.SeedListReply;
 import no.nb.nna.veidemann.api.ControllerProto.SeedListRequest;
 import no.nb.nna.veidemann.api.MessagesProto.JobExecutionStatus;
+import no.nb.nna.veidemann.api.config.v1.Role;
 import no.nb.nna.veidemann.commons.auth.AllowedRoles;
 import no.nb.nna.veidemann.commons.auth.RolesContextKey;
 import no.nb.nna.veidemann.commons.db.ConfigAdapter;
@@ -61,6 +62,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Collection;
+import java.util.stream.Collectors;
 
 import static no.nb.nna.veidemann.controller.JobExecutionUtil.crawlSeed;
 import static no.nb.nna.veidemann.controller.JobExecutionUtil.handleGet;
@@ -606,7 +608,10 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     @Override
     public void getRolesForActiveUser(Empty request, StreamObserver<RoleList> responseObserver) {
         try {
-            Collection<Role> roles = RolesContextKey.roles();
+            Collection<ConfigProto.Role> roles = RolesContextKey.roles()
+                    .stream()
+                    .map(r -> ConfigProto.Role.valueOf(r.name()))
+                    .collect(Collectors.toSet());
             if (roles == null) {
                 responseObserver.onNext(RoleList.newBuilder().build());
             } else {

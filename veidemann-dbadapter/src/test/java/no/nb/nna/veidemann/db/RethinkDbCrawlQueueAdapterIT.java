@@ -290,10 +290,11 @@ public class RethinkDbCrawlQueueAdapterIT {
         shouldRun = false;
         System.out.println();
 
-        Cursor<Map<String, Object>> response = dbAdapter.executeRequest("test",
-                r.table(Tables.CRAWL_HOST_GROUP.name));
-        assertThat(finishLatch.getCount()).isZero();
-        assertThat(response.iterator()).isEmpty();
+        try (Cursor<Map<String, Object>> response = dbAdapter.executeRequest("test",
+                r.table(Tables.CRAWL_HOST_GROUP.name));) {
+            assertThat(finishLatch.getCount()).isZero();
+            assertThat(response.iterator()).isEmpty();
+        }
 
         pool.shutdownNow();
         assertThat(pool.awaitTermination(1, TimeUnit.MINUTES)).isTrue();

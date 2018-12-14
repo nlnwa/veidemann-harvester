@@ -15,7 +15,7 @@
  */
 package no.nb.nna.veidemann.commons.auth;
 
-import no.nb.nna.veidemann.api.ConfigProto.Role;
+import no.nb.nna.veidemann.api.config.v1.Role;
 
 import java.util.Arrays;
 import java.util.Collection;

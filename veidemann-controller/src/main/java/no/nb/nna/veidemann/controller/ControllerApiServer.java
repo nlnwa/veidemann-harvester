@@ -62,6 +62,8 @@ public class ControllerApiServer implements AutoCloseable {
 
         server = serverBuilder
                 .addService(tracingInterceptor.intercept(
+                        auAuServerInterceptor.intercept(new ConfigService())))
+                .addService(tracingInterceptor.intercept(
                         auAuServerInterceptor.intercept(new ControllerService(settings))))
                 .addService(tracingInterceptor.intercept(
                         auAuServerInterceptor.intercept(new StatusService())))

@@ -18,6 +18,7 @@ package no.nb.nna.veidemann.db;
 import com.google.common.collect.ImmutableMap;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Descriptors.EnumValueDescriptor;
+import com.google.protobuf.Descriptors.FieldDescriptor;
 import com.google.protobuf.Descriptors.FieldDescriptor.Type;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.MapEntry;
@@ -69,56 +70,53 @@ public class ProtoUtils {
 
         Map rMap = r.hashMap();
         msg.getAllFields().forEach((f, v) -> {
-            if (f.isRepeated()) {
-                List l = r.array();
-                ((List) v).forEach((entry) -> {
-                    if (f.isMapField()) {
-                        Object mapKey = ((MapEntry) entry).getKey();
-                        Object mapValue = ((MapEntry) entry).getValue();
-
-                        if (f.getMessageType().findFieldByName("value").getType()
-                                == Type.MESSAGE) {
-                            mapValue = protoToRethink((MessageOrBuilder) mapValue);
-                        }
-
-                        Map map = r.hashMap(mapKey, mapValue);
-                        l.add(map);
-                    } else if (f.getType() == Type.MESSAGE) {
-                        l.add(protoToRethink((MessageOrBuilder) entry));
-                    } else if (f.getType() == Type.ENUM) {
-                        String enumValue = ((EnumValueDescriptor) entry).getName();
-                        l.add(enumValue);
-                    } else {
-                        l.add(entry);
-                    }
-                });
-                rMap.put(f.getJsonName(), l);
-            } else {
-                switch (f.getType()) {
-                    case MESSAGE:
-                        switch (f.getMessageType().getFullName()) {
-                            case "google.protobuf.Timestamp":
-                                rMap.put(f.getJsonName(), tsToOdt((Timestamp) v));
-                                break;
-                            default:
-                                rMap.put(f.getJsonName(), protoToRethink((MessageOrBuilder) v));
-                                break;
-                        }
-                        break;
-                    case ENUM:
-                        rMap.put(f.getJsonName(), v.toString());
-                        break;
-                    case BYTES:
-                        v = r.binary(((ByteString) v).toByteArray());
-                        rMap.put(f.getJsonName(), v);
-                        break;
-                    default:
-                        rMap.put(f.getJsonName(), v);
-                        break;
-                }
-            }
+            rMap.put(f.getJsonName(), protoFieldToRethink(f, v));
         });
         return rMap;
+    }
+
+    public static Object protoFieldToRethink(FieldDescriptor f, Object value) {
+        if (f.isRepeated()) {
+            List l = r.array();
+            ((List) value).forEach((entry) -> {
+                if (f.isMapField()) {
+                    Object mapKey = ((MapEntry) entry).getKey();
+                    Object mapValue = ((MapEntry) entry).getValue();
+
+                    if (f.getMessageType().findFieldByName("value").getType()
+                            == Type.MESSAGE) {
+                        mapValue = protoToRethink((MessageOrBuilder) mapValue);
+                    }
+
+                    Map map = r.hashMap(mapKey, mapValue);
+                    l.add(map);
+                } else if (f.getType() == Type.MESSAGE) {
+                    l.add(protoToRethink((MessageOrBuilder) entry));
+                } else if (f.getType() == Type.ENUM) {
+                    String enumValue = ((EnumValueDescriptor) entry).getName();
+                    l.add(enumValue);
+                } else {
+                    l.add(entry);
+                }
+            });
+            return l;
+        } else {
+            switch (f.getType()) {
+                case MESSAGE:
+                    switch (f.getMessageType().getFullName()) {
+                        case "google.protobuf.Timestamp":
+                            return tsToOdt((Timestamp) value);
+                        default:
+                            return protoToRethink((MessageOrBuilder) value);
+                    }
+                case ENUM:
+                    return value.toString();
+                case BYTES:
+                    return r.binary(((ByteString) value).toByteArray());
+                default:
+                    return value;
+            }
+        }
     }
 
     /**
@@ -178,7 +176,11 @@ public class ProtoUtils {
                         case MESSAGE:
                             switch (fd.getMessageType().getFullName()) {
                                 case "google.protobuf.Timestamp":
-                                    protoBuilder.setField(fd, odtToTs((OffsetDateTime) value));
+                                    if (value instanceof OffsetDateTime) {
+                                        protoBuilder.setField(fd, odtToTs((OffsetDateTime) value));
+                                    } else {
+                                        protoBuilder.setField(fd, odtToTs(OffsetDateTime.parse((String) value)));
+                                    }
                                     break;
                                 default:
                                     protoBuilder.setField(fd, rethinkToProto((Map) value, protoBuilder

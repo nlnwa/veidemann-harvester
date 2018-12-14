@@ -26,7 +26,7 @@ import io.grpc.ServerCallHandler;
 import io.grpc.ServerInterceptors;
 import io.grpc.ServerServiceDefinition;
 import io.grpc.Status;
-import no.nb.nna.veidemann.api.ConfigProto.Role;
+import no.nb.nna.veidemann.api.config.v1.Role;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -16,13 +16,13 @@
 package no.nb.nna.veidemann.commons.auth;
 
 import io.grpc.Context;
-import no.nb.nna.veidemann.api.ConfigProto.Role;
+import no.nb.nna.veidemann.api.config.v1.Role;
 
 import java.util.Collection;
 
 /**
  * A key for the current users roles.
- *
+ * <p>
  * Can be used to get the current users roles.
  */
 public class RolesContextKey {

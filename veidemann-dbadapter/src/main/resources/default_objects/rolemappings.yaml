@@ -1,4 +1,10 @@
-email: "admin@example.com"
-role:
-- ADMIN
-- CURATOR
+apiVersion: "v1"
+kind: "roleMapping"
+meta:
+  name: "Default"
+  description: "Default role mapping"
+roleMapping:
+  email: "admin@example.com"
+  role:
+  - ADMIN
+  - CURATOR

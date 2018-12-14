@@ -16,14 +16,15 @@
 package no.nb.nna.veidemann.db;
 
 import no.nb.nna.veidemann.api.ControllerProto.ListRequest;
+import no.nb.nna.veidemann.api.config.v1.Kind;
 
 /**
  *
  */
 public class ListRequestQueryBuilder extends ConfigListQueryBuilder<ListRequest> {
 
-    public ListRequestQueryBuilder(ListRequest request, Tables table) {
-        super(request, table);
+    public ListRequestQueryBuilder(ListRequest request, Kind kind) {
+        super(request, kind);
         setPaging(request.getPageSize(), request.getPage());
 
         if (request.getIdCount() > 0) {

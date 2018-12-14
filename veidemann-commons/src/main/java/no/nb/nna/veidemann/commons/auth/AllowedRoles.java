@@ -15,7 +15,8 @@
  */
 package no.nb.nna.veidemann.commons.auth;
 
-import no.nb.nna.veidemann.api.ConfigProto.Role;
+
+import no.nb.nna.veidemann.api.config.v1.Role;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

@@ -85,7 +85,11 @@ public class RethinkDbExecutionsAdapterIT {
     public void cleanDb() throws DbException {
         for (Tables table : Tables.values()) {
             if (table != Tables.SYSTEM) {
-                db.exec("delete", r.table(table.name).delete());
+                try {
+                    db.exec("delete", r.table(table.name).delete());
+                } catch (Exception e) {
+                    System.out.println(e.getMessage());
+                }
             }
         }
     }

@@ -40,6 +40,7 @@ public class CreateDbV0_1 implements Runnable {
     public void run() {
         try {
             createDb();
+            new PopulateDbWithTestData().run();
         } catch (DbException e) {
             throw new RuntimeException(e);
         }
@@ -67,7 +68,7 @@ public class CreateDbV0_1 implements Runnable {
 
         db.executeRequest("", r.tableCreate(Tables.EXTRACTED_TEXT.name).optArg("primary_key", "warcId"));
 
-        db.executeRequest("", r.tableCreate(Tables.BROWSER_SCRIPTS.name));
+        db.executeRequest("", r.tableCreate("config_browser_scripts"));
 
         db.executeRequest("", r.tableCreate(Tables.URI_QUEUE.name));
         db.executeRequest("", r.table(Tables.URI_QUEUE.name).indexCreate("surt"));
@@ -90,17 +91,17 @@ public class CreateDbV0_1 implements Runnable {
         db.executeRequest("", r.table(Tables.SEEDS.name).indexCreate("jobId").optArg("multi", true));
         db.executeRequest("", r.table(Tables.SEEDS.name).indexCreate("entityId"));
 
-        db.executeRequest("", r.tableCreate(Tables.CRAWL_JOBS.name));
+        db.executeRequest("", r.tableCreate("config_crawl_jobs"));
 
-        db.executeRequest("", r.tableCreate(Tables.CRAWL_CONFIGS.name));
+        db.executeRequest("", r.tableCreate("config_crawl_configs"));
 
-        db.executeRequest("", r.tableCreate(Tables.CRAWL_SCHEDULE_CONFIGS.name));
+        db.executeRequest("", r.tableCreate("config_crawl_schedule_configs"));
 
-        db.executeRequest("", r.tableCreate(Tables.BROWSER_CONFIGS.name));
+        db.executeRequest("", r.tableCreate("config_browser_configs"));
 
-        db.executeRequest("", r.tableCreate(Tables.POLITENESS_CONFIGS.name));
+        db.executeRequest("", r.tableCreate("config_politeness_configs"));
 
-        db.executeRequest("", r.tableCreate(Tables.CRAWL_HOST_GROUP_CONFIGS.name));
+        db.executeRequest("", r.tableCreate("config_crawl_host_group_configs"));
 
         db.executeRequest("", r.tableCreate(Tables.CRAWL_HOST_GROUP.name));
         db.executeRequest("", r.table(Tables.CRAWL_HOST_GROUP.name).indexCreate("nextFetchTime"));
@@ -110,18 +111,18 @@ public class CreateDbV0_1 implements Runnable {
                 .optArg("shards", 3)
                 .optArg("replicas", 1));
 
-        db.executeRequest("", r.tableCreate(Tables.ROLE_MAPPINGS.name));
+        db.executeRequest("", r.tableCreate("config_role_mappings"));
 
         createMetaIndexes(
-                Tables.BROWSER_SCRIPTS,
-                Tables.CRAWL_ENTITIES,
-                Tables.SEEDS,
-                Tables.CRAWL_JOBS,
-                Tables.CRAWL_CONFIGS,
-                Tables.CRAWL_SCHEDULE_CONFIGS,
-                Tables.BROWSER_CONFIGS,
-                Tables.POLITENESS_CONFIGS,
-                Tables.CRAWL_HOST_GROUP_CONFIGS
+                "config_browser_scripts",
+                Tables.CRAWL_ENTITIES.name,
+                Tables.SEEDS.name,
+                "config_crawl_jobs",
+                "config_crawl_configs",
+                "config_crawl_schedule_configs",
+                "config_browser_configs",
+                "config_politeness_configs",
+                "config_crawl_host_group_configs"
         );
 
         db.executeRequest("", r.table(Tables.URI_QUEUE.name)
@@ -134,22 +135,22 @@ public class CreateDbV0_1 implements Runnable {
         db.executeRequest("", r.table(Tables.EXECUTIONS.name).indexWait("startTime"));
     }
 
-    private final void createMetaIndexes(Tables... tables) throws DbException {
-        for (Tables table : tables) {
-            db.executeRequest("", r.table(table.name).indexCreate("name", row -> row.g("meta").g("name").downcase()));
-            db.executeRequest("", r.table(table.name)
+    private final void createMetaIndexes(String... tables) throws DbException {
+        for (String table : tables) {
+            db.executeRequest("", r.table(table).indexCreate("name", row -> row.g("meta").g("name").downcase()));
+            db.executeRequest("", r.table(table)
                     .indexCreate("label",
                             row -> row.g("meta").g("label").map(
                                     label -> r.array(label.g("key").downcase(), label.g("value").downcase())))
                     .optArg("multi", true));
-            db.executeRequest("", r.table(table.name)
+            db.executeRequest("", r.table(table)
                     .indexCreate("label_value",
                             row -> row.g("meta").g("label").map(
                                     label -> label.g("value").downcase()))
                     .optArg("multi", true));
         }
-        for (Tables table : tables) {
-            db.executeRequest("", r.table(table.name).indexWait("name", "label", "label_value"));
+        for (String table : tables) {
+            db.executeRequest("", r.table(table).indexWait("name", "label", "label_value"));
         }
     }
 }

@@ -17,6 +17,7 @@ package no.nb.nna.veidemann.db;
 
 import no.nb.nna.veidemann.api.ControllerProto.RoleMappingsListReply;
 import no.nb.nna.veidemann.api.ControllerProto.RoleMappingsListRequest;
+import no.nb.nna.veidemann.api.config.v1.Kind;
 import no.nb.nna.veidemann.commons.db.DbException;
 
 /**
@@ -25,7 +26,7 @@ import no.nb.nna.veidemann.commons.db.DbException;
 public class RoleMappingsListRequestQueryBuilder extends ConfigListQueryBuilder<RoleMappingsListRequest> {
 
     public RoleMappingsListRequestQueryBuilder(RoleMappingsListRequest request) {
-        super(request, Tables.ROLE_MAPPINGS);
+        super(request, Kind.roleMapping);
         setPaging(request.getPageSize(), request.getPage());
 
         if (request.getId().isEmpty()) {

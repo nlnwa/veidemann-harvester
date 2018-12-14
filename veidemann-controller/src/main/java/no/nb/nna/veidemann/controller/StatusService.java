@@ -17,7 +17,6 @@ package no.nb.nna.veidemann.controller;
 
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
-import no.nb.nna.veidemann.api.ConfigProto.Role;
 import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus;
 import no.nb.nna.veidemann.api.MessagesProto.JobExecutionStatus;
 import no.nb.nna.veidemann.api.StatusGrpc;
@@ -28,6 +27,7 @@ import no.nb.nna.veidemann.api.StatusProto.ListExecutionsRequest;
 import no.nb.nna.veidemann.api.StatusProto.ListJobExecutionsRequest;
 import no.nb.nna.veidemann.api.StatusProto.RunningExecutionsListReply;
 import no.nb.nna.veidemann.api.StatusProto.RunningExecutionsRequest;
+import no.nb.nna.veidemann.api.config.v1.Role;
 import no.nb.nna.veidemann.commons.auth.AllowedRoles;
 import no.nb.nna.veidemann.commons.db.ChangeFeed;
 import no.nb.nna.veidemann.commons.db.DbService;

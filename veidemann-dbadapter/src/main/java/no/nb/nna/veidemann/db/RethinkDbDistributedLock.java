@@ -177,33 +177,34 @@ public class RethinkDbDistributedLock implements DistributedLock {
     }
 
     public static List<Key> listExpiredDistributedLocks(RethinkDbConnection conn) throws DbQueryException, DbConnectionException {
-        Cursor<List<String>> listResponse = conn.exec("db-listExpiredLocks",
+        try (Cursor<List<String>> listResponse = conn.exec("db-listExpiredLocks",
                 r.table(Tables.LOCKS.name).optArg("read_mode", "majority")
                         .optArg("durability", "hard")
                         .filter(l -> l.g("expires").ge(r.now()))
                         .pluck("id")
-        );
+        )) {
 
-        List<Key> result = new ArrayList<>();
-
-        for (List<String> l : listResponse) {
-            result.add(new Key(l.get(0), l.get(1)));
+            return cursorToList(listResponse);
         }
-        return result;
     }
 
     public static List<Key> listExpiredDistributedLocks(RethinkDbConnection conn, String domain) throws DbQueryException, DbConnectionException {
-        Cursor<List<String>> listResponse = conn.exec("db-listExpiredLocks",
+        try (Cursor<List<String>> listResponse = conn.exec("db-listExpiredLocks",
                 r.table(Tables.LOCKS.name).optArg("read_mode", "majority")
                         .between(r.array(domain, r.minval()), r.array(domain, r.maxval()))
                         .optArg("durability", "hard")
                         .filter(l -> l.g("expires").ge(r.now()))
                         .pluck("id")
-        );
+        )) {
 
+            return cursorToList(listResponse);
+        }
+    }
+
+    private static List<Key> cursorToList(Cursor<List<String>> listCursor) {
         List<Key> result = new ArrayList<>();
 
-        for (List<String> l : listResponse) {
+        for (List<String> l : listCursor) {
             result.add(new Key(l.get(0), l.get(1)));
         }
         return result;

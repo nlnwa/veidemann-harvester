@@ -318,12 +318,13 @@ public abstract class ConfigListQueryBuilder<T extends Message> {
                 count = executeCount(conn);
             }
 
-            Cursor<Map<String, Object>> cursor = (Cursor) res;
-            for (Map<String, Object> entity : cursor) {
-                resultBuilder.addRepeatedField(valueField, convertObject(entity));
-                if (pageSize == 0) {
-                    // No paging, so separate query for count is not necessary.
-                    count++;
+            try (Cursor<Map<String, Object>> cursor = (Cursor) res) {
+                for (Map<String, Object> entity : cursor) {
+                    resultBuilder.addRepeatedField(valueField, convertObject(entity));
+                    if (pageSize == 0) {
+                        // No paging, so separate query for count is not necessary.
+                        count++;
+                    }
                 }
             }
         } else if (res != null) {

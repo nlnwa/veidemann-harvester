@@ -38,7 +38,12 @@ public abstract class ChangeFeedBase<T> implements ChangeFeed<T> {
 
     @Override
     public Stream<T> stream() {
-        return StreamSupport.stream(cursor.spliterator(), false).map(mapper());
+        return ((Stream) StreamSupport.stream(cursor.spliterator(), false).onClose(new Runnable() {
+            @Override
+            public void run() {
+                cursor.close();
+            }
+        })).map(mapper());
     }
 
     @Override

@@ -29,7 +29,7 @@ public class QueueWorker {
 
     private static final Logger LOG = LoggerFactory.getLogger(QueueWorker.class);
 
-    private static final long RESCHEDULE_DELAY = 2000;
+    private static final long RESCHEDULE_DELAY = 10000;
 
     private final Frontier frontier;
 

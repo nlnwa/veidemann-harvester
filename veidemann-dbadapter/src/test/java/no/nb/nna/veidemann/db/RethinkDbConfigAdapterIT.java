@@ -360,6 +360,7 @@ public class RethinkDbConfigAdapterIT {
         Label fooBarLabel = Label.newBuilder().setKey("foo").setValue("bar").build();
         Label bigBangLabel = Label.newBuilder().setKey("big").setValue("bang").build();
         Label aaaBBBLabel = Label.newBuilder().setKey("aaa").setValue("bbb").build();
+        Label cccDDDLabel = Label.newBuilder().setKey("ccc").setValue("ddd").build();
         assertThat(configAdapter.listConfigObjects(test1.build()).stream())
                 .allMatch(r -> {
                     if (r.getMeta().getLabelList().contains(fooBarLabel)) {
@@ -406,6 +407,38 @@ public class RethinkDbConfigAdapterIT {
                 .stream().toArray(ConfigObject[]::new);
 
         assertThat(before).contains(after);
+
+        // Update whole subobject
+        UpdateRequest.Builder ur3 = UpdateRequest.newBuilder();
+        ur3.getListRequestBuilder()
+                .setKind(crawlScheduleConfig)
+                .setNameRegex("c[s|j]")
+                .getReturnedFieldsMaskBuilder().addPaths("meta.description");
+        ur3.getUpdateTemplateBuilder().getMetaBuilder().addLabelBuilder().setKey("ccc").setValue("ddd");
+        ur3.getUpdateTemplateBuilder().getMetaBuilder().setDescription("desc");
+        ur3.getUpdateTemplateBuilder().getMetaBuilder().setName("cs");
+        ur3.getUpdateTemplateBuilder().getCrawlScheduleConfigBuilder().setCronExpression("newestCron");
+        ur3.getUpdateMaskBuilder()
+                .addPaths("meta")
+                .addPaths("crawlScheduleConfig.validFrom")
+                .addPaths("crawlScheduleConfig");
+
+        // Set user to user3
+        Context.current().withValues(EmailContextKey.getKey(), "user3", RolesContextKey.getKey(), null)
+                .call(() -> assertThat(configAdapter.updateConfigObjects(ur3.build()).getUpdated()).isEqualTo(3));
+
+        try {
+            // Check result
+            assertThat(configAdapter.listConfigObjects(test1.build()).stream())
+                    .allSatisfy(r -> {
+                        assertThat(r.getMeta().getLabelList()).containsOnly(cccDDDLabel);
+                        assertThat(r.getMeta().getName()).isEqualTo("cs");
+                        assertThat(r.getMeta().getDescription()).isEqualTo("desc");
+                        assertThat(r.getCrawlScheduleConfig().getCronExpression()).isEqualTo("newestCron");
+                    });
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     @Test

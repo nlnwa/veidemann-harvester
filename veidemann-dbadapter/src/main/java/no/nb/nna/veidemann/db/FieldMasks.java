@@ -41,7 +41,6 @@ import static com.rethinkdb.RethinkDB.r;
 public class FieldMasks {
     private static Map<String, String> SORTABLES = new HashMap<>();
     protected static FieldMasks CONFIG_OBJECT_DEF = createForConfigObject();
-    private static OneofDescriptor SPEC_DESCRIPTOR = ConfigObject.getDescriptor().getOneofs().get(0);
 
     static {
         SORTABLES.put("meta.name", "name");
@@ -253,13 +252,7 @@ public class FieldMasks {
         }
 
         if (e.descriptor.getType() == Type.MESSAGE) {
-            if (e.descriptor.getContainingOneof() != null && e.descriptor.getContainingOneof() == SPEC_DESCRIPTOR) {
-                if (e.descriptor.getJsonName().equals(kind.name())) {
-                    Map cp = r.hashMap();
-                    p.put(e.name, cp);
-                    e.children.forEach(c -> innerBuildUpdateQuery(row, cp, c, kind, object));
-                }
-            } else if (e.descriptor.isRepeated()) {
+            if (e.descriptor.isRepeated()) {
                 PathElem e2 = paths.get(e.fullName);
                 if (e2 == null) {
                     p.put(e.name, ProtoUtils.protoFieldToRethink(e.descriptor, e.getValue(object)));
@@ -272,9 +265,14 @@ public class FieldMasks {
                     p.put(e.name, buildGetFieldExpression(e2, row).default_(r.array())
                             .setDifference(ProtoUtils.protoFieldToRethink(e.descriptor, e.getValue(object))));
                 }
+            } else if (e.descriptor.getMessageType() == Timestamp.getDescriptor()) {
+                p.put(e.name, ProtoUtils.protoFieldToRethink(e.descriptor, e.getValue(object)));
             } else {
                 Map cp = r.hashMap();
                 p.put(e.name, cp);
+                if (paths.containsKey(e.fullName)) {
+                    e = FieldMasks.getElementForPath(e.fullName);
+                }
                 e.children.forEach(c -> innerBuildUpdateQuery(row, cp, c, kind, object));
             }
         } else {

@@ -22,6 +22,7 @@ import no.nb.nna.veidemann.api.config.v1.ConfigGrpc;
 import no.nb.nna.veidemann.api.config.v1.ConfigObject;
 import no.nb.nna.veidemann.api.config.v1.DeleteResponse;
 import no.nb.nna.veidemann.api.config.v1.GetRequest;
+import no.nb.nna.veidemann.api.config.v1.Kind;
 import no.nb.nna.veidemann.api.config.v1.LabelKeysResponse;
 import no.nb.nna.veidemann.api.config.v1.ListCountResponse;
 import no.nb.nna.veidemann.api.config.v1.ListRequest;
@@ -32,6 +33,7 @@ import no.nb.nna.veidemann.commons.auth.AllowedRoles;
 import no.nb.nna.veidemann.commons.db.ChangeFeed;
 import no.nb.nna.veidemann.commons.db.ConfigAdapter;
 import no.nb.nna.veidemann.commons.db.DbService;
+import no.nb.nna.veidemann.commons.util.CrawlScopes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -82,6 +84,14 @@ public class ConfigService extends ConfigGrpc.ConfigImplBase {
     @AllowedRoles({Role.CURATOR, Role.ADMIN})
     public void saveConfigObject(ConfigObject request, StreamObserver<ConfigObject> responseObserver) {
         try {
+            // If kind is seed and scope is not set, apply default scope
+            if (request.getKind() == Kind.seed && request.getSeed().getScope().getSurtPrefix().isEmpty()) {
+                String scope = CrawlScopes.generateDomainScope(request.getMeta().getName());
+                ConfigObject.Builder b = request.toBuilder();
+                b.getSeedBuilder().setScope(request.getSeed().getScope().toBuilder().setSurtPrefix(scope)).build();
+                request = b.build();
+            }
+
             responseObserver.onNext(db.saveConfigObject(request));
             responseObserver.onCompleted();
         } catch (Exception ex) {

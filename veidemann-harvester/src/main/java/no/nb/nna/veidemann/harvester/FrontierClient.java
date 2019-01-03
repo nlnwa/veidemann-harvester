@@ -48,7 +48,7 @@ public class FrontierClient implements AutoCloseable {
     private static final String METRICS_NS = "veidemann";
     private static final String METRICS_SUBSYSTEM = "harvester";
 
-    private static final Gauge activeBrowserSessions = Gauge.build()
+    static final Gauge activeBrowserSessions = Gauge.build()
             .namespace(METRICS_NS)
             .subsystem(METRICS_SUBSYSTEM)
             .name("active_browser_sessions")
@@ -156,7 +156,6 @@ public class FrontierClient implements AutoCloseable {
             MDC.put("uri", fetchUri.getUri());
             pagesTotal.inc();
 
-            activeBrowserSessions.inc();
             long startTime = System.currentTimeMillis();
 
             try {
@@ -196,7 +195,6 @@ public class FrontierClient implements AutoCloseable {
                 requestObserver.onCompleted();
                 pagesFailedTotal.labels(String.valueOf(ExtraStatusCodes.RUNTIME_EXCEPTION.getCode())).inc();
             } finally {
-                activeBrowserSessions.dec();
                 MDC.clear();
             }
         }

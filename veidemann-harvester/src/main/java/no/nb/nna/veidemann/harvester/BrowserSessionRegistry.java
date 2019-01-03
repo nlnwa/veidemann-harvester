@@ -33,6 +33,7 @@ public class BrowserSessionRegistry {
 
     public synchronized void put(BrowserSession session) {
         proxyIdToSession.put(session.getProxyId(), session);
+        FrontierClient.activeBrowserSessions.set(size());
         LOG.debug("Currently open sessions: {}", proxyIdToSession.size());
     }
 
@@ -45,12 +46,14 @@ public class BrowserSessionRegistry {
     }
 
     public synchronized BrowserSession remove(Integer proxyId) {
-        return proxyIdToSession.remove(proxyId);
+        BrowserSession removed = proxyIdToSession.remove(proxyId);
+        FrontierClient.activeBrowserSessions.set(size());
+        return removed;
     }
 
     public synchronized BrowserSession remove(BrowserSession session) {
         Objects.requireNonNull(session);
-        return proxyIdToSession.remove(session.getProxyId());
+        return remove(session.getProxyId());
     }
 
     public boolean isEmpty() {

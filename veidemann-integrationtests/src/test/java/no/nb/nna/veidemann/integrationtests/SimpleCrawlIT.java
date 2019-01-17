@@ -15,11 +15,9 @@
  */
 package no.nb.nna.veidemann.integrationtests;
 
-import no.nb.nna.veidemann.api.ConfigProto;
-import no.nb.nna.veidemann.api.ConfigProto.CrawlJob;
-import no.nb.nna.veidemann.api.ConfigProto.CrawlLimitsConfig;
 import no.nb.nna.veidemann.api.ControllerProto;
-import no.nb.nna.veidemann.api.MessagesProto.JobExecutionStatus;
+import no.nb.nna.veidemann.api.config.v1.ConfigObject;
+import no.nb.nna.veidemann.api.frontier.v1.JobExecutionStatus;
 import no.nb.nna.veidemann.commons.VeidemannHeaderConstants;
 import no.nb.nna.veidemann.commons.db.DbException;
 import org.junit.Test;
@@ -36,17 +34,10 @@ public class SimpleCrawlIT extends CrawlTestBase implements VeidemannHeaderConst
 
     @Test
     public void testHarvest() throws InterruptedException, ExecutionException, DbException {
-        CrawlJob job = controllerClient.listCrawlJobs(ControllerProto.ListRequest.newBuilder()
-                .setName("unscheduled").build())
-                .getValue(0);
+        String jobId = createJob("SimpleCrawlIT", 10, 300, 0).getId();
 
-        CrawlLimitsConfig limits = job.getLimits().toBuilder().setDepth(10).setMaxDurationS(300).setMaxBytes(0).build();
-        job = job.toBuilder().setLimits(limits).build();
-        job = controllerClient.saveCrawlJob(job);
-        String jobId = job.getId();
-
-        ConfigProto.CrawlEntity entity = createEntity("Test entity 1");
-        ConfigProto.Seed seed = createSeed("http://a1.com", entity, jobId);
+        ConfigObject entity = createEntity("Test entity 1");
+        ConfigObject seed = createSeed("http://a1.com", entity, jobId);
 
         ControllerProto.RunCrawlRequest request = ControllerProto.RunCrawlRequest.newBuilder()
                 .setJobId(jobId)
@@ -57,21 +48,21 @@ public class SimpleCrawlIT extends CrawlTestBase implements VeidemannHeaderConst
         assertThat(jes.getExecutionsStateMap()).contains(new SimpleEntry<>("FINISHED", 1), new SimpleEntry<>("FAILED", 0));
 
         // The goal is to get as low as 14 when we cache 404, 302, etc
-        new CrawlExecutionValidator(db)
+        new CrawlExecutionValidator(jes)
                 .validate()
                 .checkCrawlLogCount("response", 5)
                 .checkCrawlLogCount("revisit", 15)
-                .checkCrawlLogCount("dns", 0)
+                .checkCrawlLogCount("dns", 3)
                 .checkPageLogCount(6);
 
         jes = JobCompletion.executeJob(db, statusClient, controllerClient, request).get();
         assertThat(jes.getExecutionsStateMap()).contains(new SimpleEntry<>("FINISHED", 1), new SimpleEntry<>("FAILED", 0));
 
-        new CrawlExecutionValidator(db)
+        new CrawlExecutionValidator(jes)
                 .validate()
                 .checkCrawlLogCount("response", 5)
                 .checkCrawlLogCount("revisit", 35)
-                .checkCrawlLogCount("dns", 0)
+                .checkCrawlLogCount("dns", 3)
                 .checkPageLogCount(12);
     }
 

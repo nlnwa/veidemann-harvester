@@ -19,6 +19,8 @@ import io.grpc.Status;
 import no.nb.nna.veidemann.api.ReportProto.ExecuteDbQueryRequest;
 import no.nb.nna.veidemann.commons.VeidemannHeaderConstants;
 import no.nb.nna.veidemann.commons.db.DbException;
+import no.nb.nna.veidemann.commons.db.DbService;
+import no.nb.nna.veidemann.db.initializer.RethinkDbInitializer;
 import org.junit.Test;
 
 import java.util.concurrent.ExecutionException;
@@ -31,7 +33,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class DbQueryIT extends CrawlTestBase implements VeidemannHeaderConstants {
 
     @Test
-    public void testHarvest() throws InterruptedException, ExecutionException, DbException {
+    public void testQuery() throws InterruptedException, ExecutionException, DbException {
+        // Remove seeds to get known state
+        ((RethinkDbInitializer) DbService.getInstance().getDbInitializer())
+                .getDbConnection()
+                .exec(r.table("config_seeds").delete());
+
+
         QueryObserver observer = new QueryObserver();
         reportClient.executeDbQuery(ExecuteDbQueryRequest.newBuilder()
                 .setQuery("r.table('config_seeds').count()").build(), observer);

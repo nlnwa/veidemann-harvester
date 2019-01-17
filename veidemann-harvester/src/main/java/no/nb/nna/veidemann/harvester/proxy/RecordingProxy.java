@@ -22,11 +22,11 @@ import net.lightbody.bmp.mitm.TrustSource;
 import net.lightbody.bmp.mitm.keys.ECKeyGenerator;
 import net.lightbody.bmp.mitm.manager.ImpersonatingMitmManager;
 import no.nb.nna.veidemann.commons.client.ContentWriterClient;
+import no.nb.nna.veidemann.commons.client.DnsServiceClient;
 import no.nb.nna.veidemann.harvester.BrowserSessionRegistry;
 import org.littleshoot.proxy.ChainedProxy;
 import org.littleshoot.proxy.ChainedProxyAdapter;
 import org.littleshoot.proxy.ChainedProxyManager;
-import org.littleshoot.proxy.HostResolver;
 import org.littleshoot.proxy.HttpProxyServer;
 import org.littleshoot.proxy.HttpProxyServerBootstrap;
 import org.littleshoot.proxy.impl.DefaultHttpProxyServer;
@@ -65,7 +65,7 @@ public class RecordingProxy implements AutoCloseable {
      * @throws IOException is thrown if certificate directory could not be created
      */
     public RecordingProxy(final int serverCount, File workDir, int port, final ContentWriterClient contentWriterClient,
-                          final HostResolver hostResolver, BrowserSessionRegistry sessionRegistry,
+                          final DnsServiceClient dnsServiceClient, BrowserSessionRegistry sessionRegistry,
                           String cacheHost, int cachePort) throws IOException {
 
         LOG.info("Starting recording proxy listening on port {}.", port);
@@ -109,7 +109,6 @@ public class RecordingProxy implements AutoCloseable {
                 .withAllowLocalOnly(false)
                 .withPort(port)
                 .withTransparent(true)
-                .withServerResolver(hostResolver)
                 .withManInTheMiddle(mitmManager)
                 .withMaxChunkSize(1024 * 1024)
                 .withMaxHeaderSize(1024 * 32)
@@ -129,14 +128,22 @@ public class RecordingProxy implements AutoCloseable {
                     }
                 });
 
-        HttpProxyServer server = serverBootstrap.withFiltersSource(
-                new RecorderFilterSourceAdapter(0, contentWriterClient, sessionRegistry, hostResolver)).start();
+        DnsServiceHostResolver hostResolver = new DnsServiceHostResolver(dnsServiceClient, sessionRegistry, 0);
+        RecorderFilterSourceAdapter adapter = new RecorderFilterSourceAdapter(0, contentWriterClient, sessionRegistry, hostResolver);
+        HttpProxyServer server = serverBootstrap
+                .withServerResolver(hostResolver)
+                .withFiltersSource(adapter)
+                .start();
         servers.add(server);
         LOG.info("Started proxy 0 on port: {}", server.getListenAddress().getPort());
 
         for (int i = 1; i < serverCount; i++) {
-            server = server.clone().withFiltersSource(
-                    new RecorderFilterSourceAdapter(i, contentWriterClient, sessionRegistry, hostResolver)).start();
+            hostResolver = new DnsServiceHostResolver(dnsServiceClient, sessionRegistry, i);
+            adapter = new RecorderFilterSourceAdapter(i, contentWriterClient, sessionRegistry, hostResolver);
+            server = server.clone()
+                    .withServerResolver(hostResolver)
+                    .withFiltersSource(adapter)
+                    .start();
             servers.add(server);
             LOG.info("Started proxy {} on port: {}", i, server.getListenAddress().getPort());
         }

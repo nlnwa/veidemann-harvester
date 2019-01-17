@@ -18,19 +18,18 @@ package no.nb.nna.veidemann.harvester.browsercontroller;
 import io.opentracing.Span;
 import io.opentracing.tag.Tags;
 import io.opentracing.util.GlobalTracer;
-import no.nb.nna.veidemann.api.ConfigProto.BrowserConfig;
-import no.nb.nna.veidemann.api.ConfigProto.BrowserScript;
-import no.nb.nna.veidemann.api.ConfigProto.CrawlConfig;
-import no.nb.nna.veidemann.api.ControllerProto;
-import no.nb.nna.veidemann.api.ControllerProto.ListRequest;
-import no.nb.nna.veidemann.api.MessagesProto.PageLog;
-import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
+import no.nb.nna.veidemann.api.config.v1.ConfigObject;
+import no.nb.nna.veidemann.api.config.v1.ConfigRef;
+import no.nb.nna.veidemann.api.config.v1.Kind;
+import no.nb.nna.veidemann.api.config.v1.ListRequest;
+import no.nb.nna.veidemann.api.frontier.v1.PageLog;
+import no.nb.nna.veidemann.api.frontier.v1.QueuedUri;
 import no.nb.nna.veidemann.chrome.client.ChromeDebugProtocol;
 import no.nb.nna.veidemann.chrome.client.ChromeDebugProtocolConfig;
 import no.nb.nna.veidemann.commons.ExtraStatusCodes;
 import no.nb.nna.veidemann.commons.VeidemannHeaderConstants;
+import no.nb.nna.veidemann.commons.db.ChangeFeed;
 import no.nb.nna.veidemann.commons.db.DbException;
-import no.nb.nna.veidemann.commons.db.DbHelper;
 import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.harvester.BrowserSessionRegistry;
 import no.nb.nna.veidemann.harvester.FrontierClient.ProxySession;
@@ -59,7 +58,7 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
 
     private final BrowserSessionRegistry sessionRegistry;
 
-    private final Map<String, BrowserScript> scriptCache = new HashMap<>();
+    private final Map<ConfigRef, ConfigObject> scriptCache = new HashMap<>();
 
     public BrowserController(final String browserWSEndpoint, final BrowserSessionRegistry sessionRegistry) {
         this.browserWSEndpoint = browserWSEndpoint;
@@ -72,15 +71,15 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
         this.sessionRegistry = sessionRegistry;
     }
 
-    public RenderResult render(ProxySession proxySession, QueuedUri queuedUri, CrawlConfig config) throws IOException {
+    public RenderResult render(ProxySession proxySession, QueuedUri queuedUri, ConfigObject crawlConfig) throws IOException, DbException {
         LOG.trace("Connecting to browser with: " + proxySession.getBrowserWsEndpoint());
         ChromeDebugProtocolConfig protocolConfig = chromeDebugProtocolConfig.withBrowserWSEndpoint(proxySession.getBrowserWsEndpoint());
 
-        return render(proxySession.getProxyId(), protocolConfig, queuedUri, config);
+        return render(proxySession.getProxyId(), protocolConfig, queuedUri, crawlConfig);
     }
 
     public RenderResult render(int proxyId, ChromeDebugProtocolConfig protocolConfig,
-                               QueuedUri queuedUri, CrawlConfig config) throws IOException {
+                               QueuedUri queuedUri, ConfigObject crawlConfig) throws IOException {
 
         Span span = GlobalTracer.get()
                 .buildSpan("render")
@@ -94,11 +93,12 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
         MDC.put("eid", queuedUri.getExecutionId());
         MDC.put("uri", queuedUri.getUri());
 
-        BrowserConfig browserConfig = null;
+        ConfigObject browserConfig = null;
         BrowserSession session = null;
         try {
-            browserConfig = DbHelper.getBrowserConfigForCrawlConfig(config);
-            session = new BrowserSession(proxyId, chrome.connect(protocolConfig),
+            browserConfig = DbService.getInstance().getConfigAdapter()
+                    .getConfigObject(crawlConfig.getCrawlConfig().getBrowserConfigRef());
+            session = new BrowserSession(proxyId, chrome.connect(protocolConfig), crawlConfig,
                     browserConfig, queuedUri, span);
         } catch (Exception t) {
             if (session != null) {
@@ -121,14 +121,14 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
             session.getCrawlLogs().waitForMatcherToFinish();
 
             if (session.isPageRenderable()) {
-                if (config.getExtra().getCreateSnapshot()) {
+                if (crawlConfig.getCrawlConfig().getExtra().getCreateScreenshot()) {
                     LOG.debug("Save screenshot");
                     session.saveScreenshot();
                 }
 
                 LOG.debug("Extract outlinks");
                 try {
-                    List<BrowserScript> scripts = getScripts(browserConfig);
+                    List<ConfigObject> scripts = getScripts(browserConfig);
                     result.withOutlinks(session.extractOutlinks(scripts));
                 } catch (Exception t) {
                     LOG.error("Failed extracting outlinks", t);
@@ -150,7 +150,8 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
                     LOG.error("Missing initial request");
                 } else {
                     pageLog.setWarcId(session.getUriRequests().getInitialRequest().getWarcId())
-                            .setReferrer(session.getUriRequests().getInitialRequest().getReferrer());
+                            .setReferrer(session.getUriRequests().getInitialRequest().getReferrer())
+                            .setCollectionFinalName(session.getUriRequests().getInitialRequest().getCrawlLog().getCollectionFinalName());
                 }
 
                 session.getUriRequests().getPageLogResources().forEach(r -> pageLog.addResource(r));
@@ -178,28 +179,29 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
         return result;
     }
 
-    private List<BrowserScript> getScripts(BrowserConfig browserConfig) {
-        List<BrowserScript> scripts = new ArrayList<>();
+    private List<ConfigObject> getScripts(ConfigObject browserConfig) {
+        List<ConfigObject> scripts = new ArrayList<>();
         try {
-            for (String scriptId : browserConfig.getScriptIdList()) {
-                BrowserScript script = scriptCache.get(scriptId);
+            for (ConfigRef scriptRef : browserConfig.getBrowserConfig().getScriptRefList()) {
+                ConfigObject script = scriptCache.get(scriptRef);
                 if (script == null) {
-                    ControllerProto.GetRequest req = ControllerProto.GetRequest.newBuilder()
-                            .setId(scriptId)
-                            .build();
-                    script = DbService.getInstance().getConfigAdapter().getBrowserScript(req);
-                    scriptCache.put(scriptId, script);
+                    script = DbService.getInstance().getConfigAdapter().getConfigObject(scriptRef);
+                    scriptCache.put(scriptRef, script);
                 }
                 scripts.add(script);
             }
             ListRequest req = ListRequest.newBuilder()
-                    .addAllLabelSelector(browserConfig.getScriptSelectorList())
+                    .setKind(Kind.browserScript)
+                    .addAllLabelSelector(browserConfig.getBrowserConfig().getScriptSelectorList())
                     .build();
-            for (BrowserScript script : DbService.getInstance().getConfigAdapter().listBrowserScripts(req).getValueList()) {
-                if (!scriptCache.containsKey(script.getId())) {
-                    scriptCache.put(script.getId(), script);
-                }
-                scripts.add(script);
+            try (ChangeFeed<ConfigObject> r = DbService.getInstance().getConfigAdapter().listConfigObjects(req)) {
+                r.stream().forEach(script -> {
+                    ConfigRef scriptRef = ConfigRef.newBuilder().setKind(Kind.browserScript).setId(script.getId()).build();
+                    if (!scriptCache.containsKey(scriptRef)) {
+                        scriptCache.put(scriptRef, script);
+                    }
+                    scripts.add(script);
+                });
             }
         } catch (DbException e) {
             LOG.warn("Could not get browser scripts from DB", e);

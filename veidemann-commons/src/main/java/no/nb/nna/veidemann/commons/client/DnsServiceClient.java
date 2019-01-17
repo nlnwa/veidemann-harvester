@@ -22,8 +22,10 @@ import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.opentracing.contrib.ClientTracingInterceptor;
 import io.opentracing.util.GlobalTracer;
-import no.nb.nna.veidemann.api.DnsResolverGrpc;
-import no.nb.nna.veidemann.api.DnsResolverProto;
+import no.nb.nna.veidemann.api.config.v1.ConfigRef;
+import no.nb.nna.veidemann.api.dnsresolver.v1.DnsResolverGrpc;
+import no.nb.nna.veidemann.api.dnsresolver.v1.ResolveReply;
+import no.nb.nna.veidemann.api.dnsresolver.v1.ResolveRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,16 +60,17 @@ public class DnsServiceClient implements AutoCloseable {
         asyncStub = DnsResolverGrpc.newStub(channel);
     }
 
-    public InetSocketAddress resolve(String host, int port) throws UnknownHostException {
+    public InetSocketAddress resolve(String host, int port, ConfigRef collectionRef) throws UnknownHostException {
         try {
             // Ensure host is never null
             host = host == null ? "" : host;
-            DnsResolverProto.ResolveRequest request = DnsResolverProto.ResolveRequest.newBuilder()
+            ResolveRequest request = ResolveRequest.newBuilder()
                     .setHost(host)
                     .setPort(port)
+                    .setCollectionRef(collectionRef)
                     .build();
 
-            DnsResolverProto.ResolveReply reply = GrpcUtil.forkedCall(() -> blockingStub.resolve(request));
+            ResolveReply reply = GrpcUtil.forkedCall(() -> blockingStub.resolve(request));
 
             InetSocketAddress address = new InetSocketAddress(
                     InetAddress.getByAddress(reply.getHost(), reply.getRawIp().toByteArray()), reply.getPort());

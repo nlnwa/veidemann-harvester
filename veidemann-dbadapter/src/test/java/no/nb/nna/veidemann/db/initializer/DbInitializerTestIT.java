@@ -16,6 +16,7 @@
 package no.nb.nna.veidemann.db.initializer;
 
 import com.rethinkdb.net.Cursor;
+import no.nb.nna.veidemann.api.config.v1.Kind;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.commons.settings.CommonSettings;
@@ -25,6 +26,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.util.List;
 import java.util.Map;
 
 import static com.rethinkdb.RethinkDB.r;
@@ -69,7 +71,7 @@ public class DbInitializerTestIT {
         DbService.getInstance().getDbInitializer().initialize();
 
         String version = db.executeRequest("", r.table(Tables.SYSTEM.name).get("db_version").g("db_version"));
-        assertThat(version).isEqualTo("1.0");
+        assertThat(version).isEqualTo(CreateNewDb.DB_VERSION);
 
         long configObjectCount = db.executeRequest("", r.table(Tables.CONFIG.name).count());
         assertThat(configObjectCount).isGreaterThan(0);
@@ -90,7 +92,7 @@ public class DbInitializerTestIT {
 
         try (Cursor<Map> configObjects = db.executeRequest("", r.table(Tables.CONFIG.name))) {
             assertThat(configObjects.iterator())
-                    .hasSize(12)
+                    .hasSize(13)
                     .allSatisfy(r -> {
                         assertThat(r.get("apiVersion")).isEqualTo("v1");
                         assertThat(r).containsKey("kind");
@@ -119,7 +121,7 @@ public class DbInitializerTestIT {
         DbService.getInstance().getDbInitializer().initialize();
 
         String version = db.executeRequest("", r.table(Tables.SYSTEM.name).get("db_version").g("db_version"));
-        assertThat(version).isEqualTo("1.0");
+        assertThat(version).isEqualTo(CreateNewDb.DB_VERSION);
 
         long configObjectCount = db.executeRequest("", r.table(Tables.CONFIG.name).count());
         assertThat(configObjectCount).isGreaterThan(0);
@@ -140,7 +142,7 @@ public class DbInitializerTestIT {
 
         try (Cursor<Map> configObjects = db.executeRequest("", r.table(Tables.CONFIG.name))) {
             assertThat(configObjects.iterator())
-                    .hasSize(12)
+                    .hasSize(13)
                     .allSatisfy(r -> {
                         assertThat(r.get("apiVersion")).isEqualTo("v1");
                         assertThat(r).containsKey("kind");
@@ -159,6 +161,23 @@ public class DbInitializerTestIT {
                         assertThat(r).containsKey("seed");
                         assertThat(r).containsKey("meta");
                         assertThat((Map) r.get("meta")).containsKey("name");
+                        checkConfigRef((Map) r.get("seed"), "entityRef", Kind.crawlEntity);
+                        checkConfigRefList((Map) r.get("seed"), "jobRef", Kind.crawlJob);
+                    });
+        }
+        try (Cursor<Map> configObjects = db.executeRequest("", r.table(Tables.SEEDS.name)
+                .getAll(r.array(Kind.crawlEntity.name(), "d816019f-103e-44b8-aa3b-93cd727104c6"))
+                .optArg("index", "configRefs"))) {
+            assertThat(configObjects.iterator())
+                    .hasSize(1)
+                    .allSatisfy(r -> {
+                        assertThat(r.get("apiVersion")).isEqualTo("v1");
+                        assertThat(r.get("kind")).isEqualTo("seed");
+                        assertThat(r).containsKey("seed");
+                        assertThat(r).containsKey("meta");
+                        assertThat((Map) r.get("meta")).containsKey("name");
+                        checkConfigRef((Map) r.get("seed"), "entityRef", Kind.crawlEntity);
+                        checkConfigRefList((Map) r.get("seed"), "jobRef", Kind.crawlJob);
                     });
         }
 
@@ -185,5 +204,33 @@ public class DbInitializerTestIT {
                         assertThat((Map) r.get("browserConfig")).containsEntry("maxInactivityTimeMs", 2000L);
                     });
         }
+
+        try (Cursor<Map> configObjects = db.executeRequest("", r.table(Tables.CONFIG.name)
+                .filter(r.hashMap("kind", "crawlConfig")))) {
+            assertThat(configObjects.iterator())
+                    .hasSize(1)
+                    .allSatisfy(r -> {
+                        assertThat(r.get("apiVersion")).isEqualTo("v1");
+                        assertThat(r.get("kind")).isEqualTo("crawlConfig");
+                        assertThat(r).containsKey("crawlConfig");
+                        assertThat((Map) r.get("crawlConfig")).containsKey("extra");
+                        assertThat(((Map<String, Map>) r.get("crawlConfig")).get("extra")).containsEntry("createScreenshot", true);
+                    });
+        }
+    }
+
+    private void checkConfigRef(Map<String, ? extends Object> parent, String refName, Kind expectedKind) {
+        assertThat(parent).containsKey(refName);
+        assertThat(((Map<String, Map>) parent).get(refName).get("kind")).isEqualTo(expectedKind.name());
+        assertThat(((Map<String, Map<String, String>>) parent).get(refName).get("id")).isNotEmpty();
+    }
+
+    private void checkConfigRefList(Map<String, ? extends Object> parent, String refName, Kind expectedKind) {
+        assertThat(parent).containsKey(refName);
+        List<Map<String, ? extends Object>> refs = (List<Map<String, ? extends Object>>) parent.get(refName);
+        assertThat(refs).allSatisfy(ref -> {
+            assertThat(((Map<String, String>) ref).get("kind")).isEqualTo(expectedKind.name());
+            assertThat(((Map<String, String>) ref).get("id")).isNotEmpty();
+        });
     }
 }

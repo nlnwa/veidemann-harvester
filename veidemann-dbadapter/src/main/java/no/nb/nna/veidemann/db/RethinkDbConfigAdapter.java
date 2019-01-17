@@ -37,7 +37,9 @@ import no.nb.nna.veidemann.api.ControllerProto.SeedListReply;
 import no.nb.nna.veidemann.api.ControllerProto.SeedListRequest;
 import no.nb.nna.veidemann.api.config.v1.ConfigObject;
 import no.nb.nna.veidemann.api.config.v1.ConfigObject.SpecCase;
+import no.nb.nna.veidemann.api.config.v1.ConfigRef;
 import no.nb.nna.veidemann.api.config.v1.DeleteResponse;
+import no.nb.nna.veidemann.api.config.v1.GetLabelKeysRequest;
 import no.nb.nna.veidemann.api.config.v1.Kind;
 import no.nb.nna.veidemann.api.config.v1.LabelKeysResponse;
 import no.nb.nna.veidemann.api.config.v1.ListCountResponse;
@@ -69,7 +71,7 @@ public class RethinkDbConfigAdapter implements ConfigAdapter {
     }
 
     @Override
-    public ConfigObject getConfigObject(no.nb.nna.veidemann.api.config.v1.GetRequest request) throws DbException {
+    public ConfigObject getConfigObject(ConfigRef request) throws DbException {
         final Tables table = getTableForKind(request.getKind());
 
         Map<String, Object> response = conn.exec("db-getConfigObject",
@@ -132,25 +134,27 @@ public class RethinkDbConfigAdapter implements ConfigAdapter {
 
         switch (object.getKind()) {
             case browserScript:
-                checkDependencies(object, Kind.browserConfig, "browserConfig.scriptId");
+                checkDependencies(object, Kind.browserConfig, "browserConfig.scriptRef");
                 break;
             case crawlEntity:
-                checkDependencies(object, Kind.seed, "seed.entityId");
+                checkDependencies(object, Kind.seed, "seed.entityRef");
                 break;
             case crawlJob:
-                checkDependencies(object, Kind.seed, "seed.jobId");
+                checkDependencies(object, Kind.seed, "seed.jobRef");
                 break;
             case crawlScheduleConfig:
-                checkDependencies(object, Kind.crawlJob, "crawlJob.scheduleId");
+                checkDependencies(object, Kind.crawlJob, "crawlJob.scheduleRef");
                 break;
             case politenessConfig:
-                checkDependencies(object, Kind.crawlConfig, "crawlConfig.politenessId");
+                checkDependencies(object, Kind.crawlConfig, "crawlConfig.politenessRef");
                 break;
             case browserConfig:
-                checkDependencies(object, Kind.crawlConfig, "crawlConfig.browserConfigId");
+                checkDependencies(object, Kind.crawlConfig, "crawlConfig.browserConfigRef");
                 break;
             case crawlConfig:
-                checkDependencies(object, Kind.crawlJob, "crawlJob.crawlConfigId");
+                checkDependencies(object, Kind.crawlJob, "crawlJob.crawlConfigRef");
+            case collection:
+                checkDependencies(object, Kind.crawlConfig, "crawlConfig.collectionRef");
                 break;
         }
 
@@ -163,7 +167,7 @@ public class RethinkDbConfigAdapter implements ConfigAdapter {
     }
 
     @Override
-    public LabelKeysResponse getLabelKeys(no.nb.nna.veidemann.api.config.v1.GetRequest request) throws DbQueryException, DbConnectionException {
+    public LabelKeysResponse getLabelKeys(GetLabelKeysRequest request) throws DbQueryException, DbConnectionException {
         Tables table = getTableForKind(request.getKind());
 
         try (Cursor<String> res = conn.exec("db-getLabelKeys",
@@ -514,7 +518,7 @@ public class RethinkDbConfigAdapter implements ConfigAdapter {
             return null;
         }
 
-        response = convertV1ToOldApi(kind, response);
+        response = convertV1ToOldApi(response);
 
         return ProtoUtils.rethinkToProto(response, type);
     }
@@ -532,6 +536,37 @@ public class RethinkDbConfigAdapter implements ConfigAdapter {
                 case "sleepAfterPageloadMs":
                     spec.put("maxInactivityTimeMs", old.remove(key));
                     break;
+                case "entityId":
+                    spec.put("entityRef", r.hashMap("kind", Kind.crawlEntity.name()).with("id", old.remove(key)));
+                    break;
+                case "jobId":
+                    refToId(spec, old, "job", Kind.crawlJob);
+                    break;
+                case "scheduleId":
+                    refToId(spec, old, "schedule", Kind.crawlScheduleConfig);
+                    break;
+                case "crawlConfigId":
+                    refToId(spec, old, "crawlConfig", Kind.crawlConfig);
+                    break;
+                case "collectionId":
+                    refToId(spec, old, "collection", Kind.collection);
+                    break;
+                case "browserConfigId":
+                    refToId(spec, old, "browserConfig", Kind.browserConfig);
+                    break;
+                case "politenessId":
+                    refToId(spec, old, "politeness", Kind.politenessConfig);
+                    break;
+                case "scriptId":
+                    refToId(spec, old, "script", Kind.browserScript);
+                    break;
+                case "extra":
+                    Map extra = (Map) old.remove(key);
+                    if (extra.containsKey("createSnapshot")) {
+                        extra.put("createScreenshot", extra.remove("createSnapshot"));
+                        spec.put(key, extra);
+                    }
+                    break;
                 default:
                     spec.put(key, old.remove(key));
                     break;
@@ -543,12 +578,44 @@ public class RethinkDbConfigAdapter implements ConfigAdapter {
         return old;
     }
 
-    public static Map<String, Object> convertV1ToOldApi(Kind kind, Map<String, Object> v1) {
-        if (v1.containsKey(kind.name())) {
-            v1.putAll((Map) v1.get(kind.name()));
+    private static void refToId(MapObject spec, Map<String, Object> old, String name, Kind kind) {
+        Object oldVal = old.remove(name + "Id");
+        if (oldVal instanceof List) {
+            List refs = r.array();
+            for (String id : (List<String>) oldVal) {
+                refs.add(r.hashMap("kind", kind.name()).with("id", id));
+            }
+            spec.put(name + "Ref", refs);
+        } else {
+            spec.put(name + "Ref", r.hashMap("kind", kind.name()).with("id", oldVal));
         }
+    }
+
+    public static Map<String, Object> convertV1ToOldApi(Map<String, Object> v1) {
+        Kind kind = Kind.valueOf((String) v1.get("kind"));
+        if (v1.containsKey(kind.name())) {
+            v1.putAll((Map) v1.remove(kind.name()));
+        }
+
         switch (kind) {
+            case seed:
+                idToRef(v1, "entity");
+                idToRef(v1, "job");
+                break;
+            case crawlJob:
+                idToRef(v1, "schedule");
+                idToRef(v1, "crawlConfig");
+                break;
+            case crawlConfig:
+                idToRef(v1, "collection");
+                idToRef(v1, "browserConfig");
+                idToRef(v1, "politeness");
+                if (v1.containsKey("extra") && ((Map) v1.get("extra")).containsKey("createScreenshot")) {
+                    ((Map) v1.get("extra")).put("createSnapshot", ((Map) v1.get("extra")).remove("createScreenshot"));
+                }
+                break;
             case browserConfig:
+                idToRef(v1, "script");
                 if (v1.containsKey("maxInactivityTimeMs")) {
                     v1.put("sleepAfterPageloadMs", v1.remove("maxInactivityTimeMs"));
                 }
@@ -557,6 +624,21 @@ public class RethinkDbConfigAdapter implements ConfigAdapter {
         v1.remove("apiVersion");
         v1.remove("kind");
         return v1;
+    }
+
+    private static void idToRef(Map<String, Object> v1, String name) {
+        if (v1.containsKey(name + "Ref")) {
+            Object oldRef = v1.remove(name + "Ref");
+            if (oldRef instanceof List) {
+                List refs = r.array();
+                for (Map item : (List<Map>) oldRef) {
+                    refs.add(item.get("id"));
+                }
+                v1.put(name + "Id", refs);
+            } else {
+                v1.put(name + "Id", ((Map) oldRef).get("id"));
+            }
+        }
     }
 
     public <T extends Message> T saveMessage(T msg, Kind kind) throws DbException {
@@ -591,7 +673,7 @@ public class RethinkDbConfigAdapter implements ConfigAdapter {
                                 )))
         );
 
-        response = convertV1ToOldApi(kind, response);
+        response = convertV1ToOldApi(response);
 
         return ProtoUtils.rethinkToProto(response, (Class<T>) msg.getClass());
     }
@@ -690,13 +772,15 @@ public class RethinkDbConfigAdapter implements ConfigAdapter {
     private void checkDependencies(ConfigObject messageToCheck, Kind dependentKind,
                                    String dependentFieldName) throws DbException {
 
-        no.nb.nna.veidemann.api.config.v1.ListRequest.Builder r = no.nb.nna.veidemann.api.config.v1.ListRequest.newBuilder()
+        no.nb.nna.veidemann.api.config.v1.ListRequest.Builder request = no.nb.nna.veidemann.api.config.v1.ListRequest.newBuilder()
                 .setKind(dependentKind);
-        FieldMasks.setValue(dependentFieldName, r.getQueryTemplateBuilder(), messageToCheck.getId());
-        r.getQueryMaskBuilder().addPaths(dependentFieldName);
+        FieldMasks.setValue(dependentFieldName, request.getQueryTemplateBuilder(),
+                ConfigRef.newBuilder().setKind(messageToCheck.getKind()).setId(messageToCheck.getId()).build()
+        );
+        request.getQueryMaskBuilder().addPaths(dependentFieldName);
 
         long dependencyCount = conn.exec("db-checkDependency",
-                new ListConfigObjectQueryBuilder(r.build()).getCountQuery());
+                new ListConfigObjectQueryBuilder(request.build()).getCountQuery());
 
         if (dependencyCount > 0) {
             throw new DbQueryException("Can't delete " + messageToCheck.getKind()

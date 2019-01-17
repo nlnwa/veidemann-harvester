@@ -1,8 +1,8 @@
 package no.nb.nna.veidemann.commons.db;
 
 import com.google.protobuf.Timestamp;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlHostGroup;
-import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
+import no.nb.nna.veidemann.api.frontier.v1.CrawlHostGroup;
+import no.nb.nna.veidemann.api.frontier.v1.QueuedUri;
 
 public interface CrawlQueueAdapter {
     long deleteQueuedUrisForExecution(String executionId) throws DbException;

@@ -17,9 +17,9 @@ package no.nb.nna.veidemann.robotsservice;
 
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
-import no.nb.nna.veidemann.api.RobotsEvaluatorGrpc;
-import no.nb.nna.veidemann.api.RobotsEvaluatorProto.IsAllowedReply;
-import no.nb.nna.veidemann.api.RobotsEvaluatorProto.IsAllowedRequest;
+import no.nb.nna.veidemann.api.robotsevaluator.v1.IsAllowedReply;
+import no.nb.nna.veidemann.api.robotsevaluator.v1.IsAllowedRequest;
+import no.nb.nna.veidemann.api.robotsevaluator.v1.RobotsEvaluatorGrpc;
 import no.nb.nna.veidemann.robotsparser.RobotsTxtParser;
 import org.netpreserve.commons.uri.Uri;
 import org.netpreserve.commons.uri.UriConfigs;
@@ -50,25 +50,27 @@ public class RobotsService extends RobotsEvaluatorGrpc.RobotsEvaluatorImplBase {
         Objects.requireNonNull(request.getPoliteness());
         Objects.requireNonNull(request.getUnknownFields());
         Objects.requireNonNull(request.getUserAgent());
+        Objects.requireNonNull(request.getCollectionRef());
         try {
             Uri uri = UriConfigs.WHATWG.buildUri(request.getUri());
-            int ttlSeconds = request.getPoliteness().getMinimumRobotsValidityDurationS();
+            int ttlSeconds = request.getPoliteness().getPolitenessConfig().getMinimumRobotsValidityDurationS();
             boolean allowed = false;
 
-            switch (request.getPoliteness().getRobotsPolicy()) {
+            switch (request.getPoliteness().getPolitenessConfig().getRobotsPolicy()) {
                 case OBEY_ROBOTS:
-                    allowed = cache.get(uri, ttlSeconds, request.getExecutionId(), request.getJobExecutionId())
+                    allowed = cache.get(uri, ttlSeconds, request.getExecutionId(), request.getJobExecutionId(), request.getCollectionRef().getId())
                             .isAllowed(request.getUserAgent(), uri);
                     break;
                 case IGNORE_ROBOTS:
                     allowed = true;
                     break;
                 case CUSTOM_ROBOTS:
-                    allowed = ROBOTS_TXT_PARSER.parse(request.getPoliteness().getCustomRobots())
+                    allowed = ROBOTS_TXT_PARSER.parse(request.getPoliteness().getPolitenessConfig().getCustomRobots())
                             .isAllowed(request.getUserAgent(), uri);
                     break;
                 default:
-                    LOG.warn("Robots Policy '{}' is not implemented.", request.getPoliteness().getRobotsPolicy());
+                    LOG.warn("Robots Policy '{}' is not implemented.", request.getPoliteness()
+                            .getPolitenessConfig().getRobotsPolicy());
                     allowed = true;
                     break;
             }

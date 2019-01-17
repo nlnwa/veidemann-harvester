@@ -16,9 +16,9 @@
 package no.nb.nna.veidemann.frontier.worker;
 
 import com.google.protobuf.util.Timestamps;
-import no.nb.nna.veidemann.api.ConfigProto;
-import no.nb.nna.veidemann.api.ConfigProto.PolitenessConfig;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus.State;
+import no.nb.nna.veidemann.api.config.v1.ConfigObject;
+import no.nb.nna.veidemann.api.config.v1.CrawlLimitsConfig;
+import no.nb.nna.veidemann.api.frontier.v1.CrawlExecutionStatus;
 import no.nb.nna.veidemann.commons.ExtraStatusCodes;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbService;
@@ -44,7 +44,7 @@ public class LimitsCheck {
      * @param qUri   the URI to check
      * @return true if the submitted URI is within limits for queueing
      */
-    public static boolean isQueueable(ConfigProto.CrawlLimitsConfig limits, StatusWrapper status,
+    public static boolean isQueueable(CrawlLimitsConfig limits, StatusWrapper status,
                                       QueuedUriWrapper qUri) {
 
         if (limits.getDepth() > 0 && limits.getDepth() <= calculateDepth(qUri)) {
@@ -64,7 +64,7 @@ public class LimitsCheck {
      * @param qUri     the URI to check
      * @return true if crawl should be stopped
      */
-    public static boolean isLimitReached(Frontier frontier, ConfigProto.CrawlLimitsConfig limits, StatusWrapper status,
+    public static boolean isLimitReached(Frontier frontier, CrawlLimitsConfig limits, StatusWrapper status,
                                          QueuedUriWrapper qUri) throws DbException {
 
         if (limits.getMaxBytes() > 0 && status.getBytesCrawled() > limits.getMaxBytes()) {
@@ -74,7 +74,7 @@ public class LimitsCheck {
                 case SLEEPING:
                 case UNDEFINED:
                 case UNRECOGNIZED:
-                    status.setEndState(State.ABORTED_SIZE)
+                    status.setEndState(CrawlExecutionStatus.State.ABORTED_SIZE)
                             .incrementDocumentsDenied(
                                     DbService.getInstance().getCrawlQueueAdapter()
                                             .deleteQueuedUrisForExecution(status.getId())
@@ -93,7 +93,7 @@ public class LimitsCheck {
                 case SLEEPING:
                 case UNDEFINED:
                 case UNRECOGNIZED:
-                    status.setEndState(State.ABORTED_TIMEOUT);
+                    status.setEndState(CrawlExecutionStatus.State.ABORTED_TIMEOUT);
                     status.incrementDocumentsDenied(
                             DbService.getInstance().getCrawlQueueAdapter()
                                     .deleteQueuedUrisForExecution(status.getId())
@@ -105,8 +105,8 @@ public class LimitsCheck {
         return false;
     }
 
-    public static boolean isRetryLimitReached(PolitenessConfig politeness, QueuedUriWrapper qUri) throws DbException {
-        if (qUri.getRetries() < politeness.getMaxRetries()) {
+    public static boolean isRetryLimitReached(ConfigObject politeness, QueuedUriWrapper qUri) throws DbException {
+        if (qUri.getRetries() < politeness.getPolitenessConfig().getMaxRetries()) {
             qUri.clearError();
             return false;
         } else {

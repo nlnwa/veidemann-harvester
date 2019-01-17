@@ -15,17 +15,12 @@
  */
 package no.nb.nna.veidemann.integrationtests;
 
-import no.nb.nna.veidemann.api.ConfigProto;
-import no.nb.nna.veidemann.api.ConfigProto.CrawlConfig;
-import no.nb.nna.veidemann.api.ConfigProto.CrawlJob;
-import no.nb.nna.veidemann.api.ConfigProto.CrawlLimitsConfig;
-import no.nb.nna.veidemann.api.ConfigProto.PolitenessConfig;
 import no.nb.nna.veidemann.api.ControllerProto;
-import no.nb.nna.veidemann.api.MessagesProto.JobExecutionStatus;
 import no.nb.nna.veidemann.api.StatusProto.ExecutionId;
+import no.nb.nna.veidemann.api.config.v1.ConfigObject;
+import no.nb.nna.veidemann.api.frontier.v1.JobExecutionStatus;
 import no.nb.nna.veidemann.commons.VeidemannHeaderConstants;
 import no.nb.nna.veidemann.commons.db.DbException;
-import no.nb.nna.veidemann.commons.db.DbHelper;
 import org.junit.Test;
 
 import java.util.AbstractMap.SimpleEntry;
@@ -40,13 +35,7 @@ public class AbortCrawlIT extends CrawlTestBase implements VeidemannHeaderConsta
 
     @Test
     public void testAbortDepth() throws InterruptedException, ExecutionException, DbException {
-        CrawlJob job = controllerClient.listCrawlJobs(ControllerProto.ListRequest.newBuilder()
-                .setName("unscheduled").build())
-                .getValue(0);
-
-        CrawlLimitsConfig limits = job.getLimits().toBuilder().setDepth(2).setMaxDurationS(300).build();
-        job = job.toBuilder().setLimits(limits).build();
-        job = controllerClient.saveCrawlJob(job);
+        ConfigObject job = createJob("AbortDepth", 2, 300, 0);
 
         setupConfigAndSeeds(job);
 
@@ -56,27 +45,22 @@ public class AbortCrawlIT extends CrawlTestBase implements VeidemannHeaderConsta
 
         JobExecutionStatus jes = JobCompletion.executeJob(db, statusClient, controllerClient, request).get();
 
-        new CrawlExecutionValidator(db)
+        new CrawlExecutionValidator(jes)
                 .validate();
 
         assertThat(jes.getExecutionsStateMap()).contains(new SimpleEntry<>("FINISHED", 5));
 
-        new CrawlExecutionValidator(db)
+        new CrawlExecutionValidator(jes)
                 .validate()
-                .checkCrawlLogCount("response", 9)
-                .checkCrawlLogCount("revisit", 14)
+                .checkCrawlLogCount("response", 9, 12)
+                .checkCrawlLogCount("revisit", 11, 14)
+                .checkCrawlLogCount(23, "response", "revisit")
                 .checkPageLogCount(8);
     }
 
     @Test
     public void testAbortSize() throws InterruptedException, ExecutionException, DbException {
-        CrawlJob job = controllerClient.listCrawlJobs(ControllerProto.ListRequest.newBuilder()
-                .setName("unscheduled").build())
-                .getValue(0);
-
-        CrawlLimitsConfig limits = job.getLimits().toBuilder().setMaxBytes(1024 * 4).setMaxDurationS(300).build();
-        job = job.toBuilder().setLimits(limits).build();
-        job = controllerClient.saveCrawlJob(job);
+        ConfigObject job = createJob("AbortSize", 10, 300, 1024 * 4);
 
         setupConfigAndSeeds(job);
 
@@ -86,7 +70,7 @@ public class AbortCrawlIT extends CrawlTestBase implements VeidemannHeaderConsta
 
         JobExecutionStatus jes = JobCompletion.executeJob(db, statusClient, controllerClient, request).get();
 
-        new CrawlExecutionValidator(db)
+        new CrawlExecutionValidator(jes)
                 .validate();
 
         assertThat(jes.getExecutionsStateMap().get("ABORTED_SIZE")).isGreaterThanOrEqualTo(1);
@@ -94,13 +78,7 @@ public class AbortCrawlIT extends CrawlTestBase implements VeidemannHeaderConsta
 
     @Test
     public void testAbortManual() throws InterruptedException, ExecutionException, DbException {
-        CrawlJob job = controllerClient.listCrawlJobs(ControllerProto.ListRequest.newBuilder()
-                .setName("unscheduled").build())
-                .getValue(0);
-
-        CrawlLimitsConfig limits = job.getLimits().toBuilder().setMaxDurationS(300).build();
-        job = job.toBuilder().setLimits(limits).build();
-        job = controllerClient.saveCrawlJob(job);
+        ConfigObject job = createJob("AbortManual", 10, 300, 0);
 
         setupConfigAndSeeds(job);
 
@@ -115,7 +93,7 @@ public class AbortCrawlIT extends CrawlTestBase implements VeidemannHeaderConsta
         JobExecutionStatus jes = jc.get();
         Thread.sleep(8000);
 
-        new CrawlExecutionValidator(db)
+        new CrawlExecutionValidator(jes)
                 .validate();
 
         assertThat(jes.getExecutionsStateMap().get("ABORTED_MANUAL")).isGreaterThanOrEqualTo(3);
@@ -125,30 +103,20 @@ public class AbortCrawlIT extends CrawlTestBase implements VeidemannHeaderConsta
                 .isGreaterThanOrEqualTo(4);
     }
 
-    private void setupConfigAndSeeds(CrawlJob job) throws DbException {
+    private void setupConfigAndSeeds(ConfigObject job) throws DbException {
         String jobId = job.getId();
 
-        CrawlConfig crawlConfig = DbHelper.getCrawlConfigForJob(job);
+        ConfigObject entity1 = createEntity("Test entity 1");
+        ConfigObject seed1 = createSeed("http://a1.com", entity1, jobId);
 
-        PolitenessConfig politeness = controllerClient.savePolitenessConfig(
-                DbHelper.getPolitenessConfigForCrawlConfig(crawlConfig).toBuilder()
-                        .setMaxTimeBetweenPageLoadMs(100)
-                        .setMinTimeBetweenPageLoadMs(1)
-                        .setDelayFactor(.01f)
-                        .setRetryDelaySeconds(1)
-                        .build());
+        ConfigObject entity2 = createEntity("Test entity 2");
+        ConfigObject seed2 = createSeed("http://a2.com", entity2, jobId);
+        ConfigObject seed3 = createSeed("http://a3.com", entity2, jobId);
 
-        ConfigProto.CrawlEntity entity1 = createEntity("Test entity 1");
-        ConfigProto.Seed seed1 = createSeed("http://a1.com", entity1, jobId);
+        ConfigObject entity3 = createEntity("Test entity 3");
+        ConfigObject invalidSeed = createSeed("https://www.toll.no/ // etat under finansdepartementet", entity3, jobId);
 
-        ConfigProto.CrawlEntity entity2 = createEntity("Test entity 2");
-        ConfigProto.Seed seed2 = createSeed("http://a2.com", entity2, jobId);
-        ConfigProto.Seed seed3 = createSeed("http://a3.com", entity2, jobId);
-
-        ConfigProto.CrawlEntity entity3 = createEntity("Test entity 3");
-        ConfigProto.Seed invalidSeed = createSeed("https://www.toll.no/ // etat under finansdepartementet", entity3, jobId);
-
-        ConfigProto.CrawlEntity entity4 = createEntity("Test entity 4");
-        ConfigProto.Seed notFoundSeed = createSeed("http://static.com/not-found.gif", entity4, jobId);
+        ConfigObject entity4 = createEntity("Test entity 4");
+        ConfigObject notFoundSeed = createSeed("http://static.com/not-found.gif", entity4, jobId);
     }
 }

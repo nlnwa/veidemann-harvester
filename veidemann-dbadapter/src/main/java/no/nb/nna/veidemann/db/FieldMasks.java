@@ -18,7 +18,6 @@ package no.nb.nna.veidemann.db;
 
 import com.google.protobuf.Descriptors.FieldDescriptor;
 import com.google.protobuf.Descriptors.FieldDescriptor.Type;
-import com.google.protobuf.Descriptors.OneofDescriptor;
 import com.google.protobuf.Message.Builder;
 import com.google.protobuf.MessageOrBuilder;
 import com.google.protobuf.Timestamp;
@@ -128,28 +127,28 @@ public class FieldMasks {
 
     public static ConfigObjectOrBuilder setValue(PathElem path, ConfigObjectOrBuilder object, Object value) {
         if (object instanceof Builder) {
-            innerSetValue(path, (Builder) object, value);
+            innerSetValue(path, path, (Builder) object, value);
             return object;
         } else {
             ConfigObject.Builder b = ((ConfigObject) object).toBuilder();
-            innerSetValue(path, b, value);
+            innerSetValue(path, path, b, value);
             return b.build();
         }
     }
 
-    private static MessageOrBuilder innerSetValue(PathElem p, Builder object, Object value) {
+    private static MessageOrBuilder innerSetValue(PathElem destination, PathElem p, Builder object, Object value) {
         if (!p.parent.name.isEmpty()) {
-            object = (Builder) innerSetValue(p.parent, object, value);
+            object = (Builder) innerSetValue(destination, p.parent, object, value);
         }
 
-        if (p.descriptor.getType() == Type.MESSAGE) {
-            return object.getFieldBuilder(p.descriptor);
-        } else {
+        if (p == destination) {
             if (p.descriptor.isRepeated()) {
                 return object.addRepeatedField(p.descriptor, value);
             } else {
                 return object.setField(p.descriptor, value);
             }
+        } else {
+            return object.getFieldBuilder(p.descriptor);
         }
     }
 
@@ -160,7 +159,6 @@ public class FieldMasks {
     public static PathElem getElementForPath(String path) {
         PathElem p = CONFIG_OBJECT_DEF.paths.get(path);
         if (p == null) {
-            CONFIG_OBJECT_DEF.paths.forEach((x, y) -> System.out.println(x));
             throw new IllegalArgumentException("Illegal path: " + path);
         }
         return p;

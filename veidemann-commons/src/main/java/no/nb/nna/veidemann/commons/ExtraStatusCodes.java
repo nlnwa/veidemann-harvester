@@ -15,7 +15,8 @@
  */
 package no.nb.nna.veidemann.commons;
 
-import no.nb.nna.veidemann.api.MessagesProto;
+import no.nb.nna.veidemann.api.commons.v1.Error;
+import no.nb.nna.veidemann.api.commons.v1.ErrorOrBuilder;
 
 /**
  * Status codes in addition to those defined by http.
@@ -66,7 +67,7 @@ public enum ExtraStatusCodes {
         return description;
     }
 
-    public static ExtraStatusCodes fromFetchError(MessagesProto.ErrorOrBuilder error) {
+    public static ExtraStatusCodes fromFetchError(ErrorOrBuilder error) {
         for (ExtraStatusCodes v : values()) {
             if (v.getCode() == error.getCode()) {
                 return v;
@@ -75,12 +76,12 @@ public enum ExtraStatusCodes {
         throw new IllegalArgumentException("Unknown error code: " + error.getCode());
     }
 
-    public MessagesProto.Error toFetchError() {
-        return MessagesProto.Error.newBuilder().setCode(code).build();
+    public Error toFetchError() {
+        return Error.newBuilder().setCode(code).build();
     }
 
-    public MessagesProto.Error toFetchError(String message) {
-        return MessagesProto.Error.newBuilder().setCode(code).setMsg(message).build();
+    public Error toFetchError(String message) {
+        return Error.newBuilder().setCode(code).setMsg(message).build();
     }
 
 }

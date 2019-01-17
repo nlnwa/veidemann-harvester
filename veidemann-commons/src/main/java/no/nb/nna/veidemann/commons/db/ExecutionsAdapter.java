@@ -15,16 +15,16 @@
  */
 package no.nb.nna.veidemann.commons.db;
 
-import no.nb.nna.veidemann.api.ConfigProto.CrawlScope;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatusChange;
-import no.nb.nna.veidemann.api.MessagesProto.JobExecutionStatus;
 import no.nb.nna.veidemann.api.StatusProto.ExecutionsListReply;
 import no.nb.nna.veidemann.api.StatusProto.JobExecutionsListReply;
 import no.nb.nna.veidemann.api.StatusProto.ListExecutionsRequest;
 import no.nb.nna.veidemann.api.StatusProto.ListJobExecutionsRequest;
 import no.nb.nna.veidemann.api.StatusProto.RunningExecutionsListReply;
 import no.nb.nna.veidemann.api.StatusProto.RunningExecutionsRequest;
+import no.nb.nna.veidemann.api.config.v1.CrawlScope;
+import no.nb.nna.veidemann.api.frontier.v1.CrawlExecutionStatus;
+import no.nb.nna.veidemann.api.frontier.v1.CrawlExecutionStatusChange;
+import no.nb.nna.veidemann.api.frontier.v1.JobExecutionStatus;
 
 public interface ExecutionsAdapter {
     JobExecutionStatus createJobExecutionStatus(String jobId) throws DbException;

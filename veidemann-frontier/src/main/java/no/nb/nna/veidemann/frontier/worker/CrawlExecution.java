@@ -21,21 +21,17 @@ import io.grpc.StatusRuntimeException;
 import io.opentracing.Span;
 import io.opentracing.tag.Tags;
 import io.opentracing.util.GlobalTracer;
-import no.nb.nna.veidemann.api.ConfigProto.CrawlConfig;
-import no.nb.nna.veidemann.api.ConfigProto.CrawlJob;
-import no.nb.nna.veidemann.api.ConfigProto.CrawlLimitsConfig;
-import no.nb.nna.veidemann.api.ConfigProto.PolitenessConfig;
-import no.nb.nna.veidemann.api.ControllerProto;
-import no.nb.nna.veidemann.api.FrontierProto.PageHarvest.Metrics;
-import no.nb.nna.veidemann.api.FrontierProto.PageHarvestSpec;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus.State;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlHostGroup;
-import no.nb.nna.veidemann.api.MessagesProto.Error;
-import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
+import no.nb.nna.veidemann.api.commons.v1.Error;
+import no.nb.nna.veidemann.api.config.v1.ConfigObject;
+import no.nb.nna.veidemann.api.config.v1.CrawlLimitsConfig;
+import no.nb.nna.veidemann.api.frontier.v1.CrawlExecutionStatus;
+import no.nb.nna.veidemann.api.frontier.v1.CrawlHostGroup;
+import no.nb.nna.veidemann.api.frontier.v1.PageHarvest.Metrics;
+import no.nb.nna.veidemann.api.frontier.v1.PageHarvestSpec;
+import no.nb.nna.veidemann.api.frontier.v1.QueuedUri;
 import no.nb.nna.veidemann.commons.ExtraStatusCodes;
+import no.nb.nna.veidemann.commons.db.ConfigAdapter;
 import no.nb.nna.veidemann.commons.db.DbException;
-import no.nb.nna.veidemann.commons.db.DbHelper;
 import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.commons.db.DistributedLock;
 import no.nb.nna.veidemann.commons.db.DistributedLock.Key;
@@ -58,9 +54,9 @@ public class CrawlExecution {
 
     private final Frontier frontier;
 
-    private final CrawlConfig crawlConfig;
+    private final ConfigObject crawlConfig;
 
-    private final PolitenessConfig politenessConfig;
+    private final ConfigObject politenessConfig;
 
     private final CrawlLimitsConfig limits;
 
@@ -87,16 +83,14 @@ public class CrawlExecution {
         }
         this.status.addCurrentUri(this.qUri).saveStatus();
 
-        ControllerProto.GetRequest jobRequest = ControllerProto.GetRequest.newBuilder()
-                .setId(status.getJobId())
-                .build();
-        CrawlJob job = DbService.getInstance().getConfigAdapter().getCrawlJob(jobRequest);
+        ConfigAdapter configAdapter = DbService.getInstance().getConfigAdapter();
+        ConfigObject job = configAdapter.getConfigObject(status.getJobId());
 
         this.crawlHostGroup = crawlHostGroup;
         this.frontier = frontier;
-        this.crawlConfig = DbHelper.getCrawlConfigForJob(job);
-        this.politenessConfig = DbHelper.getPolitenessConfigForCrawlConfig(crawlConfig);
-        this.limits = job.getLimits();
+        this.crawlConfig = configAdapter.getConfigObject(job.getCrawlJob().getCrawlConfigRef());
+        this.politenessConfig = configAdapter.getConfigObject(crawlConfig.getCrawlConfig().getPolitenessRef());
+        this.limits = job.getCrawlJob().getLimits();
     }
 
     public String getId() {
@@ -144,12 +138,12 @@ public class CrawlExecution {
                             delayMs = -1L;
                             return null;
                         case RETRY:
-                            qUri.setPriorityWeight(this.crawlConfig.getPriorityWeight());
+                            qUri.setPriorityWeight(this.crawlConfig.getCrawlConfig().getPriorityWeight());
                             qUri.addUriToQueue();
                             return null;
                         case OK:
                             // IP resolution done, requeue to account for politeness
-                            qUri.setPriorityWeight(this.crawlConfig.getPriorityWeight());
+                            qUri.setPriorityWeight(this.crawlConfig.getCrawlConfig().getPriorityWeight());
                             qUri.addUriToQueue();
                             return null;
                     }
@@ -169,7 +163,7 @@ public class CrawlExecution {
                         || code.equals(Status.DEADLINE_EXCEEDED.getCode())
                         || code.equals(Status.ABORTED.getCode())) {
                     LOG.info("Request was aborted", e);
-                    qUri.setPriorityWeight(this.crawlConfig.getPriorityWeight());
+                    qUri.setPriorityWeight(this.crawlConfig.getCrawlConfig().getPriorityWeight());
                     qUri.addUriToQueue();
                 } else {
                     LOG.error("Unexpected error", e);
@@ -249,13 +243,13 @@ public class CrawlExecution {
             if (qUri.hasError() && qUri.getDiscoveryPath().isEmpty()) {
                 if (qUri.getError().getCode() == ExtraStatusCodes.PRECLUDED_BY_ROBOTS.getCode()) {
                     // Seed precluded by robots.txt; mark crawl as finished
-                    endCrawl(State.FINISHED, qUri.getError());
+                    endCrawl(CrawlExecutionStatus.State.FINISHED, qUri.getError());
                 } else {
                     // Seed failed; mark crawl as failed
-                    endCrawl(State.FAILED, qUri.getError());
+                    endCrawl(CrawlExecutionStatus.State.FAILED, qUri.getError());
                 }
             } else if (DbService.getInstance().getCrawlQueueAdapter().queuedUriCount(getId()) == 0) {
-                endCrawl(State.FINISHED);
+                endCrawl(CrawlExecutionStatus.State.FINISHED);
             }
 
             // Save updated status
@@ -302,12 +296,12 @@ public class CrawlExecution {
                     switch (check) {
                         case OK:
                             LOG.debug("Found new URI: {}, queueing.", outUri.getSurt());
-                            outUri.setPriorityWeight(this.crawlConfig.getPriorityWeight());
+                            outUri.setPriorityWeight(this.crawlConfig.getCrawlConfig().getPriorityWeight());
                             outUri.addUriToQueue();
                             break;
                         case RETRY:
                             LOG.debug("Failed preconditions for: {}, queueing for retry.", outUri.getSurt());
-                            outUri.setPriorityWeight(this.crawlConfig.getPriorityWeight());
+                            outUri.setPriorityWeight(this.crawlConfig.getCrawlConfig().getPriorityWeight());
                             outUri.addUriToQueue();
                             break;
                         case FAIL:
@@ -347,9 +341,9 @@ public class CrawlExecution {
             return;
         }
 
-        float delayFactor = politenessConfig.getDelayFactor();
-        long minTimeBetweenPageLoadMs = politenessConfig.getMinTimeBetweenPageLoadMs();
-        long maxTimeBetweenPageLoadMs = politenessConfig.getMaxTimeBetweenPageLoadMs();
+        float delayFactor = politenessConfig.getPolitenessConfig().getDelayFactor();
+        long minTimeBetweenPageLoadMs = politenessConfig.getPolitenessConfig().getMinTimeBetweenPageLoadMs();
+        long maxTimeBetweenPageLoadMs = politenessConfig.getPolitenessConfig().getMaxTimeBetweenPageLoadMs();
         if (delayFactor == 0f) {
             delayFactor = 1f;
         } else if (delayFactor < 0f) {
@@ -371,14 +365,14 @@ public class CrawlExecution {
     private void retryUri(QueuedUriWrapper qUri, Error error) throws DbException {
         LOG.info("Failed fetching ({}) at attempt #{}", qUri, qUri.getRetries());
         qUri.incrementRetries()
-                .setEarliestFetchDelaySeconds(politenessConfig.getRetryDelaySeconds())
+                .setEarliestFetchDelaySeconds(politenessConfig.getPolitenessConfig().getRetryDelaySeconds())
                 .setError(error);
 
         if (LimitsCheck.isRetryLimitReached(politenessConfig, qUri)) {
             LOG.info("Failed fetching '{}' due to retry limit", qUri);
             status.incrementDocumentsFailed();
         } else {
-            qUri.setPriorityWeight(this.crawlConfig.getPriorityWeight());
+            qUri.setPriorityWeight(this.crawlConfig.getCrawlConfig().getPriorityWeight());
             qUri.addUriToQueue();
         }
     }

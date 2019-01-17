@@ -15,17 +15,14 @@
  */
 package no.nb.nna.veidemann.frontier.worker;
 
-import no.nb.nna.veidemann.api.ConfigProto.CrawlConfig;
-import no.nb.nna.veidemann.api.FrontierProto.CrawlSeedRequest;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatusChange;
+import no.nb.nna.veidemann.api.config.v1.ConfigObject;
+import no.nb.nna.veidemann.api.frontier.v1.CrawlExecutionStatus;
+import no.nb.nna.veidemann.api.frontier.v1.CrawlSeedRequest;
 import no.nb.nna.veidemann.commons.ExtraStatusCodes;
 import no.nb.nna.veidemann.commons.client.DnsServiceClient;
 import no.nb.nna.veidemann.commons.client.RobotsServiceClient;
 import no.nb.nna.veidemann.commons.db.DbException;
-import no.nb.nna.veidemann.commons.db.DbHelper;
 import no.nb.nna.veidemann.commons.db.DbService;
-import no.nb.nna.veidemann.db.ProtoUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,17 +54,18 @@ public class Frontier implements AutoCloseable {
                         request.getJob().getId(),
                         request.getJobExecutionId(),
                         request.getSeed().getId(),
-                        request.getSeed().getScope()));
+                        request.getSeed().getSeed().getScope()));
 
         LOG.debug("New crawl execution: " + status.getId());
 
         String uri = request.getSeed().getMeta().getName();
 
         try {
-            CrawlConfig crawlConfig = DbHelper.getCrawlConfigForJob(request.getJob());
+            ConfigObject crawlConfig = DbService.getInstance().getConfigAdapter()
+                    .getConfigObject(request.getJob().getCrawlJob().getCrawlConfigRef());
             QueuedUriWrapper qUri = QueuedUriWrapper.getQueuedUriWrapper(uri, request.getJobExecutionId(),
-                    status.getId(), crawlConfig.getPolitenessId());
-            qUri.setPriorityWeight(crawlConfig.getPriorityWeight());
+                    status.getId(), crawlConfig.getCrawlConfig().getPolitenessRef());
+            qUri.setPriorityWeight(crawlConfig.getCrawlConfig().getPriorityWeight());
             qUri.addUriToQueue();
             LOG.debug("Seed '{}' added to queue", qUri.getUri());
         } catch (URISyntaxException ex) {

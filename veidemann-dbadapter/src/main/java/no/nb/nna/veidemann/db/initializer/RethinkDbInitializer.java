@@ -93,6 +93,9 @@ public class RethinkDbInitializer implements DbInitializer {
             case "0.4":
                 new Upgrade0_4To1_0(dbName, conn).run();
                 break;
+            case "1.0":
+                new Upgrade1_0To1_1(dbName, conn).run();
+                break;
             default:
                 throw new DbUpgradeException("Unknown database version '" + fromVersion + "', unable to upgrade");
         }

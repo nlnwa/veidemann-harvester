@@ -16,7 +16,6 @@
 package no.nb.nna.veidemann.db.initializer;
 
 import com.google.protobuf.Message;
-import no.nb.nna.veidemann.api.ConfigProto.RoleMapping;
 import no.nb.nna.veidemann.api.config.v1.ConfigObject;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbService;
@@ -38,7 +37,6 @@ public class PopulateDbWithDefaultData implements Runnable {
     }
 
     private final void populateDb() {
-//        ConfigAdapter db = DbService.getInstance().getConfigAdapter();
         RethinkDbConfigAdapter db = (RethinkDbConfigAdapter) DbService.getInstance().getConfigAdapter();
         try {
             try (InputStream in = getClass().getClassLoader()
@@ -109,6 +107,17 @@ public class PopulateDbWithDefaultData implements Runnable {
             }
             try (InputStream in = getClass().getClassLoader()
                     .getResourceAsStream("default_objects/rolemappings.yaml")) {
+                readYamlFile(in, ConfigObject.class)
+                        .forEach(o -> {
+                            try {
+                                db.saveConfigObject(o);
+                            } catch (DbException e) {
+                                throw new RuntimeException(e);
+                            }
+                        });
+            }
+            try (InputStream in = getClass().getClassLoader()
+                    .getResourceAsStream("default_objects/collection-configs.yaml")) {
                 readYamlFile(in, ConfigObject.class)
                         .forEach(o -> {
                             try {

@@ -23,10 +23,12 @@ import io.grpc.Status.Code;
 import io.grpc.StatusRuntimeException;
 import io.opentracing.contrib.ClientTracingInterceptor;
 import io.opentracing.util.GlobalTracer;
-import no.nb.nna.veidemann.api.ConfigProto.PolitenessConfig;
-import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
-import no.nb.nna.veidemann.api.RobotsEvaluatorGrpc;
-import no.nb.nna.veidemann.api.RobotsEvaluatorProto;
+import no.nb.nna.veidemann.api.config.v1.ConfigObject;
+import no.nb.nna.veidemann.api.config.v1.ConfigRef;
+import no.nb.nna.veidemann.api.frontier.v1.QueuedUri;
+import no.nb.nna.veidemann.api.robotsevaluator.v1.IsAllowedReply;
+import no.nb.nna.veidemann.api.robotsevaluator.v1.IsAllowedRequest;
+import no.nb.nna.veidemann.api.robotsevaluator.v1.RobotsEvaluatorGrpc;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,17 +60,18 @@ public class RobotsServiceClient implements AutoCloseable {
         asyncStub = RobotsEvaluatorGrpc.newStub(channel);
     }
 
-    public boolean isAllowed(QueuedUri queuedUri, String userAgent, PolitenessConfig politeness) {
+    public boolean isAllowed(QueuedUri queuedUri, String userAgent, ConfigObject politeness, ConfigRef collectionRef) {
         try {
-            RobotsEvaluatorProto.IsAllowedRequest request = RobotsEvaluatorProto.IsAllowedRequest.newBuilder()
+            IsAllowedRequest request = IsAllowedRequest.newBuilder()
                     .setJobExecutionId(queuedUri.getJobExecutionId())
                     .setExecutionId(queuedUri.getExecutionId())
                     .setUri(queuedUri.getUri())
                     .setUserAgent(userAgent)
                     .setPoliteness(politeness)
+                    .setCollectionRef(collectionRef)
                     .build();
 
-            RobotsEvaluatorProto.IsAllowedReply reply = GrpcUtil.forkedCall(() -> blockingStub.isAllowed(request));
+            IsAllowedReply reply = GrpcUtil.forkedCall(() -> blockingStub.isAllowed(request));
 
             return reply.getIsAllowed();
         } catch (StatusRuntimeException ex) {

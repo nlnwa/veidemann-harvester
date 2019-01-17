@@ -18,7 +18,8 @@ package no.nb.nna.veidemann.db;
 import com.rethinkdb.RethinkDB;
 import io.grpc.Context;
 import no.nb.nna.veidemann.api.config.v1.ConfigObject;
-import no.nb.nna.veidemann.api.config.v1.GetRequest;
+import no.nb.nna.veidemann.api.config.v1.ConfigRef;
+import no.nb.nna.veidemann.api.config.v1.GetLabelKeysRequest;
 import no.nb.nna.veidemann.api.config.v1.Label;
 import no.nb.nna.veidemann.api.config.v1.ListRequest;
 import no.nb.nna.veidemann.api.config.v1.UpdateRequest;
@@ -36,6 +37,7 @@ import java.util.Comparator;
 import java.util.Map;
 
 import static no.nb.nna.veidemann.api.config.v1.Kind.browserConfig;
+import static no.nb.nna.veidemann.api.config.v1.Kind.browserScript;
 import static no.nb.nna.veidemann.api.config.v1.Kind.crawlEntity;
 import static no.nb.nna.veidemann.api.config.v1.Kind.crawlJob;
 import static no.nb.nna.veidemann.api.config.v1.Kind.crawlScheduleConfig;
@@ -133,8 +135,9 @@ public class RethinkDbConfigAdapterIT {
                 .setDescription("desc4")
                 .addLabelBuilder().setKey("foo").setValue("bar");
         co4.getMetaBuilder().addLabelBuilder().setKey("aaa").setValue("bbb");
-        co4.getCrawlJobBuilder()
-                .setScheduleId(saved1.getId());
+        co4.getCrawlJobBuilder().getScheduleRefBuilder()
+                .setKind(crawlScheduleConfig)
+                .setId(saved1.getId());
 
         ConfigObject.Builder co5 = ConfigObject.newBuilder()
                 .setApiVersion("v1")
@@ -144,8 +147,9 @@ public class RethinkDbConfigAdapterIT {
                 .setDescription("desc5")
                 .addLabelBuilder().setKey("foo").setValue("bar");
         co5.getMetaBuilder().addLabelBuilder().setKey("aaa").setValue("bbb");
-        co5.getCrawlJobBuilder()
-                .setScheduleId(saved1.getId());
+        co5.getCrawlJobBuilder().getScheduleRefBuilder()
+                .setKind(crawlScheduleConfig)
+                .setId(saved1.getId());
 
         saved4 = configAdapter.saveConfigObject(co4.build());
         saved5 = configAdapter.saveConfigObject(co5.build());
@@ -169,7 +173,7 @@ public class RethinkDbConfigAdapterIT {
 
         co.getBrowserConfigBuilder()
                 .setUserAgent("agent")
-                .addScriptId("script");
+                .addScriptRef(ConfigRef.newBuilder().setKind(browserScript).setId("script"));
 
         // Convert to rethink object and back to ensure nothing gets lost
         Map rethink = ProtoUtils.protoToRethink(co);
@@ -181,7 +185,7 @@ public class RethinkDbConfigAdapterIT {
         assertThat(saved.getId()).isNotEmpty();
 
         // Test get
-        ConfigObject fetched1 = configAdapter.getConfigObject(GetRequest.newBuilder()
+        ConfigObject fetched1 = configAdapter.getConfigObject(ConfigRef.newBuilder()
                 .setKind(browserConfig)
                 .setId(saved.getId())
                 .build());
@@ -193,7 +197,7 @@ public class RethinkDbConfigAdapterIT {
 
         // Test delete
         assertThat(configAdapter.deleteConfigObject(saved).getDeleted()).isTrue();
-        ConfigObject fetched2 = configAdapter.getConfigObject(GetRequest.newBuilder()
+        ConfigObject fetched2 = configAdapter.getConfigObject(ConfigRef.newBuilder()
                 .setKind(seed)
                 .setId(saved.getId())
                 .build());
@@ -336,7 +340,7 @@ public class RethinkDbConfigAdapterIT {
 
     @Test
     public void testGetLabelKeys() throws Exception {
-        assertThat(configAdapter.getLabelKeys(GetRequest.newBuilder()
+        assertThat(configAdapter.getLabelKeys(GetLabelKeysRequest.newBuilder()
                 .setKind(crawlScheduleConfig).build()).getKeyList())
                 .containsExactlyInAnyOrder("foo", "aaa");
     }
@@ -453,8 +457,8 @@ public class RethinkDbConfigAdapterIT {
                 .addLabelBuilder().setKey("foo").setValue("bar");
 
         co.getSeedBuilder()
-                .setEntityId("entity1")
-                .addJobId("job1");
+                .setEntityRef(ConfigRef.newBuilder().setKind(crawlEntity).setId("entity1"))
+                .addJobRef(ConfigRef.newBuilder().setKind(crawlJob).setId("job1"));
 
         // Convert to rethink object and back to ensure nothing gets lost
         Map rethink = ProtoUtils.protoToRethink(co);
@@ -466,7 +470,7 @@ public class RethinkDbConfigAdapterIT {
         assertThat(saved.getId()).isNotEmpty();
 
         // Test get
-        ConfigObject fetched1 = configAdapter.getConfigObject(GetRequest.newBuilder()
+        ConfigObject fetched1 = configAdapter.getConfigObject(ConfigRef.newBuilder()
                 .setKind(seed)
                 .setId(saved.getId())
                 .build());
@@ -491,13 +495,13 @@ public class RethinkDbConfigAdapterIT {
                     assertThat(s.getKind()).isEqualTo(seed);
                     assertThat(s.getId()).isEqualTo(saved.getId());
                     assertThat(s.getMeta().getName()).isEmpty();
-                    assertThat(s.getSeed().getEntityId()).isEmpty();
-                    assertThat(s.getSeed().getJobIdList()).isEmpty();
+                    assertThat(s.getSeed().hasEntityRef()).isFalse();
+                    assertThat(s.getSeed().getJobRefList()).isEmpty();
                 });
 
         // Test delete
         assertThat(configAdapter.deleteConfigObject(saved).getDeleted()).isTrue();
-        ConfigObject fetched2 = configAdapter.getConfigObject(GetRequest.newBuilder()
+        ConfigObject fetched2 = configAdapter.getConfigObject(ConfigRef.newBuilder()
                 .setKind(seed)
                 .setId(saved.getId())
                 .build());
@@ -526,7 +530,7 @@ public class RethinkDbConfigAdapterIT {
         assertThat(saved.getId()).isNotEmpty();
 
         // Test get
-        ConfigObject fetched1 = configAdapter.getConfigObject(GetRequest.newBuilder()
+        ConfigObject fetched1 = configAdapter.getConfigObject(ConfigRef.newBuilder()
                 .setKind(crawlEntity)
                 .setId(saved.getId())
                 .build());
@@ -555,7 +559,7 @@ public class RethinkDbConfigAdapterIT {
 
         // Test delete
         assertThat(configAdapter.deleteConfigObject(saved).getDeleted()).isTrue();
-        ConfigObject fetched2 = configAdapter.getConfigObject(GetRequest.newBuilder()
+        ConfigObject fetched2 = configAdapter.getConfigObject(ConfigRef.newBuilder()
                 .setKind(crawlEntity)
                 .setId(saved.getId())
                 .build());

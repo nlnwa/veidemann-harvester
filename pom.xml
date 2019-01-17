@@ -2,9 +2,9 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-    <groupId>no.nb.nna</groupId>
+    <groupId>com.github.nlnwa</groupId>
     <artifactId>veidemann</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>0</version>
     <packaging>pom</packaging>
 
     <organization>
@@ -41,7 +41,7 @@
         <chrome.version>71.0.3542.0</chrome.version>
         <docker.java.image>openjdk:8-jdk-alpine</docker.java.image>
 
-        <veidemann.api.version>v1.0.0-beta1</veidemann.api.version>
+        <veidemann.api.version>v1.0.0-beta2</veidemann.api.version>
 
         <log4j.version>2.7</log4j.version>
         <org.jwat.version>1.0.4</org.jwat.version>
@@ -50,7 +50,7 @@
         <io.opentracing.version>0.30.0</io.opentracing.version>
         <io.opentracing.brave.version>0.20.0</io.opentracing.brave.version>
         <com.uber.jaeger.version>0.21.0</com.uber.jaeger.version>
-        <io.grpc.version>1.16.1</io.grpc.version>
+        <io.grpc.version>1.17.1</io.grpc.version>
         <io.zipkin.reporter.version>0.10.0</io.zipkin.reporter.version>
         <io.zipkin.brave.version>4.3.4</io.zipkin.brave.version>
         <antlr.version>4.7</antlr.version>
@@ -65,8 +65,8 @@
         <browserless.chrome.version>release-puppeteer-1.8.0</browserless.chrome.version>
         <rethinkdb.version>2.3.6</rethinkdb.version>
         <veidemann.cache.version>v0.1.1</veidemann.cache.version>
-        <veidemann.dns.resolver.version>v0.1.2</veidemann.dns.resolver.version>
-        <veidemann.contentwriter.version>v0.1.7</veidemann.contentwriter.version>
+        <veidemann.dns.resolver.version>v0.2.0</veidemann.dns.resolver.version>
+        <veidemann.contentwriter.version>v0.2.0</veidemann.contentwriter.version>
     </properties>
 
     <repositories>
@@ -104,11 +104,6 @@
                 <artifactId>webarchive-commons-util</artifactId>
                 <version>2.0.0-SNAPSHOT</version>
             </dependency>
-            <!--<dependency>-->
-                <!--<groupId>org.littleshoot</groupId>-->
-                <!--<artifactId>littleproxy</artifactId>-->
-                <!--<version>1.1.2</version>-->
-            <!--</dependency>-->
             <dependency>
                 <groupId>net.lightbody.bmp</groupId>
                 <artifactId>mitm</artifactId>

@@ -2,10 +2,10 @@ package no.nb.nna.veidemann.frontier.api;
 
 import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
-import no.nb.nna.veidemann.api.ConfigProto.CrawlConfig;
-import no.nb.nna.veidemann.api.FrontierProto.PageHarvestSpec;
-import no.nb.nna.veidemann.api.MessagesProto.Error;
-import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
+import no.nb.nna.veidemann.api.commons.v1.Error;
+import no.nb.nna.veidemann.api.config.v1.ConfigObject;
+import no.nb.nna.veidemann.api.frontier.v1.PageHarvestSpec;
+import no.nb.nna.veidemann.api.frontier.v1.QueuedUri;
 import no.nb.nna.veidemann.commons.ExtraStatusCodes;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.frontier.worker.CrawlExecution;
@@ -68,7 +68,7 @@ public class FrontierServiceTest {
         when(crawlExecutionMock.preFetch()).thenReturn(harvestSpec1, harvestSpec2);
         doThrow(new RuntimeException("Simulated exception in postFetchSuccess")).when(crawlExecutionMock).postFetchSuccess(any());
 
-        when(controller.render(any(), any(QueuedUri.class), any(CrawlConfig.class)))
+        when(controller.render(any(), any(QueuedUri.class), any(ConfigObject.class)))
                 .thenReturn(new RenderResult())
                 .thenThrow(new RuntimeException("Simulated render exception"))
                 .thenReturn(new RenderResult().withError(Error.newBuilder().setCode(1).setMsg("Error").build()));
@@ -82,7 +82,7 @@ public class FrontierServiceTest {
         inProcessServer.blockUntilShutdown();
 
         verify(frontierMock, times(3)).getNextPageToFetch();
-        verify(controller, times(3)).render(any(), any(QueuedUri.class), any(CrawlConfig.class));
+        verify(controller, times(3)).render(any(), any(QueuedUri.class), any(ConfigObject.class));
         verify(crawlExecutionMock, times(3)).preFetch();
         verify(crawlExecutionMock, times(3)).postFetchFinally();
         verify(crawlExecutionMock).postFetchSuccess(any());

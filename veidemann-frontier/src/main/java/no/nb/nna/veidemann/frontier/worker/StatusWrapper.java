@@ -16,10 +16,12 @@
 package no.nb.nna.veidemann.frontier.worker;
 
 import com.google.protobuf.Timestamp;
-import no.nb.nna.veidemann.api.ConfigProto;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatusChange;
-import no.nb.nna.veidemann.api.MessagesProto.Error;
+import no.nb.nna.veidemann.api.commons.v1.Error;
+import no.nb.nna.veidemann.api.config.v1.ConfigRef;
+import no.nb.nna.veidemann.api.config.v1.CrawlScope;
+import no.nb.nna.veidemann.api.config.v1.Kind;
+import no.nb.nna.veidemann.api.frontier.v1.CrawlExecutionStatus;
+import no.nb.nna.veidemann.api.frontier.v1.CrawlExecutionStatusChange;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.db.ProtoUtils;
@@ -74,8 +76,8 @@ public class StatusWrapper {
         return status.getId();
     }
 
-    public String getJobId() {
-        return status.getJobId();
+    public ConfigRef getJobId() {
+        return ConfigRef.newBuilder().setKind(Kind.crawlJob).setId(status.getJobId()).build();
     }
 
     public String getJobExecutionId() {
@@ -98,7 +100,7 @@ public class StatusWrapper {
         return getCrawlExecutionStatus().hasEndTime();
     }
 
-    public ConfigProto.CrawlScope getScope() {
+    public CrawlScope getScope() {
         return status.getScope();
     }
 

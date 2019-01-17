@@ -20,7 +20,7 @@ import io.opentracing.Span;
 import io.opentracing.Tracer;
 import io.opentracing.tag.Tags;
 import io.opentracing.util.GlobalTracer;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
+import no.nb.nna.veidemann.api.frontier.v1.CrawlLog;
 import no.nb.nna.veidemann.chrome.client.NetworkDomain;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -18,8 +18,10 @@ package no.nb.nna.veidemann.commons.util;
 import com.google.protobuf.Descriptors.FieldDescriptor;
 import com.google.protobuf.GeneratedMessageV3.Builder;
 import com.google.protobuf.Message;
-import no.nb.nna.veidemann.api.ConfigProto.Label;
-import no.nb.nna.veidemann.api.ConfigProto.Meta;
+import no.nb.nna.veidemann.api.config.v1.ConfigObject;
+import no.nb.nna.veidemann.api.config.v1.ConfigRef;
+import no.nb.nna.veidemann.api.config.v1.Label;
+import no.nb.nna.veidemann.api.config.v1.Meta;
 
 import java.math.BigInteger;
 import java.security.MessageDigest;
@@ -175,5 +177,15 @@ public class ApiTools {
         public interface CheckedFunction<T, R> {
             R apply(T t) throws Exception;
         }
+    }
+
+    /**
+     * Helper method for creating a ConfigRef for a ConfigObject.
+     *
+     * @param configObject the object to create a reference for
+     * @return the created reference
+     */
+    public static ConfigRef refForConfig(ConfigObject configObject) {
+        return ConfigRef.newBuilder().setKind(configObject.getKind()).setId(configObject.getId()).build();
     }
 }

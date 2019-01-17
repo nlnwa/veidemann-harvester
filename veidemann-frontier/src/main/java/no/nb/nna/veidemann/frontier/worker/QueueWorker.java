@@ -15,7 +15,8 @@
  */
 package no.nb.nna.veidemann.frontier.worker;
 
-import no.nb.nna.veidemann.api.MessagesProto;
+import no.nb.nna.veidemann.api.frontier.v1.CrawlHostGroup;
+import no.nb.nna.veidemann.api.frontier.v1.QueuedUri;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.commons.db.FutureOptional;
@@ -60,7 +61,7 @@ public class QueueWorker {
                 if (DbService.getInstance().getDbAdapter().getDesiredPausedState()) {
                     sleep = RESCHEDULE_DELAY;
                 } else {
-                    FutureOptional<MessagesProto.CrawlHostGroup> crawlHostGroup = DbService.getInstance().getCrawlQueueAdapter()
+                    FutureOptional<CrawlHostGroup> crawlHostGroup = DbService.getInstance().getCrawlQueueAdapter()
                             .borrowFirstReadyCrawlHostGroup();
                     LOG.trace("Borrow Crawl Host Group: {}", crawlHostGroup);
 
@@ -69,7 +70,7 @@ public class QueueWorker {
                         LOG.trace("Crawl Host Group not ready yet, delaying: {}", crawlHostGroup.getDelayMs());
                         sleep = crawlHostGroup.getDelayMs();
                     } else if (crawlHostGroup.isPresent()) {
-                        FutureOptional<MessagesProto.QueuedUri> foqu = DbService.getInstance().getCrawlQueueAdapter()
+                        FutureOptional<QueuedUri> foqu = DbService.getInstance().getCrawlQueueAdapter()
                                 .getNextQueuedUriToFetch(crawlHostGroup.get());
 
                         if (foqu.isPresent()) {

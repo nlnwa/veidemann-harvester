@@ -21,7 +21,6 @@ import io.netty.handler.codec.http.HttpRequest;
 import io.netty.util.AttributeKey;
 import no.nb.nna.veidemann.commons.client.ContentWriterClient;
 import no.nb.nna.veidemann.harvester.BrowserSessionRegistry;
-import org.littleshoot.proxy.HostResolver;
 import org.littleshoot.proxy.HttpFilters;
 import org.littleshoot.proxy.HttpFiltersAdapter;
 import org.littleshoot.proxy.HttpFiltersSourceAdapter;
@@ -45,10 +44,10 @@ public class RecorderFilterSourceAdapter extends HttpFiltersSourceAdapter {
 
     private final BrowserSessionRegistry sessionRegistry;
 
-    private final HostResolver hostResolver;
+    private final DnsServiceHostResolver hostResolver;
 
     public RecorderFilterSourceAdapter(final int proxyId, final ContentWriterClient contentWriterClient,
-                                       final BrowserSessionRegistry sessionRegistry, final HostResolver hostResolver) {
+                                       final BrowserSessionRegistry sessionRegistry, final DnsServiceHostResolver hostResolver) {
         this.proxyId = proxyId;
         this.contentWriterClient = contentWriterClient;
         this.sessionRegistry = sessionRegistry;

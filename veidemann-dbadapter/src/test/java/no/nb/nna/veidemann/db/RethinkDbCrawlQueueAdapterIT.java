@@ -17,12 +17,13 @@ package no.nb.nna.veidemann.db;
 
 import com.rethinkdb.RethinkDB;
 import com.rethinkdb.net.Cursor;
-import no.nb.nna.veidemann.api.ConfigProto.CrawlScope;
-import no.nb.nna.veidemann.api.MessagesProto;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatusChange;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlHostGroup;
-import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
+import no.nb.nna.veidemann.api.config.v1.ConfigRef;
+import no.nb.nna.veidemann.api.config.v1.CrawlScope;
+import no.nb.nna.veidemann.api.config.v1.Kind;
+import no.nb.nna.veidemann.api.frontier.v1.CrawlExecutionStatus;
+import no.nb.nna.veidemann.api.frontier.v1.CrawlExecutionStatusChange;
+import no.nb.nna.veidemann.api.frontier.v1.CrawlHostGroup;
+import no.nb.nna.veidemann.api.frontier.v1.QueuedUri;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.commons.db.FutureOptional;
@@ -99,8 +100,8 @@ public class RethinkDbCrawlQueueAdapterIT {
     public void testReleaseCrawlHostGroup() throws DbException, InterruptedException {
         RethinkDbConnection conn = ((RethinkDbInitializer) DbService.getInstance().getDbInitializer()).getDbConnection();
 
-        QueuedUri qUri1 = QueuedUri.newBuilder().setCrawlHostGroupId("crawlHostGroupId1").setPolitenessId("politenessId").setSequence(1).build();
-        QueuedUri qUri2 = QueuedUri.newBuilder().setCrawlHostGroupId("crawlHostGroupId2").setPolitenessId("politenessId").setSequence(1).build();
+        QueuedUri qUri1 = QueuedUri.newBuilder().setCrawlHostGroupId("crawlHostGroupId1").setPolitenessRef(ConfigRef.newBuilder().setKind(Kind.politenessConfig).setId("politenessId")).setSequence(1).build();
+        QueuedUri qUri2 = QueuedUri.newBuilder().setCrawlHostGroupId("crawlHostGroupId2").setPolitenessRef(ConfigRef.newBuilder().setKind(Kind.politenessConfig).setId("politenessId")).setSequence(1).build();
         queueAdapter.addToCrawlHostGroup(qUri1);
         queueAdapter.addToCrawlHostGroup(qUri2);
 
@@ -162,7 +163,7 @@ public class RethinkDbCrawlQueueAdapterIT {
                 .setIp("127.0.0.1")
                 .setSequence(1L)
                 .setCrawlHostGroupId("CHGID")
-                .setPolitenessId("PID")
+                .setPolitenessRef(ConfigRef.newBuilder().setKind(Kind.politenessConfig).setId("PID"))
                 .setExecutionId("EID")
                 .setPriorityWeight(1.0)
                 .build();
@@ -198,13 +199,13 @@ public class RethinkDbCrawlQueueAdapterIT {
     public void testBorrowFirstReadyCrawlHostGroup() throws DbException {
         QueuedUri qUri1 = QueuedUri.newBuilder()
                 .setCrawlHostGroupId("crawlHostGroupId1")
-                .setPolitenessId("politenessId")
+                .setPolitenessRef(ConfigRef.newBuilder().setKind(Kind.politenessConfig).setId("politenessId"))
                 .setSequence(1)
                 .setPriorityWeight(1.0)
                 .build();
         QueuedUri qUri2 = QueuedUri.newBuilder()
                 .setCrawlHostGroupId("crawlHostGroupId2")
-                .setPolitenessId("politenessId")
+                .setPolitenessRef(ConfigRef.newBuilder().setKind(Kind.politenessConfig).setId("politenessId"))
                 .setSequence(1)
                 .setPriorityWeight(1.0)
                 .build();
@@ -235,7 +236,7 @@ public class RethinkDbCrawlQueueAdapterIT {
             QueuedUri qUri = QueuedUri.newBuilder()
                     .setExecutionId("executionId2")
                     .setCrawlHostGroupId("crawlHostGroupId1")
-                    .setPolitenessId("politenessId")
+                    .setPolitenessRef(ConfigRef.newBuilder().setKind(Kind.politenessConfig).setId("politenessId"))
                     .setSequence(1)
                     .build();
             queueAdapter.addToCrawlHostGroup(qUri);
@@ -244,7 +245,7 @@ public class RethinkDbCrawlQueueAdapterIT {
             QueuedUri qUri = QueuedUri.newBuilder()
                     .setExecutionId("executionId1")
                     .setCrawlHostGroupId("crawlHostGroupId1")
-                    .setPolitenessId("politenessId")
+                    .setPolitenessRef(ConfigRef.newBuilder().setKind(Kind.politenessConfig).setId("politenessId"))
                     .setSequence(1)
                     .build();
             queueAdapter.addToCrawlHostGroup(qUri);
@@ -253,7 +254,7 @@ public class RethinkDbCrawlQueueAdapterIT {
             QueuedUri qUri = QueuedUri.newBuilder()
                     .setExecutionId("executionId1")
                     .setCrawlHostGroupId("crawlHostGroupId2")
-                    .setPolitenessId("politenessId")
+                    .setPolitenessRef(ConfigRef.newBuilder().setKind(Kind.politenessConfig).setId("politenessId"))
                     .setSequence(1)
                     .build();
             queueAdapter.addToCrawlHostGroup(qUri);
@@ -276,7 +277,7 @@ public class RethinkDbCrawlQueueAdapterIT {
                         "jobId", "jobExecutionId", "seedId", CrawlScope.getDefaultInstance());
                 QueuedUri qUri = QueuedUri.newBuilder()
                         .setCrawlHostGroupId(chgId)
-                        .setPolitenessId(politenessId)
+                        .setPolitenessRef(ConfigRef.newBuilder().setKind(Kind.politenessConfig).setId("politenessId"))
                         .setSequence(1)
                         .setExecutionId(ces.getId())
                         .setJobExecutionId(ces.getJobExecutionId())
@@ -321,7 +322,7 @@ public class RethinkDbCrawlQueueAdapterIT {
                         sleep = crawlHostGroup.getDelayMs();
                     } else if (crawlHostGroup.isPresent()) {
                         assertThat(crawlHostGroup.get().getQueuedUriCount()).isGreaterThan(-1L);
-                        FutureOptional<MessagesProto.QueuedUri> foqu = queueAdapter.getNextQueuedUriToFetch(crawlHostGroup.get());
+                        FutureOptional<QueuedUri> foqu = queueAdapter.getNextQueuedUriToFetch(crawlHostGroup.get());
 
                         if (foqu.isPresent()) {
                             // A fetchabel URI was found, return it

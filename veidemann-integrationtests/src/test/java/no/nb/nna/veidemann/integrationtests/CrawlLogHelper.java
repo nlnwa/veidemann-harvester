@@ -15,12 +15,13 @@
  */
 package no.nb.nna.veidemann.integrationtests;
 
-import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
 import no.nb.nna.veidemann.api.ReportProto.CrawlLogListReply;
 import no.nb.nna.veidemann.api.ReportProto.CrawlLogListRequest;
+import no.nb.nna.veidemann.api.frontier.v1.CrawlLog;
 import no.nb.nna.veidemann.commons.ExtraStatusCodes;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.db.DbException;
+import no.nb.nna.veidemann.commons.db.DbService;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -31,20 +32,24 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class CrawlLogHelper {
-    final CrawlLogListReply crawlLogListReply;
+    final List<CrawlLog> crawlLogs = new ArrayList<>();
     final Map<String, List<CrawlLog>> crawlLogsByType = new HashMap();
     final Map<String, List<CrawlLog>> crawlLogsByEid = new HashMap();
     final Map<String, List<CrawlLog>> crawlLogsByJobEid = new HashMap();
-    int reportedCount;
 
-    public CrawlLogHelper(DbAdapter db) throws DbException {
-        crawlLogListReply = db.listCrawlLogs(CrawlLogListRequest.newBuilder().setPageSize(500).build());
-        reportedCount = (int) crawlLogListReply.getCount();
-        crawlLogListReply.getValueList().forEach(c -> addCrawlLog(c));
-        checkCount();
+    public CrawlLogHelper(String collectionName) throws DbException {
+        DbAdapter db = DbService.getInstance().getDbAdapter();
+        CrawlLogListReply reply = db.listCrawlLogs(CrawlLogListRequest.newBuilder()
+                .setPageSize(5000).build());
+        reply.getValueList()
+                .stream()
+                .filter(c -> c.getCollectionFinalName().startsWith(collectionName))
+                .forEach(c -> addCrawlLog(c));
     }
 
     private void addCrawlLog(CrawlLog crawlLog) {
+        crawlLogs.add(crawlLog);
+
         String type;
         if (crawlLog.getRequestedUri().startsWith("dns")) {
             type = "dns";
@@ -75,12 +80,8 @@ public class CrawlLogHelper {
         return getCrawlLogsByType(type).size();
     }
 
-    private void checkCount() {
-        assertThat(getCrawlLog().size()).isEqualTo(reportedCount);
-    }
-
     public List<CrawlLog> getCrawlLog() {
-        return crawlLogListReply.getValueList();
+        return crawlLogs;
     }
 
     public List<CrawlLog> getCrawlLogsByType(String type) {

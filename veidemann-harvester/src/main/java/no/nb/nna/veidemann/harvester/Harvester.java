@@ -26,7 +26,6 @@ import no.nb.nna.veidemann.commons.client.DnsServiceClient;
 import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.commons.opentracing.TracerFactory;
 import no.nb.nna.veidemann.harvester.browsercontroller.BrowserController;
-import no.nb.nna.veidemann.harvester.proxy.DnsServiceHostResolver;
 import no.nb.nna.veidemann.harvester.proxy.RecordingProxy;
 import no.nb.nna.veidemann.harvester.settings.Settings;
 import org.slf4j.Logger;
@@ -94,7 +93,7 @@ public class Harvester {
              RecordingProxy proxy = new RecordingProxy(SETTINGS.getMaxOpenSessions(),
                      new File(SETTINGS.getWorkDir()),
                      SETTINGS.getProxyPort(), contentWriterClient,
-                     new DnsServiceHostResolver(dnsServiceClient), sessionRegistry, SETTINGS.getCacheHost(),
+                     dnsServiceClient, sessionRegistry, SETTINGS.getCacheHost(),
                      SETTINGS.getCachePort());
         ) {
             Runtime.getRuntime().addShutdownHook(new Thread(() -> shouldRun = false));

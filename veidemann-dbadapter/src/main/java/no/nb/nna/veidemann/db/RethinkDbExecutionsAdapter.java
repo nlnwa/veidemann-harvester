@@ -22,12 +22,6 @@ import com.rethinkdb.gen.ast.ReqlFunction1;
 import com.rethinkdb.gen.ast.Update;
 import com.rethinkdb.model.MapObject;
 import com.rethinkdb.net.Cursor;
-import no.nb.nna.veidemann.api.ConfigProto.CrawlScope;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus.State;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatusChange;
-import no.nb.nna.veidemann.api.MessagesProto.JobExecutionStatus;
-import no.nb.nna.veidemann.api.MessagesProto.JobExecutionStatus.Builder;
 import no.nb.nna.veidemann.api.StatusProto;
 import no.nb.nna.veidemann.api.StatusProto.ExecutionsListReply;
 import no.nb.nna.veidemann.api.StatusProto.JobExecutionsListReply;
@@ -35,6 +29,10 @@ import no.nb.nna.veidemann.api.StatusProto.ListExecutionsRequest;
 import no.nb.nna.veidemann.api.StatusProto.ListJobExecutionsRequest;
 import no.nb.nna.veidemann.api.StatusProto.RunningExecutionsListReply;
 import no.nb.nna.veidemann.api.StatusProto.RunningExecutionsRequest;
+import no.nb.nna.veidemann.api.config.v1.CrawlScope;
+import no.nb.nna.veidemann.api.frontier.v1.CrawlExecutionStatus;
+import no.nb.nna.veidemann.api.frontier.v1.CrawlExecutionStatusChange;
+import no.nb.nna.veidemann.api.frontier.v1.JobExecutionStatus;
 import no.nb.nna.veidemann.commons.db.ChangeFeed;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DistributedLock;
@@ -101,7 +99,7 @@ public class RethinkDbExecutionsAdapter implements ExecutionsAdapter {
                     .setUrisCrawled((long) sums.get("urisCrawled"))
                     .setBytesCrawled((long) sums.get("bytesCrawled"));
 
-            for (State s : State.values()) {
+            for (CrawlExecutionStatus.State s : CrawlExecutionStatus.State.values()) {
                 jesBuilder.putExecutionsState(s.name(), ((Long) sums.get(s.name())).intValue());
             }
 
@@ -126,7 +124,7 @@ public class RethinkDbExecutionsAdapter implements ExecutionsAdapter {
                                 doc -> r.branch(
                                         doc.hasFields("endTime"),
                                         r.hashMap(),
-                                        r.hashMap("state", State.ABORTED_MANUAL.name()))
+                                        r.hashMap("state", JobExecutionStatus.State.ABORTED_MANUAL.name()))
                         ),
                 JobExecutionStatus.class);
 
@@ -159,7 +157,7 @@ public class RethinkDbExecutionsAdapter implements ExecutionsAdapter {
                 .setJobExecutionId(jobExecutionId)
                 .setSeedId(seedId)
                 .setScope(scope)
-                .setState(State.CREATED)
+                .setState(CrawlExecutionStatus.State.CREATED)
                 .build();
 
         Map rMap = ProtoUtils.protoToRethink(status);
@@ -178,7 +176,7 @@ public class RethinkDbExecutionsAdapter implements ExecutionsAdapter {
             ReqlFunction1 updateFunc = (doc) -> {
                 MapObject rMap = r.hashMap("lastChangeTime", r.now());
 
-                if (statusChange.getState() != State.UNDEFINED) {
+                if (statusChange.getState() != CrawlExecutionStatus.State.UNDEFINED) {
                     switch (statusChange.getState()) {
                         case FETCHING:
                         case SLEEPING:
@@ -318,7 +316,7 @@ public class RethinkDbExecutionsAdapter implements ExecutionsAdapter {
 
                 // Update aggregated statistics
                 Map sums = summarizeJobExecutionStats(jobExecutionId);
-                Builder jesBuilder = jes.toBuilder()
+                JobExecutionStatus.Builder jesBuilder = jes.toBuilder()
                         .setState(state)
                         .setEndTime(ProtoUtils.getNowTs())
                         .setDocumentsCrawled((long) sums.get("documentsCrawled"))
@@ -329,7 +327,7 @@ public class RethinkDbExecutionsAdapter implements ExecutionsAdapter {
                         .setUrisCrawled((long) sums.get("urisCrawled"))
                         .setBytesCrawled((long) sums.get("bytesCrawled"));
 
-                for (State s : State.values()) {
+                for (CrawlExecutionStatus.State s : CrawlExecutionStatus.State.values()) {
                     jesBuilder.putExecutionsState(s.name(), ((Long) sums.get(s.name())).intValue());
                 }
 
@@ -369,7 +367,7 @@ public class RethinkDbExecutionsAdapter implements ExecutionsAdapter {
                                     doc -> r.branch(
                                             doc.hasFields("endTime"),
                                             r.hashMap(),
-                                            r.hashMap("state", State.ABORTED_MANUAL.name()))
+                                            r.hashMap("state", CrawlExecutionStatus.State.ABORTED_MANUAL.name()))
                             ),
                     CrawlExecutionStatus.class);
         } finally {
@@ -438,7 +436,7 @@ public class RethinkDbExecutionsAdapter implements ExecutionsAdapter {
                                     for (String f : EXECUTIONS_STAT_FIELDS) {
                                         m.with(f, doc.getField(f).default_(0));
                                     }
-                                    for (State s : State.values()) {
+                                    for (CrawlExecutionStatus.State s : CrawlExecutionStatus.State.values()) {
                                         m.with(s.name(), r.branch(doc.getField("state").eq(s.name()), 1, 0));
                                     }
                                     return m;
@@ -449,7 +447,7 @@ public class RethinkDbExecutionsAdapter implements ExecutionsAdapter {
                                     for (String f : EXECUTIONS_STAT_FIELDS) {
                                         m.with(f, left.getField(f).add(right.getField(f)));
                                     }
-                                    for (State s : State.values()) {
+                                    for (CrawlExecutionStatus.State s : CrawlExecutionStatus.State.values()) {
                                         m.with(s.name(), left.getField(s.name()).add(right.getField(s.name())));
                                     }
                                     return m;
@@ -459,7 +457,7 @@ public class RethinkDbExecutionsAdapter implements ExecutionsAdapter {
                             for (String f : EXECUTIONS_STAT_FIELDS) {
                                 m.with(f, 0);
                             }
-                            for (State s : State.values()) {
+                            for (CrawlExecutionStatus.State s : CrawlExecutionStatus.State.values()) {
                                 m.with(s.name(), 0);
                             }
                             return m;

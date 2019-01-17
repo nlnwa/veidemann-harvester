@@ -15,9 +15,9 @@
  */
 package no.nb.nna.veidemann.integrationtests;
 
-import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus;
 import no.nb.nna.veidemann.api.StatusProto.ExecutionsListReply;
 import no.nb.nna.veidemann.api.StatusProto.ListExecutionsRequest;
+import no.nb.nna.veidemann.api.frontier.v1.CrawlExecutionStatus;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbService;
 
@@ -29,9 +29,10 @@ public class CrawlExecutionsHelper {
     final ExecutionsListReply executionsListReply;
     int reportedCount;
 
-    public CrawlExecutionsHelper() throws DbException {
+    public CrawlExecutionsHelper(String jobExecutionId) throws DbException {
         executionsListReply = DbService.getInstance().getExecutionsAdapter()
-                .listCrawlExecutionStatus(ListExecutionsRequest.newBuilder().setPageSize(500).build());
+                .listCrawlExecutionStatus(ListExecutionsRequest.newBuilder()
+                        .setJobExecutionId(jobExecutionId).setPageSize(500).build());
         reportedCount = (int) executionsListReply.getCount();
         checkCount();
     }
@@ -69,6 +70,7 @@ public class CrawlExecutionsHelper {
                 .append(", Docs: ").append(crawlExecutionStatus.getDocumentsCrawled())
                 .append(", Uris: ").append(crawlExecutionStatus.getUrisCrawled())
                 .append(", Bytes: ").append(crawlExecutionStatus.getBytesCrawled())
+                .append(", JobExecutionId: ").append(crawlExecutionStatus.getJobExecutionId())
                 .toString();
     }
 }

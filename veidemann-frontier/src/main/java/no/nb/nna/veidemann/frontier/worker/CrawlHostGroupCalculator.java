@@ -16,7 +16,7 @@
 package no.nb.nna.veidemann.frontier.worker;
 
 import com.google.common.net.InetAddresses;
-import no.nb.nna.veidemann.api.ConfigProto.CrawlHostGroupConfig;
+import no.nb.nna.veidemann.api.config.v1.ConfigObject;
 import no.nb.nna.veidemann.commons.util.ApiTools;
 
 import java.math.BigInteger;
@@ -40,12 +40,12 @@ public class CrawlHostGroupCalculator {
      * @param crawlHostGroupConfigs the CrawlHostGroup configs to check
      * @return id of a CrawlHostGroup or the hashed IP
      */
-    public static String calculateCrawlHostGroup(String ip, List<CrawlHostGroupConfig> crawlHostGroupConfigs) {
+    public static String calculateCrawlHostGroup(String ip, List<ConfigObject> crawlHostGroupConfigs) {
         BigInteger ipVal = ipAsInteger(ip);
 
         String hostGroupHash = crawlHostGroupConfigs.stream()
                 .filter(g -> {
-                    return g.getIpRangeList().stream()
+                    return g.getCrawlHostGroupConfig().getIpRangeList().stream()
                             .anyMatch(r -> inRange(ipAsInteger(r.getIpFrom()), ipAsInteger(r.getIpTo()), ipVal));
                 })
                 .findFirst()

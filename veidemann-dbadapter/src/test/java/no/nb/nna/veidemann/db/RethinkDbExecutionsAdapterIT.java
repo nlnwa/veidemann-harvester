@@ -18,17 +18,16 @@ package no.nb.nna.veidemann.db;
 
 import com.google.protobuf.Timestamp;
 import com.rethinkdb.RethinkDB;
-import no.nb.nna.veidemann.api.ConfigProto.CrawlScope;
-import no.nb.nna.veidemann.api.MessagesProto.Cookie;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatus;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlExecutionStatusChange;
-import no.nb.nna.veidemann.api.MessagesProto.JobExecutionStatus;
-import no.nb.nna.veidemann.api.MessagesProto.JobExecutionStatus.State;
-import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
 import no.nb.nna.veidemann.api.StatusProto.ExecutionsListReply;
 import no.nb.nna.veidemann.api.StatusProto.JobExecutionsListReply;
 import no.nb.nna.veidemann.api.StatusProto.ListExecutionsRequest;
 import no.nb.nna.veidemann.api.StatusProto.ListJobExecutionsRequest;
+import no.nb.nna.veidemann.api.config.v1.CrawlScope;
+import no.nb.nna.veidemann.api.frontier.v1.Cookie;
+import no.nb.nna.veidemann.api.frontier.v1.CrawlExecutionStatus;
+import no.nb.nna.veidemann.api.frontier.v1.CrawlExecutionStatusChange;
+import no.nb.nna.veidemann.api.frontier.v1.JobExecutionStatus;
+import no.nb.nna.veidemann.api.frontier.v1.QueuedUri;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.commons.settings.CommonSettings;
@@ -154,7 +153,7 @@ public class RethinkDbExecutionsAdapterIT {
         assertThat(res.getUrisCrawled()).isEqualTo(1);
         assertThat(res.getBytesCrawled()).isEqualTo(1);
         assertThat(res.getCurrentUriIdList()).isEmpty();
-        assertThat(jesRes.getState()).isEqualTo(State.RUNNING);
+        assertThat(jesRes.getState()).isEqualTo(JobExecutionStatus.State.RUNNING);
         assertThat(jesRes.getExecutionsStateMap().get("SLEEPING")).isEqualTo(1);
         assertThat(jesRes.getExecutionsStateMap().get("FETCHING")).isEqualTo(0);
         assertThat(jesRes.getExecutionsStateMap().get("FINISHED")).isEqualTo(0);
@@ -196,7 +195,7 @@ public class RethinkDbExecutionsAdapterIT {
         assertThat(res.getUrisCrawled()).isEqualTo(1);
         assertThat(res.getBytesCrawled()).isEqualTo(1);
         assertThat(res.getCurrentUriIdList()).containsExactly(qUri1.getId());
-        assertThat(jesRes.getState()).isEqualTo(State.RUNNING);
+        assertThat(jesRes.getState()).isEqualTo(JobExecutionStatus.State.RUNNING);
         assertThat(jesRes.getExecutionsStateMap().get("SLEEPING")).isEqualTo(0);
         assertThat(jesRes.getExecutionsStateMap().get("FETCHING")).isEqualTo(1);
         assertThat(jesRes.getExecutionsStateMap().get("FINISHED")).isEqualTo(0);
@@ -239,7 +238,7 @@ public class RethinkDbExecutionsAdapterIT {
         assertThat(res.getUrisCrawled()).isEqualTo(1);
         assertThat(res.getBytesCrawled()).isEqualTo(1);
         assertThat(res.getCurrentUriIdList()).containsExactly(qUri1.getId(), qUri2.getId());
-        assertThat(jesRes.getState()).isEqualTo(State.RUNNING);
+        assertThat(jesRes.getState()).isEqualTo(JobExecutionStatus.State.RUNNING);
         assertThat(jesRes.getExecutionsStateMap().get("SLEEPING")).isEqualTo(0);
         assertThat(jesRes.getExecutionsStateMap().get("FETCHING")).isEqualTo(1);
         assertThat(jesRes.getExecutionsStateMap().get("FINISHED")).isEqualTo(0);
@@ -283,7 +282,7 @@ public class RethinkDbExecutionsAdapterIT {
         assertThat(res.getUrisCrawled()).isEqualTo(7);
         assertThat(res.getBytesCrawled()).isEqualTo(8);
         assertThat(res.getCurrentUriIdList()).containsExactly(qUri2.getId());
-        assertThat(jesRes.getState()).isEqualTo(State.RUNNING);
+        assertThat(jesRes.getState()).isEqualTo(JobExecutionStatus.State.RUNNING);
         assertThat(jesRes.getExecutionsStateMap().get("SLEEPING")).isEqualTo(0);
         assertThat(jesRes.getExecutionsStateMap().get("FETCHING")).isEqualTo(1);
         assertThat(jesRes.getExecutionsStateMap().get("FINISHED")).isEqualTo(0);
@@ -320,7 +319,7 @@ public class RethinkDbExecutionsAdapterIT {
         assertThat(res.getUrisCrawled()).isEqualTo(7);
         assertThat(res.getBytesCrawled()).isEqualTo(8);
         assertThat(res.getCurrentUriIdList()).isEmpty();
-        assertThat(jesRes.getState()).isEqualTo(State.RUNNING);
+        assertThat(jesRes.getState()).isEqualTo(JobExecutionStatus.State.RUNNING);
         assertThat(jesRes.getExecutionsStateMap().get("SLEEPING")).isEqualTo(1);
         assertThat(jesRes.getExecutionsStateMap().get("FETCHING")).isEqualTo(0);
         assertThat(jesRes.getExecutionsStateMap().get("FINISHED")).isEqualTo(0);
@@ -363,7 +362,7 @@ public class RethinkDbExecutionsAdapterIT {
         assertThat(res.getUrisCrawled()).isEqualTo(7);
         assertThat(res.getBytesCrawled()).isEqualTo(8);
         assertThat(res.getCurrentUriIdList()).isEmpty();
-        assertThat(jesRes.getState()).isEqualTo(State.FINISHED);
+        assertThat(jesRes.getState()).isEqualTo(JobExecutionStatus.State.FINISHED);
         assertThat(jesRes.getExecutionsStateMap().get("SLEEPING")).isEqualTo(0);
         assertThat(jesRes.getExecutionsStateMap().get("FETCHING")).isEqualTo(0);
         assertThat(jesRes.getExecutionsStateMap().get("FINISHED")).isEqualTo(1);
@@ -403,7 +402,7 @@ public class RethinkDbExecutionsAdapterIT {
         assertThat(res.getUrisCrawled()).isEqualTo(7);
         assertThat(res.getBytesCrawled()).isEqualTo(8);
         assertThat(res.getCurrentUriIdList()).isEmpty();
-        assertThat(jesRes.getState()).isEqualTo(State.FINISHED);
+        assertThat(jesRes.getState()).isEqualTo(JobExecutionStatus.State.FINISHED);
         assertThat(jesRes.getExecutionsStateMap().get("SLEEPING")).isEqualTo(0);
         assertThat(jesRes.getExecutionsStateMap().get("FETCHING")).isEqualTo(0);
         assertThat(jesRes.getExecutionsStateMap().get("FINISHED")).isEqualTo(1);
@@ -434,7 +433,7 @@ public class RethinkDbExecutionsAdapterIT {
         assertThat(res.hasLastChangeTime()).isTrue();
         assertThat(res.hasCreatedTime()).isTrue();
         assertThat(res.hasEndTime()).isFalse();
-        assertThat(jesRes.getState()).isEqualTo(State.FINISHED);
+        assertThat(jesRes.getState()).isEqualTo(JobExecutionStatus.State.FINISHED);
         assertThat(jesRes.getExecutionsStateMap().get("SLEEPING")).isEqualTo(0);
         assertThat(jesRes.getExecutionsStateMap().get("FETCHING")).isEqualTo(0);
         assertThat(jesRes.getExecutionsStateMap().get("FINISHED")).isEqualTo(1);
@@ -466,7 +465,7 @@ public class RethinkDbExecutionsAdapterIT {
         assertThat(res.hasCreatedTime()).isTrue();
         assertThat(res.hasEndTime()).isTrue();
         assertThat(res.getEndTime()).isNotEqualTo(ts);
-        assertThat(jesRes.getState()).isEqualTo(State.FINISHED);
+        assertThat(jesRes.getState()).isEqualTo(JobExecutionStatus.State.FINISHED);
         assertThat(jesRes.getExecutionsStateMap().get("SLEEPING")).isEqualTo(0);
         assertThat(jesRes.getExecutionsStateMap().get("FETCHING")).isEqualTo(0);
         assertThat(jesRes.getExecutionsStateMap().get("FINISHED")).isEqualTo(2);

@@ -49,13 +49,16 @@ import no.nb.nna.veidemann.api.ControllerProto.RunCrawlReply;
 import no.nb.nna.veidemann.api.ControllerProto.RunCrawlRequest;
 import no.nb.nna.veidemann.api.ControllerProto.SeedListReply;
 import no.nb.nna.veidemann.api.ControllerProto.SeedListRequest;
-import no.nb.nna.veidemann.api.MessagesProto.JobExecutionStatus;
+import no.nb.nna.veidemann.api.config.v1.ConfigObject;
+import no.nb.nna.veidemann.api.config.v1.ConfigRef;
+import no.nb.nna.veidemann.api.config.v1.Kind;
 import no.nb.nna.veidemann.api.config.v1.Role;
+import no.nb.nna.veidemann.api.frontier.v1.JobExecutionStatus;
 import no.nb.nna.veidemann.commons.auth.AllowedRoles;
 import no.nb.nna.veidemann.commons.auth.RolesContextKey;
+import no.nb.nna.veidemann.commons.db.ChangeFeed;
 import no.nb.nna.veidemann.commons.db.ConfigAdapter;
 import no.nb.nna.veidemann.commons.db.DbService;
-import no.nb.nna.veidemann.commons.util.ApiTools.ListReplyWalker;
 import no.nb.nna.veidemann.commons.util.CrawlScopes;
 import no.nb.nna.veidemann.controller.settings.Settings;
 import org.slf4j.Logger;
@@ -530,28 +533,32 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
     @AllowedRoles({Role.CURATOR, Role.ADMIN})
     public void runCrawl(RunCrawlRequest request, StreamObserver<RunCrawlReply> responseObserver) {
         try {
-            GetRequest jobRequest = GetRequest.newBuilder()
+            ConfigRef jobRequest = ConfigRef.newBuilder()
+                    .setKind(Kind.crawlJob)
                     .setId(request.getJobId())
                     .build();
 
-            CrawlJob job = db.getCrawlJob(jobRequest);
+            ConfigObject job = db.getConfigObject(jobRequest);
             LOG.info("Job '{}' starting", job.getMeta().getName());
 
             JobExecutionStatus jobExecutionStatus = DbService.getInstance().getExecutionsAdapter()
                     .createJobExecutionStatus(job.getId());
 
             if (!request.getSeedId().isEmpty()) {
-                Seed seed = db.getSeed(GetRequest.newBuilder()
+                ConfigObject seed = db.getConfigObject(ConfigRef.newBuilder()
+                        .setKind(Kind.seed)
                         .setId(request.getSeedId())
                         .build());
                 crawlSeed(job, seed, jobExecutionStatus);
             } else {
-                ListReplyWalker<SeedListRequest, Seed> walker = new ListReplyWalker<>();
-                SeedListRequest.Builder seedRequest = SeedListRequest.newBuilder().setCrawlJobId(job.getId());
+                no.nb.nna.veidemann.api.config.v1.ListRequest.Builder seedRequest = no.nb.nna.veidemann.api.config.v1.ListRequest.newBuilder()
+                        .setKind(Kind.seed);
+                seedRequest.getQueryMaskBuilder().addPaths(Kind.seed.name() + ".jobRef");
+                seedRequest.getQueryTemplateBuilder().getSeedBuilder().addJobRefBuilder().setKind(Kind.crawlJob).setId(job.getId());
 
-                walker.walk(seedRequest,
-                        req -> db.listSeeds(req),
-                        seed -> crawlSeed(job, seed, jobExecutionStatus));
+                try (ChangeFeed<ConfigObject> seeds = db.listConfigObjects(seedRequest.build())) {
+                    seeds.stream().forEach(s -> crawlSeed(job, s, jobExecutionStatus));
+                }
             }
             LOG.info("All seeds for job '{}' started", job.getMeta().getName());
 

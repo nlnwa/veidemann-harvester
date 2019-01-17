@@ -15,16 +15,11 @@
  */
 package no.nb.nna.veidemann.integrationtests;
 
-import no.nb.nna.veidemann.api.ConfigProto;
-import no.nb.nna.veidemann.api.ConfigProto.CrawlConfig;
-import no.nb.nna.veidemann.api.ConfigProto.CrawlJob;
-import no.nb.nna.veidemann.api.ConfigProto.CrawlLimitsConfig;
-import no.nb.nna.veidemann.api.ConfigProto.PolitenessConfig;
 import no.nb.nna.veidemann.api.ControllerProto;
-import no.nb.nna.veidemann.api.MessagesProto.JobExecutionStatus;
+import no.nb.nna.veidemann.api.config.v1.ConfigObject;
+import no.nb.nna.veidemann.api.frontier.v1.JobExecutionStatus;
 import no.nb.nna.veidemann.commons.VeidemannHeaderConstants;
 import no.nb.nna.veidemann.commons.db.DbException;
-import no.nb.nna.veidemann.commons.db.DbHelper;
 import org.junit.Test;
 
 import java.util.AbstractMap.SimpleEntry;
@@ -39,40 +34,20 @@ public class MultiSiteCrawlIT extends CrawlTestBase implements VeidemannHeaderCo
 
     @Test
     public void testHarvest() throws InterruptedException, ExecutionException, DbException {
-        CrawlJob job = controllerClient.listCrawlJobs(ControllerProto.ListRequest.newBuilder()
-                .setName("unscheduled").build())
-                .getValue(0);
+        String jobId = createJob("MultiSiteCrawlIT", 10, 300, 0).getId();
 
-        CrawlConfig crawlConfig = DbHelper.getCrawlConfigForJob(job);
-        controllerClient.saveBrowserConfig(
-                DbHelper.getBrowserConfigForCrawlConfig(crawlConfig).toBuilder().setPageLoadTimeoutMs(10000).build());
+        ConfigObject entity1 = createEntity("Test entity 1");
+        ConfigObject seed1 = createSeed("http://a1.com", entity1, jobId);
 
-        PolitenessConfig politeness = DbHelper.getPolitenessConfigForCrawlConfig(crawlConfig).toBuilder()
-                .setMaxTimeBetweenPageLoadMs(100)
-                .setMinTimeBetweenPageLoadMs(1)
-                .setDelayFactor(.01f)
-                .setRetryDelaySeconds(1)
-                .setUseHostname(false)
-                .build();
-        politeness = controllerClient.savePolitenessConfig(politeness);
+        ConfigObject entity2 = createEntity("Test entity 2");
+        ConfigObject seed2 = createSeed("http://a2.com", entity2, jobId);
+        ConfigObject seed3 = createSeed("http://a3.com", entity2, jobId);
 
-        CrawlLimitsConfig limits = job.getLimits().toBuilder().setDepth(10).setMaxDurationS(300).setMaxBytes(0).build();
-        job = job.toBuilder().setLimits(limits).build();
-        job = controllerClient.saveCrawlJob(job);
-        String jobId = job.getId();
+        ConfigObject entity3 = createEntity("Test entity 3");
+        ConfigObject invalidSeed = createSeed("https://www.toll.no/ // etat under finansdepartementet", entity3, jobId);
 
-        ConfigProto.CrawlEntity entity1 = createEntity("Test entity 1");
-        ConfigProto.Seed seed1 = createSeed("http://a1.com", entity1, jobId);
-
-        ConfigProto.CrawlEntity entity2 = createEntity("Test entity 2");
-        ConfigProto.Seed seed2 = createSeed("http://a2.com", entity2, jobId);
-        ConfigProto.Seed seed3 = createSeed("http://a3.com", entity2, jobId);
-
-        ConfigProto.CrawlEntity entity3 = createEntity("Test entity 3");
-        ConfigProto.Seed invalidSeed = createSeed("https://www.toll.no/ // etat under finansdepartementet", entity3, jobId);
-
-        ConfigProto.CrawlEntity entity4 = createEntity("Test entity 4");
-        ConfigProto.Seed notFoundSeed = createSeed("http://static.com/not-found.gif", entity4, jobId);
+        ConfigObject entity4 = createEntity("Test entity 4");
+        ConfigObject notFoundSeed = createSeed("http://static.com/not-found.gif", entity4, jobId);
 
         ControllerProto.RunCrawlRequest request = ControllerProto.RunCrawlRequest.newBuilder()
                 .setJobId(jobId)
@@ -81,20 +56,22 @@ public class MultiSiteCrawlIT extends CrawlTestBase implements VeidemannHeaderCo
         JobExecutionStatus jes = JobCompletion.executeJob(db, statusClient, controllerClient, request).get();
         assertThat(jes.getExecutionsStateMap()).contains(new SimpleEntry<>("FINISHED", 5));
 
-        new CrawlExecutionValidator(db)
+        new CrawlExecutionValidator(jes)
                 .validate()
-                .checkCrawlLogCount("response", 9)
-                .checkCrawlLogCount("revisit", 50)
+                .checkCrawlLogCount("response", 9, 11)
+                .checkCrawlLogCount("revisit", 48, 50)
                 .checkCrawlLogCount("dns", 6)
+                .checkCrawlLogCount(59, "response", "revisit")
                 .checkPageLogCount(20);
 
         jes = JobCompletion.executeJob(db, statusClient, controllerClient, request).get();
         assertThat(jes.getExecutionsStateMap()).contains(new SimpleEntry<>("FINISHED", 5));
 
-        new CrawlExecutionValidator(db)
+        new CrawlExecutionValidator(jes)
                 .validate()
-                .checkCrawlLogCount("response", 11)
-                .checkCrawlLogCount("revisit", 107)
+                .checkCrawlLogCount("response", 11, 13)
+                .checkCrawlLogCount("revisit", 105, 107)
+                .checkCrawlLogCount(118, "response", "revisit")
                 .checkCrawlLogCount("dns", 6)
                 .checkPageLogCount(40);
     }

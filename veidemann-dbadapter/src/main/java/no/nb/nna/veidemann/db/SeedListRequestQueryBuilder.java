@@ -39,11 +39,15 @@ public class SeedListRequestQueryBuilder extends ConfigListQueryBuilder<SeedList
             buildSelectorQuery(request.getLabelSelectorList());
 
             if (!request.getCrawlJobId().isEmpty()) {
-                addQuery(r.table(table.name).getAll(request.getCrawlJobId()).optArg("index", "jobId"));
+                addQuery(r.table(table.name)
+                        .getAll(r.array(Kind.crawlJob.name(), request.getCrawlJobId()))
+                        .optArg("index", "configRefs"));
             }
 
             if (!request.getEntityId().isEmpty()) {
-                addQuery(r.table(table.name).getAll(request.getEntityId()).optArg("index", "entityId"));
+                addQuery(r.table(table.name)
+                        .getAll(r.array(Kind.crawlEntity.name(), request.getEntityId()))
+                        .optArg("index", "configRefs"));
             }
         }
     }

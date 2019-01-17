@@ -16,6 +16,7 @@
 package no.nb.nna.veidemann.db.initializer;
 
 import com.rethinkdb.RethinkDB;
+import no.nb.nna.veidemann.api.config.v1.Kind;
 import no.nb.nna.veidemann.commons.db.DbConnectionException;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbQueryException;
@@ -27,7 +28,7 @@ import org.slf4j.LoggerFactory;
 public class CreateNewDb implements Runnable {
     private static final Logger LOG = LoggerFactory.getLogger(CreateNewDb.class);
 
-    public static final String DB_VERSION = "1.0";
+    public static final String DB_VERSION = "1.1";
 
     static final RethinkDB r = RethinkDB.r;
 
@@ -60,6 +61,16 @@ public class CreateNewDb implements Runnable {
                 )));
 
         conn.exec(r.tableCreate(Tables.CONFIG.name));
+        conn.exec(r.table(Tables.CONFIG.name)
+                .indexCreate("configRefs", row -> row
+                        .g(Kind.browserConfig.name()).g("scriptRef").map(d -> r.array(d.g("kind"), d.g("id")))
+                        .add(r.array(row.g(Kind.crawlJob.name()).g("scheduleRef").do_(d -> r.array(d.g("kind"), d.g("id")))))
+                        .add(r.array(row.g(Kind.crawlJob.name()).g("crawlConfigRef").do_(d -> r.array(d.g("kind"), d.g("id")))))
+                        .add(r.array(row.g(Kind.crawlConfig.name()).g("collectionRef").do_(d -> r.array(d.g("kind"), d.g("id")))))
+                        .add(r.array(row.g(Kind.crawlConfig.name()).g("browserConfigRef").do_(d -> r.array(d.g("kind"), d.g("id")))))
+                        .add(r.array(row.g(Kind.crawlConfig.name()).g("politenessRef").do_(d -> r.array(d.g("kind"), d.g("id")))))
+                ).optArg("multi", true)
+        );
 
         conn.exec(r.tableCreate(Tables.LOCKS.name));
 
@@ -80,7 +91,7 @@ public class CreateNewDb implements Runnable {
         conn.exec(r.table(Tables.URI_QUEUE.name).indexCreate("executionId"));
         conn.exec(r.table(Tables.URI_QUEUE.name).indexCreate("crawlHostGroupKey_sequence_earliestFetch",
                 uri -> r.array(uri.g("crawlHostGroupId"),
-                        uri.g("politenessId"),
+                        uri.g("politenessRef").g("id"),
                         uri.g("sequence"),
                         uri.g("earliestFetchTimeStamp"))));
 
@@ -103,18 +114,14 @@ public class CreateNewDb implements Runnable {
 
         conn.exec(r.tableCreate(Tables.SEEDS.name));
         conn.exec(r.table(Tables.SEEDS.name)
-                .indexCreate("jobId", row -> row.g("seed").g("jobId"))
-                .optArg("multi", true));
-        conn.exec(r.table(Tables.SEEDS.name)
-                .indexCreate("entityId", row -> row.g("seed").g("entityId")));
+                .indexCreate("configRefs", row -> row
+                        .g(Kind.seed.name()).g("jobRef").map(d -> r.array(d.g("kind"), d.g("id")))
+                        .add(r.array(row.g(Kind.seed.name()).g("entityRef").do_(d -> r.array(d.g("kind"), d.g("id")))))
+                ).optArg("multi", true)
+        );
 
         conn.exec(r.tableCreate(Tables.CRAWL_HOST_GROUP.name));
         conn.exec(r.table(Tables.CRAWL_HOST_GROUP.name).indexCreate("nextFetchTime"));
-
-        conn.exec(r.tableCreate(Tables.ALREADY_CRAWLED_CACHE.name)
-                .optArg("durability", "soft")
-                .optArg("shards", 3)
-                .optArg("replicas", 1));
 
         createMetaIndexes(
                 Tables.CONFIG,
@@ -127,7 +134,8 @@ public class CreateNewDb implements Runnable {
         conn.exec(r.table(Tables.CRAWL_LOG.name).indexWait("surt_time", "executionId"));
         conn.exec(r.table(Tables.PAGE_LOG.name).indexWait("executionId"));
         conn.exec(r.table(Tables.SCREENSHOT.name).indexWait("executionId"));
-        conn.exec(r.table(Tables.SEEDS.name).indexWait("jobId", "entityId"));
+        conn.exec(r.table(Tables.CONFIG.name).indexWait("configRefs"));
+        conn.exec(r.table(Tables.SEEDS.name).indexWait("configRefs"));
         conn.exec(r.table(Tables.CRAWL_HOST_GROUP.name).indexWait("nextFetchTime"));
         conn.exec(r.table(Tables.EXECUTIONS.name).indexWait("createdTime", "jobId", "state", "seedId", "jobExecutionId"));
         conn.exec(r.table(Tables.JOB_EXECUTIONS.name).indexWait("startTime", "jobId", "state"));

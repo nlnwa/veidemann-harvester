@@ -41,6 +41,7 @@ import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
 
+import static no.nb.nna.veidemann.commons.VeidemannHeaderConstants.COLLECTION_ID;
 import static no.nb.nna.veidemann.commons.VeidemannHeaderConstants.EXECUTION_ID;
 import static no.nb.nna.veidemann.commons.VeidemannHeaderConstants.JOB_EXECUTION_ID;
 
@@ -93,6 +94,7 @@ public class RobotsCache {
                                 .url(url)
                                 .addHeader(EXECUTION_ID, key.executionId)
                                 .addHeader(JOB_EXECUTION_ID, key.jobExecutionId)
+                                .addHeader(COLLECTION_ID, key.collectionId)
                                 .build();
 
                         try (Response response = client.newCall(request).execute();) {
@@ -112,8 +114,8 @@ public class RobotsCache {
                 .build();
     }
 
-    public RobotsTxt get(final Uri uri, final int ttlSeconds, final String executionId, final String jobExecutionId) {
-        return cache.get(new CacheKey(uri, ttlSeconds, executionId, jobExecutionId));
+    public RobotsTxt get(final Uri uri, final int ttlSeconds, final String executionId, final String jobExecutionId, final String collectionId) {
+        return cache.get(new CacheKey(uri, ttlSeconds, executionId, jobExecutionId, collectionId));
     }
 
     public static final class CacheKey {
@@ -130,13 +132,16 @@ public class RobotsCache {
 
         private final String jobExecutionId;
 
-        public CacheKey(final Uri uri, final int ttlSeconds, final String executionId, final String jobExecutionId) {
+        private final String collectionId;
+
+        public CacheKey(final Uri uri, final int ttlSeconds, final String executionId, final String jobExecutionId, final String collectionId) {
             this.protocol = uri.getScheme();
             this.domain = uri.getHost();
             this.port = uri.getDecodedPort();
             this.ttlSeconds = ttlSeconds;
             this.executionId = executionId;
             this.jobExecutionId = jobExecutionId;
+            this.collectionId = collectionId;
         }
 
         public String getDomain() {

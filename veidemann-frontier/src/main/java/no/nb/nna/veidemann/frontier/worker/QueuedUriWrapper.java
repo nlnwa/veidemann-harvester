@@ -18,13 +18,15 @@ package no.nb.nna.veidemann.frontier.worker;
 import com.google.protobuf.Timestamp;
 import com.google.protobuf.util.Durations;
 import com.google.protobuf.util.Timestamps;
-import no.nb.nna.veidemann.api.ConfigProto.CrawlHostGroupConfig;
-import no.nb.nna.veidemann.api.ConfigProto.PolitenessConfig;
-import no.nb.nna.veidemann.api.ControllerProto;
-import no.nb.nna.veidemann.api.MessagesProto;
-import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
-import no.nb.nna.veidemann.api.MessagesProto.QueuedUriOrBuilder;
+import no.nb.nna.veidemann.api.commons.v1.Error;
+import no.nb.nna.veidemann.api.config.v1.ConfigObject;
+import no.nb.nna.veidemann.api.config.v1.ConfigRef;
+import no.nb.nna.veidemann.api.config.v1.Kind;
+import no.nb.nna.veidemann.api.config.v1.ListRequest;
+import no.nb.nna.veidemann.api.frontier.v1.QueuedUri;
+import no.nb.nna.veidemann.api.frontier.v1.QueuedUriOrBuilder;
 import no.nb.nna.veidemann.commons.ExtraStatusCodes;
+import no.nb.nna.veidemann.commons.db.ChangeFeed;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.commons.util.ApiTools;
@@ -36,6 +38,7 @@ import org.slf4j.LoggerFactory;
 
 import java.net.URISyntaxException;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  *
@@ -65,7 +68,7 @@ public class QueuedUriWrapper {
         requireNonEmpty(qUri.getUri(), "Empty URI string");
         requireNonEmpty(qUri.getJobExecutionId(), "Empty JobExecutionId");
         requireNonEmpty(qUri.getExecutionId(), "Empty ExecutionId");
-        requireNonEmpty(qUri.getPolitenessId(), "Empty PolitenessId");
+        requireNonEmpty(qUri.getPolitenessRef(), "Empty PolitenessRef");
 
         return new QueuedUriWrapper(qUri);
     }
@@ -74,24 +77,24 @@ public class QueuedUriWrapper {
         requireNonEmpty(qUri.getUri(), "Empty URI string");
         requireNonEmpty(parentUri.getJobExecutionId(), "Empty JobExecutionId");
         requireNonEmpty(parentUri.getExecutionId(), "Empty ExecutionId");
-        requireNonEmpty(parentUri.getPolitenessId(), "Empty PolitenessId");
+        requireNonEmpty(parentUri.getPolitenessRef(), "Empty PolitenessRef");
 
         QueuedUriWrapper wrapper = new QueuedUriWrapper(qUri)
                 .setJobExecutionId(parentUri.getJobExecutionId())
                 .setExecutionId(parentUri.getExecutionId())
-                .setPolitenessId(parentUri.getPolitenessId());
+                .setPolitenessRef(parentUri.getPolitenessRef());
         wrapper.wrapped.setUnresolved(true);
 
         return wrapper;
     }
 
-    public static QueuedUriWrapper getQueuedUriWrapper(String uri, String jobExecutionId, String executionId, String politenessId)
+    public static QueuedUriWrapper getQueuedUriWrapper(String uri, String jobExecutionId, String executionId, ConfigRef politenessId)
             throws URISyntaxException, DbException {
         return new QueuedUriWrapper(QueuedUri.newBuilder()
                 .setUri(uri)
                 .setJobExecutionId(jobExecutionId)
                 .setExecutionId(executionId)
-                .setPolitenessId(politenessId)
+                .setPolitenessRef(politenessId)
                 .setUnresolved(true)
                 .setSequence(1L)
         );
@@ -101,7 +104,7 @@ public class QueuedUriWrapper {
         requireNonEmpty(wrapped.getUri(), "Empty URI string");
         requireNonEmpty(wrapped.getJobExecutionId(), "Empty JobExecutionId");
         requireNonEmpty(wrapped.getExecutionId(), "Empty ExecutionId");
-        requireNonEmpty(wrapped.getPolitenessId(), "Empty PolitenessId");
+        requireNonEmpty(wrapped.getPolitenessRef(), "Empty PolitenessRef");
         if (wrapped.getSequence() <= 0) {
             String msg = "Uri is missing Sequence. Uri: " + wrapped.getUri();
             IllegalStateException ex = new IllegalStateException(msg);
@@ -217,11 +220,11 @@ public class QueuedUriWrapper {
         return wrapped.hasError();
     }
 
-    MessagesProto.Error getError() {
+    Error getError() {
         return wrapped.getError();
     }
 
-    QueuedUriWrapper setError(MessagesProto.Error value) {
+    QueuedUriWrapper setError(Error value) {
         wrapped.setError(value);
         return this;
     }
@@ -246,12 +249,12 @@ public class QueuedUriWrapper {
         return this;
     }
 
-    String getPolitenessId() {
-        return wrapped.getPolitenessId();
+    ConfigRef getPolitenessRef() {
+        return wrapped.getPolitenessRef();
     }
 
-    QueuedUriWrapper setPolitenessId(String value) {
-        wrapped.setPolitenessId(value);
+    QueuedUriWrapper setPolitenessRef(ConfigRef value) {
+        wrapped.setPolitenessRef(value);
         return this;
     }
 
@@ -293,7 +296,7 @@ public class QueuedUriWrapper {
         return wrapped.getUnresolved();
     }
 
-    QueuedUriWrapper setResolved(PolitenessConfig politeness) throws DbException {
+    QueuedUriWrapper setResolved(ConfigObject politeness) throws DbException {
         if (wrapped.getUnresolved() == false) {
             return this;
         }
@@ -305,16 +308,19 @@ public class QueuedUriWrapper {
         }
 
         String crawlHostGroupId;
-        if (politeness.getUseHostname()) {
+        if (politeness.getPolitenessConfig().getUseHostname()) {
             // Use host name for politeness
             crawlHostGroupId = ApiTools.createSha1Digest(getHost());
         } else {
             // Use IP for politeness
             // Calculate CrawlHostGroup
-            List<CrawlHostGroupConfig> groupConfigs = DbService.getInstance().getConfigAdapter()
-                    .listCrawlHostGroupConfigs(ControllerProto.ListRequest.newBuilder()
-                            .addAllLabelSelector(politeness.getCrawlHostGroupSelectorList()).build()).getValueList();
-            crawlHostGroupId = CrawlHostGroupCalculator.calculateCrawlHostGroup(wrapped.getIp(), groupConfigs);
+            try (ChangeFeed<ConfigObject> cursor = DbService.getInstance().getConfigAdapter().listConfigObjects(ListRequest.newBuilder()
+                    .setKind(Kind.crawlHostGroupConfig)
+                    .addAllLabelSelector(politeness.getPolitenessConfig().getCrawlHostGroupSelectorList()).build())) {
+
+                List<ConfigObject> groupConfigs = cursor.stream().collect(Collectors.toList());
+                crawlHostGroupId = CrawlHostGroupCalculator.calculateCrawlHostGroup(wrapped.getIp(), groupConfigs);
+            }
         }
 
         wrapped.setCrawlHostGroupId(crawlHostGroupId);
@@ -329,6 +335,13 @@ public class QueuedUriWrapper {
 
     private static void requireNonEmpty(String obj, String message) {
         if (obj == null || obj.isEmpty()) {
+            LOG.error(message);
+            throw new NullPointerException(message);
+        }
+    }
+
+    private static void requireNonEmpty(ConfigRef obj, String message) {
+        if (obj == null || obj.getId().isEmpty() || obj.getKind() == Kind.undefined) {
             LOG.error(message);
             throw new NullPointerException(message);
         }

@@ -1,6 +1,6 @@
 package no.nb.nna.veidemann.frontier.worker;
 
-import no.nb.nna.veidemann.api.MessagesProto;
+import no.nb.nna.veidemann.api.frontier.v1.CrawlLog;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.db.ProtoUtils;
@@ -29,7 +29,7 @@ public class DbUtil {
     }
 
     public static void writeLog(QueuedUriWrapper qUri, int statusCode) throws DbException {
-        MessagesProto.CrawlLog crawlLog = MessagesProto.CrawlLog.newBuilder()
+        CrawlLog crawlLog = CrawlLog.newBuilder()
                 .setRequestedUri(qUri.getUri())
                 .setJobExecutionId(qUri.getJobExecutionId())
                 .setExecutionId(qUri.getExecutionId())

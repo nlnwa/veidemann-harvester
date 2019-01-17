@@ -19,10 +19,13 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.protobuf.ByteString;
 import io.opentracing.BaseSpan;
-import no.nb.nna.veidemann.api.ConfigProto;
-import no.nb.nna.veidemann.api.ConfigProto.BrowserConfig;
 import no.nb.nna.veidemann.api.MessagesProto;
-import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
+import no.nb.nna.veidemann.api.config.v1.BrowserConfig;
+import no.nb.nna.veidemann.api.config.v1.ConfigObject;
+import no.nb.nna.veidemann.api.config.v1.ConfigRef;
+import no.nb.nna.veidemann.api.config.v1.Label;
+import no.nb.nna.veidemann.api.frontier.v1.Cookie;
+import no.nb.nna.veidemann.api.frontier.v1.QueuedUri;
 import no.nb.nna.veidemann.chrome.client.BrowserClient;
 import no.nb.nna.veidemann.chrome.client.ClientClosedException;
 import no.nb.nna.veidemann.chrome.client.DebuggerDomain;
@@ -52,6 +55,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
+//import no.nb.nna.veidemann.api.ConfigProto;
+
 /**
  *
  */
@@ -60,6 +65,8 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
     private static final Logger LOG = LoggerFactory.getLogger(BrowserSession.class);
 
     final int proxyId;
+
+    final ConfigObject crawlConfig;
 
     final QueuedUri queuedUri;
 
@@ -75,23 +82,24 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
 
     volatile boolean closed = false;
 
-    public BrowserSession(int proxyId, BrowserClient browser, BrowserConfig browserConfig, QueuedUri queuedUri, BaseSpan span)
-            throws IOException, ExecutionException, TimeoutException {
-
+    public BrowserSession(int proxyId, BrowserClient browser, ConfigObject crawlConfig, ConfigObject browserConfig,
+                          QueuedUri queuedUri, BaseSpan span) throws IOException, ExecutionException, TimeoutException {
+        this.crawlConfig = crawlConfig;
         this.proxyId = proxyId;
         this.queuedUri = Objects.requireNonNull(queuedUri);
 
         this.browser = browser;
         // Ensure that we at least wait a second even if the configuration says less.
-        long maxIdleTime = Math.max(browserConfig.getSleepAfterPageloadMs(), 1000);
-        crawlLogs = new CrawlLogRegistry(this, browserConfig.getPageLoadTimeoutMs(), maxIdleTime);
+        BrowserConfig bc = browserConfig.getBrowserConfig();
+        long maxIdleTime = Math.max(bc.getMaxInactivityTimeMs(), 1000);
+        crawlLogs = new CrawlLogRegistry(this, bc.getPageLoadTimeoutMs(), maxIdleTime);
         uriRequests = new UriRequestRegistry(crawlLogs, queuedUri, span);
 
-        session = browser.newPage(browserConfig.getWindowWidth(), browserConfig.getWindowHeight());
+        session = browser.newPage(bc.getWindowWidth(), bc.getWindowHeight());
 
         LOG.debug("Browser page created");
 
-        String userAgent = browserConfig.getUserAgent();
+        String userAgent = bc.getUserAgent();
 
         // Set userAgent to config value if it exist, otherwise just replace HeadlessChrome with ChromeVersion
         // like the real browser.
@@ -132,11 +140,15 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
         LOG.debug("Browser session configured");
     }
 
+    public ConfigRef getCollectionRef() {
+        return crawlConfig.getCrawlConfig().getCollectionRef();
+    }
+
     public String getJobExecutionId() {
         return queuedUri.getJobExecutionId();
     }
 
-    public String getExecutionId() {
+    public String getCrawlExecutionId() {
         return queuedUri.getExecutionId();
     }
 
@@ -259,7 +271,7 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
 
             DbService.getInstance().getDbAdapter().saveScreenshot(MessagesProto.Screenshot.newBuilder()
                     .setImg(ByteString.copyFrom(img))
-                    .setExecutionId(getExecutionId())
+                    .setExecutionId(getCrawlExecutionId())
                     .setUri(uriRequests.getRootRequest().getUrl())
                     .build());
         } catch (ExecutionException | TimeoutException | DbException ex) {
@@ -267,12 +279,12 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
         }
     }
 
-    List<MessagesProto.Cookie> extractCookies() throws ClientClosedException, SessionClosedException {
+    List<Cookie> extractCookies() throws ClientClosedException, SessionClosedException {
         try {
-            List<MessagesProto.Cookie> cookies = session.network().getAllCookies().run()
+            List<Cookie> cookies = session.network().getAllCookies().run()
                     .cookies().stream()
                     .map(c -> {
-                        MessagesProto.Cookie.Builder cb = MessagesProto.Cookie.newBuilder();
+                        Cookie.Builder cb = Cookie.newBuilder();
                         if (c.name() != null) {
                             cb.setName(c.name());
                         }
@@ -313,16 +325,16 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
         }
     }
 
-    public List<MessagesProto.QueuedUri> extractOutlinks(List<ConfigProto.BrowserScript> scripts) throws ClientClosedException, SessionClosedException {
-        ConfigProto.Label outlinksLabel = ApiTools.buildLabel("type", "extract_outlinks");
-        List<MessagesProto.Cookie> cookies = extractCookies();
+    public List<QueuedUri> extractOutlinks(List<ConfigObject> scripts) throws ClientClosedException, SessionClosedException {
+        Label outlinksLabel = ApiTools.buildLabel("type", "extract_outlinks");
+        List<Cookie> cookies = extractCookies();
         try {
-            List<MessagesProto.QueuedUri> outlinks = new ArrayList<>();
-            for (ConfigProto.BrowserScript script : scripts) {
+            List<QueuedUri> outlinks = new ArrayList<>();
+            for (ConfigObject script : scripts) {
                 if (ApiTools.hasLabel(script.getMeta(), outlinksLabel)) {
                     LOG.debug("Executing link extractor script '{}'", script.getMeta().getName());
                     RuntimeDomain.EvaluateResponse ev = session.runtime()
-                            .evaluate(script.getScript()).withReturnByValue(Boolean.TRUE).run();
+                            .evaluate(script.getBrowserScript().getScript()).withReturnByValue(Boolean.TRUE).run();
 
                     LOG.trace("Outlinks: {}", ev.result().value());
                     if (ev.result().value() != null) {
@@ -332,9 +344,9 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
                             String path = uriRequests.getRootRequest().getDiscoveryPath() + "L";
                             for (int i = 0; i < links.length; i++) {
                                 if (!uriRequests.getInitialRequest().getUrl().equals(links[i])) {
-                                    outlinks.add(MessagesProto.QueuedUri.newBuilder()
+                                    outlinks.add(QueuedUri.newBuilder()
                                             .setJobExecutionId(getJobExecutionId())
-                                            .setExecutionId(getExecutionId())
+                                            .setExecutionId(getCrawlExecutionId())
                                             .setUri(links[i])
                                             .setReferrer(uriRequests.getRootRequest().getUrl())
                                             .setDiscoveredTimeStamp(ProtoUtils.odtToTs(OffsetDateTime.now()))

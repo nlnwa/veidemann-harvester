@@ -20,14 +20,13 @@ import io.grpc.ManagedChannelBuilder;
 import io.grpc.StatusRuntimeException;
 import io.opentracing.contrib.ClientTracingInterceptor;
 import io.opentracing.util.GlobalTracer;
-import no.nb.nna.veidemann.api.ConfigProto.CrawlJob;
-import no.nb.nna.veidemann.api.ConfigProto.Seed;
-import no.nb.nna.veidemann.api.FrontierGrpc;
-import no.nb.nna.veidemann.api.FrontierGrpc.FrontierBlockingStub;
-import no.nb.nna.veidemann.api.FrontierGrpc.FrontierStub;
-import no.nb.nna.veidemann.api.FrontierProto.CrawlExecutionId;
-import no.nb.nna.veidemann.api.FrontierProto.CrawlSeedRequest;
-import no.nb.nna.veidemann.api.MessagesProto.JobExecutionStatus;
+import no.nb.nna.veidemann.api.config.v1.ConfigObject;
+import no.nb.nna.veidemann.api.frontier.v1.CrawlExecutionId;
+import no.nb.nna.veidemann.api.frontier.v1.CrawlSeedRequest;
+import no.nb.nna.veidemann.api.frontier.v1.FrontierGrpc;
+import no.nb.nna.veidemann.api.frontier.v1.FrontierGrpc.FrontierBlockingStub;
+import no.nb.nna.veidemann.api.frontier.v1.FrontierGrpc.FrontierStub;
+import no.nb.nna.veidemann.api.frontier.v1.JobExecutionStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,7 +59,7 @@ public class FrontierClient implements AutoCloseable {
         JobExecutionUtil.addFrontierClient(supportedSeedType, this);
     }
 
-    public CrawlExecutionId crawlSeed(CrawlJob crawlJob, Seed seed, JobExecutionStatus jobExecution) {
+    public CrawlExecutionId crawlSeed(ConfigObject crawlJob, ConfigObject seed, JobExecutionStatus jobExecution) {
         try {
             CrawlSeedRequest request = CrawlSeedRequest.newBuilder()
                     .setJob(crawlJob)

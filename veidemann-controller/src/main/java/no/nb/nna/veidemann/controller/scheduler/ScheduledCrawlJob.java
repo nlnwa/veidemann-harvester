@@ -17,13 +17,13 @@ package no.nb.nna.veidemann.controller.scheduler;
 
 import it.sauronsoftware.cron4j.Task;
 import it.sauronsoftware.cron4j.TaskExecutionContext;
-import no.nb.nna.veidemann.api.ConfigProto.CrawlJob;
-import no.nb.nna.veidemann.api.ConfigProto.Seed;
-import no.nb.nna.veidemann.api.ControllerProto.SeedListRequest;
-import no.nb.nna.veidemann.api.MessagesProto.JobExecutionStatus;
+import no.nb.nna.veidemann.api.config.v1.ConfigObject;
+import no.nb.nna.veidemann.api.config.v1.Kind;
+import no.nb.nna.veidemann.api.config.v1.ListRequest;
+import no.nb.nna.veidemann.api.frontier.v1.JobExecutionStatus;
+import no.nb.nna.veidemann.commons.db.ChangeFeed;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbService;
-import no.nb.nna.veidemann.commons.util.ApiTools.ListReplyWalker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,9 +36,9 @@ public class ScheduledCrawlJob extends Task {
 
     private static final Logger LOG = LoggerFactory.getLogger(ScheduledCrawlJob.class);
 
-    final CrawlJob job;
+    final ConfigObject job;
 
-    public ScheduledCrawlJob(CrawlJob job) {
+    public ScheduledCrawlJob(ConfigObject job) {
         this.job = job;
     }
 
@@ -46,17 +46,17 @@ public class ScheduledCrawlJob extends Task {
     public void execute(TaskExecutionContext context) throws RuntimeException {
         LOG.debug("Job '{}' starting", job.getMeta().getName());
 
-        ListReplyWalker<SeedListRequest, Seed> walker = new ListReplyWalker<>();
-        SeedListRequest.Builder seedRequest = SeedListRequest.newBuilder().setCrawlJobId(job.getId());
+        ListRequest.Builder seedRequest = ListRequest.newBuilder()
+                .setKind(Kind.seed);
+        seedRequest.getQueryMaskBuilder().addPaths(Kind.seed.name() + ".jobRef");
+        seedRequest.getQueryTemplateBuilder().getSeedBuilder().addJobRefBuilder().setKind(Kind.crawlJob).setId(job.getId());
 
         try {
-            if (DbService.getInstance().getConfigAdapter().listSeeds(seedRequest.build()).getCount() > 0) {
-                JobExecutionStatus jobExecutionStatus = DbService.getInstance().getExecutionsAdapter()
-                        .createJobExecutionStatus(job.getId());
+            JobExecutionStatus jobExecutionStatus = DbService.getInstance().getExecutionsAdapter()
+                    .createJobExecutionStatus(job.getId());
 
-                walker.walk(seedRequest,
-                        req -> DbService.getInstance().getConfigAdapter().listSeeds(req),
-                        seed -> crawlSeed(job, seed, jobExecutionStatus));
+            try (ChangeFeed<ConfigObject> seeds = DbService.getInstance().getConfigAdapter().listConfigObjects(seedRequest.build())) {
+                seeds.stream().forEach(s -> crawlSeed(job, s, jobExecutionStatus));
 
                 LOG.info("All seeds for job '{}' started", job.getMeta().getName());
             }

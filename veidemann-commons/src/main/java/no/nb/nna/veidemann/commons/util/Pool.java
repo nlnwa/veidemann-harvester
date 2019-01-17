@@ -130,7 +130,7 @@ public class Pool<T> implements AutoCloseable {
         }
 
         private void finalizeObject(Consumer<T> objectFinalizer) {
-            if (objectFinalizer != null) {
+            if (objectFinalizer != null && object != null) {
                 objectFinalizer.accept(object);
             }
         }

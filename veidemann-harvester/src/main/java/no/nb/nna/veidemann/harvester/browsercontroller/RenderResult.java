@@ -15,8 +15,8 @@
  */
 package no.nb.nna.veidemann.harvester.browsercontroller;
 
-import no.nb.nna.veidemann.api.MessagesProto.Error;
-import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
+import no.nb.nna.veidemann.api.commons.v1.Error;
+import no.nb.nna.veidemann.api.frontier.v1.QueuedUri;
 
 import java.util.List;
 import java.util.stream.Stream;

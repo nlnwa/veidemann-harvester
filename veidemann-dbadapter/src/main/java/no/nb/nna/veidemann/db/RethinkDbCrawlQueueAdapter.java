@@ -3,8 +3,8 @@ package no.nb.nna.veidemann.db;
 import com.google.protobuf.Timestamp;
 import com.rethinkdb.RethinkDB;
 import com.rethinkdb.net.Cursor;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlHostGroup;
-import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
+import no.nb.nna.veidemann.api.frontier.v1.CrawlHostGroup;
+import no.nb.nna.veidemann.api.frontier.v1.QueuedUri;
 import no.nb.nna.veidemann.commons.db.CrawlQueueAdapter;
 import no.nb.nna.veidemann.commons.db.DbConnectionException;
 import no.nb.nna.veidemann.commons.db.DbException;
@@ -44,7 +44,7 @@ public class RethinkDbCrawlQueueAdapter implements CrawlQueueAdapter {
     @Override
     public QueuedUri addToCrawlHostGroup(QueuedUri qUri) throws DbException {
         String crawlHostGroupId = qUri.getCrawlHostGroupId();
-        String politenessId = qUri.getPolitenessId();
+        String politenessId = qUri.getPolitenessRef().getId();
         Objects.requireNonNull(crawlHostGroupId, "CrawlHostGroupId cannot be null");
         Objects.requireNonNull(politenessId, "PolitenessId cannot be null");
         if (qUri.getSequence() <= 0L) {
@@ -201,19 +201,21 @@ public class RethinkDbCrawlQueueAdapter implements CrawlQueueAdapter {
     public long deleteQueuedUrisForExecution(String executionId) throws DbException {
         long deleted = 0;
 
-        List<Map<String, String>> chgKeys = conn.exec(
+        List<Map<String, Object>> chgKeys = conn.exec(
                 r.table(Tables.URI_QUEUE.name).optArg("read_mode", "majority")
                         .getAll(executionId).optArg("index", "executionId")
-                        .pluck("crawlHostGroupId", "politenessId")
+                        .pluck("crawlHostGroupId", "politenessRef")
                         .distinct()
         );
 
 
-        for (Map<String, String> group : chgKeys) {
-            List<String> startKey = r.array(group.get("crawlHostGroupId"), group.get("politenessId"), r.minval(), r.minval());
-            List<String> endKey = r.array(group.get("crawlHostGroupId"), group.get("politenessId"), r.maxval(), r.maxval());
+        for (Map<String, Object> group : chgKeys) {
+            String crawlHostGroupId = (String) group.get("crawlHostGroupId");
+            String politenessId = ((Map<String, String>) group.get("politenessRef")).get("id");
+            List<String> startKey = r.array(crawlHostGroupId, politenessId, r.minval(), r.minval());
+            List<String> endKey = r.array(crawlHostGroupId, politenessId, r.maxval(), r.maxval());
 
-            DistributedLock lock = conn.createDistributedLock(createKey(group.get("crawlHostGroupId"), group.get("politenessId")), lockExpirationSeconds);
+            DistributedLock lock = conn.createDistributedLock(createKey(crawlHostGroupId, politenessId), lockExpirationSeconds);
             lock.lock();
             try {
                 long deleteResponse = conn.exec("db-deleteQueuedUrisForExecution",

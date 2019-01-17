@@ -18,6 +18,9 @@ package no.nb.nna.veidemann.integrationtests;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.List;
+import java.util.function.Function;
+import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 import com.google.common.net.HttpHeaders;
 import com.google.gson.Gson;
@@ -52,6 +55,12 @@ public class WarcInspector {
     }
 
     public static WarcFileSet getWarcFiles() throws UncheckedIOException {
+        return getWarcFiles(null);
+    }
+
+    public static WarcFileSet getWarcFiles(String regex) throws UncheckedIOException {
+        Pattern fileMatcher = Pattern.compile(regex);
+
         HttpUrl url = WARC_SERVER_URL.resolve("warcs");
 
         Request request = new Request.Builder()
@@ -61,12 +70,21 @@ public class WarcInspector {
 
         try (Response response = CLIENT.newCall(request).execute();) {
             if (response.isSuccessful()) {
-                return new WarcFileSet(GSON.fromJson(response.body().charStream(), List.class)
-                        .stream().map(m -> new WarcFile(m)));
+                Stream warcFileStream = GSON.fromJson(response.body().charStream(), List.class).stream();
+                return new WarcFileSet(warcFileStream
+                        .map(WarcFile::new)
+                        .filter(wf -> {
+                            if (fileMatcher == null) {
+                                return true;
+                            } else {
+                                return fileMatcher.matcher(((WarcFile) wf).getName()).matches();
+                            }
+                        })
+                );
             } else {
                 throw new IOException("Unexpected code " + response);
             }
-        } catch(IOException ex) {
+        } catch (IOException ex) {
             throw new UncheckedIOException(ex);
         }
     }
@@ -83,7 +101,7 @@ public class WarcInspector {
             if (!response.isSuccessful()) {
                 throw new IOException("Unexpected code " + response);
             }
-        } catch(IOException ex) {
+        } catch (IOException ex) {
             throw new UncheckedIOException(ex);
         }
     }
@@ -101,7 +119,7 @@ public class WarcInspector {
             } else {
                 throw new IOException("Unexpected code " + response);
             }
-        } catch(IOException ex) {
+        } catch (IOException ex) {
             throw new UncheckedIOException(ex);
         }
     }
@@ -119,7 +137,7 @@ public class WarcInspector {
             } else {
                 throw new IOException("Unexpected code " + response);
             }
-        } catch(IOException ex) {
+        } catch (IOException ex) {
             throw new UncheckedIOException(ex);
         }
     }

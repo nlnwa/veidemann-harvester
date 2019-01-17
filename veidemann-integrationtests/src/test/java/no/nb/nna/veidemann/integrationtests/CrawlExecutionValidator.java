@@ -15,17 +15,25 @@
  */
 package no.nb.nna.veidemann.integrationtests;
 
-import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
-import no.nb.nna.veidemann.api.MessagesProto.PageLog;
+import no.nb.nna.veidemann.api.ReportProto.CrawlLogListRequest;
 import no.nb.nna.veidemann.api.ReportProto.ExecuteDbQueryRequest;
 import no.nb.nna.veidemann.api.ReportProto.PageLogListRequest;
+import no.nb.nna.veidemann.api.config.v1.ConfigObject;
+import no.nb.nna.veidemann.api.config.v1.ConfigRef;
+import no.nb.nna.veidemann.api.config.v1.Kind;
+import no.nb.nna.veidemann.api.frontier.v1.CrawlLog;
+import no.nb.nna.veidemann.api.frontier.v1.JobExecutionStatus;
+import no.nb.nna.veidemann.api.frontier.v1.PageLog;
 import no.nb.nna.veidemann.commons.ExtraStatusCodes;
+import no.nb.nna.veidemann.commons.db.ConfigAdapter;
 import no.nb.nna.veidemann.commons.db.DbException;
+import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.db.RethinkDbAdapter;
 import org.jwat.common.HttpHeader;
 import org.jwat.warc.WarcRecord;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -37,14 +45,19 @@ import static org.assertj.core.api.Assertions.fail;
 
 public class CrawlExecutionValidator {
     final RethinkDbAdapter db;
+    final ConfigAdapter configAdapter;
 
     CrawlLogHelper crawlLogs;
     CrawlExecutionsHelper crawlExecutions;
-    List<PageLog> pageLogs;
+    List<PageLog> pageLogs = new ArrayList<>();
     Map<String, WarcRecord> warcRecords;
 
-    public CrawlExecutionValidator(RethinkDbAdapter db) {
-        this.db = db;
+    final JobExecutionStatus jobExecutionStatus;
+
+    public CrawlExecutionValidator(JobExecutionStatus jobExecutionStatus) {
+        this.db = (RethinkDbAdapter) DbService.getInstance().getDbAdapter();
+        this.configAdapter = DbService.getInstance().getConfigAdapter();
+        this.jobExecutionStatus = jobExecutionStatus;
     }
 
     public CrawlExecutionValidator validate() throws DbException, InterruptedException {
@@ -62,6 +75,24 @@ public class CrawlExecutionValidator {
     public CrawlExecutionValidator checkCrawlLogCount(String type, int expectedSize) {
         assertThat(crawlLogs.getTypeCount(type))
                 .as("Wrong number of crawl log records of type %s", type)
+                .isEqualTo(expectedSize);
+        return this;
+    }
+
+    public CrawlExecutionValidator checkCrawlLogCount(String type, int minExpectedSize, int maxExpectedSize) {
+        assertThat(crawlLogs.getTypeCount(type))
+                .as("Wrong number of crawl log records of type %s", type)
+                .isBetween(minExpectedSize, maxExpectedSize);
+        return this;
+    }
+
+    public CrawlExecutionValidator checkCrawlLogCount(int expectedSize, String... types) {
+        int count = 0;
+        for (String t : types) {
+            count += crawlLogs.getTypeCount(t);
+        }
+        assertThat(count)
+                .as("Wrong number of crawl log records for types %s", types)
                 .isEqualTo(expectedSize);
         return this;
     }
@@ -146,14 +177,13 @@ public class CrawlExecutionValidator {
         crawlExecutions.getCrawlExecutionStatus().forEach(ces -> {
             System.out.println(CrawlExecutionsHelper.formatCrawlExecution(ces));
             List<CrawlLog> logs = crawlLogs.getCrawlLogsByExecutionId(ces.getId());
-            logs.forEach(c -> System.out.println("  " + c.getStatusCode() + " - " + c.getRequestedUri()));
+//            logs.forEach(c -> System.out.println("  " + c.getStatusCode() + " - " + c.getRequestedUri()));
             assertThat(logs.stream()
                     .filter(cl -> (cl.getStatusCode() != ExtraStatusCodes.RETRY_LIMIT_REACHED.getCode()
                             && !cl.getRequestedUri().endsWith("robots.txt")))
                     .count())
-                    .as("Mismatch between CrawlExecutionStatus.getDocumentsCrawled and CrawlLog count")
+                    .as("Mismatch between CrawlExecutionStatus.getUrisCrawled and CrawlLog count.")
                     .isEqualTo((int) ces.getUrisCrawled());
-
             long summarizedSize = logs.stream()
                     .filter(cl -> (cl.getStatusCode() != ExtraStatusCodes.RETRY_LIMIT_REACHED.getCode()
                             && !cl.getRequestedUri().endsWith("robots.txt")))
@@ -266,19 +296,31 @@ public class CrawlExecutionValidator {
     }
 
     private void init() throws DbException {
-        crawlLogs = new CrawlLogHelper(db);
-        pageLogs = db.listPageLogs(PageLogListRequest.newBuilder().setPageSize(500).build()).getValueList();
-        crawlExecutions = new CrawlExecutionsHelper();
+        ConfigObject job = configAdapter.getConfigObject(ConfigRef.newBuilder().setKind(Kind.crawlJob)
+                .setId(jobExecutionStatus.getJobId()).build());
+        ConfigObject crawlConfig = configAdapter.getConfigObject(job.getCrawlJob().getCrawlConfigRef());
+        ConfigObject collection = configAdapter.getConfigObject(crawlConfig.getCrawlConfig().getCollectionRef());
+
+        crawlLogs = new CrawlLogHelper(collection.getMeta().getName());
+        db.listPageLogs(PageLogListRequest.newBuilder().setPageSize(5000).build()).getValueList()
+                .stream()
+                .filter(pl -> pl.getCollectionFinalName().startsWith(collection.getMeta().getName()))
+                .forEach(pl -> pageLogs.add(pl));
+        crawlExecutions = new CrawlExecutionsHelper(jobExecutionStatus.getId());
         warcRecords = new HashMap<>();
 
-        WarcInspector.getWarcFiles().getRecordStream()
+        String warcRegex = collection.getMeta().getName() + ".*\\.warc.*";
+        WarcInspector.getWarcFiles(warcRegex).listFiles().forEach(f -> System.out.println("Warc file: " + f.getName()));
+        WarcInspector.getWarcFiles(warcRegex).getRecordStream()
                 .forEach(r -> {
                     try {
                         r.close();
                     } catch (IOException e) {
                         fail("Failed closing record", e);
                     }
-                    WarcRecord existing = warcRecords.put(r.header.warcRecordIdStr.substring(10, r.header.warcRecordIdStr.lastIndexOf(">")), r);
+
+                    String warcId = stripWarcId(r.header.warcRecordIdStr);
+                    WarcRecord existing = warcRecords.put(warcId, r);
                     assertThat(existing)
                             .as("Duplicate WARC record id %s", r.header.warcRecordIdStr)
                             .isNull();

@@ -20,8 +20,9 @@ import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import no.nb.nna.veidemann.api.config.v1.ConfigGrpc;
 import no.nb.nna.veidemann.api.config.v1.ConfigObject;
+import no.nb.nna.veidemann.api.config.v1.ConfigRef;
 import no.nb.nna.veidemann.api.config.v1.DeleteResponse;
-import no.nb.nna.veidemann.api.config.v1.GetRequest;
+import no.nb.nna.veidemann.api.config.v1.GetLabelKeysRequest;
 import no.nb.nna.veidemann.api.config.v1.Kind;
 import no.nb.nna.veidemann.api.config.v1.LabelKeysResponse;
 import no.nb.nna.veidemann.api.config.v1.ListCountResponse;
@@ -51,7 +52,7 @@ public class ConfigService extends ConfigGrpc.ConfigImplBase {
 
     @Override
     @AllowedRoles({Role.READONLY, Role.CURATOR, Role.ADMIN})
-    public void getConfigObject(GetRequest request, StreamObserver<ConfigObject> responseObserver) {
+    public void getConfigObject(ConfigRef request, StreamObserver<ConfigObject> responseObserver) {
         handleGet(() -> db.getConfigObject(request), responseObserver);
     }
 
@@ -129,7 +130,7 @@ public class ConfigService extends ConfigGrpc.ConfigImplBase {
 
     @Override
     @AllowedRoles({Role.READONLY, Role.CURATOR, Role.ADMIN})
-    public void getLabelKeys(GetRequest request, StreamObserver<LabelKeysResponse> responseObserver) {
+    public void getLabelKeys(GetLabelKeysRequest request, StreamObserver<LabelKeysResponse> responseObserver) {
         handleGet(() -> db.getLabelKeys(request), responseObserver);
     }
 }

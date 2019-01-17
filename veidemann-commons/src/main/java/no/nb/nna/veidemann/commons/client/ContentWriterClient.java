@@ -15,6 +15,7 @@
  */
 package no.nb.nna.veidemann.commons.client;
 
+import com.google.protobuf.Empty;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.Status;
@@ -22,12 +23,12 @@ import io.grpc.StatusException;
 import io.grpc.stub.StreamObserver;
 import io.opentracing.contrib.ClientTracingInterceptor;
 import io.opentracing.util.GlobalTracer;
-import no.nb.nna.veidemann.api.ContentWriterGrpc;
-import no.nb.nna.veidemann.api.ContentWriterProto.Data;
-import no.nb.nna.veidemann.api.ContentWriterProto.WriteReply;
-import no.nb.nna.veidemann.api.ContentWriterProto.WriteRequest;
-import no.nb.nna.veidemann.api.ContentWriterProto.WriteRequestMeta;
-import no.nb.nna.veidemann.api.ContentWriterProto.WriteResponseMeta;
+import no.nb.nna.veidemann.api.contentwriter.v1.ContentWriterGrpc;
+import no.nb.nna.veidemann.api.contentwriter.v1.Data;
+import no.nb.nna.veidemann.api.contentwriter.v1.WriteReply;
+import no.nb.nna.veidemann.api.contentwriter.v1.WriteRequest;
+import no.nb.nna.veidemann.api.contentwriter.v1.WriteRequestMeta;
+import no.nb.nna.veidemann.api.contentwriter.v1.WriteResponseMeta;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

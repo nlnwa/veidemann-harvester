@@ -16,17 +16,21 @@
 package no.nb.nna.veidemann.harvester.browsercontroller;
 
 import com.google.common.net.InetAddresses;
-import no.nb.nna.veidemann.api.ConfigProto;
 import no.nb.nna.veidemann.api.ConfigProto.BrowserConfig;
-import no.nb.nna.veidemann.api.ContentWriterProto;
-import no.nb.nna.veidemann.api.ContentWriterProto.RecordType;
-import no.nb.nna.veidemann.api.ContentWriterProto.WriteResponseMeta;
-import no.nb.nna.veidemann.api.ControllerProto;
-import no.nb.nna.veidemann.api.MessagesProto;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
-import no.nb.nna.veidemann.api.MessagesProto.PageLog;
+import no.nb.nna.veidemann.api.config.v1.ConfigObject;
+import no.nb.nna.veidemann.api.config.v1.ConfigRef;
+import no.nb.nna.veidemann.api.config.v1.ExtraConfig;
+import no.nb.nna.veidemann.api.config.v1.Kind;
+import no.nb.nna.veidemann.api.config.v1.PolitenessConfig;
+import no.nb.nna.veidemann.api.contentwriter.v1.RecordType;
+import no.nb.nna.veidemann.api.contentwriter.v1.WriteResponseMeta;
+import no.nb.nna.veidemann.api.frontier.v1.CrawlLog;
+import no.nb.nna.veidemann.api.frontier.v1.PageLog;
+import no.nb.nna.veidemann.api.frontier.v1.QueuedUri;
 import no.nb.nna.veidemann.chrome.client.ChromeDebugProtocolConfig;
 import no.nb.nna.veidemann.commons.client.ContentWriterClient;
+import no.nb.nna.veidemann.commons.client.DnsServiceClient;
+import no.nb.nna.veidemann.commons.db.ChangeFeed;
 import no.nb.nna.veidemann.commons.db.ConfigAdapter;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.db.DbException;
@@ -38,17 +42,21 @@ import org.junit.Ignore;
 import org.junit.Test;
 import org.littleshoot.proxy.HostResolver;
 import org.mockito.invocation.InvocationOnMock;
-import org.netpreserve.commons.uri.UriConfigs;
+import org.mockito.stubbing.Answer;
 
 import java.io.File;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 import static org.assertj.core.api.Assertions.fail;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -111,7 +119,7 @@ public class BrowserControllerIT {
             ContentWriterClient contentWriterClient = mock(ContentWriterClient.class);
             ContentWriterClient.ContentWriterSession contentWriterSession = mock(ContentWriterClient.ContentWriterSession.class);
             when(contentWriterClient.createSession()).thenReturn(contentWriterSession);
-            ContentWriterProto.WriteResponseMeta.Builder response = ContentWriterProto.WriteResponseMeta.newBuilder()
+            WriteResponseMeta.Builder response = WriteResponseMeta.newBuilder()
                     .putRecordMeta(0, WriteResponseMeta.RecordMeta.newBuilder()
                             .setRecordNum(0)
                             .setWarcId("WARC_ID_REQUEST")
@@ -130,7 +138,7 @@ public class BrowserControllerIT {
 
             DbAdapter db = getDbMock();
 
-            MessagesProto.QueuedUri queuedUri = MessagesProto.QueuedUri.newBuilder()
+            QueuedUri queuedUri = QueuedUri.newBuilder()
                     .setUri("http://a1.com")
 //                    .setUri("https://www.nb.no")
 //                    .setUri("http://example.org")
@@ -146,7 +154,7 @@ public class BrowserControllerIT {
 //                    .setReferrer("http://example.org/")
                     .build();
 
-            ConfigProto.CrawlConfig config = getDefaultConfig();
+            ConfigObject config = getDefaultConfig();
 
             File tmpDir = Files.createDirectories(Paths.get("target", "it-workdir")).toFile();
             tmpDir.deleteOnExit();
@@ -158,8 +166,22 @@ public class BrowserControllerIT {
 
             ChromeDebugProtocolConfig protocolConfig = new ChromeDebugProtocolConfig(browserWSEndpoint);
 
+            DnsServiceClient dnsServiceClient = mock(DnsServiceClient.class);
+            when(dnsServiceClient.resolve(any(), anyInt(), any())).thenAnswer(new Answer<InetSocketAddress>() {
+                @Override
+                public InetSocketAddress answer(InvocationOnMock invocation) throws Throwable {
+                    String host = invocation.getArgument(0);
+                    int port = invocation.getArgument(1);
+                    System.out.println("Writing DNS to collection: " + invocation.getArgument(2));
+                    InetSocketAddress resolvedAddress = new InetSocketAddress(InetAddresses.forString("127.0.0.1"), testSitesHttpPort);
+//            InetSocketAddress resolvedAddress = new InetSocketAddress(InetAddress.getByName(host), port);
+                    System.out.println("H: " + host + ":" + port + " => " + resolvedAddress);
+                    return resolvedAddress;
+                }
+            });
+
             try (RecordingProxy proxy = new RecordingProxy(2, tmpDir, proxyPort, contentWriterClient,
-                    new TestHostResolver(), sessionRegistry, cacheHost, cachePort);
+                    dnsServiceClient, sessionRegistry, cacheHost, cachePort);
 
                  BrowserController controller = new BrowserController(browserWSEndpoint, sessionRegistry);) {
 
@@ -201,32 +223,38 @@ public class BrowserControllerIT {
         }
     }
 
-    private ConfigProto.CrawlConfig getDefaultConfig() {
-        ConfigProto.BrowserConfig browserConfig = ConfigProto.BrowserConfig.newBuilder()
-                .setMeta(ApiTools.buildMeta("Default", "Default browser configuration"))
+    private ConfigObject getDefaultConfig() {
+        ConfigObject.Builder browserConfig = ConfigObject.newBuilder()
+                .setApiVersion("v1")
+                .setKind(Kind.browserConfig)
+                .setMeta(ApiTools.buildMeta("Default", "Default browser configuration"));
+        browserConfig.getBrowserConfigBuilder()
                 .setUserAgent("veidemann/1.0")
                 .setWindowHeight(1280)
                 .setWindowWidth(1024)
                 .setPageLoadTimeoutMs(20000)
-                .setSleepAfterPageloadMs(10000)
-                .addScriptSelector("scope:default")
-                .build();
+                .setMaxInactivityTimeMs(10000)
+                .addScriptSelector("scope:default");
 
-        ConfigProto.PolitenessConfig politenessConfig = ConfigProto.PolitenessConfig.newBuilder()
-                .setMeta(ApiTools.buildMeta("Default", "Default politeness configuration"))
-                .setRobotsPolicy(ConfigProto.PolitenessConfig.RobotsPolicy.OBEY_ROBOTS)
+        ConfigObject.Builder politenessConfig = ConfigObject.newBuilder()
+                .setApiVersion("v1")
+                .setKind(Kind.politenessConfig)
+                .setMeta(ApiTools.buildMeta("Default", "Default politeness configuration"));
+        politenessConfig.getPolitenessConfigBuilder()
+                .setRobotsPolicy(PolitenessConfig.RobotsPolicy.OBEY_ROBOTS)
                 .setMinimumRobotsValidityDurationS(86400)
-                .setMinTimeBetweenPageLoadMs(1000)
-                .build();
+                .setMinTimeBetweenPageLoadMs(1000);
 
-        ConfigProto.CrawlConfig config = ConfigProto.CrawlConfig.newBuilder()
-                .setMeta(ApiTools.buildMeta("Default", "Default crawl configuration"))
-                .setBrowserConfigId(browserConfig.getId())
-                .setPolitenessId(politenessConfig.getId())
-                .setExtra(ConfigProto.ExtraConfig.newBuilder().setCreateSnapshot(true).setExtractText(true))
-                .build();
+        ConfigObject.Builder crawlConfig = ConfigObject.newBuilder()
+                .setApiVersion("v1")
+                .setKind(Kind.crawlConfig)
+                .setMeta(ApiTools.buildMeta("Default", "Default crawl configuration"));
+        crawlConfig.getCrawlConfigBuilder()
+                .setBrowserConfigRef(ConfigRef.newBuilder().setKind(Kind.browserConfig).setId(browserConfig.getId()))
+                .setPolitenessRef(ConfigRef.newBuilder().setKind(Kind.politenessConfig).setId(politenessConfig.getId()))
+                .setExtra(ExtraConfig.newBuilder().setCreateScreenshot(true).setExtractText(true));
 
-        return config;
+        return crawlConfig.build();
     }
 
     private DbAdapter getDbMock() throws DbException {
@@ -255,38 +283,58 @@ public class BrowserControllerIT {
 //            System.out.println("::::PageLOG");
             return o;
         });
-        when(configAdapter.listBrowserScripts(any())).thenReturn(ControllerProto.BrowserScriptListReply.newBuilder()
-                .addValue(ConfigProto.BrowserScript.newBuilder()
-                        .setMeta(ApiTools.buildMeta("extract-outlinks.js", "", ApiTools
-                                .buildLabel("type", "extract_outlinks")))
-                        .setScript("var __brzl_framesDone = new Set();\n"
-                                + "var __brzl_compileOutlinks = function(frame) {\n"
-                                + "  __brzl_framesDone.add(frame);\n"
-                                + "  if (frame && frame.document) {\n"
-                                + "    var outlinks = Array.prototype.slice.call(frame.document.querySelectorAll('a[href]'));\n"
-                                + "    for (var i = 0; i < frame.frames.length; i++) {\n"
-                                + "      if (frame.frames[i] && !__brzl_framesDone.has(frame.frames[i])) {\n"
-                                + "        outlinks = outlinks.concat(__brzl_compileOutlinks(frame.frames[i]));\n"
-                                + "      }\n"
-                                + "    }\n"
-                                + "  }\n"
-                                + "  return outlinks;\n"
-                                + "}\n"
-                                + "__brzl_compileOutlinks(window).join('\\n');\n")
-                        .build())
-                .build());
+
+        ConfigObject.Builder script = ConfigObject.newBuilder()
+                .setMeta(ApiTools.buildMeta("extract-outlinks.js", "", ApiTools
+                        .buildLabel("type", "extract_outlinks")));
+        script.getBrowserScriptBuilder().setScript("var __brzl_framesDone = new Set();\n"
+                + "var __brzl_compileOutlinks = function(frame) {\n"
+                + "  __brzl_framesDone.add(frame);\n"
+                + "  if (frame && frame.document) {\n"
+                + "    var outlinks = Array.prototype.slice.call(frame.document.querySelectorAll('a[href]'));\n"
+                + "    for (var i = 0; i < frame.frames.length; i++) {\n"
+                + "      if (frame.frames[i] && !__brzl_framesDone.has(frame.frames[i])) {\n"
+                + "        outlinks = outlinks.concat(__brzl_compileOutlinks(frame.frames[i]));\n"
+                + "      }\n"
+                + "    }\n"
+                + "  }\n"
+                + "  return outlinks;\n"
+                + "}\n"
+                + "__brzl_compileOutlinks(window).join('\\n');\n");
+
+        ChangeFeedMock<ConfigObject> scripts = new ChangeFeedMock<ConfigObject>().add(script.build());
+        when(configAdapter.listConfigObjects(any())).thenReturn(scripts);
         return db;
     }
 
-    private class TestHostResolver implements HostResolver {
+//    private class TestHostResolver implements HostResolver {
+//
+//        @Override
+//        public InetSocketAddress resolve(String host, int port) throws UnknownHostException {
+//            InetSocketAddress resolvedAddress = new InetSocketAddress(InetAddresses.forString("127.0.0.1"), testSitesHttpPort);
+////            InetSocketAddress resolvedAddress = new InetSocketAddress(InetAddress.getByName(host), port);
+//            System.out.println("H: " + host + ":" + port + " => " + resolvedAddress);
+//            return resolvedAddress;
+//        }
+//
+//    }
 
-        @Override
-        public InetSocketAddress resolve(String host, int port) throws UnknownHostException {
-            InetSocketAddress resolvedAddress = new InetSocketAddress(InetAddresses.forString("127.0.0.1"), testSitesHttpPort);
-//            InetSocketAddress resolvedAddress = new InetSocketAddress(InetAddress.getByName(host), port);
-            System.out.println("H: " + host + ":" + port + " => " + resolvedAddress);
-            return resolvedAddress;
+    public class ChangeFeedMock<T> implements ChangeFeed<T> {
+        final List<T> cursor = new ArrayList<>();
+
+        public ChangeFeedMock<T> add(T element) {
+            cursor.add(element);
+            return this;
         }
 
+        @Override
+        public Stream<T> stream() {
+            return ((Stream) StreamSupport.stream(cursor.spliterator(), false));
+        }
+
+        @Override
+        public void close() {
+
+        }
     }
 }

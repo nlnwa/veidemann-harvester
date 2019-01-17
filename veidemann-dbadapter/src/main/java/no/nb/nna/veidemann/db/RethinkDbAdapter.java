@@ -19,10 +19,7 @@ import com.google.protobuf.Empty;
 import com.google.protobuf.Message;
 import com.rethinkdb.RethinkDB;
 import com.rethinkdb.ast.ReqlAst;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
-import no.nb.nna.veidemann.api.MessagesProto.CrawledContent;
 import no.nb.nna.veidemann.api.MessagesProto.ExtractedText;
-import no.nb.nna.veidemann.api.MessagesProto.PageLog;
 import no.nb.nna.veidemann.api.MessagesProto.Screenshot;
 import no.nb.nna.veidemann.api.ReportProto.CrawlLogListReply;
 import no.nb.nna.veidemann.api.ReportProto.CrawlLogListRequest;
@@ -30,8 +27,12 @@ import no.nb.nna.veidemann.api.ReportProto.PageLogListReply;
 import no.nb.nna.veidemann.api.ReportProto.PageLogListRequest;
 import no.nb.nna.veidemann.api.ReportProto.ScreenshotListReply;
 import no.nb.nna.veidemann.api.ReportProto.ScreenshotListRequest;
+import no.nb.nna.veidemann.api.contentwriter.v1.CrawledContent;
+import no.nb.nna.veidemann.api.frontier.v1.CrawlLog;
+import no.nb.nna.veidemann.api.frontier.v1.PageLog;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.db.DbException;
+import no.nb.nna.veidemann.commons.db.DbQueryException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -116,6 +117,9 @@ public class RethinkDbAdapter implements DbAdapter {
                 LOG.error("Missing ExecutionId in CrawlLog: {}", cl, new IllegalStateException());
             }
         }
+        if (cl.getCollectionFinalName().isEmpty()) {
+            LOG.error("Missing collectionFinalName: {}", cl, new IllegalStateException());
+        }
         if (!cl.hasTimeStamp()) {
             cl = cl.toBuilder().setTimeStamp(ProtoUtils.getNowTs()).build();
         }
@@ -137,6 +141,9 @@ public class RethinkDbAdapter implements DbAdapter {
 
     @Override
     public PageLog savePageLog(PageLog pageLog) throws DbException {
+        if (pageLog.getCollectionFinalName().isEmpty()) {
+            LOG.error("Missing collectionFinalName: {}", pageLog, new IllegalStateException());
+        }
         Map rMap = ProtoUtils.protoToRethink(pageLog);
         return conn.executeInsert("db-savePageLog",
                 r.table(Tables.PAGE_LOG.name)

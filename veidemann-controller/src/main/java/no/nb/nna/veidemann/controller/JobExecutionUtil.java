@@ -2,9 +2,8 @@ package no.nb.nna.veidemann.controller;
 
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
-import no.nb.nna.veidemann.api.ConfigProto.CrawlJob;
-import no.nb.nna.veidemann.api.ConfigProto.Seed;
-import no.nb.nna.veidemann.api.MessagesProto.JobExecutionStatus;
+import no.nb.nna.veidemann.api.config.v1.ConfigObject;
+import no.nb.nna.veidemann.api.frontier.v1.JobExecutionStatus;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.util.ApiTools;
 import org.slf4j.Logger;
@@ -12,7 +11,6 @@ import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.function.Supplier;
 
 import static no.nb.nna.veidemann.commons.util.ApiTools.buildLabel;
 
@@ -51,8 +49,8 @@ public class JobExecutionUtil {
         }
     }
 
-    public static void crawlSeed(CrawlJob job, Seed seed, JobExecutionStatus jobExecutionStatus) {
-        if (!seed.getDisabled()) {
+    public static void crawlSeed(ConfigObject job, ConfigObject seed, JobExecutionStatus jobExecutionStatus) {
+        if (!seed.getSeed().getDisabled()) {
             LOG.info("Start harvest of: {}", seed.getMeta().getName());
 
             String type = ApiTools.getFirstLabelWithKey(seed.getMeta(), "type")

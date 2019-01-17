@@ -8,10 +8,14 @@ meta:
   - key: "type"
     value: "default"
 crawlJob:
-  scheduleId: "5604f0cc-315d-4091-8d6e-1b17a7eb990b"
+  scheduleRef:
+    kind: "crawlScheduleConfig"
+    id: "5604f0cc-315d-4091-8d6e-1b17a7eb990b"
   limits:
     maxDurationS: 60
-  crawlConfigId: "f8609d3f-9bf2-416c-ad50-7774b7d2dd95"
+  crawlConfigRef:
+    kind: "crawlConfig"
+    id: "f8609d3f-9bf2-416c-ad50-7774b7d2dd95"
 ---
 apiVersion: "v1"
 kind: "crawlJob"
@@ -23,10 +27,14 @@ meta:
   - key: "type"
     value: "default"
 crawlJob:
-  scheduleId: "1960663c-4bfa-4002-bc1b-24338bb66aa4"
+  scheduleRef:
+    kind: "crawlScheduleConfig"
+    id: "1960663c-4bfa-4002-bc1b-24338bb66aa4"
   limits:
     maxDurationS: 86400
-  crawlConfigId: "f8609d3f-9bf2-416c-ad50-7774b7d2dd95"
+  crawlConfigRef:
+    kind: "crawlConfig"
+    id: "f8609d3f-9bf2-416c-ad50-7774b7d2dd95"
 ---
 apiVersion: "v1"
 kind: "crawlJob"
@@ -38,10 +46,14 @@ meta:
   - key: "type"
     value: "default"
 crawlJob:
-  scheduleId: "846cbc1e-540b-460b-bc75-2d2a2d4193c5"
+  scheduleRef:
+    kind: "crawlScheduleConfig"
+    id: "846cbc1e-540b-460b-bc75-2d2a2d4193c5"
   limits:
     maxDurationS: 86400
-  crawlConfigId: "f8609d3f-9bf2-416c-ad50-7774b7d2dd95"
+  crawlConfigRef:
+    kind: "crawlConfig"
+    id: "f8609d3f-9bf2-416c-ad50-7774b7d2dd95"
 ---
 apiVersion: "v1"
 kind: "crawlJob"
@@ -57,4 +69,6 @@ crawlJob:
     depth: 10
     maxDurationS: 86400
     maxBytes: 1073741824
-  crawlConfigId: "f8609d3f-9bf2-416c-ad50-7774b7d2dd95"
+  crawlConfigRef:
+    kind: "crawlConfig"
+    id: "f8609d3f-9bf2-416c-ad50-7774b7d2dd95"

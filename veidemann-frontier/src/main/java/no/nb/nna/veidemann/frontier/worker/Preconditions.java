@@ -15,13 +15,12 @@
  */
 package no.nb.nna.veidemann.frontier.worker;
 
-import no.nb.nna.veidemann.api.ConfigProto.BrowserConfig;
-import no.nb.nna.veidemann.api.ConfigProto.CrawlConfig;
-import no.nb.nna.veidemann.api.ConfigProto.PolitenessConfig;
-import no.nb.nna.veidemann.api.ConfigProto.PolitenessConfig.RobotsPolicy;
+import no.nb.nna.veidemann.api.config.v1.ConfigObject;
+import no.nb.nna.veidemann.api.config.v1.PolitenessConfig.RobotsPolicy;
 import no.nb.nna.veidemann.commons.ExtraStatusCodes;
+import no.nb.nna.veidemann.commons.db.ConfigAdapter;
 import no.nb.nna.veidemann.commons.db.DbException;
-import no.nb.nna.veidemann.commons.db.DbHelper;
+import no.nb.nna.veidemann.commons.db.DbService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,20 +43,22 @@ public class Preconditions {
     private Preconditions() {
     }
 
-    public static PreconditionState checkPreconditions(Frontier frontier, CrawlConfig config, StatusWrapper status,
+    public static PreconditionState checkPreconditions(Frontier frontier, ConfigObject crawlConfig, StatusWrapper status,
                                                        QueuedUriWrapper qUri) throws DbException {
 
-        PolitenessConfig politeness = DbHelper.getPolitenessConfigForCrawlConfig(config);
-        BrowserConfig browserConfig = DbHelper.getBrowserConfigForCrawlConfig(config);
+        ConfigAdapter configAdapter = DbService.getInstance().getConfigAdapter();
+
+        ConfigObject politeness = configAdapter.getConfigObject(crawlConfig.getCrawlConfig().getPolitenessRef());
+        ConfigObject browserConfig = configAdapter.getConfigObject(crawlConfig.getCrawlConfig().getBrowserConfigRef());
 
         qUri.clearError();
 
-        if (!checkRobots(frontier, browserConfig.getUserAgent(), politeness, qUri)) {
+        if (!checkRobots(frontier, browserConfig.getBrowserConfig().getUserAgent(), crawlConfig, politeness, qUri)) {
             status.incrementDocumentsDenied(1L);
             return PreconditionState.DENIED;
         }
 
-        if (resolveDns(frontier, politeness, qUri)) {
+        if (resolveDns(frontier, crawlConfig, politeness, qUri)) {
             qUri.setResolved(politeness);
             return PreconditionState.OK;
         } else {
@@ -72,12 +73,13 @@ public class Preconditions {
         }
     }
 
-    private static boolean checkRobots(Frontier frontier, String userAgent, PolitenessConfig politeness,
+    private static boolean checkRobots(Frontier frontier, String userAgent, ConfigObject crawlConfig, ConfigObject politeness,
                                        QueuedUriWrapper qUri) throws DbException {
         LOG.debug("Check robots.txt for URI '{}'", qUri.getUri());
         // Check robots.txt
-        if (politeness.getRobotsPolicy() != RobotsPolicy.IGNORE_ROBOTS
-                && !frontier.getRobotsServiceClient().isAllowed(qUri.getQueuedUri(), userAgent, politeness)) {
+        if (politeness.getPolitenessConfig().getRobotsPolicy() != RobotsPolicy.IGNORE_ROBOTS
+                && !frontier.getRobotsServiceClient().isAllowed(qUri.getQueuedUri(), userAgent, politeness,
+                crawlConfig.getCrawlConfig().getCollectionRef())) {
             LOG.info("URI '{}' precluded by robots.txt", qUri.getUri());
             qUri = qUri.setError(ExtraStatusCodes.PRECLUDED_BY_ROBOTS.toFetchError());
             DbUtil.writeLog(qUri);
@@ -86,7 +88,7 @@ public class Preconditions {
         return true;
     }
 
-    private static boolean resolveDns(Frontier frontier, PolitenessConfig politeness, QueuedUriWrapper qUri) {
+    private static boolean resolveDns(Frontier frontier, ConfigObject crawlConfig, ConfigObject politeness, QueuedUriWrapper qUri) {
         if (!qUri.getIp().isEmpty()) {
             return true;
         }
@@ -95,7 +97,7 @@ public class Preconditions {
 
         try {
             String ip = frontier.getDnsServiceClient()
-                    .resolve(qUri.getHost(), qUri.getPort())
+                    .resolve(qUri.getHost(), qUri.getPort(), crawlConfig.getCrawlConfig().getCollectionRef())
                     .getAddress()
                     .getHostAddress();
             qUri.setIp(ip);
@@ -108,7 +110,7 @@ public class Preconditions {
                     ex);
 
             qUri.setError(ExtraStatusCodes.FAILED_DNS.toFetchError(ex.toString()))
-                    .setEarliestFetchDelaySeconds(politeness.getRetryDelaySeconds())
+                    .setEarliestFetchDelaySeconds(politeness.getPolitenessConfig().getRetryDelaySeconds())
                     .incrementRetries();
             return false;
         }

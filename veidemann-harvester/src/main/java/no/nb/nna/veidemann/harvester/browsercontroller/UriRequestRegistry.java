@@ -16,8 +16,8 @@
 package no.nb.nna.veidemann.harvester.browsercontroller;
 
 import io.opentracing.BaseSpan;
-import no.nb.nna.veidemann.api.MessagesProto.PageLog.Resource;
-import no.nb.nna.veidemann.api.MessagesProto.QueuedUri;
+import no.nb.nna.veidemann.api.frontier.v1.PageLog.Resource;
+import no.nb.nna.veidemann.api.frontier.v1.QueuedUri;
 import no.nb.nna.veidemann.chrome.client.NetworkDomain;
 import no.nb.nna.veidemann.commons.ExtraStatusCodes;
 import no.nb.nna.veidemann.commons.VeidemannHeaderConstants;

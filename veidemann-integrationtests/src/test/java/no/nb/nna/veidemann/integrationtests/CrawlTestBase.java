@@ -19,21 +19,26 @@ import com.google.protobuf.Empty;
 import com.rethinkdb.RethinkDB;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
-import no.nb.nna.veidemann.api.ConfigProto;
-import no.nb.nna.veidemann.api.ConfigProto.CrawlEntity;
 import no.nb.nna.veidemann.api.ConfigProto.LogLevels;
 import no.nb.nna.veidemann.api.ConfigProto.LogLevels.Level;
-import no.nb.nna.veidemann.api.ConfigProto.Seed;
-import no.nb.nna.veidemann.api.ContentWriterGrpc;
 import no.nb.nna.veidemann.api.ControllerGrpc;
 import no.nb.nna.veidemann.api.ReportGrpc;
 import no.nb.nna.veidemann.api.StatusGrpc;
+import no.nb.nna.veidemann.api.config.v1.Collection.SubCollectionType;
+import no.nb.nna.veidemann.api.config.v1.ConfigGrpc;
+import no.nb.nna.veidemann.api.config.v1.ConfigObject;
+import no.nb.nna.veidemann.api.config.v1.ConfigRef;
+import no.nb.nna.veidemann.api.config.v1.Kind;
+import no.nb.nna.veidemann.api.config.v1.ListRequest;
+import no.nb.nna.veidemann.api.config.v1.Meta;
+import no.nb.nna.veidemann.api.config.v1.Seed;
+import no.nb.nna.veidemann.api.contentwriter.v1.ContentWriterGrpc;
 import no.nb.nna.veidemann.commons.db.DbConnectionException;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.commons.settings.CommonSettings;
+import no.nb.nna.veidemann.commons.util.ApiTools;
 import no.nb.nna.veidemann.db.RethinkDbAdapter;
-import no.nb.nna.veidemann.db.Tables;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -42,6 +47,8 @@ public abstract class CrawlTestBase {
     static ManagedChannel contentWriterChannel;
 
     static ManagedChannel controllerChannel;
+
+    static ConfigGrpc.ConfigBlockingStub configClient;
 
     static ControllerGrpc.ControllerBlockingStub controllerClient;
 
@@ -66,7 +73,10 @@ public abstract class CrawlTestBase {
         System.out.println("Database address: " + dbHost + ":" + dbPort);
 
         controllerChannel = ManagedChannelBuilder.forAddress(controllerHost, controllerPort).usePlaintext().build();
+
         controllerClient = ControllerGrpc.newBlockingStub(controllerChannel).withWaitForReady();
+
+        configClient = ConfigGrpc.newBlockingStub(controllerChannel).withWaitForReady();
 
         statusClient = StatusGrpc.newBlockingStub(controllerChannel).withWaitForReady();
 
@@ -99,32 +109,87 @@ public abstract class CrawlTestBase {
 
     @After
     public void cleanup() throws DbException {
-        contentWriterClient.delete(Empty.getDefaultInstance());
-        db.executeRequest("delete", r.table(Tables.CRAWLED_CONTENT.name).delete());
-        db.executeRequest("delete", r.table(Tables.CRAWL_LOG.name).delete());
-        db.executeRequest("delete", r.table(Tables.PAGE_LOG.name).delete());
-        db.executeRequest("delete", r.table(Tables.EXECUTIONS.name).delete());
-        db.executeRequest("delete", r.table(Tables.JOB_EXECUTIONS.name).delete());
-        db.executeRequest("delete", r.table(Tables.EXTRACTED_TEXT.name).delete());
-        db.executeRequest("delete", r.table(Tables.SCREENSHOT.name).delete());
-        db.executeRequest("delete", r.table(Tables.URI_QUEUE.name).delete());
-        db.executeRequest("delete", r.table(Tables.CRAWL_HOST_GROUP.name).delete());
-        db.executeRequest("delete", r.table(Tables.CRAWL_ENTITIES.name).delete());
-        db.executeRequest("delete", r.table(Tables.SEEDS.name).delete());
     }
 
-    CrawlEntity createEntity(String name) {
-        return controllerClient.saveEntity(
-                ConfigProto.CrawlEntity.newBuilder()
-                        .setMeta(ConfigProto.Meta.newBuilder().setName(name))
+    public ConfigObject createJob(String name, int depth, long maxDurationS, long maxBytes) {
+        // Update browser config with shorter inactivity time
+        ConfigObject browserConfig = configClient.listConfigObjects(ListRequest.newBuilder()
+                .setKind(Kind.browserConfig)
+                .build())
+                .next();
+        ConfigObject.Builder browserConfigBuilder = browserConfig.toBuilder();
+        browserConfigBuilder.getBrowserConfigBuilder().setMaxInactivityTimeMs(500);
+        browserConfig = configClient.saveConfigObject(browserConfigBuilder.build());
+
+        // Create politeness which is not very polite
+        ConfigObject.Builder politenessBuilder = ConfigObject.newBuilder()
+                .setApiVersion("v1")
+                .setKind(Kind.politenessConfig);
+        politenessBuilder.getMetaBuilder().setName(name);
+        politenessBuilder.getPolitenessConfigBuilder()
+                .setMaxTimeBetweenPageLoadMs(100)
+                .setMinTimeBetweenPageLoadMs(1)
+                .setDelayFactor(.01f)
+                .setRetryDelaySeconds(1)
+                .setUseHostname(true);
+        ConfigObject politeness = configClient.saveConfigObject(politenessBuilder.build());
+
+        // Create a collection for this test
+        ConfigObject.Builder collectionBuilder = ConfigObject.newBuilder()
+                .setApiVersion("v1")
+                .setKind(Kind.collection);
+        collectionBuilder.getMetaBuilder().setName(name).setDescription("Collection for " + name);
+        collectionBuilder.getCollectionBuilder()
+                .setCompress(true)
+                .setFileSize(1024 * 1024 * 100)
+                .addSubCollectionsBuilder().setName("dns").setType(SubCollectionType.DNS);
+        ConfigObject collection = configClient.saveConfigObject(collectionBuilder.build());
+
+        // Create a crawl config which references the above configs
+        ConfigObject.Builder crawlConfigBuilder = ConfigObject.newBuilder()
+                .setApiVersion("v1")
+                .setKind(Kind.crawlConfig);
+        crawlConfigBuilder.getMetaBuilder().setName(name);
+        crawlConfigBuilder.getCrawlConfigBuilder()
+                .setCollectionRef(ApiTools.refForConfig(collection))
+                .setBrowserConfigRef(ApiTools.refForConfig(browserConfig))
+                .setPolitenessRef(ApiTools.refForConfig(politeness))
+                .getExtraBuilder().setCreateScreenshot(true).setExtractText(true);
+        ConfigObject crawlConfig = configClient.saveConfigObject(crawlConfigBuilder.build());
+
+        // Create a job with the specified limits
+        ConfigObject.Builder jobBuilder = ConfigObject.newBuilder()
+                .setApiVersion("v1")
+                .setKind(Kind.crawlJob);
+        jobBuilder.getMetaBuilder().setName(name);
+        jobBuilder.getCrawlJobBuilder()
+                .setCrawlConfigRef(ApiTools.refForConfig(crawlConfig))
+                .getLimitsBuilder()
+                .setDepth(depth)
+                .setMaxDurationS(maxDurationS)
+                .setMaxBytes(maxBytes);
+        ConfigObject job = configClient.saveConfigObject(jobBuilder.build());
+
+        return job;
+    }
+
+    ConfigObject createEntity(String name) {
+        return configClient.saveConfigObject(
+                ConfigObject.newBuilder()
+                        .setApiVersion("v1")
+                        .setKind(Kind.crawlEntity)
+                        .setMeta(Meta.newBuilder().setName(name))
                         .build());
     }
 
-    Seed createSeed(String uri, CrawlEntity entity, String jobId) {
-        return controllerClient.saveSeed(ConfigProto.Seed.newBuilder()
-                .setMeta(ConfigProto.Meta.newBuilder().setName(uri))
-                .setEntityId(entity.getId())
-                .addJobId(jobId)
+    ConfigObject createSeed(String uri, ConfigObject entity, String jobId) {
+        return configClient.saveConfigObject(ConfigObject.newBuilder()
+                .setApiVersion("v1")
+                .setKind(Kind.seed)
+                .setMeta(Meta.newBuilder().setName(uri))
+                .setSeed(Seed.newBuilder()
+                        .setEntityRef(ApiTools.refForConfig(entity))
+                        .addJobRef(ConfigRef.newBuilder().setKind(Kind.crawlJob).setId(jobId)))
                 .build());
     }
 }

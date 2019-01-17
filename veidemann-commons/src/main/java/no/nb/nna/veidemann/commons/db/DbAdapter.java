@@ -16,10 +16,7 @@
 package no.nb.nna.veidemann.commons.db;
 
 import com.google.protobuf.Empty;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
-import no.nb.nna.veidemann.api.MessagesProto.CrawledContent;
 import no.nb.nna.veidemann.api.MessagesProto.ExtractedText;
-import no.nb.nna.veidemann.api.MessagesProto.PageLog;
 import no.nb.nna.veidemann.api.MessagesProto.Screenshot;
 import no.nb.nna.veidemann.api.ReportProto.CrawlLogListReply;
 import no.nb.nna.veidemann.api.ReportProto.CrawlLogListRequest;
@@ -27,6 +24,9 @@ import no.nb.nna.veidemann.api.ReportProto.PageLogListReply;
 import no.nb.nna.veidemann.api.ReportProto.PageLogListRequest;
 import no.nb.nna.veidemann.api.ReportProto.ScreenshotListReply;
 import no.nb.nna.veidemann.api.ReportProto.ScreenshotListRequest;
+import no.nb.nna.veidemann.api.contentwriter.v1.CrawledContent;
+import no.nb.nna.veidemann.api.frontier.v1.CrawlLog;
+import no.nb.nna.veidemann.api.frontier.v1.PageLog;
 
 import java.util.Optional;
 

@@ -20,7 +20,9 @@ import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
-import no.nb.nna.veidemann.api.ContentWriterProto;
+import no.nb.nna.veidemann.api.contentwriter.v1.Data;
+import no.nb.nna.veidemann.api.contentwriter.v1.RecordType;
+import no.nb.nna.veidemann.api.contentwriter.v1.WriteRequestMeta;
 import no.nb.nna.veidemann.commons.client.ContentWriterClient.ContentWriterSession;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.util.Sha1Digest;
@@ -52,24 +54,23 @@ public class ContentCollector {
 
     private final int recordNum;
 
-    private final ContentWriterProto.RecordType type;
+    private final RecordType type;
 
     private final String targetUri;
 
-    private final ContentWriterProto.WriteRequestMeta.RecordMeta.Builder recordMeta;
+    private final WriteRequestMeta.RecordMeta.Builder recordMeta;
 
     private long size;
 
     private boolean shouldAddSeparator = false;
 
-    public ContentCollector(int recordNum, ContentWriterProto.RecordType type,
-                            final String targetUri, final DbAdapter db) {
+    public ContentCollector(int recordNum, RecordType type, final String targetUri, final DbAdapter db) {
         this.recordNum = recordNum;
         this.type = type;
         this.targetUri = targetUri;
         this.db = db;
         this.digest = new Sha1Digest();
-        this.recordMeta = ContentWriterProto.WriteRequestMeta.RecordMeta.newBuilder()
+        this.recordMeta = WriteRequestMeta.RecordMeta.newBuilder()
                 .setRecordNum(recordNum)
                 .setType(type);
         switch (type) {
@@ -105,7 +106,7 @@ public class ContentCollector {
         ByteString headerData = ByteString.copyFromUtf8(preamble).concat(serializeHeaders(headers));
 
         digest.update(headerData);
-        contentWriterSession.sendHeader(ContentWriterProto.Data.newBuilder().setRecordNum(recordNum).setData(headerData).build());
+        contentWriterSession.sendHeader(Data.newBuilder().setRecordNum(recordNum).setData(headerData).build());
         shouldAddSeparator = true;
         size = headerData.size();
     }
@@ -133,7 +134,7 @@ public class ContentCollector {
         if (payload.readableBytes() == 0) {
             ByteString data = ByteString.copyFrom(payload.nioBuffer());
             digest.update(data);
-            contentWriterSession.sendPayload(ContentWriterProto.Data.newBuilder().setRecordNum(recordNum).setData(data).build());
+            contentWriterSession.sendPayload(Data.newBuilder().setRecordNum(recordNum).setData(data).build());
             size += data.size();
         } else {
             ByteBuffer payloadBuf = payload.nioBuffer();
@@ -141,7 +142,7 @@ public class ContentCollector {
                 int length = Math.min(32 * 1024, payloadBuf.remaining());
                 ByteString data = ByteString.copyFrom(payloadBuf, length);
                 digest.update(data);
-                contentWriterSession.sendPayload(ContentWriterProto.Data.newBuilder().setRecordNum(recordNum).setData(data).build());
+                contentWriterSession.sendPayload(Data.newBuilder().setRecordNum(recordNum).setData(data).build());
                 size += data.size();
             }
         }
@@ -159,7 +160,7 @@ public class ContentCollector {
         return recordNum;
     }
 
-    public ContentWriterProto.WriteRequestMeta.RecordMeta getRecordMeta() {
+    public WriteRequestMeta.RecordMeta getRecordMeta() {
         return recordMeta
                 .setBlockDigest(digest.getPrefixedDigestString())
                 .setSize(size)

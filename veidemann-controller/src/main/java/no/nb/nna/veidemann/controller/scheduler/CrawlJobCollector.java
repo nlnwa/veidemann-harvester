@@ -19,10 +19,12 @@ import it.sauronsoftware.cron4j.SchedulingPattern;
 import it.sauronsoftware.cron4j.Task;
 import it.sauronsoftware.cron4j.TaskCollector;
 import it.sauronsoftware.cron4j.TaskTable;
-import no.nb.nna.veidemann.api.ConfigProto.CrawlJob;
-import no.nb.nna.veidemann.api.ConfigProto.CrawlScheduleConfig;
-import no.nb.nna.veidemann.api.ControllerProto.GetRequest;
-import no.nb.nna.veidemann.api.ControllerProto.ListRequest;
+import no.nb.nna.veidemann.api.config.v1.ConfigObject;
+import no.nb.nna.veidemann.api.config.v1.ConfigRef;
+import no.nb.nna.veidemann.api.config.v1.CrawlScheduleConfig;
+import no.nb.nna.veidemann.api.config.v1.Kind;
+import no.nb.nna.veidemann.api.config.v1.ListRequest;
+import no.nb.nna.veidemann.commons.db.ChangeFeed;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.db.ProtoUtils;
@@ -43,13 +45,13 @@ public class CrawlJobCollector implements TaskCollector {
     final ListRequest listRequest;
 
     public CrawlJobCollector() {
-        this.listRequest = ListRequest.newBuilder().build();
+        this.listRequest = ListRequest.newBuilder().setKind(Kind.crawlJob).build();
     }
 
     @Override
     public TaskTable getTasks() {
         TaskTable tasks = new TaskTable();
-        Map<String, CrawlScheduleConfig> schedules = new HashMap<>();
+        Map<ConfigRef, ConfigObject> schedules = new HashMap<>();
 
         try {
             // Do not schedule jobs if Veidemann is paused.
@@ -57,40 +59,38 @@ public class CrawlJobCollector implements TaskCollector {
                 return tasks;
             }
 
-            for (CrawlJob job : DbService.getInstance().getConfigAdapter().listCrawlJobs(listRequest).getValueList()) {
-                // Check if job is disabled
-                if (!job.getDisabled()) {
-                    CrawlScheduleConfig schedule = schedules.computeIfAbsent(job.getScheduleId(),
-                            k -> {
-                                if (k.isEmpty()) {
-                                    return CrawlScheduleConfig.getDefaultInstance();
-                                } else {
+            try (ChangeFeed<ConfigObject> cursor = DbService.getInstance().getConfigAdapter().listConfigObjects(listRequest)) {
+                cursor.stream().forEach(job -> {
+                    // Check if job is disabled
+                    if (!job.getCrawlJob().getDisabled() && job.getCrawlJob().hasScheduleRef()) {
+                        ConfigObject schedule = schedules.computeIfAbsent(job.getCrawlJob().getScheduleRef(),
+                                k -> {
                                     try {
-                                        return DbService.getInstance().getConfigAdapter()
-                                                .getCrawlScheduleConfig(GetRequest.newBuilder().setId(k).build());
+                                        return DbService.getInstance().getConfigAdapter().getConfigObject(k);
                                     } catch (DbException e) {
                                         LOG.error("Failed getting tasks for scheduler", e);
                                         throw new RuntimeException(e);
                                     }
-                                }
-                            });
+                                });
 
-                    // Check if job is valid for current date
-                    OffsetDateTime now = ProtoUtils.getNowOdt();
-                    if (!schedule.getCronExpression().isEmpty()
-                            && (!schedule.hasValidFrom() || ProtoUtils.tsToOdt(schedule.getValidFrom()).isBefore(now))
-                            && (!schedule.hasValidTo() || ProtoUtils.tsToOdt(schedule.getValidTo()).isAfter(now))) {
+                        // Check if job is valid for current date
+                        OffsetDateTime now = ProtoUtils.getNowOdt();
+                        CrawlScheduleConfig csc = schedule.getCrawlScheduleConfig();
+                        if (!csc.getCronExpression().isEmpty()
+                                && (!csc.hasValidFrom() || ProtoUtils.tsToOdt(csc.getValidFrom()).isBefore(now))
+                                && (!csc.hasValidTo() || ProtoUtils.tsToOdt(csc.getValidTo()).isAfter(now))) {
 
-                        if (LOG.isDebugEnabled()) {
-                            LOG.debug("Read Job: '{}' with cron expression '{}'",
-                                    job.getMeta().getName(), schedule.getCronExpression());
+                            if (LOG.isDebugEnabled()) {
+                                LOG.debug("Read Job: '{}' with cron expression '{}'",
+                                        job.getMeta().getName(), csc.getCronExpression());
+                            }
+
+                            SchedulingPattern pattern = new SchedulingPattern(csc.getCronExpression());
+                            Task task = new ScheduledCrawlJob(job);
+                            tasks.add(pattern, task);
                         }
-
-                        SchedulingPattern pattern = new SchedulingPattern(schedule.getCronExpression());
-                        Task task = new ScheduledCrawlJob(job);
-                        tasks.add(pattern, task);
                     }
-                }
+                });
             }
         } catch (DbException e) {
             LOG.error("Failed getting tasks for scheduler", e);

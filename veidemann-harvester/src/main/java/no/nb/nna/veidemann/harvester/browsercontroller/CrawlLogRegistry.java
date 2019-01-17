@@ -16,8 +16,7 @@
 package no.nb.nna.veidemann.harvester.browsercontroller;
 
 import com.google.protobuf.Timestamp;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlLog.Builder;
+import no.nb.nna.veidemann.api.frontier.v1.CrawlLog;
 import no.nb.nna.veidemann.commons.ExtraStatusCodes;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbService;
@@ -63,7 +62,7 @@ public class CrawlLogRegistry {
             this.uri = uri;
         }
 
-        public void setCrawlLog(Builder crawlLog) {
+        public void setCrawlLog(CrawlLog.Builder crawlLog) {
             crawlLogsLock.lock();
             try {
                 this.crawlLog = crawlLog;
@@ -74,7 +73,7 @@ public class CrawlLogRegistry {
             }
         }
 
-        public Builder getCrawlLog() {
+        public CrawlLog.Builder getCrawlLog() {
             if (crawlLog == null) {
                 NullPointerException e = new NullPointerException("Crawl log is null");
                 LOG.warn("Trying to access missing crawl log", e);

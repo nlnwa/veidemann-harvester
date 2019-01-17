@@ -15,13 +15,15 @@
  */
 package no.nb.nna.veidemann.harvester.proxy;
 
-import java.net.InetSocketAddress;
-import java.net.UnknownHostException;
-
+import no.nb.nna.veidemann.api.config.v1.ConfigRef;
 import no.nb.nna.veidemann.commons.client.DnsServiceClient;
+import no.nb.nna.veidemann.harvester.BrowserSessionRegistry;
 import org.littleshoot.proxy.HostResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 
 /**
  *
@@ -31,13 +33,22 @@ public class DnsServiceHostResolver implements HostResolver {
     private static final Logger LOG = LoggerFactory.getLogger(DnsServiceHostResolver.class);
 
     private final DnsServiceClient dnsServiceClient;
+    private final BrowserSessionRegistry browserSessionRegistry;
+    private final int proxyId;
 
-    public DnsServiceHostResolver(final DnsServiceClient dnsServiceClient) {
+    public DnsServiceHostResolver(final DnsServiceClient dnsServiceClient, final BrowserSessionRegistry browserSessionRegistry, final int proxyId) {
         this.dnsServiceClient = dnsServiceClient;
+        this.browserSessionRegistry = browserSessionRegistry;
+        this.proxyId = proxyId;
     }
 
     @Override
     public InetSocketAddress resolve(String host, int port) throws UnknownHostException {
-        return dnsServiceClient.resolve(host, port);
+        ConfigRef collectionRef = browserSessionRegistry.get(proxyId).getCollectionRef();
+        return dnsServiceClient.resolve(host, port, collectionRef);
+    }
+
+    public InetSocketAddress resolve(String host, int port, ConfigRef collectionRef) throws UnknownHostException {
+        return dnsServiceClient.resolve(host, port, collectionRef);
     }
 }

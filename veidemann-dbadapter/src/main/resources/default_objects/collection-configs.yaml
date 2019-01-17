@@ -1,0 +1,17 @@
+apiVersion: "v1"
+kind: "collection"
+id: "2fa23773-d7e1-4748-8ab6-9253e470a3f5"
+meta:
+  name: "Veidemann"
+  description: "Veidemann default collection"
+  label:
+    - key: "type"
+      value: "default"
+collection:
+  collectionDedupPolicy: YEARLY
+  fileRotationPolicy: DAILY
+  compress: true
+  fileSize: 1000000000
+  subCollections:
+    - type: SCREENSHOT
+      name: screenshot

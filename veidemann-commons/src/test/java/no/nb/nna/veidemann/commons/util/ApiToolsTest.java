@@ -17,10 +17,11 @@
 package no.nb.nna.veidemann.commons.util;
 
 import com.google.protobuf.Message;
-import no.nb.nna.veidemann.api.ConfigProto;
 import no.nb.nna.veidemann.api.ConfigProto.Seed;
 import no.nb.nna.veidemann.api.ControllerProto.SeedListReply;
 import no.nb.nna.veidemann.api.ControllerProto.SeedListRequest;
+import no.nb.nna.veidemann.api.config.v1.Label;
+import no.nb.nna.veidemann.api.config.v1.Meta;
 import no.nb.nna.veidemann.commons.util.ApiTools.ListReplyWalker.CheckedFunction;
 import org.junit.Test;
 
@@ -38,7 +39,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class ApiToolsTest {
     @Test
     public void testGetFirstLabelWithKey() {
-        ConfigProto.Meta meta = buildMeta("name", "descr",
+        Meta meta = buildMeta("name", "descr",
                 buildLabel("aa", "bb"), buildLabel("cc", "dd"), buildLabel("aa", "ee"));
 
         assertThat(ApiTools.getFirstLabelWithKey(meta, "aa")).isPresent().contains(buildLabel("aa", "bb"));
@@ -51,11 +52,11 @@ public class ApiToolsTest {
      */
     @Test
     public void testHasLabel() {
-        ConfigProto.Meta meta = buildMeta("name", "descr", buildLabel("aa", "bb"), buildLabel("cc", "dd"));
+        Meta meta = buildMeta("name", "descr", buildLabel("aa", "bb"), buildLabel("cc", "dd"));
 
-        ConfigProto.Label labelToFind1 = buildLabel("aa", "bb");
-        ConfigProto.Label labelToFind2 = buildLabel("cc", "dd");
-        ConfigProto.Label labelToFind3 = buildLabel("ee", "ff");
+        Label labelToFind1 = buildLabel("aa", "bb");
+        Label labelToFind2 = buildLabel("cc", "dd");
+        Label labelToFind3 = buildLabel("ee", "ff");
 
         assertThat(ApiTools.hasLabel(meta, labelToFind1)).isTrue();
 

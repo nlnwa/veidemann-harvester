@@ -44,13 +44,14 @@ import no.nb.nna.veidemann.api.ControllerProto.RoleMappingsListReply;
 import no.nb.nna.veidemann.api.ControllerProto.RoleMappingsListRequest;
 import no.nb.nna.veidemann.api.ControllerProto.SeedListReply;
 import no.nb.nna.veidemann.api.ControllerProto.SeedListRequest;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlHostGroup;
-import no.nb.nna.veidemann.api.MessagesProto.CrawlLog;
-import no.nb.nna.veidemann.api.MessagesProto.CrawledContent;
 import no.nb.nna.veidemann.api.MessagesProto.ExtractedText;
 import no.nb.nna.veidemann.api.MessagesProto.Screenshot;
 import no.nb.nna.veidemann.api.config.v1.ConfigObject;
+import no.nb.nna.veidemann.api.config.v1.ConfigRef;
 import no.nb.nna.veidemann.api.config.v1.Kind;
+import no.nb.nna.veidemann.api.contentwriter.v1.CrawledContent;
+import no.nb.nna.veidemann.api.frontier.v1.CrawlHostGroup;
+import no.nb.nna.veidemann.api.frontier.v1.CrawlLog;
 import no.nb.nna.veidemann.commons.auth.EmailContextKey;
 import no.nb.nna.veidemann.commons.auth.RolesContextKey;
 import no.nb.nna.veidemann.commons.db.DbException;
@@ -66,6 +67,7 @@ import org.junit.Ignore;
 import org.junit.Test;
 
 import java.time.OffsetDateTime;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -424,6 +426,7 @@ public class RethinkDbAdapterIT {
                 .setWarcId(cc1.getWarcId())
                 .setJobExecutionId("jeid")
                 .setExecutionId("ceid")
+                .setCollectionFinalName("collection")
                 .build());
 
         Optional<CrawledContent> r2 = dbAdapter.hasCrawledContent(cc2);
@@ -493,10 +496,43 @@ public class RethinkDbAdapterIT {
                 .setContentType("text/plain")
                 .setJobExecutionId("jeid")
                 .setExecutionId("eid")
+                .setCollectionFinalName("collection")
                 .build();
         CrawlLog result = dbAdapter.saveCrawlLog(cl);
         assertThat(result.getContentType()).isEqualTo("text/plain");
         assertThat(result.getWarcId()).isNotEmpty();
+    }
+
+    public static boolean hasLabel(Meta meta, Label... labelToFind) {
+        boolean found = false;
+        for (Label ltf : labelToFind) {
+            found = false;
+            for (Label ml : meta.getLabelList()) {
+                if (ltf.equals(ml)) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                break;
+            }
+        }
+        return found;
+    }
+
+    public static Meta buildMeta(String name, String description, Label... label) {
+        return Meta.newBuilder()
+                .setName(name)
+                .setDescription(name)
+                .addAllLabel(Arrays.asList(label))
+                .build();
+    }
+
+    public static Label buildLabel(String key, String value) {
+        return Label.newBuilder()
+                .setKey(key)
+                .setValue(value)
+                .build();
     }
 
     /**
@@ -505,14 +541,14 @@ public class RethinkDbAdapterIT {
     @Test
     public void testSaveBrowserScript() throws DbException {
         BrowserScript script = BrowserScript.newBuilder()
-                .setMeta(ApiTools.buildMeta("test.js", "description", ApiTools.buildLabel("type", "login")))
+                .setMeta(buildMeta("test.js", "description", buildLabel("type", "login")))
                 .setScript("code")
                 .build();
 
         BrowserScript result = configAdapter.saveBrowserScript(script);
         assertThat(result.getId()).isNotEmpty();
         assertThat(result.getScript()).isEqualTo("code");
-        assertThat(ApiTools.hasLabel(result.getMeta(), ApiTools.buildLabel("type", "login"))).isTrue();
+        assertThat(hasLabel(result.getMeta(), buildLabel("type", "login"))).isTrue();
     }
 
     @Test
@@ -545,12 +581,12 @@ public class RethinkDbAdapterIT {
     @Test
     public void testListBrowserScripts() throws DbException {
         BrowserScript script1 = BrowserScript.newBuilder()
-                .setMeta(ApiTools.buildMeta("test.js", "description", ApiTools.buildLabel("type", "login")))
+                .setMeta(buildMeta("test.js", "description", buildLabel("type", "login")))
                 .setScript("code")
                 .build();
         BrowserScript script2 = BrowserScript.newBuilder()
-                .setMeta(ApiTools.buildMeta("extract-outlinks.js", "description",
-                        ApiTools.buildLabel("type", "extract_outlinks")))
+                .setMeta(buildMeta("extract-outlinks.js", "description",
+                        buildLabel("type", "extract_outlinks")))
                 .setScript("code")
                 .build();
         script1 = configAdapter.saveBrowserScript(script1);
@@ -765,7 +801,7 @@ public class RethinkDbAdapterIT {
                     assertThat(r.getValue(0).getSleepAfterPageloadMs()).isGreaterThan(0);
                 });
 
-        ConfigObject coResult = configAdapter.getConfigObject(no.nb.nna.veidemann.api.config.v1.GetRequest.newBuilder()
+        ConfigObject coResult = configAdapter.getConfigObject(ConfigRef.newBuilder()
                 .setKind(Kind.browserConfig)
                 .setId(result.getId()).build());
 

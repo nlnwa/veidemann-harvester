@@ -106,7 +106,7 @@ public class CreateDbV0_1 implements Runnable {
         db.executeRequest("", r.tableCreate(Tables.CRAWL_HOST_GROUP.name));
         db.executeRequest("", r.table(Tables.CRAWL_HOST_GROUP.name).indexCreate("nextFetchTime"));
 
-        db.executeRequest("", r.tableCreate(Tables.ALREADY_CRAWLED_CACHE.name)
+        db.executeRequest("", r.tableCreate("already_crawled_cache")
                 .optArg("durability", "soft")
                 .optArg("shards", 3)
                 .optArg("replicas", 1));

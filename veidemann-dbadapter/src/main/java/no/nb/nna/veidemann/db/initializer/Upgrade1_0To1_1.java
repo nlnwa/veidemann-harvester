@@ -119,10 +119,13 @@ public class Upgrade1_0To1_1 extends UpgradeDbBase {
 
     private void renameCrawlConfigField() throws DbQueryException, DbConnectionException {
         String kind = "crawlConfig";
-        conn.exec(r.table(Tables.CONFIG.name).filter(r.hashMap("kind", kind)).replace(o -> o
-                .merge(r.hashMap(kind, r.hashMap("extra",
-                        r.hashMap("createScreenshot", o.g(kind).g("extra").g("createSnapshot")))))
-                .without(r.hashMap(kind, r.hashMap("extra", "createSnapshot")))
+        conn.exec(r.table(Tables.CONFIG.name).filter(r.hashMap("kind", kind)).replace(o ->
+                r.branch(o.hasFields(r.hashMap(kind, r.hashMap("extra", "createSnapshot"))),
+                        o.merge(r.hashMap(kind, r.hashMap("extra",
+                                r.hashMap("createScreenshot", o.g(kind).g("extra").g("createSnapshot")))))
+                                .without(r.hashMap(kind, r.hashMap("extra", "createSnapshot"))),
+                        o
+                )
         ));
     }
 

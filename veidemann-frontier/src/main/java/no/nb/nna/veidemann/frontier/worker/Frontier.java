@@ -63,8 +63,10 @@ public class Frontier implements AutoCloseable {
         try {
             ConfigObject crawlConfig = DbService.getInstance().getConfigAdapter()
                     .getConfigObject(request.getJob().getCrawlJob().getCrawlConfigRef());
+            ConfigObject collectionConfig = DbService.getInstance().getConfigAdapter()
+                    .getConfigObject(crawlConfig.getCrawlConfig().getCollectionRef());
             QueuedUriWrapper qUri = QueuedUriWrapper.getQueuedUriWrapper(uri, request.getJobExecutionId(),
-                    status.getId(), crawlConfig.getCrawlConfig().getPolitenessRef());
+                    status.getId(), crawlConfig.getCrawlConfig().getPolitenessRef(), collectionConfig.getMeta().getName());
             qUri.setPriorityWeight(crawlConfig.getCrawlConfig().getPriorityWeight());
             qUri.addUriToQueue();
             LOG.debug("Seed '{}' added to queue", qUri.getUri());

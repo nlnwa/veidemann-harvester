@@ -41,6 +41,7 @@ public class DbUtil {
                 .setError(qUri.getError())
                 .setRetries(qUri.getRetries())
                 .setFetchTimeStamp(ProtoUtils.getNowTs())
+                .setCollectionFinalName(qUri.getCollectionName())
                 .build();
         DbService.getInstance().getDbAdapter().saveCrawlLog(crawlLog);
     }

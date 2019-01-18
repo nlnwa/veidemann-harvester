@@ -58,6 +58,8 @@ public class CrawlExecution {
 
     private final ConfigObject politenessConfig;
 
+    private final ConfigObject collectionConfig;
+
     private final CrawlLimitsConfig limits;
 
     private final QueuedUriWrapper qUri;
@@ -76,19 +78,19 @@ public class CrawlExecution {
 
     public CrawlExecution(QueuedUri queuedUri, CrawlHostGroup crawlHostGroup, Frontier frontier) throws DbException {
         this.status = StatusWrapper.getStatusWrapper(queuedUri.getExecutionId());
+        ConfigAdapter configAdapter = DbService.getInstance().getConfigAdapter();
+        ConfigObject job = configAdapter.getConfigObject(status.getJobId());
+        this.crawlConfig = configAdapter.getConfigObject(job.getCrawlJob().getCrawlConfigRef());
+        this.collectionConfig = configAdapter.getConfigObject(crawlConfig.getCrawlConfig().getCollectionRef());
         try {
-            this.qUri = QueuedUriWrapper.getQueuedUriWrapper(queuedUri).clearError();
+            this.qUri = QueuedUriWrapper.getQueuedUriWrapper(queuedUri, collectionConfig.getMeta().getName()).clearError();
         } catch (URISyntaxException ex) {
             throw new RuntimeException(ex);
         }
         this.status.addCurrentUri(this.qUri).saveStatus();
 
-        ConfigAdapter configAdapter = DbService.getInstance().getConfigAdapter();
-        ConfigObject job = configAdapter.getConfigObject(status.getJobId());
-
         this.crawlHostGroup = crawlHostGroup;
         this.frontier = frontier;
-        this.crawlConfig = configAdapter.getConfigObject(job.getCrawlJob().getCrawlConfigRef());
         this.politenessConfig = configAdapter.getConfigObject(crawlConfig.getCrawlConfig().getPolitenessRef());
         this.limits = job.getCrawlJob().getLimits();
     }
@@ -283,10 +285,10 @@ public class CrawlExecution {
 
     public void queueOutlink(QueuedUri outlink) throws DbException {
         try {
-            QueuedUriWrapper outUri = QueuedUriWrapper.getQueuedUriWrapper(qUri, outlink);
+            QueuedUriWrapper outUri = QueuedUriWrapper.getQueuedUriWrapper(qUri, outlink, collectionConfig.getMeta().getName());
 
             DistributedLock lock = DbService.getInstance()
-                    .createDistributedLock(new Key("quri", outUri.getQueuedUri().getSurt()), 10);
+                    .createDistributedLock(new Key("quri", outUri.getSurt()), 10);
             lock.lock();
             try {
                 if (shouldInclude(outUri)) {

@@ -51,35 +51,38 @@ public class QueuedUriWrapper {
 
     private Uri surt;
 
+    private final String collectionName;
+
     boolean justAdded = false;
 
-    private QueuedUriWrapper(QueuedUriOrBuilder uri) throws URISyntaxException, DbException {
+    private QueuedUriWrapper(QueuedUriOrBuilder uri, String collectionName) throws URISyntaxException, DbException {
+        this.collectionName = collectionName;
         if (uri instanceof QueuedUri.Builder) {
             wrapped = (QueuedUri.Builder) uri;
         } else {
             wrapped = ((QueuedUri) uri).toBuilder();
         }
         if (wrapped.getSurt().isEmpty()) {
-            createSurt();
+            createSurt(collectionName);
         }
     }
 
-    public static QueuedUriWrapper getQueuedUriWrapper(QueuedUri qUri) throws URISyntaxException, DbException {
+    public static QueuedUriWrapper getQueuedUriWrapper(QueuedUri qUri, String collectionName) throws URISyntaxException, DbException {
         requireNonEmpty(qUri.getUri(), "Empty URI string");
         requireNonEmpty(qUri.getJobExecutionId(), "Empty JobExecutionId");
         requireNonEmpty(qUri.getExecutionId(), "Empty ExecutionId");
         requireNonEmpty(qUri.getPolitenessRef(), "Empty PolitenessRef");
 
-        return new QueuedUriWrapper(qUri);
+        return new QueuedUriWrapper(qUri, collectionName);
     }
 
-    public static QueuedUriWrapper getQueuedUriWrapper(QueuedUriWrapper parentUri, QueuedUri qUri) throws URISyntaxException, DbException {
+    public static QueuedUriWrapper getQueuedUriWrapper(QueuedUriWrapper parentUri, QueuedUri qUri, String collectionName) throws URISyntaxException, DbException {
         requireNonEmpty(qUri.getUri(), "Empty URI string");
         requireNonEmpty(parentUri.getJobExecutionId(), "Empty JobExecutionId");
         requireNonEmpty(parentUri.getExecutionId(), "Empty ExecutionId");
         requireNonEmpty(parentUri.getPolitenessRef(), "Empty PolitenessRef");
 
-        QueuedUriWrapper wrapper = new QueuedUriWrapper(qUri)
+        QueuedUriWrapper wrapper = new QueuedUriWrapper(qUri, collectionName)
                 .setJobExecutionId(parentUri.getJobExecutionId())
                 .setExecutionId(parentUri.getExecutionId())
                 .setPolitenessRef(parentUri.getPolitenessRef());
@@ -88,7 +91,7 @@ public class QueuedUriWrapper {
         return wrapper;
     }
 
-    public static QueuedUriWrapper getQueuedUriWrapper(String uri, String jobExecutionId, String executionId, ConfigRef politenessId)
+    public static QueuedUriWrapper getQueuedUriWrapper(String uri, String jobExecutionId, String executionId, ConfigRef politenessId, String collectionName)
             throws URISyntaxException, DbException {
         return new QueuedUriWrapper(QueuedUri.newBuilder()
                 .setUri(uri)
@@ -96,7 +99,8 @@ public class QueuedUriWrapper {
                 .setExecutionId(executionId)
                 .setPolitenessRef(politenessId)
                 .setUnresolved(true)
-                .setSequence(1L)
+                .setSequence(1L),
+                collectionName
         );
     }
 
@@ -131,7 +135,7 @@ public class QueuedUriWrapper {
         return this;
     }
 
-    private void createSurt() throws URISyntaxException, DbException {
+    private void createSurt(String collectionName) throws URISyntaxException, DbException {
         LOG.debug("Parse URI '{}'", wrapped.getUri());
         try {
             surt = UriConfigs.SURT_KEY.buildUri(wrapped.getUri());
@@ -331,6 +335,10 @@ public class QueuedUriWrapper {
 
     public QueuedUri getQueuedUri() {
         return wrapped.build();
+    }
+
+    public String getCollectionName() {
+        return collectionName;
     }
 
     private static void requireNonEmpty(String obj, String message) {

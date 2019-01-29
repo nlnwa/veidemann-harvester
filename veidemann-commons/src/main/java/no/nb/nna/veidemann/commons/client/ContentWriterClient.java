@@ -134,7 +134,7 @@ public class ContentWriterClient implements AutoCloseable {
         }
 
         public synchronized ContentWriterSession sendHeader(Data data) {
-            sendRequest(() -> WriteRequest.newBuilder().setHeader(data).build());
+            sendRequest(() -> WriteRequest.newBuilder().setProtocolHeader(data).build());
             return this;
         }
 

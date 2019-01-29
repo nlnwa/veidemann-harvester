@@ -15,8 +15,10 @@
  */
 package no.nb.nna.veidemann.db.initializer;
 
+import com.google.gson.Gson;
 import com.google.protobuf.Descriptors.FieldDescriptor;
 import com.google.protobuf.Message;
+import com.rethinkdb.net.Cursor;
 import no.nb.nna.veidemann.api.ConfigProto.BrowserConfig;
 import no.nb.nna.veidemann.api.ConfigProto.BrowserScript;
 import no.nb.nna.veidemann.api.ConfigProto.CrawlConfig;
@@ -26,15 +28,21 @@ import no.nb.nna.veidemann.api.ConfigProto.CrawlScheduleConfig;
 import no.nb.nna.veidemann.api.ConfigProto.PolitenessConfig;
 import no.nb.nna.veidemann.api.ConfigProto.RoleMapping;
 import no.nb.nna.veidemann.api.ConfigProto.Seed;
+import no.nb.nna.veidemann.api.frontier.v1.CrawlLog;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.db.ProtoUtils;
 import no.nb.nna.veidemann.db.RethinkDbConfigAdapter;
 import no.nb.nna.veidemann.db.RethinkDbConnection;
+import no.nb.nna.veidemann.db.Tables;
 import org.yaml.snakeyaml.Yaml;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -133,7 +141,7 @@ public class PopulateDbWithTestData implements Runnable {
                         });
             }
             try (InputStream in = getClass().getClassLoader()
-                    .getResourceAsStream("testdata-V0_1/crawl_entities.yaml")) {
+                    .getResourceAsStream("testdata-V0_1/crawl-entities.yaml")) {
                 readYamlFile(in, CrawlEntity.class)
                         .forEach(o -> {
                             try {
@@ -153,6 +161,34 @@ public class PopulateDbWithTestData implements Runnable {
                                 throw new RuntimeException(e);
                             }
                         });
+            }
+            try (InputStream in = getClass().getClassLoader()
+                    .getResourceAsStream("testdata-V0_1/crawllogs.json")) {
+                BufferedReader reader = new BufferedReader(new InputStreamReader(in));
+                Gson g = new Gson();
+                String line = reader.readLine();
+                do {
+                    Map m = g.fromJson(line, Map.class);
+                    Object c = conn.exec("db-saveCrawllog", r.table(Tables.CRAWL_LOG.name).insert(m));
+                    line = reader.readLine();
+                } while (line != null);
+            } catch (Exception e) {
+                e.printStackTrace();
+                System.exit(1);
+            }
+            try (InputStream in = getClass().getClassLoader()
+                    .getResourceAsStream("testdata-V0_1/crawled-content.json")) {
+                BufferedReader reader = new BufferedReader(new InputStreamReader(in));
+                Gson g = new Gson();
+                String line = reader.readLine();
+                do {
+                    Map m = g.fromJson(line, Map.class);
+                    Object c = conn.exec("db-saveCrawledContent", r.table(Tables.CRAWLED_CONTENT.name).insert(m));
+                    line = reader.readLine();
+                } while (line != null);
+            } catch (Exception e) {
+                e.printStackTrace();
+                System.exit(1);
             }
         } catch (IOException ex) {
             throw new UncheckedIOException(ex);

@@ -15,12 +15,12 @@
  */
 package no.nb.nna.veidemann.integrationtests;
 
-import no.nb.nna.veidemann.api.ReportProto.CrawlLogListRequest;
 import no.nb.nna.veidemann.api.ReportProto.ExecuteDbQueryRequest;
 import no.nb.nna.veidemann.api.ReportProto.PageLogListRequest;
 import no.nb.nna.veidemann.api.config.v1.ConfigObject;
 import no.nb.nna.veidemann.api.config.v1.ConfigRef;
 import no.nb.nna.veidemann.api.config.v1.Kind;
+import no.nb.nna.veidemann.api.contentwriter.v1.StorageRef;
 import no.nb.nna.veidemann.api.frontier.v1.CrawlLog;
 import no.nb.nna.veidemann.api.frontier.v1.JobExecutionStatus;
 import no.nb.nna.veidemann.api.frontier.v1.PageLog;
@@ -142,7 +142,22 @@ public class CrawlExecutionValidator {
             });
         });
         warcRecords.values().stream()
-                .filter(w -> (("response".equals(w.header.warcTypeStr)) || ("revisit".equals(w.header.warcTypeStr)) || ("resource".equals(w.header.warcTypeStr))))
+                .peek(wid -> {
+                    try {
+                        StorageRef sr = db.getStorageRef(stripWarcId(wid.header.warcRecordIdStr));
+                        assertThat(db.getStorageRef(stripWarcId(wid.header.warcRecordIdStr)))
+                                .as("StorageRef not found for WARC record %s (uri: %s, type: %s)",
+                                        stripWarcId(wid.header.warcRecordIdStr),
+                                        wid.header.warcTargetUriStr,
+                                        wid.header.warcTypeStr)
+                                .isNotNull();
+                    } catch (DbException e) {
+                        throw new RuntimeException(e);
+                    }
+                })
+                .filter(wid -> ("response".equals(wid.header.warcTypeStr)
+                        || "revisit".equals(wid.header.warcTypeStr)
+                ))
                 .forEach(wid -> {
                     String warcId = stripWarcId(wid.header.warcRecordIdStr);
                     String refersTo = stripWarcId(wid.header.warcRefersToStr);
@@ -151,10 +166,14 @@ public class CrawlExecutionValidator {
                             .collect(Collectors.toList());
 
                     assertThat(crawlLogs.getCrawlLogEntry(warcId))
-                            .as("Missing crawllog entry for WARC record %s, record type %s, target %s",
-                                    wid.header.warcRecordIdStr, wid.header.warcTypeStr, wid.header.warcTargetUriStr)
+                            .as("Missing crawllog entry for WARC record %s, record type %s, target %s\n%s",
+                                    wid.header.warcRecordIdStr, wid.header.warcTypeStr, wid.header.warcTargetUriStr, wid.header.headerBytes)
                             .isNotNull();
                     if (!refersTo.isEmpty()) {
+                        assertThat(wid.header.warcTypeStr)
+                                .as("Warc record '%s' refers to another record, record type is not revisit. Actual type is %s",
+                                        warcId, wid.header.warcTypeStr)
+                                .isEqualTo("revisit");
                         assertThat(crawlLogs.getCrawlLogEntry(refersTo))
                                 .as("Missing crawllog entry for WARC record %s's warcRefersTo %s", wid, refersTo)
                                 .isNotNull();
@@ -164,6 +183,12 @@ public class CrawlExecutionValidator {
                         assertThat(refersTo)
                                 .as("Warc record '%s' refers to itself", warcId)
                                 .isNotEqualTo(warcId);
+                        assertThat(wid.header.warcRefersToTargetUriStr)
+                                .as("WARC record %s's warcRefersToTargetUri is empty for a revisit", wid)
+                                .isNotEmpty();
+                        assertThat(wid.header.warcRefersToDateStr)
+                                .as("WARC record %s's warcRefersToDate is empty for a revisit", wid)
+                                .isNotEmpty();
                     }
                     if (!concurrentTo.isEmpty()) {
                         assertThat(warcRecords.keySet().stream())
@@ -219,22 +244,36 @@ public class CrawlExecutionValidator {
                             .as("Block digest for crawllog entry %s (uri:%s) was empty",
                                     cl.getWarcId(), cl.getRequestedUri())
                             .isNotEmpty();
-                    assertThat(cl.getPayloadDigest())
-                            .as("Payload digest for crawllog entry %s (uri:%s) was empty",
-                                    cl.getWarcId(), cl.getRequestedUri())
-                            .isNotEmpty();
+                    if (cl.getContentType().equals("text/dns")) {
+                        assertThat(cl.getPayloadDigest())
+                                .as("Payload digest for crawllog entry %s (uri:%s) should be empty, was: %s",
+                                        cl.getWarcId(), cl.getRequestedUri(), cl.getPayloadDigest())
+                                .isNullOrEmpty();
+                    } else {
+                        assertThat(cl.getPayloadDigest())
+                                .as("Payload digest for crawllog entry %s (uri:%s) was empty",
+                                        cl.getWarcId(), cl.getRequestedUri())
+                                .isNotEmpty();
+                    }
                 });
         warcRecords.values().stream()
                 .filter(w -> ((!"metadata".equals(w.header.warcTypeStr)) && (!"warcinfo".equals(w.header.warcTypeStr))))
                 .forEach(w -> {
                     assertThat(w.header.warcBlockDigestStr)
-                            .as("Block digest for WARC entry %s (uri:%s) was empty",
+                            .as("Block digest for WARC entry %s (uri:%s, content-type: %s) was empty",
                                     w.header.warcRecordIdStr, w.header.warcTargetUriStr)
                             .isNotEmpty();
-                    assertThat(w.header.warcPayloadDigestStr)
-                            .as("Payload digest for WARC entry %s (uri:%s) was empty",
-                                    w.header.warcRecordIdStr, w.header.warcTargetUriStr)
-                            .isNotEmpty();
+                    if (w.header.contentTypeStr.startsWith("application/http")) {
+                        assertThat(w.header.warcPayloadDigestStr)
+                                .as("Payload digest for WARC entry %s (uri:%s, content-type: %s) was empty",
+                                        w.header.warcRecordIdStr, w.header.warcTargetUriStr, w.header.contentTypeStr)
+                                .isNotEmpty();
+                    } else {
+                        assertThat(w.header.warcPayloadDigestStr)
+                                .as("Payload digest for WARC entry %s (uri:%s, content-type: %s) should be empty, was: %s",
+                                        w.header.warcRecordIdStr, w.header.warcTargetUriStr, w.header.contentTypeStr, w.header.warcPayloadDigestStr)
+                                .isNullOrEmpty();
+                    }
                 });
     }
 
@@ -310,19 +349,19 @@ public class CrawlExecutionValidator {
         warcRecords = new HashMap<>();
 
         String warcRegex = collection.getMeta().getName() + ".*\\.warc.*";
-        WarcInspector.getWarcFiles(warcRegex).listFiles().forEach(f -> System.out.println("Warc file: " + f.getName()));
+        WarcInspector.getWarcFiles(warcRegex).listFiles().forEach(f -> System.out.println("Warc file: " + f.getName() + ", size: " + f.getSize()));
         WarcInspector.getWarcFiles(warcRegex).getRecordStream()
-                .forEach(r -> {
+                .forEach(w -> {
                     try {
-                        r.close();
+                        w.close();
                     } catch (IOException e) {
                         fail("Failed closing record", e);
                     }
 
-                    String warcId = stripWarcId(r.header.warcRecordIdStr);
-                    WarcRecord existing = warcRecords.put(warcId, r);
+                    String warcId = stripWarcId(w.header.warcRecordIdStr);
+                    WarcRecord existing = warcRecords.put(warcId, w);
                     assertThat(existing)
-                            .as("Duplicate WARC record id %s", r.header.warcRecordIdStr)
+                            .as("Duplicate WARC record id %s", w.header.warcRecordIdStr)
                             .isNull();
                 });
     }

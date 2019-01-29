@@ -178,6 +178,19 @@ public class ProtoUtils {
                                 case "google.protobuf.Timestamp":
                                     if (value instanceof OffsetDateTime) {
                                         protoBuilder.setField(fd, odtToTs((OffsetDateTime) value));
+                                    } else if (value instanceof Map && ((Map) value).containsKey("dateTime")) {
+                                        Map<String, Map<String, Number>> m =
+                                                ((Map<String, Map<String, Map<String, Number>>>) value).get("dateTime");
+                                        OffsetDateTime odt = OffsetDateTime.of(
+                                                m.get("date").get("year").intValue(),
+                                                m.get("date").get("month").intValue(),
+                                                m.get("date").get("day").intValue(),
+                                                m.get("time").get("hour").intValue(),
+                                                m.get("time").get("minute").intValue(),
+                                                m.get("time").get("second").intValue(),
+                                                m.get("time").get("nano").intValue(),
+                                                ZoneOffset.UTC);
+                                        protoBuilder.setField(fd, odtToTs(odt));
                                     } else {
                                         protoBuilder.setField(fd, odtToTs(OffsetDateTime.parse((String) value)));
                                     }
@@ -192,21 +205,31 @@ public class ProtoUtils {
                             protoBuilder.setField(fd, fd.getEnumType().findValueByName((String) value));
                             break;
                         case INT32:
-                            if (value instanceof Long) {
-                                protoBuilder.setField(fd, ((Long) value).intValue());
-                            } else {
-                                protoBuilder.setField(fd, (int) value);
+                            if (value instanceof Number) {
+                                protoBuilder.setField(fd, ((Number) value).intValue());
+                            } else if (value instanceof String) {
+                                protoBuilder.setField(fd, Integer.parseInt((String) value));
+                            }
+                            break;
+                        case INT64:
+                            if (value instanceof Number) {
+                                protoBuilder.setField(fd, ((Number) value).longValue());
+                            } else if (value instanceof String) {
+                                protoBuilder.setField(fd, Long.parseLong((String) value));
                             }
                             break;
                         case FLOAT:
-                            if (value instanceof Double) {
-                                protoBuilder.setField(fd, ((Double) value).floatValue());
-                            } else if (value instanceof Long) {
-                                protoBuilder.setField(fd, ((Long) value).floatValue());
-                            } else if (value instanceof Integer) {
-                                protoBuilder.setField(fd, ((Integer) value).floatValue());
-                            } else {
-                                protoBuilder.setField(fd, (float) value);
+                            if (value instanceof Number) {
+                                protoBuilder.setField(fd, ((Number) value).floatValue());
+                            } else if (value instanceof String) {
+                                protoBuilder.setField(fd, Float.parseFloat((String) value));
+                            }
+                            break;
+                        case DOUBLE:
+                            if (value instanceof Number) {
+                                protoBuilder.setField(fd, ((Number) value).doubleValue());
+                            } else if (value instanceof String) {
+                                protoBuilder.setField(fd, Double.parseDouble((String) value));
                             }
                             break;
                         case BYTES:

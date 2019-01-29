@@ -411,14 +411,20 @@ public class RethinkDbAdapterIT {
         CrawledContent cc1 = CrawledContent.newBuilder()
                 .setDigest("testIsDuplicateContent")
                 .setWarcId("warc-id1")
+                .setTargetUri("target-uri1")
+                .setDate(ProtoUtils.getNowTs())
                 .build();
         CrawledContent cc2 = CrawledContent.newBuilder()
                 .setDigest("testIsDuplicateContent")
                 .setWarcId("warc-id2")
+                .setTargetUri("target-uri2")
+                .setDate(ProtoUtils.getNowTs())
                 .build();
         CrawledContent cc3 = CrawledContent.newBuilder()
                 .setDigest("testIsDuplicateContent")
                 .setWarcId("warc-id3")
+                .setTargetUri("target-uri3")
+                .setDate(ProtoUtils.getNowTs())
                 .build();
 
         assertThat(dbAdapter.hasCrawledContent(cc1).isPresent()).isFalse();
@@ -454,6 +460,8 @@ public class RethinkDbAdapterIT {
         CrawledContent cc = CrawledContent.newBuilder()
                 .setDigest("testDeleteCrawledContent")
                 .setWarcId("warc-id")
+                .setTargetUri("target-uri")
+                .setDate(ProtoUtils.getNowTs())
                 .build();
 
         dbAdapter.hasCrawledContent(cc);

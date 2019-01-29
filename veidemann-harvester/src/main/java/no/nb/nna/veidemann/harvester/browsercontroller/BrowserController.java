@@ -28,6 +28,7 @@ import no.nb.nna.veidemann.chrome.client.ChromeDebugProtocol;
 import no.nb.nna.veidemann.chrome.client.ChromeDebugProtocolConfig;
 import no.nb.nna.veidemann.commons.ExtraStatusCodes;
 import no.nb.nna.veidemann.commons.VeidemannHeaderConstants;
+import no.nb.nna.veidemann.commons.client.ContentWriterClient;
 import no.nb.nna.veidemann.commons.db.ChangeFeed;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbService;
@@ -60,8 +61,12 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
 
     private final Map<ConfigRef, ConfigObject> scriptCache = new HashMap<>();
 
-    public BrowserController(final String browserWSEndpoint, final BrowserSessionRegistry sessionRegistry) {
+    private final ContentWriterClient contentWriterClient;
+
+    public BrowserController(final String browserWSEndpoint, final BrowserSessionRegistry sessionRegistry,
+                             final ContentWriterClient contentWriterClient) {
         this.browserWSEndpoint = browserWSEndpoint;
+        this.contentWriterClient = contentWriterClient;
 
         chromeDebugProtocolConfig = new ChromeDebugProtocolConfig()
                 .withTracer(GlobalTracer.get())
@@ -123,7 +128,7 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
             if (session.isPageRenderable()) {
                 if (crawlConfig.getCrawlConfig().getExtra().getCreateScreenshot()) {
                     LOG.debug("Save screenshot");
-                    session.saveScreenshot();
+                    session.saveScreenshot(contentWriterClient);
                 }
 
                 LOG.debug("Extract outlinks");

@@ -17,9 +17,11 @@ package no.nb.nna.veidemann.db.initializer;
 
 import com.rethinkdb.net.Cursor;
 import no.nb.nna.veidemann.api.config.v1.Kind;
+import no.nb.nna.veidemann.api.contentwriter.v1.CrawledContent;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.commons.settings.CommonSettings;
+import no.nb.nna.veidemann.db.ProtoUtils;
 import no.nb.nna.veidemann.db.RethinkDbAdapter;
 import no.nb.nna.veidemann.db.Tables;
 import org.junit.After;
@@ -215,6 +217,18 @@ public class DbInitializerTestIT {
                         assertThat(r).containsKey("crawlConfig");
                         assertThat((Map) r.get("crawlConfig")).containsKey("extra");
                         assertThat(((Map<String, Map>) r.get("crawlConfig")).get("extra")).containsEntry("createScreenshot", true);
+                    });
+        }
+
+        try (Cursor<Map> crawledContent = db.executeRequest("", r.table(Tables.CRAWLED_CONTENT.name))) {
+            assertThat(crawledContent.iterator())
+                    .hasSize(10)
+                    .allSatisfy(r -> {
+                        CrawledContent cc = ProtoUtils.rethinkToProto(r, CrawledContent.class);
+                        assertThat(cc.hasDate());
+                        assertThat(cc.getTargetUri()).isNotEmpty();
+                        assertThat(cc.getWarcId()).isNotEmpty();
+                        assertThat(cc.getDigest()).isNotEmpty();
                     });
         }
     }

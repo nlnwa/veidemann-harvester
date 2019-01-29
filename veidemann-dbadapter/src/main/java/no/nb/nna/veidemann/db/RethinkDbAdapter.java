@@ -28,11 +28,11 @@ import no.nb.nna.veidemann.api.ReportProto.PageLogListRequest;
 import no.nb.nna.veidemann.api.ReportProto.ScreenshotListReply;
 import no.nb.nna.veidemann.api.ReportProto.ScreenshotListRequest;
 import no.nb.nna.veidemann.api.contentwriter.v1.CrawledContent;
+import no.nb.nna.veidemann.api.contentwriter.v1.StorageRef;
 import no.nb.nna.veidemann.api.frontier.v1.CrawlLog;
 import no.nb.nna.veidemann.api.frontier.v1.PageLog;
 import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.db.DbException;
-import no.nb.nna.veidemann.commons.db.DbQueryException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,6 +59,8 @@ public class RethinkDbAdapter implements DbAdapter {
     public Optional<CrawledContent> hasCrawledContent(CrawledContent cc) throws DbException {
         ensureContainsValue(cc, "digest");
         ensureContainsValue(cc, "warc_id");
+        ensureContainsValue(cc, "target_uri");
+        ensureContainsValue(cc, "date");
 
         Map rMap = ProtoUtils.protoToRethink(cc);
         Map<String, Object> response = executeRequest("db-hasCrawledContent",
@@ -87,6 +89,28 @@ public class RethinkDbAdapter implements DbAdapter {
                 return Optional.of(result);
             }
         }
+    }
+
+    @Override
+    public StorageRef saveStorageRef(StorageRef storageRef) throws DbException {
+        ensureContainsValue(storageRef, "warc_id");
+        ensureContainsValue(storageRef, "storage_ref");
+
+        Map rMap = ProtoUtils.protoToRethink(storageRef);
+        return conn.executeInsert("db-saveStorageRef",
+                r.table(Tables.STORAGE_REF.name)
+                        .insert(rMap)
+                        .optArg("conflict", "replace"),
+                StorageRef.class
+        );
+    }
+
+    @Override
+    public StorageRef getStorageRef(String warcId) throws DbException {
+        return conn.executeGet("get-getStorageRef",
+                r.table(Tables.STORAGE_REF.name).get(warcId),
+                StorageRef.class
+        );
     }
 
     public void deleteCrawledContent(String digest) throws DbException {

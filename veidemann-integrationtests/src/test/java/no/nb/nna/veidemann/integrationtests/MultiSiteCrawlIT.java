@@ -58,8 +58,8 @@ public class MultiSiteCrawlIT extends CrawlTestBase implements VeidemannHeaderCo
 
         new CrawlExecutionValidator(jes)
                 .validate()
-                .checkCrawlLogCount("response", 9, 11)
-                .checkCrawlLogCount("revisit", 48, 50)
+                .checkCrawlLogCount("response", 9, 12)
+                .checkCrawlLogCount("revisit", 47, 50)
                 .checkCrawlLogCount("dns", 6)
                 .checkCrawlLogCount(59, "response", "revisit")
                 .checkPageLogCount(20);
@@ -69,8 +69,8 @@ public class MultiSiteCrawlIT extends CrawlTestBase implements VeidemannHeaderCo
 
         new CrawlExecutionValidator(jes)
                 .validate()
-                .checkCrawlLogCount("response", 11, 13)
-                .checkCrawlLogCount("revisit", 105, 107)
+                .checkCrawlLogCount("response", 11, 14)
+                .checkCrawlLogCount("revisit", 104, 107)
                 .checkCrawlLogCount(118, "response", "revisit")
                 .checkCrawlLogCount("dns", 6)
                 .checkPageLogCount(40);

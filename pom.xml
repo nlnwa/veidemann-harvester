@@ -41,10 +41,10 @@
         <chrome.version>71.0.3542.0</chrome.version>
         <docker.java.image>openjdk:8-jdk-alpine</docker.java.image>
 
-        <veidemann.api.version>v1.0.0-beta2</veidemann.api.version>
+        <veidemann.api.version>v1.0.0-beta3</veidemann.api.version>
 
         <log4j.version>2.7</log4j.version>
-        <org.jwat.version>1.0.4</org.jwat.version>
+        <org.jwat.version>1.1.1</org.jwat.version>
         <org.glassfish.jersey.version>2.25.1</org.glassfish.jersey.version>
         <cache2k-version>1.0.0.CR4</cache2k-version>
         <io.opentracing.version>0.30.0</io.opentracing.version>
@@ -65,8 +65,8 @@
         <browserless.chrome.version>release-puppeteer-1.8.0</browserless.chrome.version>
         <rethinkdb.version>2.3.6</rethinkdb.version>
         <veidemann.cache.version>v0.1.1</veidemann.cache.version>
-        <veidemann.dns.resolver.version>v0.2.0</veidemann.dns.resolver.version>
-        <veidemann.contentwriter.version>v0.2.0</veidemann.contentwriter.version>
+        <veidemann.dns.resolver.version>v0.2.1</veidemann.dns.resolver.version>
+        <veidemann.contentwriter.version>v0.2.1</veidemann.contentwriter.version>
     </properties>
 
     <repositories>

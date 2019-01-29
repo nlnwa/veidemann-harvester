@@ -81,10 +81,11 @@ public class Harvester {
              DnsServiceClient dnsServiceClient = new DnsServiceClient(
                      SETTINGS.getDnsResolverHost(), SETTINGS.getDnsResolverPort());
 
-             BrowserController controller = new BrowserController(SETTINGS.getBrowserWSEndpoint(), sessionRegistry);
-
              ContentWriterClient contentWriterClient = new ContentWriterClient(
                      SETTINGS.getContentWriterHost(), SETTINGS.getContentWriterPort());
+
+             BrowserController controller = new BrowserController(SETTINGS.getBrowserWSEndpoint(), sessionRegistry,
+                     contentWriterClient);
 
              FrontierClient frontierClient = new FrontierClient(controller, SETTINGS.getFrontierHost(),
                      SETTINGS.getFrontierPort(), SETTINGS.getMaxOpenSessions(), SETTINGS.getBrowserWSEndpoint(),

@@ -25,6 +25,7 @@ import no.nb.nna.veidemann.api.ReportProto.PageLogListRequest;
 import no.nb.nna.veidemann.api.ReportProto.ScreenshotListReply;
 import no.nb.nna.veidemann.api.ReportProto.ScreenshotListRequest;
 import no.nb.nna.veidemann.api.contentwriter.v1.CrawledContent;
+import no.nb.nna.veidemann.api.contentwriter.v1.StorageRef;
 import no.nb.nna.veidemann.api.frontier.v1.CrawlLog;
 import no.nb.nna.veidemann.api.frontier.v1.PageLog;
 
@@ -36,6 +37,10 @@ import java.util.Optional;
 public interface DbAdapter {
 
     Optional<CrawledContent> hasCrawledContent(CrawledContent cc) throws DbException;
+
+    StorageRef saveStorageRef(StorageRef storageRef) throws DbException;
+
+    StorageRef getStorageRef(String warcId) throws DbException;
 
     CrawlLog saveCrawlLog(CrawlLog cl) throws DbException;
 

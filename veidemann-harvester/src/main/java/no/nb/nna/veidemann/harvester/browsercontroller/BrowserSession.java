@@ -18,13 +18,20 @@ package no.nb.nna.veidemann.harvester.browsercontroller;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.protobuf.ByteString;
+import io.grpc.StatusException;
 import io.opentracing.BaseSpan;
-import no.nb.nna.veidemann.api.MessagesProto;
 import no.nb.nna.veidemann.api.config.v1.BrowserConfig;
+import no.nb.nna.veidemann.api.config.v1.Collection.SubCollectionType;
 import no.nb.nna.veidemann.api.config.v1.ConfigObject;
 import no.nb.nna.veidemann.api.config.v1.ConfigRef;
 import no.nb.nna.veidemann.api.config.v1.Label;
+import no.nb.nna.veidemann.api.contentwriter.v1.Data;
+import no.nb.nna.veidemann.api.contentwriter.v1.RecordType;
+import no.nb.nna.veidemann.api.contentwriter.v1.WriteRequestMeta;
+import no.nb.nna.veidemann.api.contentwriter.v1.WriteRequestMeta.RecordMeta;
+import no.nb.nna.veidemann.api.contentwriter.v1.WriteResponseMeta;
 import no.nb.nna.veidemann.api.frontier.v1.Cookie;
+import no.nb.nna.veidemann.api.frontier.v1.CrawlLog;
 import no.nb.nna.veidemann.api.frontier.v1.QueuedUri;
 import no.nb.nna.veidemann.chrome.client.BrowserClient;
 import no.nb.nna.veidemann.chrome.client.ClientClosedException;
@@ -36,9 +43,10 @@ import no.nb.nna.veidemann.chrome.client.PageSession;
 import no.nb.nna.veidemann.chrome.client.RuntimeDomain;
 import no.nb.nna.veidemann.chrome.client.SessionClosedException;
 import no.nb.nna.veidemann.commons.VeidemannHeaderConstants;
-import no.nb.nna.veidemann.commons.db.DbException;
-import no.nb.nna.veidemann.commons.db.DbService;
+import no.nb.nna.veidemann.commons.client.ContentWriterClient;
+import no.nb.nna.veidemann.commons.client.ContentWriterClient.ContentWriterSession;
 import no.nb.nna.veidemann.commons.util.ApiTools;
+import no.nb.nna.veidemann.commons.util.Sha1Digest;
 import no.nb.nna.veidemann.db.ProtoUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -68,6 +76,8 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
 
     final ConfigObject crawlConfig;
 
+    final ConfigObject browserConfig;
+
     final QueuedUri queuedUri;
 
     final BrowserClient browser;
@@ -85,6 +95,7 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
     public BrowserSession(int proxyId, BrowserClient browser, ConfigObject crawlConfig, ConfigObject browserConfig,
                           QueuedUri queuedUri, BaseSpan span) throws IOException, ExecutionException, TimeoutException {
         this.crawlConfig = crawlConfig;
+        this.browserConfig = browserConfig;
         this.proxyId = proxyId;
         this.queuedUri = Objects.requireNonNull(queuedUri);
 
@@ -264,17 +275,57 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
         return uriRequests.getRootRequest().isRenderable();
     }
 
-    public void saveScreenshot() throws ClientClosedException, SessionClosedException {
+    public void saveScreenshot(ContentWriterClient contentWriterClient) throws ClientClosedException, SessionClosedException {
         try {
             PageDomain.CaptureScreenshotResponse screenshot = session.page().captureScreenshot().withFormat("png").run();
             byte[] img = Base64.getDecoder().decode(screenshot.data());
 
-            DbService.getInstance().getDbAdapter().saveScreenshot(MessagesProto.Screenshot.newBuilder()
-                    .setImg(ByteString.copyFrom(img))
-                    .setExecutionId(getCrawlExecutionId())
-                    .setUri(uriRequests.getRootRequest().getUrl())
-                    .build());
-        } catch (ExecutionException | TimeoutException | DbException ex) {
+            ContentWriterSession contentWriter = contentWriterClient.createSession();
+
+            Sha1Digest digest = new Sha1Digest().update(img);
+            Data data = Data.newBuilder().setRecordNum(0).setData(ByteString.copyFrom(img)).build();
+            contentWriter.sendPayload(data);
+
+            CrawlLog log = uriRequests.getRootRequest().getCrawlLog();
+
+            ByteString screenshotMetaRecord = ByteString.copyFromUtf8(
+                    "browserVersion: " + browser.version()
+                            + "\r\nwindowHeight: " + browserConfig.getBrowserConfig().getWindowHeight()
+                            + "\r\nwindowWidth: " + browserConfig.getBrowserConfig().getWindowWidth()
+                            + "\r\nuserAgent: " + browserConfig.getBrowserConfig().getUserAgent()
+                            + "\r\n");
+            contentWriter.sendPayload(Data.newBuilder().setRecordNum(1).setData(screenshotMetaRecord).build());
+            Sha1Digest screenshotMetaRecordDigest = new Sha1Digest().update(screenshotMetaRecord);
+
+            RecordMeta screenshotRecordMeta = RecordMeta.newBuilder()
+                    .setRecordNum(0)
+                    .setSubCollection(SubCollectionType.SCREENSHOT)
+                    .setType(RecordType.RESOURCE)
+                    .setSize(img.length)
+                    .setBlockDigest(digest.getPrefixedDigestString())
+                    .setRecordContentType("image/png")
+                    .addWarcConcurrentTo(log.getWarcId())
+                    .build();
+            RecordMeta screenshotMetaRecordMeta = RecordMeta.newBuilder()
+                    .setRecordNum(1)
+                    .setSubCollection(SubCollectionType.SCREENSHOT)
+                    .setType(RecordType.METADATA)
+                    .setSize(screenshotMetaRecord.size())
+                    .setBlockDigest(screenshotMetaRecordDigest.getPrefixedDigestString())
+                    .setRecordContentType("application/warc-fields")
+                    .build();
+            WriteRequestMeta meta = WriteRequestMeta.newBuilder()
+                    .setIpAddress(log.getIpAddress())
+                    .setCollectionRef(crawlConfig.getCrawlConfig().getCollectionRef())
+                    .setExecutionId(log.getExecutionId())
+                    .setFetchTimeStamp(log.getFetchTimeStamp())
+                    .setTargetUri(log.getRequestedUri())
+                    .putRecordMeta(0, screenshotRecordMeta)
+                    .putRecordMeta(1, screenshotMetaRecordMeta)
+                    .build();
+            contentWriter.sendMetadata(meta);
+            WriteResponseMeta response = contentWriter.finish();
+        } catch (ExecutionException | TimeoutException | InterruptedException | StatusException ex) {
             throw new RuntimeException(ex);
         }
     }

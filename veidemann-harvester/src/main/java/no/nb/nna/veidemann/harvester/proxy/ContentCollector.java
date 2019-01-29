@@ -102,7 +102,6 @@ public class ContentCollector {
     }
 
     public void setHeaders(String preamble, HttpHeaders headers, ContentWriterSession contentWriterSession) {
-        recordMeta.setPayloadContentType(headers.get("Content-Type", ""));
         ByteString headerData = ByteString.copyFromUtf8(preamble).concat(serializeHeaders(headers));
 
         digest.update(headerData);

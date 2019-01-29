@@ -183,7 +183,7 @@ public class BrowserControllerIT {
             try (RecordingProxy proxy = new RecordingProxy(2, tmpDir, proxyPort, contentWriterClient,
                     dnsServiceClient, sessionRegistry, cacheHost, cachePort);
 
-                 BrowserController controller = new BrowserController(browserWSEndpoint, sessionRegistry);) {
+                 BrowserController controller = new BrowserController(browserWSEndpoint, sessionRegistry, null);) {
 
                 RenderResult result = controller.render(0, protocolConfig, queuedUri, config);
                 System.out.println("##### " + result);

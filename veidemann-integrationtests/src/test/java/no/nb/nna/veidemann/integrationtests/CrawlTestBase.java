@@ -141,8 +141,9 @@ public abstract class CrawlTestBase {
         collectionBuilder.getMetaBuilder().setName(name).setDescription("Collection for " + name);
         collectionBuilder.getCollectionBuilder()
                 .setCompress(true)
-                .setFileSize(1024 * 1024 * 100)
-                .addSubCollectionsBuilder().setName("dns").setType(SubCollectionType.DNS);
+                .setFileSize(1024 * 1024 * 100);
+        collectionBuilder.getCollectionBuilder().addSubCollectionsBuilder().setName("screenshot").setType(SubCollectionType.SCREENSHOT);
+        collectionBuilder.getCollectionBuilder().addSubCollectionsBuilder().setName("dns").setType(SubCollectionType.DNS);
         ConfigObject collection = configClient.saveConfigObject(collectionBuilder.build());
 
         // Create a crawl config which references the above configs

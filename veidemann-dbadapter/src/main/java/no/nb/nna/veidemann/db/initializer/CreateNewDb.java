@@ -28,7 +28,7 @@ import org.slf4j.LoggerFactory;
 public class CreateNewDb implements Runnable {
     private static final Logger LOG = LoggerFactory.getLogger(CreateNewDb.class);
 
-    public static final String DB_VERSION = "1.1";
+    public static final String DB_VERSION = "1.2";
 
     static final RethinkDB r = RethinkDB.r;
 
@@ -83,6 +83,8 @@ public class CreateNewDb implements Runnable {
         conn.exec(r.table(Tables.PAGE_LOG.name).indexCreate("executionId"));
 
         conn.exec(r.tableCreate(Tables.CRAWLED_CONTENT.name).optArg("primary_key", "digest"));
+
+        conn.exec(r.tableCreate(Tables.STORAGE_REF.name).optArg("primary_key", "warcId"));
 
         conn.exec(r.tableCreate(Tables.EXTRACTED_TEXT.name).optArg("primary_key", "warcId"));
 

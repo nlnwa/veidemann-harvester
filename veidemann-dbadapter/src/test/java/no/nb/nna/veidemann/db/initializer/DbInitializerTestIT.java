@@ -222,13 +222,20 @@ public class DbInitializerTestIT {
 
         try (Cursor<Map> crawledContent = db.executeRequest("", r.table(Tables.CRAWLED_CONTENT.name))) {
             assertThat(crawledContent.iterator())
-                    .hasSize(10)
+                    .hasSize(11)
                     .allSatisfy(r -> {
                         CrawledContent cc = ProtoUtils.rethinkToProto(r, CrawledContent.class);
-                        assertThat(cc.hasDate());
-                        assertThat(cc.getTargetUri()).isNotEmpty();
                         assertThat(cc.getWarcId()).isNotEmpty();
                         assertThat(cc.getDigest()).isNotEmpty();
+
+                        if (cc.getWarcId().equals("2e2b8f3d-c561-4643-97e9-55be42a42194")) {
+                            // This is missing in test crawl log, so values should be empty
+                            assertThat(!cc.hasDate());
+                            assertThat(cc.getTargetUri()).isEmpty();
+                        } else {
+                            assertThat(cc.hasDate());
+                            assertThat(cc.getTargetUri()).isNotEmpty();
+                        }
                     });
         }
     }

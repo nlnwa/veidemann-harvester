@@ -50,6 +50,8 @@ import no.nb.nna.veidemann.api.config.v1.ConfigObject;
 import no.nb.nna.veidemann.api.config.v1.ConfigRef;
 import no.nb.nna.veidemann.api.config.v1.Kind;
 import no.nb.nna.veidemann.api.contentwriter.v1.CrawledContent;
+import no.nb.nna.veidemann.api.contentwriter.v1.RecordType;
+import no.nb.nna.veidemann.api.contentwriter.v1.StorageRef;
 import no.nb.nna.veidemann.api.frontier.v1.CrawlHostGroup;
 import no.nb.nna.veidemann.api.frontier.v1.CrawlLog;
 import no.nb.nna.veidemann.commons.auth.EmailContextKey;
@@ -428,11 +430,10 @@ public class RethinkDbAdapterIT {
                 .build();
 
         assertThat(dbAdapter.hasCrawledContent(cc1).isPresent()).isFalse();
-        dbAdapter.saveCrawlLog(CrawlLog.newBuilder()
+        dbAdapter.saveStorageRef(StorageRef.newBuilder()
                 .setWarcId(cc1.getWarcId())
-                .setJobExecutionId("jeid")
-                .setExecutionId("ceid")
-                .setCollectionFinalName("collection")
+                .setRecordType(RecordType.REQUEST)
+                .setStorageRef("warcfile:test:0")
                 .build());
 
         Optional<CrawledContent> r2 = dbAdapter.hasCrawledContent(cc2);

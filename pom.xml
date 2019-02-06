@@ -38,7 +38,7 @@
         <maven.compiler.target>1.8</maven.compiler.target>
         <docker.tag>latest</docker.tag>
 
-        <chrome.version>71.0.3542.0</chrome.version>
+        <chrome.version>72.0.3582.0</chrome.version>
         <docker.java.image>openjdk:8-jdk-alpine</docker.java.image>
 
         <veidemann.api.version>v1.0.0-beta3</veidemann.api.version>
@@ -62,7 +62,7 @@
         <go.wrapper.plugin.version>2.1.6</go.wrapper.plugin.version>
 
         <!-- Versions of external docker containers used in integration tests -->
-        <browserless.chrome.version>release-puppeteer-1.8.0</browserless.chrome.version>
+        <browserless.chrome.version>1.2.0-puppeteer-1.10.0</browserless.chrome.version>
         <rethinkdb.version>2.3.6</rethinkdb.version>
         <veidemann.cache.version>v0.1.1</veidemann.cache.version>
         <veidemann.dns.resolver.version>v0.2.1</veidemann.dns.resolver.version>
@@ -376,7 +376,7 @@
                 <plugin>
                     <groupId>io.fabric8</groupId>
                     <artifactId>docker-maven-plugin</artifactId>
-                    <version>0.26.0</version>
+                    <version>0.28.0</version>
                 </plugin>
                 <plugin>
                     <groupId>org.codehaus.mojo</groupId>

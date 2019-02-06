@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>com.github.nlnwa</groupId>
@@ -195,8 +196,13 @@
                                             <enabled>true</enabled>
                                         </log>
                                         <wait>
-                                            <log>.*browserless-chrome.*</log>
                                             <time>30000</time>
+                                            <tcp>
+                                                <mode>mapped</mode>
+                                                <ports>
+                                                    <port>3000</port>
+                                                </ports>
+                                            </tcp>
                                         </wait>
                                     </run>
                                 </image>
@@ -236,7 +242,9 @@
                                             <DNS_RESOLVER_PORT>8053</DNS_RESOLVER_PORT>
                                             <CACHE_HOST>cache</CACHE_HOST>
                                             <MAX_OPEN_SESSIONS>3</MAX_OPEN_SESSIONS>
-                                            <JAVA_OPTS>-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005</JAVA_OPTS>
+                                            <JAVA_OPTS>
+                                                -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005
+                                            </JAVA_OPTS>
                                         </env>
                                         <log>
                                             <enabled>true</enabled>
@@ -297,7 +305,8 @@
                                     </run>
                                 </image>
                                 <image>
-                                    <name>norsknettarkiv/veidemann-contentwriter:${veidemann.contentwriter.version}</name>
+                                    <name>norsknettarkiv/veidemann-contentwriter:${veidemann.contentwriter.version}
+                                    </name>
                                     <alias>contentwriter</alias>
                                     <run>
                                         <network>

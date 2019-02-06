@@ -113,9 +113,11 @@ public class Domain {
     }
 
     public Parameter ref(String id) {
-        for (Parameter t : types) {
-            if (id.equals(t.id)) {
-                return t;
+        if (types != null) {
+            for (Parameter t : types) {
+                if (id.equals(t.id)) {
+                    return t;
+                }
             }
         }
         throw new IllegalStateException("Unresolved $ref: " + id + " in " + domain);

@@ -32,10 +32,15 @@ public class Upgrade1_1To1_2 extends UpgradeDbBase {
 
         // update crawled_content with TargetUri and Timestamp
         conn.exec(r.table(Tables.CRAWLED_CONTENT.name)
+                .filter(f -> f.hasFields("targetUri").not())
                 .update(d -> d.merge(r.table(Tables.CRAWL_LOG.name)
                         .get(d.g("warcId"))
+                        .default_(r.hashMap())
                         .pluck("requestedUri", "fetchTimeStamp")
-                        .do_(x -> r.hashMap("targetUri", x.g("requestedUri")).with("date", x.g("fetchTimeStamp")))))
+                        .do_(x -> r.branch(
+                                x.hasFields("requestedUri", "fetchTimeStamp"),
+                                r.hashMap("targetUri", x.g("requestedUri")).with("date", x.g("fetchTimeStamp")),
+                                r.hashMap()))))
                 .optArg("non_atomic", true));
     }
 

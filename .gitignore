@@ -6,7 +6,6 @@ target/
 **/release.properties
 **/dependency-reduced-pom.xml
 **/buildNumber.properties
-**/.mvn/*
 **/nbactions.xml
 /src/main/script/work/
 **/nbproject/*
@@ -20,4 +19,3 @@ target/
 *.iml
 .idea
 /src/main/kubernetes-auau/configmap.yml
-!/.mvn/extensions.xml

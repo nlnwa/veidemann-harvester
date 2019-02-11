@@ -18,9 +18,8 @@
 
     <dependencies>
         <dependency>
-            <groupId>${project.groupId}</groupId>
-            <artifactId>veidemann-dbadapter</artifactId>
-            <version>${project.version}</version>
+            <groupId>com.github.nlnwa</groupId>
+            <artifactId>veidemann-rethinkdbadapter</artifactId>
         </dependency>
         <dependency>
             <groupId>${project.groupId}</groupId>
@@ -28,9 +27,8 @@
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>${project.groupId}</groupId>
+            <groupId>com.github.nlnwa</groupId>
             <artifactId>veidemann-commons</artifactId>
-            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>org.netpreserve.commons</groupId>
@@ -69,17 +67,6 @@
         <dependency>
             <groupId>com.google.code.gson</groupId>
             <artifactId>gson</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>org.cache2k</groupId>
-            <artifactId>cache2k-api</artifactId>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.cache2k</groupId>
-            <artifactId>cache2k-all</artifactId>
-            <scope>runtime</scope>
         </dependency>
 
         <!-- Configuration framework -->

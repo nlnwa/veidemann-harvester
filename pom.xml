@@ -22,14 +22,11 @@
 
     <modules>
         <module>veidemann-harvester</module>
-        <module>veidemann-dbadapter</module>
         <module>veidemann-chrome-client</module>
         <module>veidemann-contentexplorer</module>
         <module>veidemann-frontier</module>
         <module>veidemann-integrationtests</module>
         <module>veidemann-controller</module>
-        <module>veidemann-commons</module>
-        <module>veidemann-robotsevaluator</module>
     </modules>
 
     <properties>
@@ -41,20 +38,15 @@
         <chrome.version>72.0.3582.0</chrome.version>
         <docker.java.image>openjdk:8-jdk-alpine</docker.java.image>
 
-        <veidemann.api.version>v1.0.0-beta3</veidemann.api.version>
+        <veidemann.commons.version>0.3.5</veidemann.commons.version>
+        <veidemann.rethinkdbadapter.version>0.3.4</veidemann.rethinkdbadapter.version>
 
         <log4j.version>2.7</log4j.version>
         <org.jwat.version>1.1.1</org.jwat.version>
         <org.glassfish.jersey.version>2.25.1</org.glassfish.jersey.version>
-        <cache2k-version>1.0.0.CR4</cache2k-version>
         <io.opentracing.version>0.30.0</io.opentracing.version>
-        <io.opentracing.brave.version>0.20.0</io.opentracing.brave.version>
         <com.uber.jaeger.version>0.21.0</com.uber.jaeger.version>
         <io.grpc.version>1.17.1</io.grpc.version>
-        <io.zipkin.reporter.version>0.10.0</io.zipkin.reporter.version>
-        <io.zipkin.brave.version>4.3.4</io.zipkin.brave.version>
-        <antlr.version>4.7</antlr.version>
-        <antlr4test-maven-plugin.version>1.8</antlr4test-maven-plugin.version>
         <io.prometheus.version>0.5.0</io.prometheus.version>
 
         <!--Properties for golang-->
@@ -65,8 +57,9 @@
         <browserless.chrome.version>1.2.0-puppeteer-1.10.0</browserless.chrome.version>
         <rethinkdb.version>2.3.6</rethinkdb.version>
         <veidemann.cache.version>v0.1.1</veidemann.cache.version>
-        <veidemann.dns.resolver.version>v0.2.1</veidemann.dns.resolver.version>
-        <veidemann.contentwriter.version>v0.2.1</veidemann.contentwriter.version>
+        <veidemann.dns.resolver.version>v0.2.2</veidemann.dns.resolver.version>
+        <veidemann.contentwriter.version>0.2.2</veidemann.contentwriter.version>
+        <veidemann.robotsevaluator.version>0.3.5</veidemann.robotsevaluator.version>
     </properties>
 
     <repositories>
@@ -91,8 +84,13 @@
         <dependencies>
             <dependency>
                 <groupId>com.github.nlnwa</groupId>
-                <artifactId>veidemann-api</artifactId>
-                <version>${veidemann.api.version}</version>
+                <artifactId>veidemann-commons</artifactId>
+                <version>${veidemann.commons.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.github.nlnwa</groupId>
+                <artifactId>veidemann-rethinkdbadapter</artifactId>
+                <version>${veidemann.rethinkdbadapter.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.netpreserve.commons</groupId>
@@ -194,12 +192,6 @@
             </dependency>
 
             <dependency>
-                <groupId>org.antlr</groupId>
-                <artifactId>antlr4-runtime</artifactId>
-                <version>${antlr.version}</version>
-            </dependency>
-
-            <dependency>
                 <groupId>com.google.code.gson</groupId>
                 <artifactId>gson</artifactId>
                 <version>2.8.5</version>
@@ -221,12 +213,6 @@
                 <groupId>org.yaml</groupId>
                 <artifactId>snakeyaml</artifactId>
                 <version>1.17</version>
-            </dependency>
-
-            <dependency>
-                <groupId>com.rethinkdb</groupId>
-                <artifactId>rethinkdb-driver</artifactId>
-                <version>2.3.3</version>
             </dependency>
 
             <!-- ARC/WARC libraries -->
@@ -290,19 +276,6 @@
                 <groupId>it.sauronsoftware.cron4j</groupId>
                 <artifactId>cron4j</artifactId>
                 <version>2.2.5</version>
-            </dependency>
-
-            <dependency>
-                <groupId>org.cache2k</groupId>
-                <artifactId>cache2k-api</artifactId>
-                <version>${cache2k-version}</version>
-                <scope>provided</scope>
-            </dependency>
-            <dependency>
-                <groupId>org.cache2k</groupId>
-                <artifactId>cache2k-all</artifactId>
-                <version>${cache2k-version}</version>
-                <scope>runtime</scope>
             </dependency>
 
             <dependency>

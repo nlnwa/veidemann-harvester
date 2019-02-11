@@ -39,6 +39,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
@@ -51,6 +52,7 @@ public class CrawlExecutionValidator {
     CrawlExecutionsHelper crawlExecutions;
     List<PageLog> pageLogs = new ArrayList<>();
     Map<String, WarcRecord> warcRecords;
+    Map<String, WarcRecord> warcScreenshotRecords;
 
     final JobExecutionStatus jobExecutionStatus;
 
@@ -166,8 +168,8 @@ public class CrawlExecutionValidator {
                             .collect(Collectors.toList());
 
                     assertThat(crawlLogs.getCrawlLogEntry(warcId))
-                            .as("Missing crawllog entry for WARC record %s, record type %s, target %s\n%s",
-                                    wid.header.warcRecordIdStr, wid.header.warcTypeStr, wid.header.warcTargetUriStr, wid.header.headerBytes)
+                            .as("Missing crawllog entry for WARC record %s, record type %s, target %s",
+                                    wid.header.warcRecordIdStr, wid.header.warcTypeStr, wid.header.warcTargetUriStr)
                             .isNotNull();
                     if (!refersTo.isEmpty()) {
                         assertThat(wid.header.warcTypeStr)
@@ -196,6 +198,54 @@ public class CrawlExecutionValidator {
                                 .containsAll(concurrentTo);
                         assertThat(concurrentTo)
                                 .as("Warc record '%s' is concurrent to itself", warcId)
+                                .doesNotContain(warcId);
+                    }
+                });
+        warcScreenshotRecords.values().stream()
+                .peek(wid -> {
+                    try {
+                        StorageRef sr = db.getStorageRef(stripWarcId(wid.header.warcRecordIdStr));
+                        assertThat(db.getStorageRef(stripWarcId(wid.header.warcRecordIdStr)))
+                                .as("StorageRef not found for WARC record %s (uri: %s, type: %s)",
+                                        stripWarcId(wid.header.warcRecordIdStr),
+                                        wid.header.warcTargetUriStr,
+                                        wid.header.warcTypeStr)
+                                .isNotNull();
+                    } catch (DbException e) {
+                        throw new RuntimeException(e);
+                    }
+                })
+                .forEach(wid -> {
+                    String warcId = stripWarcId(wid.header.warcRecordIdStr);
+                    String refersTo = stripWarcId(wid.header.warcRefersToStr);
+                    List<String> concurrentTo = wid.header.warcConcurrentToList.stream()
+                            .map(c -> stripWarcId(c.warcConcurrentToStr))
+                            .collect(Collectors.toList());
+
+                    if (!refersTo.isEmpty()) {
+                        assertThat(wid.header.warcTypeStr)
+                                .as("Warc screenshot record '%s' refers to another record, record type is not revisit. Actual type is %s",
+                                        warcId, wid.header.warcTypeStr)
+                                .isEqualTo("revisit");
+                        assertThat(warcScreenshotRecords.keySet().stream())
+                                .as("Missing referred WARC record for WARC screenshot record %s's warcRefersTo %s", wid, refersTo)
+                                .contains(refersTo);
+                        assertThat(refersTo)
+                                .as("Warc screenshot record '%s' refers to itself", warcId)
+                                .isNotEqualTo(warcId);
+                        assertThat(wid.header.warcRefersToTargetUriStr)
+                                .as("WARC screenshot record %s's warcRefersToTargetUri is empty for a revisit", wid)
+                                .isNotEmpty();
+                        assertThat(wid.header.warcRefersToDateStr)
+                                .as("WARC screenshot record %s's warcRefersToDate is empty for a revisit", wid)
+                                .isNotEmpty();
+                    }
+                    if (!concurrentTo.isEmpty()) {
+                        assertThat(Stream.concat(warcScreenshotRecords.keySet().stream(), warcRecords.keySet().stream()))
+                                .as("Missing referred WARC record for WARC screenshot record %s's concurrentTo %s", wid, concurrentTo)
+                                .containsAll(concurrentTo);
+                        assertThat(concurrentTo)
+                                .as("Warc scrrenshot record '%s' is concurrent to itself", warcId)
                                 .doesNotContain(warcId);
                     }
                 });
@@ -346,9 +396,9 @@ public class CrawlExecutionValidator {
                 .filter(pl -> pl.getCollectionFinalName().startsWith(collection.getMeta().getName()))
                 .forEach(pl -> pageLogs.add(pl));
         crawlExecutions = new CrawlExecutionsHelper(jobExecutionStatus.getId());
-        warcRecords = new HashMap<>();
 
-        String warcRegex = collection.getMeta().getName() + ".*\\.warc.*";
+        warcRecords = new HashMap<>();
+        String warcRegex = collection.getMeta().getName() + "((-)|(_dns)).*\\.warc.*";
         WarcInspector.getWarcFiles(warcRegex).listFiles().forEach(f -> System.out.println("Warc file: " + f.getName() + ", size: " + f.getSize()));
         WarcInspector.getWarcFiles(warcRegex).getRecordStream()
                 .forEach(w -> {
@@ -360,6 +410,23 @@ public class CrawlExecutionValidator {
 
                     String warcId = stripWarcId(w.header.warcRecordIdStr);
                     WarcRecord existing = warcRecords.put(warcId, w);
+                    assertThat(existing)
+                            .as("Duplicate WARC record id %s", w.header.warcRecordIdStr)
+                            .isNull();
+                });
+        warcScreenshotRecords = new HashMap<>();
+        String warcScreenshotRegex = collection.getMeta().getName() + "_screenshot.*\\.warc.*";
+        WarcInspector.getWarcFiles(warcScreenshotRegex).listFiles().forEach(f -> System.out.println("Warc file: " + f.getName() + ", size: " + f.getSize()));
+        WarcInspector.getWarcFiles(warcScreenshotRegex).getRecordStream()
+                .forEach(w -> {
+                    try {
+                        w.close();
+                    } catch (IOException e) {
+                        fail("Failed closing record", e);
+                    }
+
+                    String warcId = stripWarcId(w.header.warcRecordIdStr);
+                    WarcRecord existing = warcScreenshotRecords.put(warcId, w);
                     assertThat(existing)
                             .as("Duplicate WARC record id %s", w.header.warcRecordIdStr)
                             .isNull();

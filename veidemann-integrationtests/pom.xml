@@ -17,9 +17,8 @@
 
     <dependencies>
         <dependency>
-            <groupId>${project.groupId}</groupId>
+            <groupId>com.github.nlnwa</groupId>
             <artifactId>veidemann-commons</artifactId>
-            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>${project.groupId}</groupId>
@@ -27,9 +26,9 @@
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>${project.groupId}</groupId>
-            <artifactId>veidemann-dbadapter</artifactId>
-            <version>${project.version}</version>
+            <groupId>com.github.nlnwa</groupId>
+            <artifactId>veidemann-rethinkdbadapter</artifactId>
+            <version>${veidemann.rethinkdbadapter.version}</version>
         </dependency>
         <dependency>
             <groupId>${project.groupId}</groupId>
@@ -42,9 +41,9 @@
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>${project.groupId}</groupId>
+            <groupId>com.github.nlnwa.veidemann-robotsevaluator</groupId>
             <artifactId>veidemann-robotsevaluator-service</artifactId>
-            <version>${project.version}</version>
+            <version>0.3.4</version>
         </dependency>
 
         <!-- ARC/WARC libraries -->
@@ -140,7 +139,7 @@
                                     </run>
                                 </image>
                                 <image>
-                                    <name>norsknettarkiv/veidemann-db-initializer</name>
+                                    <name>norsknettarkiv/veidemann-db-initializer:${veidemann.rethinkdbadapter.version}</name>
                                     <alias>db-initializer</alias>
                                     <run>
                                         <network>
@@ -472,7 +471,7 @@
                                     </run>
                                 </image>
                                 <image>
-                                    <name>norsknettarkiv/veidemann-robotsevaluator-service</name>
+                                    <name>norsknettarkiv/veidemann-robotsevaluator-service:${veidemann.robotsevaluator.version}</name>
                                     <alias>robots</alias>
                                     <run>
                                         <network>

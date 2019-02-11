@@ -15,14 +15,12 @@
 
     <dependencies>
         <dependency>
-            <groupId>${project.groupId}</groupId>
-            <artifactId>veidemann-dbadapter</artifactId>
-            <version>${project.version}</version>
+            <groupId>com.github.nlnwa</groupId>
+            <artifactId>veidemann-rethinkdbadapter</artifactId>
         </dependency>
         <dependency>
-            <groupId>${project.groupId}</groupId>
+            <groupId>com.github.nlnwa</groupId>
             <artifactId>veidemann-commons</artifactId>
-            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>io.netty</groupId>

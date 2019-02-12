@@ -374,7 +374,7 @@
                                     </run>
                                 </image>
                                 <image>
-                                    <name>norsknettarkiv/veidemann-frontier</name>
+                                    <name>norsknettarkiv/veidemann-frontier:${veidemann.frontier.version}</name>
                                     <alias>frontier</alias>
                                     <run>
                                         <network>

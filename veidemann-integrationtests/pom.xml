@@ -36,9 +36,9 @@
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>${project.groupId}</groupId>
+            <groupId>com.github.nlnwa</groupId>
             <artifactId>veidemann-controller</artifactId>
-            <version>${project.version}</version>
+            <version>${veidemann.controller.version}</version>
         </dependency>
         <dependency>
             <groupId>com.github.nlnwa.veidemann-robotsevaluator</groupId>
@@ -405,7 +405,7 @@
                                     </run>
                                 </image>
                                 <image>
-                                    <name>norsknettarkiv/veidemann-controller</name>
+                                    <name>norsknettarkiv/veidemann-controller:${veidemann.controller.version}</name>
                                     <alias>controller</alias>
                                     <run>
                                         <network>

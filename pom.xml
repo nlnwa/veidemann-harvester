@@ -25,7 +25,6 @@
         <module>veidemann-chrome-client</module>
         <module>veidemann-contentexplorer</module>
         <module>veidemann-integrationtests</module>
-        <module>veidemann-controller</module>
     </modules>
 
     <properties>
@@ -60,6 +59,7 @@
         <veidemann.contentwriter.version>0.2.2</veidemann.contentwriter.version>
         <veidemann.robotsevaluator.version>0.3.5</veidemann.robotsevaluator.version>
         <veidemann.frontier.version>0.3.4</veidemann.frontier.version>
+        <veidemann.controller.version>0.3.7</veidemann.controller.version>
     </properties>
 
     <repositories>

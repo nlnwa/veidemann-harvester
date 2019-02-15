@@ -25,7 +25,6 @@
         <module>veidemann-chrome-client</module>
         <module>veidemann-contentexplorer</module>
         <module>veidemann-integrationtests</module>
-        <module>veidemann-controller</module>
     </modules>
 
     <properties>

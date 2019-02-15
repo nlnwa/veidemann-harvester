@@ -314,8 +314,15 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
                     .setBlockDigest(screenshotMetaRecordDigest.getPrefixedDigestString())
                     .setRecordContentType("application/warc-fields")
                     .build();
+
+            String ip = log.getIpAddress();
+            if (ip == null || ip.isEmpty()) {
+                LOG.error("Missing IP address for screenshot, using 127.0.0.1");
+                ip = "127.0.0.1";
+            }
+
             WriteRequestMeta meta = WriteRequestMeta.newBuilder()
-                    .setIpAddress(log.getIpAddress())
+                    .setIpAddress(ip)
                     .setCollectionRef(crawlConfig.getCrawlConfig().getCollectionRef())
                     .setExecutionId(log.getExecutionId())
                     .setFetchTimeStamp(log.getFetchTimeStamp())
@@ -325,8 +332,10 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
                     .build();
             contentWriter.sendMetadata(meta);
             WriteResponseMeta response = contentWriter.finish();
-        } catch (ExecutionException | TimeoutException | InterruptedException | StatusException ex) {
+        } catch (ExecutionException | TimeoutException | InterruptedException ex) {
             throw new RuntimeException(ex);
+        } catch (StatusException ex) {
+            LOG.error("Error writing screenshot", ex);
         }
     }
 

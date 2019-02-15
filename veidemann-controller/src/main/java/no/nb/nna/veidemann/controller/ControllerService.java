@@ -544,6 +544,11 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
             JobExecutionStatus jobExecutionStatus = DbService.getInstance().getExecutionsAdapter()
                     .createJobExecutionStatus(job.getId());
 
+            RunCrawlReply reply = RunCrawlReply.newBuilder().setJobExecutionId(jobExecutionStatus.getId()).build();
+
+            responseObserver.onNext(reply);
+            responseObserver.onCompleted();
+
             if (!request.getSeedId().isEmpty()) {
                 ConfigObject seed = db.getConfigObject(ConfigRef.newBuilder()
                         .setKind(Kind.seed)
@@ -561,11 +566,6 @@ public class ControllerService extends ControllerGrpc.ControllerImplBase {
                 }
             }
             LOG.info("All seeds for job '{}' started", job.getMeta().getName());
-
-            RunCrawlReply reply = RunCrawlReply.newBuilder().setJobExecutionId(jobExecutionStatus.getId()).build();
-
-            responseObserver.onNext(reply);
-            responseObserver.onCompleted();
         } catch (Exception ex) {
             LOG.error(ex.getMessage(), ex);
             Status status = Status.UNKNOWN.withDescription(ex.toString());

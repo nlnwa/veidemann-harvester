@@ -36,8 +36,8 @@
         <chrome.version>72.0.3582.0</chrome.version>
         <docker.java.image>openjdk:8-jdk-alpine</docker.java.image>
 
-        <veidemann.commons.version>0.3.8</veidemann.commons.version>
-        <veidemann.rethinkdbadapter.version>0.3.14</veidemann.rethinkdbadapter.version>
+        <veidemann.commons.version>0.3.10</veidemann.commons.version>
+        <veidemann.rethinkdbadapter.version>0.3.15</veidemann.rethinkdbadapter.version>
 
         <log4j.version>2.7</log4j.version>
         <org.jwat.version>1.1.1</org.jwat.version>
@@ -58,8 +58,8 @@
         <veidemann.dns.resolver.version>0.2.5</veidemann.dns.resolver.version>
         <veidemann.contentwriter.version>0.2.5</veidemann.contentwriter.version>
         <veidemann.robotsevaluator.version>0.3.5</veidemann.robotsevaluator.version>
-        <veidemann.frontier.version>0.3.13</veidemann.frontier.version>
-        <veidemann.controller.version>0.3.11</veidemann.controller.version>
+        <veidemann.frontier.version>0.3.14</veidemann.frontier.version>
+        <veidemann.controller.version>0.3.12</veidemann.controller.version>
     </properties>
 
     <repositories>

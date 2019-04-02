@@ -119,6 +119,7 @@ public class FrontierClient implements AutoCloseable {
             requestObserver.onNext(NEW_PAGE_REQUEST);
         } catch (RuntimeException e) {
             // Cancel RPC
+            LOG.error("Request cancelled", e);
             requestObserver.onError(e);
             proxySessionLease.close();
         }

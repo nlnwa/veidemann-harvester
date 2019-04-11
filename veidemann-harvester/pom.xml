@@ -48,10 +48,16 @@
             <version>83ee1ef6c8</version>
         </dependency>
 
+        <!--<dependency>-->
+            <!--<groupId>net.lightbody.bmp</groupId>-->
+            <!--<artifactId>mitm</artifactId>-->
+        <!--</dependency>-->
         <dependency>
-            <groupId>net.lightbody.bmp</groupId>
+            <groupId>com.github.nlnwa.browsermob-proxy</groupId>
             <artifactId>mitm</artifactId>
+            <version>42549fb07dc710acdd9d84e7ab6589af1496233b</version>
         </dependency>
+
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-io</artifactId>

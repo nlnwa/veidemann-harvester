@@ -108,10 +108,6 @@
 
                             <images>
                                 <image>
-                                    <name>norsknettarkiv/veidemann-certgen</name>
-                                    <alias>certgen</alias>
-                                </image>
-                                <image>
                                     <name>rethinkdb:${rethinkdb.version}</name>
                                     <alias>db</alias>
                                     <run>
@@ -227,9 +223,6 @@
                                             <bind>
                                                 <volume>harvester-workdir:/workdir</volume>
                                             </bind>
-                                            <from>
-                                                <image>certgen</image>
-                                            </from>
                                         </volumes>
                                         <env>
                                             <BROWSER_WS_ENDPOINT>ws://browser:3000/</BROWSER_WS_ENDPOINT>
@@ -265,7 +258,6 @@
                                         </network>
                                         <ports>
                                             <port>+cache.http.host:cache.http.port:3128</port>
-                                            <port>+cache.https.host:cache.https.port:3129</port>
                                         </ports>
                                         <capAdd>
                                             <add>NET_ADMIN</add>
@@ -277,9 +269,6 @@
                                             <bind>
                                                 <volume>cache-data:/var/cache/squid</volume>
                                             </bind>
-                                            <from>
-                                                <image>certgen</image>
-                                            </from>
                                         </volumes>
                                         <env>
                                             <DNS_SERVERS>dnsresolver</DNS_SERVERS>

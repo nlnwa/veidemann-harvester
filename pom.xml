@@ -34,7 +34,8 @@
         <docker.tag>latest</docker.tag>
 
         <chrome.version>72.0.3582.0</chrome.version>
-        <docker.java.image>openjdk:8-jdk-alpine</docker.java.image>
+        <!--<docker.java.image>openjdk:8-jdk-alpine</docker.java.image>-->
+        <docker.java.image>openjdk:8u201-jdk-alpine3.9</docker.java.image>
 
         <veidemann.commons.version>0.3.10</veidemann.commons.version>
         <veidemann.rethinkdbadapter.version>0.3.15</veidemann.rethinkdbadapter.version>
@@ -46,6 +47,7 @@
         <com.uber.jaeger.version>0.21.0</com.uber.jaeger.version>
         <io.grpc.version>1.17.1</io.grpc.version>
         <io.prometheus.version>0.5.0</io.prometheus.version>
+        <netty.version>4.1.34.Final</netty.version>
 
         <!--Properties for golang-->
         <go.sdk.version>1.9.2</go.sdk.version>
@@ -54,12 +56,12 @@
         <!-- Versions of external docker containers used in integration tests -->
         <browserless.chrome.version>1.2.0-puppeteer-1.10.0</browserless.chrome.version>
         <rethinkdb.version>2.3.6</rethinkdb.version>
-        <veidemann.cache.version>v0.1.1</veidemann.cache.version>
+        <veidemann.cache.version>0.2.1</veidemann.cache.version>
         <veidemann.dns.resolver.version>0.2.5</veidemann.dns.resolver.version>
         <veidemann.contentwriter.version>0.2.5</veidemann.contentwriter.version>
         <veidemann.robotsevaluator.version>0.3.5</veidemann.robotsevaluator.version>
-        <veidemann.frontier.version>0.3.14</veidemann.frontier.version>
-        <veidemann.controller.version>0.3.12</veidemann.controller.version>
+        <veidemann.frontier.version>0.3.15</veidemann.frontier.version>
+        <veidemann.controller.version>0.3.14</veidemann.controller.version>
     </properties>
 
     <repositories>
@@ -110,7 +112,77 @@
             <dependency>
                 <groupId>io.netty</groupId>
                 <artifactId>netty-all</artifactId>
-                <version>4.1.30.Final</version>
+                <version>${netty.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-buffer</artifactId>
+                <version>${netty.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-codec</artifactId>
+                <version>${netty.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-codec-haproxy</artifactId>
+                <version>${netty.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-codec-http</artifactId>
+                <version>${netty.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-codec-http2</artifactId>
+                <version>${netty.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-codec-socks</artifactId>
+                <version>${netty.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-common</artifactId>
+                <version>${netty.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-handler</artifactId>
+                <version>${netty.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-handler-proxy</artifactId>
+                <version>${netty.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-transport</artifactId>
+                <version>${netty.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-transport-rxtx</artifactId>
+                <version>${netty.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-transport-sctp</artifactId>
+                <version>${netty.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-transport-udp</artifactId>
+                <version>${netty.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-example</artifactId>
+                <version>${netty.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.commons</groupId>

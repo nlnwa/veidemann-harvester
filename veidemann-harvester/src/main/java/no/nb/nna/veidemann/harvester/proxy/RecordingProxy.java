@@ -84,7 +84,7 @@ public class RecordingProxy implements AutoCloseable {
                 .notAfter(new Date(System.currentTimeMillis() + 365L * 24L * 60L * 60L * 1000L));
 
         File genratedCertFile = new File(certificateDir, "VeidemannCA.pem");
-        File cacheCaCertFile = new File(certificateDir, "cache-selfsignedCA.crt");
+//        File cacheCaCertFile = new File(certificateDir, "cache-selfsignedCA.crt");
 
         // create a dyamic CA root certificate generator using Elliptic Curve keys
         RootCertificateGenerator certificateAndKeySource = RootCertificateGenerator.builder()
@@ -94,14 +94,14 @@ public class RecordingProxy implements AutoCloseable {
         // save the dynamically-generated CA root certificate for installation in a browser
         certificateAndKeySource.saveRootCertificateAsPemFile(genratedCertFile);
 
-        TrustSource trustSource = TrustSource.defaultTrustSource().add(cacheCaCertFile);
+//        TrustSource trustSource = TrustSource.defaultTrustSource().add(cacheCaCertFile);
 
         // tell the MitmManager to use the root certificate we just generated, and to use EC keys when
         // creating impersonated server certs
         ImpersonatingMitmManager mitmManager = ImpersonatingMitmManager.builder()
                 .rootCertificateSource(certificateAndKeySource)
                 .serverKeyGenerator(new ECKeyGenerator())
-                .trustSource(trustSource)
+//                .trustSource(trustSource)
                 .trustAllServers(true)
                 .build();
 

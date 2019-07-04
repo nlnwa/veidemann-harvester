@@ -56,6 +56,10 @@ public class Codegen {
         String jsProtocol = "https://chromium.googlesource.com/v8/v8/+/chromium/"
                 + CHROME_VERSION.split("\\.")[2] + "/src/inspector/js_protocol.pdl?format=text";
 
+        System.out.println("Using protocol definitions from:");
+        System.out.println("   " + browserProtocol);
+        System.out.println("   " + jsProtocol);
+
         Protocol protocol = loadProtocol(browserProtocol);
         protocol.merge(loadProtocol(jsProtocol));
 
@@ -64,7 +68,7 @@ public class Codegen {
 
     static Protocol loadProtocol(String url) throws IOException {
         try (InputStream stream = Base64.getDecoder().wrap(new URL(url).openStream())) {
-            Map proto = PdlParser.parse(stream);
+            Map proto = PdlParser.parse(stream, true);
             JsonElement json = gson.toJsonTree(proto);
             return gson.fromJson(json, Protocol.class);
         }

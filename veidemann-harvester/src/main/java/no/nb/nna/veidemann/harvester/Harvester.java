@@ -22,16 +22,14 @@ import com.typesafe.config.ConfigFactory;
 import io.prometheus.client.exporter.HTTPServer;
 import io.prometheus.client.hotspot.DefaultExports;
 import no.nb.nna.veidemann.commons.client.ContentWriterClient;
-import no.nb.nna.veidemann.commons.client.DnsServiceClient;
+import no.nb.nna.veidemann.commons.client.RobotsServiceClient;
 import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.commons.opentracing.TracerFactory;
 import no.nb.nna.veidemann.harvester.browsercontroller.BrowserController;
-import no.nb.nna.veidemann.harvester.proxy.RecordingProxy;
 import no.nb.nna.veidemann.harvester.settings.Settings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
 import java.io.IOException;
 
 /**
@@ -78,9 +76,6 @@ public class Harvester {
 
         try (DbService db = DbService.configure(SETTINGS);
 
-             DnsServiceClient dnsServiceClient = new DnsServiceClient(
-                     SETTINGS.getDnsResolverHost(), SETTINGS.getDnsResolverPort());
-
              ContentWriterClient contentWriterClient = new ContentWriterClient(
                      SETTINGS.getContentWriterHost(), SETTINGS.getContentWriterPort());
 
@@ -89,13 +84,11 @@ public class Harvester {
 
              FrontierClient frontierClient = new FrontierClient(controller, SETTINGS.getFrontierHost(),
                      SETTINGS.getFrontierPort(), SETTINGS.getMaxOpenSessions(), SETTINGS.getBrowserWSEndpoint(),
-                     SETTINGS.getProxyPort());
+                     SETTINGS.getProxyHost(), SETTINGS.getProxyPort());
 
-             RecordingProxy proxy = new RecordingProxy(SETTINGS.getMaxOpenSessions(),
-                     new File(SETTINGS.getWorkDir()),
-                     SETTINGS.getProxyPort(), contentWriterClient,
-                     dnsServiceClient, sessionRegistry, SETTINGS.getCacheHost(),
-                     SETTINGS.getCachePort());
+             RobotsServiceClient robotsServiceClient = new RobotsServiceClient(SETTINGS.getRobotsTxtEvaluatorHost(), SETTINGS.getRobotsTxtEvaluatorPort());
+
+             BrowserControllerApiServer apiServer = new BrowserControllerApiServer(SETTINGS.getBrowserControllerPort(), sessionRegistry, robotsServiceClient).start()
         ) {
             Runtime.getRuntime().addShutdownHook(new Thread(() -> shouldRun = false));
 

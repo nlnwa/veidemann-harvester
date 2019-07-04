@@ -36,17 +36,14 @@ import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.util.ApiTools;
 import no.nb.nna.veidemann.harvester.BrowserSessionRegistry;
-import no.nb.nna.veidemann.harvester.proxy.RecordingProxy;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
-import org.littleshoot.proxy.HostResolver;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
 import java.io.File;
 import java.net.InetSocketAddress;
-import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -180,10 +177,7 @@ public class BrowserControllerIT {
                 }
             });
 
-            try (RecordingProxy proxy = new RecordingProxy(2, tmpDir, proxyPort, contentWriterClient,
-                    dnsServiceClient, sessionRegistry, cacheHost, cachePort);
-
-                 BrowserController controller = new BrowserController(browserWSEndpoint, sessionRegistry, null);) {
+            try (BrowserController controller = new BrowserController(browserWSEndpoint, sessionRegistry, null);) {
 
                 RenderResult result = controller.render(0, protocolConfig, queuedUri, config);
                 System.out.println("##### " + result);

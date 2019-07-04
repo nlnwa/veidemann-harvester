@@ -52,9 +52,9 @@ public class AbortCrawlIT extends CrawlTestBase implements VeidemannHeaderConsta
 
         new CrawlExecutionValidator(jes)
                 .validate()
-                .checkCrawlLogCount("response", 9, 12)
-                .checkCrawlLogCount("revisit", 11, 14)
-                .checkCrawlLogCount(23, "response", "revisit")
+                .checkCrawlLogCount("response", 8)
+                .checkCrawlLogCount("revisit", 14)
+                .checkCrawlLogCount(22, "response", "revisit")
                 .checkPageLogCount(8);
     }
 

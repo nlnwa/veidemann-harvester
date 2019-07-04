@@ -21,6 +21,7 @@ import no.nb.nna.veidemann.commons.settings.CommonSettings;
  * Configuration settings for Veidemann harvester.
  */
 public class Settings extends CommonSettings {
+    private String proxyHost;
 
     private int proxyPort;
 
@@ -44,13 +45,23 @@ public class Settings extends CommonSettings {
 
     private int contentWriterPort;
 
-    private String dnsResolverHost;
-
-    private int dnsResolverPort;
-
     private int maxOpenSessions;
 
     private int prometheusPort;
+
+    private int browserControllerPort;
+
+    private String robotsTxtEvaluatorHost;
+
+    private int robotsTxtEvaluatorPort;
+
+    public String getProxyHost() {
+        return proxyHost;
+    }
+
+    public void setProxyHost(String proxyHost) {
+        this.proxyHost = proxyHost;
+    }
 
     public int getProxyPort() {
         return proxyPort;
@@ -124,22 +135,6 @@ public class Settings extends CommonSettings {
         this.contentWriterPort = contentWriterPort;
     }
 
-    public String getDnsResolverHost() {
-        return dnsResolverHost;
-    }
-
-    public void setDnsResolverHost(String dnsResolverHost) {
-        this.dnsResolverHost = dnsResolverHost;
-    }
-
-    public int getDnsResolverPort() {
-        return dnsResolverPort;
-    }
-
-    public void setDnsResolverPort(int dnsResolverPort) {
-        this.dnsResolverPort = dnsResolverPort;
-    }
-
     public String getCacheHost() {
         return cacheHost;
     }
@@ -170,5 +165,29 @@ public class Settings extends CommonSettings {
 
     public void setPrometheusPort(int prometheusPort) {
         this.prometheusPort = prometheusPort;
+    }
+
+    public int getBrowserControllerPort() {
+        return browserControllerPort;
+    }
+
+    public void setBrowserControllerPort(int browserControllerPort) {
+        this.browserControllerPort = browserControllerPort;
+    }
+
+    public String getRobotsTxtEvaluatorHost() {
+        return robotsTxtEvaluatorHost;
+    }
+
+    public void setRobotsTxtEvaluatorHost(String robotsTxtEvaluatorHost) {
+        this.robotsTxtEvaluatorHost = robotsTxtEvaluatorHost;
+    }
+
+    public int getRobotsTxtEvaluatorPort() {
+        return robotsTxtEvaluatorPort;
+    }
+
+    public void setRobotsTxtEvaluatorPort(int robotsTxtEvaluatorPort) {
+        this.robotsTxtEvaluatorPort = robotsTxtEvaluatorPort;
     }
 }

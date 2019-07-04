@@ -24,9 +24,9 @@ import java.util.stream.Collectors;
  */
 public class PdlParser {
     private static final Logger LOG = LoggerFactory.getLogger(PdlParser.class);
-    private static final List<String> primitiveTypes = Arrays.asList(new String[]{"integer", "number", "boolean", "string", "object", "any", "array"});
+    private static final List<String> primitiveTypes = Arrays.asList(new String[]{"integer", "number", "boolean", "string", "object", "any", "array", "binary"});
 
-    public static Map<String, Object> parse(InputStream in) throws IOException {
+    public static Map<String, Object> parse(InputStream in, boolean mapBinaryToString) throws IOException {
 
         BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
 
@@ -87,7 +87,7 @@ public class PdlParser {
             if (m.matches()) {
                 List types = getOrCreateList(domain, "types");
                 item = createItem("id", m.group(3), m.group(1), m.group(2), null, description);
-                assignType(item, m.group(5), m.group(4));
+                assignType(item, m.group(5), m.group(4), mapBinaryToString);
                 types.add(item);
                 continue;
             }
@@ -112,7 +112,7 @@ public class PdlParser {
                 if (m.group(3) != null) {
                     param.put("optional", true);
                 }
-                assignType(param, m.group(5), m.group(4));
+                assignType(param, m.group(5), m.group(4), mapBinaryToString);
                 if ("enum".equals(m.group(5))) {
                     enumliterals = getOrCreateList(param, "enum");
                 }
@@ -178,15 +178,18 @@ public class PdlParser {
         return l;
     }
 
-    private static void assignType(Map item, String type, String isArray) {
+    private static void assignType(Map item, String type, String isArray, boolean mapBinaryToString) {
         if (isArray != null) {
             item.put("type", "array");
             Map items = new HashMap();
             item.put("items", items);
-            assignType(items, type, null);
+            assignType(items, type, null, mapBinaryToString);
             return;
         }
         if ("enum".equals(type)) {
+            type = "string";
+        }
+        if (mapBinaryToString && "binary".equals(type)) {
             type = "string";
         }
         if (primitiveTypes.contains(type)) {
@@ -195,6 +198,7 @@ public class PdlParser {
             item.put("$ref", type);
         }
     }
+
 
     private static Map createItem(String experimental, String deprecated, String name, String description) {
         Map d = new HashMap();

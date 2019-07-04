@@ -222,11 +222,14 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
                         } else if ("net::ERR_UNKNOWN_URL_SCHEME".equals(f.errorText())) {
                             LOG.debug("Resource has unknown URL Scheme: Error '{}', Blocked reason '{}'", f.errorText(), f.blockedReason());
                             request.setStatusCode(ExtraStatusCodes.ILLEGAL_URI.getCode());
+                        } else if ("net::ERR_TUNNEL_CONNECTION_FAILED".equals(f.errorText())) {
+                            LOG.debug("Could not create tls tunnel for resource: Error '{}', Blocked reason '{}'", f.errorText(), f.blockedReason());
+                            request.setStatusCode(ExtraStatusCodes.CONNECT_FAILED.getCode());
                         } else {
-                            request.setStatusCode(ExtraStatusCodes.BLOCKED_BY_CUSTOM_PROCESSOR.getCode());
+
                             LOG.error(
-                                    "Failed fetching page: Error '{}', Blocked reason '{}', Resource type: '{}', Canceled: {}, Req: {}",
-                                    f.errorText(), f.blockedReason(), f.type(), f.canceled(), request.getUrl());
+                                    "Failed fetching page: Error '{}', Blocked reason '{}', Resource type: '{}', Canceled: {}, Req: {}, Req Id: {}",
+                                    f.errorText(), f.blockedReason(), f.type(), f.canceled(), request.getUrl(), f.requestId());
                         }
                     } else {
                         LOG.error(

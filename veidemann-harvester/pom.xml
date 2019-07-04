@@ -38,37 +38,9 @@
             <groupId>org.netpreserve.commons</groupId>
             <artifactId>webarchive-commons-util</artifactId>
         </dependency>
-        <!--<dependency>-->
-            <!--<groupId>org.littleshoot</groupId>-->
-            <!--<artifactId>littleproxy</artifactId>-->
-        <!--</dependency>-->
-        <dependency>
-            <groupId>com.github.michalsvec</groupId>
-            <artifactId>littleproxy</artifactId>
-            <version>83ee1ef6c8</version>
-        </dependency>
-
-        <!--<dependency>-->
-            <!--<groupId>net.lightbody.bmp</groupId>-->
-            <!--<artifactId>mitm</artifactId>-->
-        <!--</dependency>-->
-        <dependency>
-            <groupId>com.github.nlnwa.browsermob-proxy</groupId>
-            <artifactId>mitm</artifactId>
-            <version>42549fb07dc710acdd9d84e7ab6589af1496233b</version>
-        </dependency>
-
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-io</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-all</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.grpc</groupId>
-            <artifactId>grpc-netty-shaded</artifactId>
         </dependency>
         <dependency>
             <groupId>com.google.code.gson</groupId>
@@ -117,229 +89,35 @@
             </plugin>
 
             <plugin>
-                <groupId>io.fabric8</groupId>
-                <artifactId>docker-maven-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <id>docker-build</id>
-                    </execution>
-                </executions>
+                <groupId>com.google.cloud.tools</groupId>
+                <artifactId>jib-maven-plugin</artifactId>
+                <version>1.2.0</version>
                 <configuration>
-                    <removeVolumes>true</removeVolumes>
-                    <autoCreateCustomNetworks>true</autoCreateCustomNetworks>
-                    <images>
-                        <image>
-                            <name>norsknettarkiv/${project.artifactId}</name>
-                            <alias>harvester</alias>
-                            <run>
-                                <skip>true</skip>
-                            </run>
-                            <build>
-                                <from>${docker.java.image}</from>
-                                <maintainer>National Library of Norway</maintainer>
-                                <tags>
-                                    <tag>${docker.tag}</tag>
-                                </tags>
-                                <runCmds>
-                                    <run>apk add --no-cache su-exec openssl libuuid</run>
-                                    <run>mkdir /workdir</run>
-                                </runCmds>
-                                <volumes>
-                                    <volume>/workdir</volume>
-                                </volumes>
-                                <env>
-                                    <WORK_DIR>/workdir</WORK_DIR>
-                                </env>
-                                <ports>
-                                    <port>8080</port>
-                                    <port>9301</port>
-                                </ports>
-                                <!--<user>operator</user>-->
-                                <cmd>
-                                    <exec>
-                                        <!--<arg>/veidemann/bin/${project.artifactId}</arg>-->
-                                        <arg>/veidemann/bin/start.sh</arg>
-                                    </exec>
-                                </cmd>
-                                <assembly>
-                                    <targetDir>/veidemann</targetDir>
-
-                                    <inline>
-                                        <includeBaseDirectory>true</includeBaseDirectory>
-                                        <fileSets>
-                                            <fileSet>
-                                                <directory>target/appassembler/bin</directory>
-                                                <outputDirectory>bin</outputDirectory>
-                                                <includes>
-                                                    <include>${project.artifactId}</include>
-                                                    <include>start.sh</include>
-                                                </includes>
-                                                <fileMode>0755</fileMode>
-                                            </fileSet>
-                                            <fileSet>
-                                                <directory>target/appassembler/bin</directory>
-                                                <outputDirectory>bin</outputDirectory>
-                                                <excludes>
-                                                    <exclude>${project.artifactId}</exclude>
-                                                    <exclude>start.sh</exclude>
-                                                </excludes>
-                                                <fileMode>0644</fileMode>
-                                            </fileSet>
-                                            <fileSet>
-                                                <directory>target/appassembler</directory>
-                                                <outputDirectory>/</outputDirectory>
-                                                <excludes>
-                                                    <exclude>bin</exclude>
-                                                </excludes>
-                                            </fileSet>
-                                        </fileSets>
-                                        <files>
-                                            <file>
-                                                <source>../LICENSE</source>
-                                                <outputDirectory></outputDirectory>
-                                                <fileMode>0644</fileMode>
-                                            </file>
-                                        </files>
-                                    </inline>
-                                </assembly>
-                            </build>
-                        </image>
-                        <image>
-                            <name>norsknettarkiv/veidemann-certgen</name>
-                            <alias>certgen</alias>
-                            <run>
-                                <namingStrategy>alias</namingStrategy>
-                                <network>
-                                    <mode>custom</mode>
-                                    <name>cdp-test-net</name>
-                                    <alias>certgen</alias>
-                                </network>
-                                <volumes>
-                                    <bind>
-                                        <volume>${project.build.directory}/it-workdir/certificates:/ca-certificates
-                                        </volume>
-                                    </bind>
-                                </volumes>
-                            </run>
-                        </image>
-                        <image>
-                            <name>norsknettarkiv/testsites</name>
-                            <alias>testsites</alias>
-                            <run>
-                                <namingStrategy>alias</namingStrategy>
-                                <network>
-                                    <mode>custom</mode>
-                                    <name>cdp-test-net</name>
-                                    <alias>testsites</alias>
-                                </network>
-                                <ports>
-                                    <port>+test.http.host:test.http.port:80</port>
-                                    <port>+test.dns.host:test.dns.port:53</port>
-                                </ports>
-                                <log>
-                                    <enabled>true</enabled>
-                                </log>
-                                <wait>
-                                    <tcp>
-                                        <mode>mapped</mode>
-                                        <ports>
-                                            <port>80</port>
-                                            <port>53</port>
-                                        </ports>
-                                    </tcp>
-                                    <time>20000</time>
-                                </wait>
-                            </run>
-                        </image>
-                        <image>
-                            <name>norsknettarkiv/veidemann-cache:${veidemann.cache.version}</name>
-                            <alias>cache</alias>
-                            <run>
-                                <namingStrategy>alias</namingStrategy>
-                                <network>
-                                    <mode>custom</mode>
-                                    <name>cdp-test-net</name>
-                                    <alias>cache</alias>
-                                </network>
-                                <ports>
-                                    <port>+cache.http.host:cache.http.port:3128</port>
-                                    <port>+cache.https.host:cache.https.port:3129</port>
-                                </ports>
-                                <capAdd>
-                                    <add>NET_ADMIN</add>
-                                </capAdd>
-                                <!-- 2GB -->
-                                <memory>2147483648</memory>
-                                <shmSize>2147483648</shmSize>
-                                <volumes>
-                                    <bind>
-                                        <volume>cache-data:/var/cache/squid</volume>
-                                    </bind>
-                                    <from>
-                                        <image>certgen</image>
-                                    </from>
-                                </volumes>
-                                <env>
-                                    <DNS_SERVERS>${test.dns.server}</DNS_SERVERS>
-                                </env>
-                                <log>
-                                    <enabled>false</enabled>
-                                </log>
-                                <dependsOn>
-                                    <container>testsites</container>
-                                </dependsOn>
-                                <wait>
-                                    <tcp>
-                                        <mode>mapped</mode>
-                                        <ports>
-                                            <port>3128</port>
-                                        </ports>
-                                    </tcp>
-                                    <time>30000</time>
-                                </wait>
-                            </run>
-                        </image>
-                        <image>
-                            <name>browserless/chrome:${browserless.chrome.version}</name>
-                            <alias>browser</alias>
-                            <run>
-                                <namingStrategy>alias</namingStrategy>
-                                <network>
-                                    <mode>custom</mode>
-                                    <name>cdp-test-net</name>
-                                    <alias>browser</alias>
-                                </network>
-                                <dependsOn>
-                                    <container>certgen</container>
-                                    <container>testsites</container>
-                                    <container>cache</container>
-                                </dependsOn>
-                                <volumes>
-                                    <bind>
-                                        <volume>${project.build.directory}/it-workdir/certificates/pki:/root/.pki
-                                        </volume>
-                                    </bind>
-                                </volumes>
-                                <ports>
-                                    <port>+browser.host:browser.port:3000</port>
-                                </ports>
-                                <env>
-                                    <!--<DEBUG>*</DEBUG>-->
-                                    <!--<DEBUG>browserless/chrome</DEBUG>-->
-                                    <CONNECTION_TIMEOUT>60000</CONNECTION_TIMEOUT>
-                                </env>
-                                <memory>1073741824</memory>
-                                <shmSize>1073741824</shmSize>
-                                <log>
-                                    <enabled>true</enabled>
-                                </log>
-                                <dns>
-                                    <!--<host>${docker.container.testsites.net.cdp-test-net.ip}</host>-->
-                                    <!--<host>8.8.8.8</host>-->
-                                </dns>
-                            </run>
-                        </image>
-                    </images>
+                    <to>
+                        <image>docker.io/norsknettarkiv/${project.artifactId}</image>
+                        <tags>
+                            <tag>${docker.tag}</tag>
+                        </tags>
+                        <auth>
+                            <username>${env.DOCKER_USERNAME}</username>
+                            <password>${env.DOCKER_PASSWORD}</password>
+                        </auth>
+                    </to>
+                    <container>
+                        <ports>
+                            <port>8080</port>
+                            <port>9301</port>
+                        </ports>
+                        <volumes>
+                            <volume>/workdir</volume>
+                        </volumes>
+                        <environment>
+                            <WORK_DIR>/workdir</WORK_DIR>
+                        </environment>
+                        <jvmFlags>
+                            <jvmFlag>-Dfile.encoding=UTF-8</jvmFlag>
+                        </jvmFlags>
+                    </container>
                 </configuration>
             </plugin>
         </plugins>
@@ -350,49 +128,14 @@
             <id>docker-build</id>
             <build>
                 <plugins>
-                    <!-- Create assembly with startup scripts and dependencies -->
                     <plugin>
-                        <groupId>org.codehaus.mojo</groupId>
-                        <artifactId>appassembler-maven-plugin</artifactId>
-                        <configuration>
-                            <licenseHeaderFile>${basedir}/../src/main/etc/license-header.txt</licenseHeaderFile>
-                            <programs>
-                                <program>
-                                    <mainClass>no.nb.nna.veidemann.harvester.Main</mainClass>
-                                    <id>${project.artifactId}</id>
-                                </program>
-                            </programs>
-                            <binFolder>bin</binFolder>
-                            <repositoryName>lib</repositoryName>
-                            <repositoryLayout>flat</repositoryLayout>
-                            <useWildcardClassPath>true</useWildcardClassPath>
-                            <configurationDirectory>config</configurationDirectory>
-                            <endorsedDir>plugins</endorsedDir>
-                            <preAssembleDirectory>src/main/distfiles</preAssembleDirectory>
-                            <extraJvmArguments>-Dconfig.file=@BASEDIR@/config/application.conf
-                                -XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap
-                            </extraJvmArguments>
-                        </configuration>
+                        <groupId>com.google.cloud.tools</groupId>
+                        <artifactId>jib-maven-plugin</artifactId>
                         <executions>
                             <execution>
                                 <phase>package</phase>
                                 <goals>
-                                    <goal>assemble</goal>
-                                </goals>
-                            </execution>
-                        </executions>
-                    </plugin>
-
-                    <!-- Build Docker image -->
-                    <plugin>
-                        <groupId>io.fabric8</groupId>
-                        <artifactId>docker-maven-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <id>docker-build</id>
-                                <phase>package</phase>
-                                <goals>
-                                    <goal>build</goal>
+                                    <goal>dockerBuild</goal>
                                 </goals>
                             </execution>
                         </executions>
@@ -400,114 +143,21 @@
                 </plugins>
             </build>
         </profile>
-
         <profile>
-            <id>integration-tests</id>
+            <id>docker-build-and-push</id>
             <build>
                 <plugins>
                     <plugin>
-                        <groupId>org.codehaus.gmaven</groupId>
-                        <artifactId>groovy-maven-plugin</artifactId>
-                        <version>2.0</version>
+                        <groupId>com.google.cloud.tools</groupId>
+                        <artifactId>jib-maven-plugin</artifactId>
                         <executions>
                             <execution>
-                                <phase>generate-resources</phase>
+                                <phase>package</phase>
                                 <goals>
-                                    <goal>execute</goal>
-                                </goals>
-                                <configuration>
-                                    <source>
-                                        def proc = 'id -u'.execute()
-                                        proc.waitForOrKill(1000)
-                                        if (proc.exitValue()) {
-                                            def err = new StringBuffer()
-                                            proc.consumeProcessErrorStream(err)
-                                            throw new RuntimeException("ERROR: " + err.toString())
-                                        }
-                                        project.properties.uid = proc.text.trim()
-
-                                        new File('${project.build.directory}/it-workdir/certificates').mkdirs()
-                                    </source>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                    <plugin>
-                        <groupId>org.codehaus.mojo</groupId>
-                        <artifactId>build-helper-maven-plugin</artifactId>
-                        <version>3.0.0</version>
-                        <executions>
-                            <execution>
-                                <id>get-local-ip</id>
-                                <goals>
-                                    <goal>local-ip</goal>
-                                </goals>
-                                <configuration>
-                                    <localIpProperty>proxy.ip</localIpProperty>
-                                </configuration>
-                            </execution>
-                            <execution>
-                                <id>reserve-network-port</id>
-                                <goals>
-                                    <goal>reserve-network-port</goal>
-                                </goals>
-                                <phase>process-resources</phase>
-                                <configuration>
-                                    <portNames>
-                                        <portName>proxy.port</portName>
-                                    </portNames>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                    <plugin>
-                        <groupId>io.fabric8</groupId>
-                        <artifactId>docker-maven-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <id>prepare-tests</id>
-                                <phase>pre-integration-test</phase>
-                                <goals>
-                                    <goal>start</goal>
-                                </goals>
-                            </execution>
-                            <execution>
-                                <id>remove-tests</id>
-                                <phase>post-integration-test</phase>
-                                <goals>
-                                    <goal>stop</goal>
-                                </goals>
-                                <configuration>
-                                    <removeVolumes>true</removeVolumes>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-failsafe-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <goals>
-                                    <goal>integration-test</goal>
-                                    <goal>verify</goal>
+                                    <goal>build</goal>
                                 </goals>
                             </execution>
                         </executions>
-                        <configuration>
-                            <systemPropertyVariables>
-                                <browser.host>${browser.host}</browser.host>
-                                <browser.port>${browser.port}</browser.port>
-                                <proxy.host>${proxy.ip}</proxy.host>
-                                <proxy.port>${proxy.port}</proxy.port>
-                                <cache.host>${cache.http.host}</cache.host>
-                                <cache.port>${cache.http.port}</cache.port>
-                                <testsites.http.host>${test.http.host}</testsites.http.host>
-                                <testsites.http.port>${test.http.port}</testsites.http.port>
-                                <testsites.dns.host>${test.dns.host}</testsites.dns.host>
-                                <testsites.dns.port>${test.dns.port}</testsites.dns.port>
-                            </systemPropertyVariables>
-                        </configuration>
                     </plugin>
                 </plugins>
             </build>

@@ -65,6 +65,9 @@ public class CrawlExecutionValidator {
     public CrawlExecutionValidator validate() throws DbException, InterruptedException {
         init();
 
+        System.out.println("\nCrawllogs");
+        crawlLogs.getCrawlLog().forEach(l -> System.out.println(l.getJobExecutionId() + " :: " + l.getCollectionFinalName() + " :: " + l.getStatusCode() + " :: " + l.getRecordType() + " :: " + l.getRequestedUri() + " :: " + l.getWarcId()));
+
         checkDrainedQueue();
         checkConsistency();
         checkValidWarc();
@@ -121,6 +124,8 @@ public class CrawlExecutionValidator {
     private void checkConsistency() {
         crawlLogs.getCrawlLog().stream()
                 .filter(cl -> cl.getStatusCode() != ExtraStatusCodes.RETRY_LIMIT_REACHED.getCode())
+                .filter(cl -> cl.getStatusCode() != ExtraStatusCodes.CONNECT_FAILED.getCode())
+                .filter(cl -> cl.getStatusCode() != ExtraStatusCodes.PRECLUDED_BY_ROBOTS.getCode())
                 .forEach(cl -> {
                     assertThat(warcRecords.keySet())
                             .as("Missing WARC record for crawllog entry %s with uri: %s",
@@ -132,17 +137,23 @@ public class CrawlExecutionValidator {
                                 .isNotNull();
                     }
                 });
-        pageLogs.forEach(pl -> {
-            assertThat(warcRecords.keySet())
-                    .as("Missing WARC record for pagelog entry %s", pl.getWarcId())
-                    .contains(pl.getWarcId());
-            pl.getResourceList().stream().filter(r -> !r.getFromCache()).forEach(r -> {
-                assertThat(warcRecords.keySet())
-                        .as("Missing WARC record for crawllog resource entry %s with uri: %s",
-                                r.getWarcId(), r.getUri())
-                        .contains(r.getWarcId());
-            });
-        });
+        pageLogs.stream()
+                .filter(pl -> pl.getResource(0).getStatusCode() != ExtraStatusCodes.CONNECT_FAILED.getCode())
+                .forEach(pl -> {
+                    assertThat(warcRecords.keySet())
+                            .as("Missing WARC record for pagelog entry %s --- %s", pl.getWarcId(), pl)
+                            .contains(pl.getWarcId());
+                    pl.getResourceList().stream()
+                            .filter(r -> !r.getFromCache())
+                            .filter(r -> r.getStatusCode() != ExtraStatusCodes.CONNECT_FAILED.getCode())
+                            .filter(r -> r.getStatusCode() != ExtraStatusCodes.PRECLUDED_BY_ROBOTS.getCode())
+                            .forEach(r -> {
+                                assertThat(warcRecords.keySet())
+                                        .as("Missing WARC record for crawllog resource entry %s with uri: %s",
+                                                r.getWarcId(), r.getUri())
+                                        .contains(r.getWarcId());
+                            });
+                });
         warcRecords.values().stream()
                 .peek(wid -> {
                     try {
@@ -252,12 +263,12 @@ public class CrawlExecutionValidator {
         crawlExecutions.getCrawlExecutionStatus().forEach(ces -> {
             System.out.println(CrawlExecutionsHelper.formatCrawlExecution(ces));
             List<CrawlLog> logs = crawlLogs.getCrawlLogsByExecutionId(ces.getId());
-//            logs.forEach(c -> System.out.println("  " + c.getStatusCode() + " - " + c.getRequestedUri()));
             assertThat(logs.stream()
                     .filter(cl -> (cl.getStatusCode() != ExtraStatusCodes.RETRY_LIMIT_REACHED.getCode()
                             && !cl.getRequestedUri().endsWith("robots.txt")))
+                    .filter(cl -> cl.getStatusCode() != ExtraStatusCodes.PRECLUDED_BY_ROBOTS.getCode())
                     .count())
-                    .as("Mismatch between CrawlExecutionStatus.getUrisCrawled and CrawlLog count.")
+                    .as("Mismatch between CrawlExecutionStatus.getUrisCrawled and CrawlLog count. CrawlExecutionStatus.getUrisCrawled was %d", ces.getUrisCrawled())
                     .isEqualTo((int) ces.getUrisCrawled());
             long summarizedSize = logs.stream()
                     .filter(cl -> (cl.getStatusCode() != ExtraStatusCodes.RETRY_LIMIT_REACHED.getCode()
@@ -272,6 +283,7 @@ public class CrawlExecutionValidator {
     private void checkIp() {
         crawlLogs.getCrawlLog().stream()
                 .filter(cl -> cl.getStatusCode() != ExtraStatusCodes.RETRY_LIMIT_REACHED.getCode())
+                .filter(cl -> cl.getStatusCode() != ExtraStatusCodes.PRECLUDED_BY_ROBOTS.getCode())
                 .forEach(cl -> {
                     assertThat(cl.getIpAddress())
                             .as("Ip address for crawllog entry %s was empty", cl.getWarcId())
@@ -289,6 +301,8 @@ public class CrawlExecutionValidator {
     private void checkChecksum() {
         crawlLogs.getCrawlLog().stream()
                 .filter(cl -> cl.getStatusCode() != ExtraStatusCodes.RETRY_LIMIT_REACHED.getCode())
+                .filter(cl -> cl.getStatusCode() != ExtraStatusCodes.CONNECT_FAILED.getCode())
+                .filter(cl -> cl.getStatusCode() != ExtraStatusCodes.PRECLUDED_BY_ROBOTS.getCode())
                 .forEach(cl -> {
                     assertThat(cl.getBlockDigest())
                             .as("Block digest for crawllog entry %s (uri:%s) was empty",

@@ -22,6 +22,7 @@ import io.opentracing.tag.Tags;
 import io.opentracing.util.GlobalTracer;
 import no.nb.nna.veidemann.api.frontier.v1.CrawlLog;
 import no.nb.nna.veidemann.chrome.client.NetworkDomain;
+import no.nb.nna.veidemann.commons.ExtraStatusCodes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -75,8 +76,6 @@ public class UriRequest {
     private final BaseSpan parentSpan;
 
     private Span span;
-
-    //    private final boolean aborted;
 
     private boolean finished = false;
 
@@ -143,7 +142,7 @@ public class UriRequest {
         if (request.redirectResponse() != null) {
             discoveryType = 'R';
             parent.statusCode = request.redirectResponse().status().intValue();
-            parent.fromCache = request.redirectResponse().fromDiskCache();
+            parent.setFromCache(request.redirectResponse().fromDiskCache());
             parent.setMimeType(request.redirectResponse().mimeType());
         } else {
             if ("script".equals(request.initiator().type())) {
@@ -169,7 +168,7 @@ public class UriRequest {
         resourceType = ResourceType.forName(response.type());
         setMimeType(response.response().mimeType());
         statusCode = response.response().status().intValue();
-        fromCache = response.response().fromDiskCache();
+        setFromCache(response.response().fromDiskCache());
 
         if (response.response().fromDiskCache() || response.response().protocol().equals("data")) {
             setFromProxy(false);
@@ -327,11 +326,7 @@ public class UriRequest {
         this.statusCode = statusCode;
     }
 
-    //    public boolean isAborted() {
-    //        return aborted;
-    //    }
-
-    public CrawlLog setCrawlLog(CrawlLog.Builder crawlLogBuilder) {
+    public CrawlLog setCrawlLog(CrawlLog.Builder crawlLogBuilder, boolean isFromCache) {
         // If request fails in client to proxy step, then status code is not set and we pick it up from the error
         if (crawlLogBuilder.getStatusCode() == 0) {
             crawlLogBuilder.setStatusCode(crawlLogBuilder.getError().getCode());
@@ -343,8 +338,9 @@ public class UriRequest {
                 .build();
         this.warcId = crawlLog.getWarcId();
         this.size = crawlLog.getSize();
-        if (crawlLog.getWarcId().isEmpty()) {
-            this.fromCache = true;
+        setFromCache(isFromCache);
+        if (this.crawlLog.getStatusCode() == ExtraStatusCodes.PRECLUDED_BY_ROBOTS.getCode()) {
+            setFromProxy(false);
         }
         return this.crawlLog;
     }
@@ -419,8 +415,7 @@ public class UriRequest {
         sb.append(", renderable=").append(renderable);
         sb.append(", url='").append(url).append('\'');
         sb.append(", referrer=").append(referrer);
-        sb.append(", fromCache=").append(fromCache);
-//        sb.append(", aborted=").append(aborted);
+        sb.append(", fromCache=").append(isFromCache());
         sb.append(", warcId=").append(warcId);
         if (crawlLog != null) {
             sb.append(", log=").append(crawlLog.getStatusCode() + "::" + crawlLog.getRequestedUri());

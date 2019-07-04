@@ -41,7 +41,7 @@ public class FrontierClient implements AutoCloseable {
 
     private final FrontierGrpc.FrontierStub asyncStub;
 
-    private final AtomicInteger idx = new AtomicInteger(0);
+    private final AtomicInteger idx = new AtomicInteger(1);
 
     private final Pool<ProxySession> pool;
 
@@ -86,23 +86,23 @@ public class FrontierClient implements AutoCloseable {
             .register();
 
     public FrontierClient(BrowserController controller, String host, int port, int maxOpenSessions,
-                          String browserWsEndpoint, int firstProxyPort) {
+                          String browserWsEndpoint, String proxyHost, int firstProxyPort) {
         this(controller, ManagedChannelBuilder.forAddress(host, port).usePlaintext(), maxOpenSessions,
-                browserWsEndpoint, firstProxyPort);
+                browserWsEndpoint, proxyHost, firstProxyPort);
     }
 
     /**
      * Construct client for accessing RouteGuide server using the existing channel.
      */
     public FrontierClient(BrowserController controller, ManagedChannelBuilder<?> channelBuilder, int maxOpenSessions,
-                          String browserWsEndpoint, int firstProxyPort) {
+                          String browserWsEndpoint, String proxyHost, int firstProxyPort) {
         LOG.info("Setting up Frontier client");
         this.controller = controller;
         ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor.Builder(GlobalTracer.get()).build();
         channel = channelBuilder.intercept(tracingInterceptor).build();
         asyncStub = FrontierGrpc.newStub(channel).withWaitForReady();
-        pool = new Pool<>(maxOpenSessions, () -> new ProxySession(idx.getAndIncrement(),
-                browserWsEndpoint, firstProxyPort), null, p -> p.reset());
+        pool = new Pool<>(maxOpenSessions - 1, () -> new ProxySession(idx.getAndIncrement(),
+                browserWsEndpoint, proxyHost, firstProxyPort), null, p -> p.reset());
     }
 
     public void requestNextPage() throws InterruptedException {
@@ -161,8 +161,8 @@ public class FrontierClient implements AutoCloseable {
 
             try {
                 LOG.debug("Start page rendering");
-
-                RenderResult result = controller.render(proxySessionLease.getObject(), fetchUri, pageHarvestSpec.getCrawlConfig());
+                ProxySession ps = proxySessionLease.getObject();
+                RenderResult result = controller.render(ps, fetchUri, pageHarvestSpec.getCrawlConfig());
 
                 pageFetchSeconds.observe((double) result.getPageFetchTimeMs() / 1000d);
 
@@ -219,12 +219,14 @@ public class FrontierClient implements AutoCloseable {
 
     public class ProxySession {
         private final int proxyId;
+        private final String proxyHost;
         private final int proxyPort;
         private final String browserWsEndpoint;
         private BrowserSession session;
 
-        public ProxySession(int proxyId, String browserWSEndpoint, int firstProxyPort) {
+        public ProxySession(int proxyId, String browserWSEndpoint, String proxyHost, int firstProxyPort) {
             this.proxyId = proxyId;
+            this.proxyHost = proxyHost;
             this.proxyPort = proxyId + firstProxyPort;
             Uri ws = UriConfigs.WHATWG.buildUri(browserWSEndpoint);
             ParsedQuery query = ws.getParsedQuery();
@@ -235,7 +237,7 @@ public class FrontierClient implements AutoCloseable {
                 proxyEntry = new Entry("--proxy-server", val);
                 query = query.put(proxyEntry);
             } else {
-                proxyEntry = new Entry("--proxy-server", "http://harvester:" + proxyPort);
+                proxyEntry = new Entry("--proxy-server", "http://" + proxyHost + ":" + proxyPort);
                 query = query.add(proxyEntry);
             }
             browserWsEndpoint = UriConfigs.WHATWG.builder(ws).parsedQuery(query).build().toString();
@@ -245,6 +247,10 @@ public class FrontierClient implements AutoCloseable {
 
         public int getProxyId() {
             return proxyId;
+        }
+
+        public String getProxyHost() {
+            return proxyHost;
         }
 
         public int getProxyPort() {

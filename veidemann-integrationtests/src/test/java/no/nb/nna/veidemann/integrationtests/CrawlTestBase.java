@@ -43,6 +43,8 @@ import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 
+import java.util.concurrent.TimeUnit;
+
 public abstract class CrawlTestBase {
     static ManagedChannel contentWriterChannel;
 
@@ -61,6 +63,12 @@ public abstract class CrawlTestBase {
     static RethinkDbAdapter db;
 
     static RethinkDB r = RethinkDB.r;
+
+    ConfigObject browserConfig;
+    ConfigObject politeness;
+    ConfigObject collection;
+    ConfigObject crawlConfig;
+    ConfigObject job;
 
     @BeforeClass
     public static void init() throws DbConnectionException {
@@ -103,8 +111,16 @@ public abstract class CrawlTestBase {
     }
 
     @AfterClass
-    public static void shutdown() {
+    public static void shutdown() throws InterruptedException {
+        System.out.println("Shutting down...");
+        controllerChannel.shutdown();
+        contentWriterChannel.shutdown();
+        System.out.println("Avaiting termination of controller channel");
+        controllerChannel.awaitTermination(1, TimeUnit.MINUTES);
+        System.out.println("Avaiting termination of content writer channel");
+        contentWriterChannel.awaitTermination(1, TimeUnit.MINUTES);
         DbService.getInstance().close();
+        System.out.println("Shut down");
     }
 
     @After
@@ -113,7 +129,7 @@ public abstract class CrawlTestBase {
 
     public ConfigObject createJob(String name, int depth, long maxDurationS, long maxBytes) {
         // Update browser config with shorter inactivity time
-        ConfigObject browserConfig = configClient.listConfigObjects(ListRequest.newBuilder()
+        browserConfig = configClient.listConfigObjects(ListRequest.newBuilder()
                 .setKind(Kind.browserConfig)
                 .build())
                 .next();
@@ -132,7 +148,7 @@ public abstract class CrawlTestBase {
                 .setDelayFactor(.01f)
                 .setRetryDelaySeconds(1)
                 .setUseHostname(true);
-        ConfigObject politeness = configClient.saveConfigObject(politenessBuilder.build());
+        politeness = configClient.saveConfigObject(politenessBuilder.build());
 
         // Create a collection for this test
         ConfigObject.Builder collectionBuilder = ConfigObject.newBuilder()
@@ -144,7 +160,7 @@ public abstract class CrawlTestBase {
                 .setFileSize(1024 * 1024 * 100);
         collectionBuilder.getCollectionBuilder().addSubCollectionsBuilder().setName("screenshot").setType(SubCollectionType.SCREENSHOT);
         collectionBuilder.getCollectionBuilder().addSubCollectionsBuilder().setName("dns").setType(SubCollectionType.DNS);
-        ConfigObject collection = configClient.saveConfigObject(collectionBuilder.build());
+        collection = configClient.saveConfigObject(collectionBuilder.build());
 
         // Create a crawl config which references the above configs
         ConfigObject.Builder crawlConfigBuilder = ConfigObject.newBuilder()
@@ -156,7 +172,7 @@ public abstract class CrawlTestBase {
                 .setBrowserConfigRef(ApiTools.refForConfig(browserConfig))
                 .setPolitenessRef(ApiTools.refForConfig(politeness))
                 .getExtraBuilder().setCreateScreenshot(true).setExtractText(true);
-        ConfigObject crawlConfig = configClient.saveConfigObject(crawlConfigBuilder.build());
+        crawlConfig = configClient.saveConfigObject(crawlConfigBuilder.build());
 
         // Create a job with the specified limits
         ConfigObject.Builder jobBuilder = ConfigObject.newBuilder()
@@ -169,7 +185,7 @@ public abstract class CrawlTestBase {
                 .setDepth(depth)
                 .setMaxDurationS(maxDurationS)
                 .setMaxBytes(maxBytes);
-        ConfigObject job = configClient.saveConfigObject(jobBuilder.build());
+        job = configClient.saveConfigObject(jobBuilder.build());
 
         return job;
     }
@@ -192,5 +208,11 @@ public abstract class CrawlTestBase {
                         .setEntityRef(ApiTools.refForConfig(entity))
                         .addJobRef(ConfigRef.newBuilder().setKind(Kind.crawlJob).setId(jobId)))
                 .build());
+    }
+
+    void listSeeds() {
+        configClient.listConfigObjects(ListRequest.newBuilder()
+                .setKind(Kind.seed)
+                .build()).forEachRemaining(s -> System.out.println("Seed: " + s.getId() + " :: " + s));
     }
 }

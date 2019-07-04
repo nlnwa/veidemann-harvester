@@ -63,8 +63,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
-//import no.nb.nna.veidemann.api.ConfigProto;
-
 /**
  *
  */
@@ -77,6 +75,10 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
     final ConfigObject crawlConfig;
 
     final ConfigObject browserConfig;
+
+    final ConfigObject politenessConfig;
+
+    final List<ConfigObject> scripts;
 
     final QueuedUri queuedUri;
 
@@ -93,9 +95,13 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
     volatile boolean closed = false;
 
     public BrowserSession(int proxyId, BrowserClient browser, ConfigObject crawlConfig, ConfigObject browserConfig,
-                          QueuedUri queuedUri, BaseSpan span) throws IOException, ExecutionException, TimeoutException {
+                          ConfigObject politenessConfig, List<ConfigObject> scripts, QueuedUri queuedUri, BaseSpan span)
+            throws IOException, ExecutionException, TimeoutException {
+
         this.crawlConfig = crawlConfig;
         this.browserConfig = browserConfig;
+        this.politenessConfig = politenessConfig;
+        this.scripts = scripts;
         this.proxyId = proxyId;
         this.queuedUri = Objects.requireNonNull(queuedUri);
 
@@ -161,6 +167,10 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
 
     public String getCrawlExecutionId() {
         return queuedUri.getExecutionId();
+    }
+
+    public List<ConfigObject> getScripts() {
+        return scripts;
     }
 
     public int getProxyId() {
@@ -385,7 +395,7 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
         }
     }
 
-    public List<QueuedUri> extractOutlinks(List<ConfigObject> scripts) throws ClientClosedException, SessionClosedException {
+    public List<QueuedUri> extractOutlinks() throws ClientClosedException, SessionClosedException {
         Label outlinksLabel = ApiTools.buildLabel("type", "extract_outlinks");
         List<Cookie> cookies = extractCookies();
         try {
@@ -525,6 +535,18 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
 //                lambda: self.websock_thread.got_page_load_event,
 //                timeout=timeout)
 
+
+    public ConfigObject getCrawlConfig() {
+        return crawlConfig;
+    }
+
+    public ConfigObject getBrowserConfig() {
+        return browserConfig;
+    }
+
+    public ConfigObject getPolitenessConfig() {
+        return politenessConfig;
+    }
 
     public boolean isClosed() {
         return closed;

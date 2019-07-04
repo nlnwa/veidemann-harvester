@@ -18,6 +18,8 @@ package no.nb.nna.veidemann.harvester.browsercontroller;
 import io.opentracing.Span;
 import io.opentracing.tag.Tags;
 import io.opentracing.util.GlobalTracer;
+import no.nb.nna.veidemann.api.config.v1.Collection.SubCollection;
+import no.nb.nna.veidemann.api.config.v1.Collection.SubCollectionType;
 import no.nb.nna.veidemann.api.config.v1.ConfigObject;
 import no.nb.nna.veidemann.api.config.v1.ConfigRef;
 import no.nb.nna.veidemann.api.config.v1.Kind;
@@ -32,6 +34,7 @@ import no.nb.nna.veidemann.commons.client.ContentWriterClient;
 import no.nb.nna.veidemann.commons.db.ChangeFeed;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbService;
+import no.nb.nna.veidemann.commons.util.CollectionNameGenerator;
 import no.nb.nna.veidemann.harvester.BrowserSessionRegistry;
 import no.nb.nna.veidemann.harvester.FrontierClient.ProxySession;
 import org.slf4j.Logger;
@@ -103,8 +106,10 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
         try {
             browserConfig = DbService.getInstance().getConfigAdapter()
                     .getConfigObject(crawlConfig.getCrawlConfig().getBrowserConfigRef());
+            ConfigObject politenessConfig = DbService.getInstance().getConfigAdapter()
+                    .getConfigObject(crawlConfig.getCrawlConfig().getPolitenessRef());
             session = new BrowserSession(proxyId, chrome.connect(protocolConfig), crawlConfig,
-                    browserConfig, queuedUri, span);
+                    browserConfig, politenessConfig, getScripts(browserConfig), queuedUri, span);
         } catch (Exception t) {
             if (session != null) {
                 session.close();
@@ -133,8 +138,7 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
 
                 LOG.debug("Extract outlinks");
                 try {
-                    List<ConfigObject> scripts = getScripts(browserConfig);
-                    result.withOutlinks(session.extractOutlinks(scripts));
+                    result.withOutlinks(session.extractOutlinks());
                 } catch (Exception t) {
                     LOG.error("Failed extracting outlinks", t);
                 }
@@ -145,7 +149,6 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
                 LOG.info("Page is not renderable");
             }
             try {
-
                 LOG.debug("======== PAGELOG ========\n{}", session.getUriRequests());
 
                 PageLog.Builder pageLog = PageLog.newBuilder()

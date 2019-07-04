@@ -16,18 +16,27 @@
 package no.nb.nna.veidemann.harvester.browsercontroller;
 
 import com.google.protobuf.Timestamp;
+import io.grpc.stub.StreamObserver;
+import no.nb.nna.veidemann.api.browsercontroller.v1.DoReply;
+import no.nb.nna.veidemann.api.browsercontroller.v1.NotifyActivity.Activity;
+import no.nb.nna.veidemann.api.config.v1.Collection.SubCollectionType;
+import no.nb.nna.veidemann.api.config.v1.ConfigRef;
 import no.nb.nna.veidemann.api.frontier.v1.CrawlLog;
+import no.nb.nna.veidemann.api.frontier.v1.CrawlLogOrBuilder;
 import no.nb.nna.veidemann.commons.ExtraStatusCodes;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.db.ProtoUtils;
+import no.nb.nna.veidemann.harvester.BrowserControllerService;
+import org.netpreserve.commons.uri.Uri;
+import org.netpreserve.commons.uri.UriConfigs;
+import org.netpreserve.commons.uri.UriException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
@@ -51,21 +60,57 @@ public class CrawlLogRegistry {
     private final long startTime = System.currentTimeMillis();
     private long lastActivityTime = System.currentTimeMillis();
 
-    public class Entry {
-        final long proxyRequestId;
+    public class Entry implements BrowserControllerService.ProxyRequest {
         final String uri;
+        final BrowserSession session;
         private CrawlLog.Builder crawlLog;
         private boolean resolved = false;
+        private ConfigRef collectionRef;
+        boolean fromCache;
+        StreamObserver<DoReply> responseObserver;
 
-        public Entry(long proxyRequestId, String uri) {
-            this.proxyRequestId = proxyRequestId;
+        public Entry(String uri, BrowserSession session) {
             this.uri = uri;
+            this.session = session;
         }
 
-        public void setCrawlLog(CrawlLog.Builder crawlLog) {
+        @Override
+        public String getUri() {
+            return uri;
+        }
+
+        @Override
+        public void setCrawlLog(CrawlLogOrBuilder crawlLog, boolean isFromCache) {
+            this.fromCache = isFromCache;
             crawlLogsLock.lock();
             try {
-                this.crawlLog = crawlLog;
+                if (crawlLog instanceof CrawlLog) {
+                    this.crawlLog = ((CrawlLog) crawlLog).toBuilder();
+                } else {
+                    this.crawlLog = (CrawlLog.Builder) crawlLog;
+                }
+
+                if (this.crawlLog.getSurt() == "") {
+                    try {
+                        Uri surtUri = UriConfigs.SURT_KEY.buildUri(uri);
+                        this.crawlLog.setSurt(surtUri.toString());
+                    } catch (UriException ex) {
+                        this.crawlLog.setError(ExtraStatusCodes.ILLEGAL_URI.toFetchError(ex.getMessage()));
+                    }
+                }
+
+                if (this.crawlLog.hasError() && this.crawlLog.getCollectionFinalName().isEmpty()) {
+                    this.crawlLog.setCollectionFinalName(BrowserControllerService.getCollectionFinalName(getCollectionRef(), SubCollectionType.UNDEFINED));
+                }
+
+                if (this.crawlLog.getExecutionId().isEmpty()) {
+                    this.crawlLog.setExecutionId(session.getCrawlExecutionId());
+                }
+
+                if (this.crawlLog.getJobExecutionId().isEmpty()) {
+                    this.crawlLog.setJobExecutionId(session.getJobExecutionId());
+                }
+
                 lastActivityTime = System.currentTimeMillis();
                 crawlLogsUpdate.signalAll();
             } finally {
@@ -73,6 +118,7 @@ public class CrawlLogRegistry {
             }
         }
 
+        @Override
         public CrawlLog.Builder getCrawlLog() {
             if (crawlLog == null) {
                 NullPointerException e = new NullPointerException("Crawl log is null");
@@ -82,12 +128,45 @@ public class CrawlLogRegistry {
             return crawlLog;
         }
 
+        @Override
+        public void notifyActivity(Activity activity) {
+        }
+
         boolean isResponseReceived() {
             return crawlLog != null;
         }
 
         boolean isResolved() {
             return resolved;
+        }
+
+        @Override
+        public ConfigRef getCollectionRef() {
+            return collectionRef;
+        }
+
+        @Override
+        public void setCollectionRef(ConfigRef collectionRef) {
+            this.collectionRef = collectionRef;
+        }
+
+        @Override
+        public boolean isFromCache() {
+            return fromCache;
+        }
+
+        @Override
+        public void setResponseObserver(StreamObserver<DoReply> responseObserver) {
+            this.responseObserver = responseObserver;
+        }
+
+        @Override
+        public void cancelRequest(String reason) {
+            try {
+                responseObserver.onNext(DoReply.newBuilder().setCancel(reason).build());
+            } catch (IllegalStateException e) {
+                LOG.debug("Canceling closed call");
+            }
         }
     }
 
@@ -99,10 +178,10 @@ public class CrawlLogRegistry {
         matcherThread.start();
     }
 
-    public Entry registerProxyRequest(long proxyRequestId, String uri) {
+    public Entry registerProxyRequest(String uri) {
         crawlLogsLock.lock();
         try {
-            Entry crawlLogEntry = new Entry(proxyRequestId, uri);
+            Entry crawlLogEntry = new Entry(uri, browserSession);
             crawlLogs.add(crawlLogEntry);
             lastActivityTime = System.currentTimeMillis();
             crawlLogsUpdate.signalAll();
@@ -307,12 +386,18 @@ public class CrawlLogRegistry {
         return false;
     }
 
+    private boolean uriEquals(String u1, String u2) {
+        Uri uri1 = UriConfigs.WHATWG.buildUri(u1);
+        Uri uri2 = UriConfigs.WHATWG.buildUri(u2);
+        return uri1.equals(uri2);
+    }
+
     private boolean innerFindRequestForCrawlLog(Entry crawlLogEntry, UriRequest r) {
         boolean requestFound = false;
         Timestamp now = ProtoUtils.getNowTs();
         if (r.getCrawlLog() == null
                 && !r.isFromCache()
-                && Objects.equals(r.getUrl(), crawlLogEntry.uri)) {
+                && uriEquals(r.getUrl(), crawlLogEntry.uri)) {
 
             if (crawlLogEntry.isResponseReceived() && crawlLogEntry.getCrawlLog().getStatusCode() == r.getStatusCode()) {
                 requestFound = true;
@@ -328,13 +413,29 @@ public class CrawlLogRegistry {
                 // Update request to match crawllog
                 r.setStatusCode(crawlLogEntry.getCrawlLog().getStatusCode());
                 requestFound = true;
+            } else if (r.getStatusCode() == 0 && crawlLogEntry.getCrawlLog().getStatusCode() == ExtraStatusCodes.CONNECT_FAILED.getCode()) {
+                // If https connect fails, the proxy will return 0, but proxy sets crawllogstatus to -2 which is the underlying status.
+                // Update request to match crawllog
+                r.setStatusCode(crawlLogEntry.getCrawlLog().getStatusCode());
+                requestFound = true;
+            } else if (r.getStatusCode() == 403 && crawlLogEntry.getCrawlLog().getStatusCode() == ExtraStatusCodes.PRECLUDED_BY_ROBOTS.getCode()) {
+                // If request is precluded by robots.txt, the proxy will return 403, but proxy sets crawllogstatus to -9998 which is the underlying status.
+                // Update request to match crawllog
+                r.setStatusCode(crawlLogEntry.getCrawlLog().getStatusCode());
+                requestFound = true;
+            } else {
+                try {
+                    System.out.println("REQUEST STATUS: " + r.getStatusCode() + ", CL STATUS: " + crawlLogEntry.getCrawlLog().getStatusCode() + " :: " + r.getUrl());
+                } catch (NullPointerException e) {
+                    System.out.println("NPE REQUEST STATUS: " + r.getStatusCode() + ", CL STATUS: " + crawlLogEntry.isResponseReceived() + " :: " + r.getUrl());
+                }
             }
         }
 
         if (requestFound) {
             if (crawlLogEntry.isResponseReceived()) {
                 crawlLogEntry.getCrawlLog().setTimeStamp(now);
-                CrawlLog enrichedCrawlLog = r.setCrawlLog(crawlLogEntry.getCrawlLog());
+                CrawlLog enrichedCrawlLog = r.setCrawlLog(crawlLogEntry.getCrawlLog(), crawlLogEntry.isFromCache());
                 if (!r.isFromCache()) {
                     try {
                         DbService.getInstance().getDbAdapter().saveCrawlLog(enrichedCrawlLog);
@@ -362,7 +463,7 @@ public class CrawlLogRegistry {
 
         browserSession.getUriRequests().getRequestStream().forEach(re -> {
             if (re.getCrawlLog() == null) {
-                LOG.trace("Missing CrawlLog for {} {} {} {}", re.getRequestId(), re.getStatusCode(), re.getUrl(),
+                LOG.error("Missing CrawlLog for {} {} {} {}", re.getRequestId(), re.getStatusCode(), re.getUrl(),
                         re.getDiscoveryPath());
 
                 // Only requests that comes from the origin server should be added to the unhandled requests list

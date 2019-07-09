@@ -231,9 +231,6 @@
                                             <CONTENT_WRITER_PORT>8080</CONTENT_WRITER_PORT>
                                             <ROBOTS_EVALUATOR_PORT>50053</ROBOTS_EVALUATOR_PORT>
                                             <ROBOTS_EVALUATOR_HOST>robots</ROBOTS_EVALUATOR_HOST>
-                                            <CACHE_HOST>recorderproxy</CACHE_HOST>
-                                            <CACHE_PORT>9900</CACHE_PORT>
-                                            <BROWSER_CONTROLLER_PORT>9999</BROWSER_CONTROLLER_PORT>
                                             <PROXY_HOST>recorderproxy</PROXY_HOST>
                                             <PROXY_PORT>9900</PROXY_PORT>
                                             <MAX_OPEN_SESSIONS>3</MAX_OPEN_SESSIONS>
@@ -269,12 +266,16 @@
                                             <container>contentwriter</container>
                                         </dependsOn>
                                         <env>
-                                            <CACHE>cache:3128</CACHE>
+                                            <CACHE_HOST>cache</CACHE_HOST>
+                                            <CACHE_PORT>3128</CACHE_PORT>
                                             <PORT>9900</PORT>
                                             <PROXY_COUNT>3</PROXY_COUNT>
-                                            <DNS_RESOLVER>dnsresolver:8053</DNS_RESOLVER>
-                                            <CONTENT_WRITER>contentwriter:8080</CONTENT_WRITER>
-                                            <BROWSER_CONTROLLER>harvester:9999</BROWSER_CONTROLLER>
+                                            <DNS_RESOLVER_HOST>dnsresolver</DNS_RESOLVER_HOST>
+                                            <DNS_RESOLVER_PORT>8053</DNS_RESOLVER_PORT>
+                                            <CONTENT_WRITER_HOST>contentwriter</CONTENT_WRITER_HOST>
+                                            <CONTENT_WRITER_PORT>8080</CONTENT_WRITER_PORT>
+                                            <BROWSER_CONTROLLER_HOST>harvester</BROWSER_CONTROLLER_HOST>
+                                            <BROWSER_CONTROLLER_PORT>9999</BROWSER_CONTROLLER_PORT>
                                             <CA></CA>
                                             <CA_KEY></CA_KEY>
                                         </env>

@@ -56,7 +56,7 @@
         <veidemann.robotsevaluator.version>0.3.8</veidemann.robotsevaluator.version>
         <veidemann.frontier.version>0.3.18</veidemann.frontier.version>
         <veidemann.controller.version>0.3.17</veidemann.controller.version>
-        <veidemann.recorderproxy.version>0.1.0</veidemann.recorderproxy.version>
+        <veidemann.recorderproxy.version>0.1.2</veidemann.recorderproxy.version>
     </properties>
 
     <repositories>

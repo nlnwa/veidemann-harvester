@@ -240,6 +240,7 @@ public class FrontierClient implements AutoCloseable {
                 proxyEntry = new Entry("--proxy-server", "http://" + proxyHost + ":" + proxyPort);
                 query = query.add(proxyEntry);
             }
+            query = query.add(new Entry("--ignore-certificate-errors", (String) null));
             browserWsEndpoint = UriConfigs.WHATWG.builder(ws).parsedQuery(query).build().toString();
             browserSessions.inc();
             LOG.info("Created session:  " + this);

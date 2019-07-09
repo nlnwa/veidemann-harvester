@@ -463,11 +463,11 @@ public class CrawlLogRegistry {
 
         browserSession.getUriRequests().getRequestStream().forEach(re -> {
             if (re.getCrawlLog() == null) {
-                LOG.error("Missing CrawlLog for {} {} {} {}", re.getRequestId(), re.getStatusCode(), re.getUrl(),
-                        re.getDiscoveryPath());
-
                 // Only requests that comes from the origin server should be added to the unhandled requests list
                 if (!re.isFromCache() && re.isFromProxy() && re.getStatusCode() >= 0) {
+                    LOG.error("Missing CrawlLog for {} {} {} {}, fromCache: {}, fromProxy: {}", re.getRequestId(),
+                            re.getStatusCode(), re.getUrl(), re.getDiscoveryPath(), re.isFromCache(), re.isFromProxy());
+
                     status.unhandledRequests.add(re);
                 }
             }

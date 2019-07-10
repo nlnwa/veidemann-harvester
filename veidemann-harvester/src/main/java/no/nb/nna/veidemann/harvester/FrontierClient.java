@@ -103,16 +103,15 @@ public class FrontierClient implements AutoCloseable {
         asyncStub = FrontierGrpc.newStub(channel).withWaitForReady();
         pool = new Pool<>(maxOpenSessions - 1, () -> new ProxySession(idx.getAndIncrement(),
                 browserWsEndpoint, proxyHost, firstProxyPort), null, p -> p.reset());
+        LOG.error("Frontier client pointing to " + channel.authority());
     }
 
     public void requestNextPage() throws InterruptedException {
         Lease<ProxySession> proxySessionLease = pool.lease();
+
+        LOG.trace("Request next URI to fetch");
         ResponseObserver responseObserver = new ResponseObserver(proxySessionLease);
-
-        FrontierGrpc.FrontierStub s = asyncStub;
-
-        StreamObserver<PageHarvest> requestObserver = s
-                .getNextPage(responseObserver);
+        StreamObserver<PageHarvest> requestObserver = asyncStub.getNextPage(responseObserver);
         responseObserver.setRequestObserver(requestObserver);
 
         try {

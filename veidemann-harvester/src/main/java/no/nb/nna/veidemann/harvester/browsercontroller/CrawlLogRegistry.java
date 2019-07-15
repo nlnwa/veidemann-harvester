@@ -399,35 +399,38 @@ public class CrawlLogRegistry {
                 && !r.isFromCache()
                 && uriEquals(r.getUrl(), crawlLogEntry.uri)) {
 
-            if (crawlLogEntry.isResponseReceived() && crawlLogEntry.getCrawlLog().getStatusCode() == r.getStatusCode()) {
-                requestFound = true;
-            } else if (r.getStatusCode() == ExtraStatusCodes.CANCELED_BY_BROWSER.getCode()) {
-                if (crawlLogEntry.isResponseReceived()) {
+            if (crawlLogEntry.isResponseReceived()) {
+                if (crawlLogEntry.getCrawlLog().getStatusCode() == r.getStatusCode()) {
+                    requestFound = true;
+                } else if (r.getStatusCode() == ExtraStatusCodes.CANCELED_BY_BROWSER.getCode()) {
+                    r.setStatusCode(crawlLogEntry.getCrawlLog().getStatusCode());
+                    requestFound = true;
+                } else if (crawlLogEntry.getCrawlLog().getStatusCode() == ExtraStatusCodes.CANCELED_BY_BROWSER.getCode()) {
+                    r.setStatusCode(crawlLogEntry.getCrawlLog().getStatusCode());
+                    requestFound = true;
+                } else if (r.getStatusCode() == 504 && crawlLogEntry.getCrawlLog().getStatusCode() == ExtraStatusCodes.HTTP_TIMEOUT.getCode()) {
+                    // If http times out, the proxy will return 504, but proxy sets crawllogstatus to -4 which is the underlying status.
+                    // Update request to match crawllog
+                    r.setStatusCode(crawlLogEntry.getCrawlLog().getStatusCode());
+                    requestFound = true;
+                } else if (r.getStatusCode() == 0 && crawlLogEntry.getCrawlLog().getStatusCode() == ExtraStatusCodes.CONNECT_FAILED.getCode()) {
+                    // If https connect fails, the proxy will return 0, but proxy sets crawllogstatus to -2 which is the underlying status.
+                    // Update request to match crawllog
+                    r.setStatusCode(crawlLogEntry.getCrawlLog().getStatusCode());
+                    requestFound = true;
+                } else if (r.getStatusCode() == 403 && crawlLogEntry.getCrawlLog().getStatusCode() == ExtraStatusCodes.PRECLUDED_BY_ROBOTS.getCode()) {
+                    // If request is precluded by robots.txt, the proxy will return 403, but proxy sets crawllogstatus to -9998 which is the underlying status.
+                    // Update request to match crawllog
                     r.setStatusCode(crawlLogEntry.getCrawlLog().getStatusCode());
                     requestFound = true;
                 } else {
-                    requestFound = true;
+                    LOG.warn("Unhandled response: Request status: {}, CrawlLog status: {}, URL:{}", r.getStatusCode(), crawlLogEntry.getCrawlLog().getStatusCode(), r.getUrl());
                 }
-            } else if (r.getStatusCode() == 504 && crawlLogEntry.getCrawlLog().getStatusCode() == ExtraStatusCodes.HTTP_TIMEOUT.getCode()) {
-                // If http times out, the proxy will return 504, but proxy sets crawllogstatus to -4 which is the underlying status.
-                // Update request to match crawllog
-                r.setStatusCode(crawlLogEntry.getCrawlLog().getStatusCode());
-                requestFound = true;
-            } else if (r.getStatusCode() == 0 && crawlLogEntry.getCrawlLog().getStatusCode() == ExtraStatusCodes.CONNECT_FAILED.getCode()) {
-                // If https connect fails, the proxy will return 0, but proxy sets crawllogstatus to -2 which is the underlying status.
-                // Update request to match crawllog
-                r.setStatusCode(crawlLogEntry.getCrawlLog().getStatusCode());
-                requestFound = true;
-            } else if (r.getStatusCode() == 403 && crawlLogEntry.getCrawlLog().getStatusCode() == ExtraStatusCodes.PRECLUDED_BY_ROBOTS.getCode()) {
-                // If request is precluded by robots.txt, the proxy will return 403, but proxy sets crawllogstatus to -9998 which is the underlying status.
-                // Update request to match crawllog
-                r.setStatusCode(crawlLogEntry.getCrawlLog().getStatusCode());
-                requestFound = true;
             } else {
-                try {
-                    System.out.println("REQUEST STATUS: " + r.getStatusCode() + ", CL STATUS: " + crawlLogEntry.getCrawlLog().getStatusCode() + " :: " + r.getUrl());
-                } catch (NullPointerException e) {
-                    System.out.println("NPE REQUEST STATUS: " + r.getStatusCode() + ", CL STATUS: " + crawlLogEntry.isResponseReceived() + " :: " + r.getUrl());
+                if (r.getStatusCode() == ExtraStatusCodes.CANCELED_BY_BROWSER.getCode()) {
+                    requestFound = true;
+                } else {
+                    LOG.debug("Response not received (yet?): Request status: {}, URL:{}", r.getStatusCode(), r.getUrl());
                 }
             }
         }

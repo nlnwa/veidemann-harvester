@@ -37,17 +37,17 @@ public class MultiSiteCrawlIT extends CrawlTestBase implements VeidemannHeaderCo
         String jobId = createJob("MultiSiteCrawlIT", 10, 300, 0).getId();
 
         ConfigObject entity1 = createEntity("Test entity 1");
-        ConfigObject seed1 = createSeed("http://a1.com", entity1, jobId);
+        ConfigObject seed1 = createSeed("https://a1.com", entity1, jobId);
 
         ConfigObject entity2 = createEntity("Test entity 2");
-        ConfigObject seed2 = createSeed("http://a2.com", entity2, jobId);
-        ConfigObject seed3 = createSeed("http://a3.com", entity2, jobId);
+        createSeed("https://a2.com", entity2, jobId);
+        createSeed("https://a3.com", entity2, jobId);
 
         ConfigObject entity3 = createEntity("Test entity 3");
         ConfigObject invalidSeed = createSeed("https://www.toll.no/ // etat under finansdepartementet", entity3, jobId);
 
         ConfigObject entity4 = createEntity("Test entity 4");
-        ConfigObject notFoundSeed = createSeed("http://static.com/not-found.gif", entity4, jobId);
+        ConfigObject notFoundSeed = createSeed("https://static.com/not-found.gif", entity4, jobId);
 
         ControllerProto.RunCrawlRequest request = ControllerProto.RunCrawlRequest.newBuilder()
                 .setJobId(jobId)
@@ -69,8 +69,8 @@ public class MultiSiteCrawlIT extends CrawlTestBase implements VeidemannHeaderCo
 
         new CrawlExecutionValidator(jes)
                 .validate()
-                .checkCrawlLogCount("response", 9)
-                .checkCrawlLogCount("revisit", 107)
+                .checkCrawlLogCount("response", 8)
+                .checkCrawlLogCount("revisit", 108)
                 .checkCrawlLogCount(116, "response", "revisit")
                 .checkCrawlLogCount("dns", 6)
                 .checkPageLogCount(40);

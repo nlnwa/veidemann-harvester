@@ -408,18 +408,28 @@ public class CrawlLogRegistry {
                 } else if (crawlLogEntry.getCrawlLog().getStatusCode() == ExtraStatusCodes.CANCELED_BY_BROWSER.getCode()) {
                     r.setStatusCode(crawlLogEntry.getCrawlLog().getStatusCode());
                     requestFound = true;
-                } else if (r.getStatusCode() == 504 && crawlLogEntry.getCrawlLog().getStatusCode() == ExtraStatusCodes.HTTP_TIMEOUT.getCode()) {
+                } else if (crawlLogEntry.getCrawlLog().getStatusCode() == ExtraStatusCodes.HTTP_TIMEOUT.getCode()) {
                     // If http times out, the proxy will return 504, but proxy sets crawllogstatus to -4 which is the underlying status.
                     // Update request to match crawllog
                     r.setStatusCode(crawlLogEntry.getCrawlLog().getStatusCode());
                     requestFound = true;
-                } else if (r.getStatusCode() == 0 && crawlLogEntry.getCrawlLog().getStatusCode() == ExtraStatusCodes.CONNECT_FAILED.getCode()) {
-                    // If https connect fails, the proxy will return 0, but proxy sets crawllogstatus to -2 which is the underlying status.
+                } else if (crawlLogEntry.getCrawlLog().getStatusCode() == ExtraStatusCodes.CONNECT_FAILED.getCode()) {
+                    // If https connect fails, the proxy will return 503, but proxy sets crawllogstatus to -2 which is the underlying status.
                     // Update request to match crawllog
                     r.setStatusCode(crawlLogEntry.getCrawlLog().getStatusCode());
                     requestFound = true;
-                } else if (r.getStatusCode() == 403 && crawlLogEntry.getCrawlLog().getStatusCode() == ExtraStatusCodes.PRECLUDED_BY_ROBOTS.getCode()) {
-                    // If request is precluded by robots.txt, the proxy will return 403, but proxy sets crawllogstatus to -9998 which is the underlying status.
+                } else if (crawlLogEntry.getCrawlLog().getStatusCode() == ExtraStatusCodes.PRECLUDED_BY_ROBOTS.getCode()) {
+                    // If request is precluded by robots.txt, the proxy will return 503, but proxy sets crawllogstatus to -9998 which is the underlying status.
+                    // Update request to match crawllog
+                    r.setStatusCode(crawlLogEntry.getCrawlLog().getStatusCode());
+                    requestFound = true;
+                } else if (crawlLogEntry.getCrawlLog().getStatusCode() == ExtraStatusCodes.DOMAIN_LOOKUP_FAILED.getCode()) {
+                    // If domain lookup fails, the proxy will return 503, but proxy sets crawllogstatus to -6 which is the underlying status.
+                    // Update request to match crawllog
+                    r.setStatusCode(crawlLogEntry.getCrawlLog().getStatusCode());
+                    requestFound = true;
+                } else if (crawlLogEntry.getCrawlLog().getStatusCode() == ExtraStatusCodes.EMPTY_RESPONSE.getCode()) {
+                    // If the response contains nothing, the proxy will return 503, but proxy sets crawllogstatus to -404 which is the underlying status.
                     // Update request to match crawllog
                     r.setStatusCode(crawlLogEntry.getCrawlLog().getStatusCode());
                     requestFound = true;

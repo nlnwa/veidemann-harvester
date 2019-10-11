@@ -16,4 +16,10 @@ env:
 
 script: .travis/build_script.sh
 
-after_success: .travis/push_script.sh
+deploy:
+  skip_cleanup: true
+  provider: script
+  script: .travis/push_script.sh $TRAVIS_BRANCH 'docker.io/norsknettarkiv/veidemann-contentwriter'
+  on:
+    tags: true
+    branch: recorderproxy-rc

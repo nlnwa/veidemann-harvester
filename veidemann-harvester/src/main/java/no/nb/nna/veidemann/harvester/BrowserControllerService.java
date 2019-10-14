@@ -117,7 +117,11 @@ public class BrowserControllerService extends BrowserControllerGrpc.BrowserContr
 
             @Override
             public void onError(Throwable t) {
-                LOG.error("Browser controller api error", t);
+                String uri = "";
+                if (proxyRequest != null) {
+                    uri = proxyRequest.getUri();
+                }
+                LOG.error("Browser controller api error: {} (uri: {})", t.toString(), uri, t);
             }
 
             @Override

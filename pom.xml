@@ -50,13 +50,13 @@
         <!-- Versions of external docker containers used in integration tests -->
         <browserless.chrome.version>1.5.0-puppeteer-1.14.0</browserless.chrome.version>
         <rethinkdb.version>2.3.6</rethinkdb.version>
-        <veidemann.cache.version>0.2.1</veidemann.cache.version>
+        <veidemann.cache.version>0.2.2</veidemann.cache.version>
         <veidemann.dns.resolver.version>0.2.5</veidemann.dns.resolver.version>
         <veidemann.contentwriter.version>0.2.5</veidemann.contentwriter.version>
         <veidemann.robotsevaluator.version>0.3.8</veidemann.robotsevaluator.version>
         <veidemann.frontier.version>0.3.20</veidemann.frontier.version>
         <veidemann.controller.version>0.3.17</veidemann.controller.version>
-        <veidemann.recorderproxy.version>0.1.2</veidemann.recorderproxy.version>
+        <veidemann.recorderproxy.version>0.2.0</veidemann.recorderproxy.version>
     </properties>
 
     <repositories>
@@ -438,7 +438,7 @@
                 <plugin>
                     <groupId>io.fabric8</groupId>
                     <artifactId>docker-maven-plugin</artifactId>
-                    <version>0.30.0</version>
+                    <version>0.31.0</version>
                 </plugin>
                 <plugin>
                     <groupId>org.codehaus.mojo</groupId>

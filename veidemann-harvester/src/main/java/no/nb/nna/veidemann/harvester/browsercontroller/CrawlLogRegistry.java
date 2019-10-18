@@ -433,6 +433,11 @@ public class CrawlLogRegistry {
                     // Update request to match crawllog
                     r.setStatusCode(crawlLogEntry.getCrawlLog().getStatusCode());
                     requestFound = true;
+                } else if (crawlLogEntry.getCrawlLog().getStatusCode() == ExtraStatusCodes.RUNTIME_EXCEPTION.getCode()) {
+                    // If the response is a runtime exception, the proxy will return 503, but proxy sets crawllogstatus to -5 which is the underlying status.
+                    // Update request to match crawllog
+                    r.setStatusCode(crawlLogEntry.getCrawlLog().getStatusCode());
+                    requestFound = true;
                 } else {
                     LOG.warn("Unhandled response: Request status: {}, CrawlLog status: {}, URL:{}", r.getStatusCode(), crawlLogEntry.getCrawlLog().getStatusCode(), r.getUrl());
                 }

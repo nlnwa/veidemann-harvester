@@ -84,7 +84,7 @@ public class Harvester {
 
              FrontierClient frontierClient = new FrontierClient(controller, SETTINGS.getFrontierHost(),
                      SETTINGS.getFrontierPort(), SETTINGS.getMaxOpenSessions(), SETTINGS.getBrowserWSEndpoint(),
-                     SETTINGS.getProxyHost(), SETTINGS.getProxyPort());
+                     SETTINGS.getProxyHost(), SETTINGS.getProxyPort(), SETTINGS.isHeadlessBrowser());
 
              RobotsServiceClient robotsServiceClient = new RobotsServiceClient(SETTINGS.getRobotsTxtEvaluatorHost(), SETTINGS.getRobotsTxtEvaluatorPort());
 

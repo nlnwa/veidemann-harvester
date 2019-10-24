@@ -33,7 +33,7 @@
         <maven.compiler.target>11</maven.compiler.target>
         <docker.tag>latest</docker.tag>
 
-        <chrome.version>75.0.3738.0</chrome.version>
+        <chrome.version>78.0.3882.0</chrome.version>
 
         <veidemann.commons.version>0.3.11</veidemann.commons.version>
         <veidemann.rethinkdbadapter.version>0.3.18</veidemann.rethinkdbadapter.version>
@@ -48,7 +48,7 @@
         <netty.version>4.1.42.Final</netty.version>
 
         <!-- Versions of external docker containers used in integration tests -->
-        <browserless.chrome.version>1.5.0-puppeteer-1.14.0</browserless.chrome.version>
+        <browserless.chrome.version>1.18.1-puppeteer-1.20.0</browserless.chrome.version>
         <rethinkdb.version>2.3.6</rethinkdb.version>
         <veidemann.cache.version>0.2.2</veidemann.cache.version>
         <veidemann.dns.resolver.version>0.2.5</veidemann.dns.resolver.version>

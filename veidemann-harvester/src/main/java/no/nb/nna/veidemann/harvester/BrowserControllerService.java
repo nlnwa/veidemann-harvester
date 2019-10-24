@@ -38,6 +38,8 @@ import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.commons.util.ApiTools;
 import no.nb.nna.veidemann.commons.util.CollectionNameGenerator;
 import no.nb.nna.veidemann.harvester.browsercontroller.BrowserSession;
+import org.netpreserve.commons.uri.Uri;
+import org.netpreserve.commons.uri.UriConfigs;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -132,11 +134,13 @@ public class BrowserControllerService extends BrowserControllerGrpc.BrowserContr
     }
 
     private BrowserScript getReplacementScript(BrowserSession session, String uri) {
+        String normalizedUri = UriConfigs.WHATWG.buildUri(uri).toString();
         Label replacementLabel = ApiTools.buildLabel("type", "replacement");
         for (ConfigObject script : session.getScripts()) {
             if (ApiTools.hasLabel(script.getMeta(), replacementLabel)) {
                 for (String urlRegexp : script.getBrowserScript().getUrlRegexpList()) {
-                    if (uri.matches(urlRegexp)) {
+                    if (normalizedUri.matches(urlRegexp)) {
+                        LOG.warn("Check script {} {} {} {}", script.getMeta().getName(), normalizedUri, urlRegexp, normalizedUri.matches(urlRegexp));
                         return script.getBrowserScript();
                     }
                 }

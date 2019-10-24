@@ -37,6 +37,7 @@ import org.slf4j.MDC;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.StringJoiner;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
@@ -168,6 +169,21 @@ public class CrawlLogRegistry {
                 LOG.debug("Canceling closed call");
             }
         }
+
+        @Override
+        public String toString() {
+            StringJoiner sj = new StringJoiner(", ", Entry.class.getSimpleName() + "[", "]")
+                    .add("uri='" + uri + "'")
+                    .add("resolved=" + resolved)
+                    .add("fromCache=" + fromCache);
+            if (crawlLog != null) {
+                sj.add("status=" + crawlLog.getStatusCode())
+                        .add("referrer=" + crawlLog.getReferrer())
+                        .add("size=" + crawlLog.getSize())
+                        .add("contentType=" + crawlLog.getContentType());
+            }
+            return sj.toString();
+        }
     }
 
     public CrawlLogRegistry(final BrowserSession session, final long pageLoadTimeout, final long maxIdleTime) {
@@ -235,7 +251,7 @@ public class CrawlLogRegistry {
                 waitForIdle();
                 crawlLogsLock.lock();
                 try {
-                    innerMatchCrawlLogAndRequest(status);
+                    innerMatchCrawlLogAndRequest(status, false);
 
                     if (!status.allHandled()) {
                         checkForFileDownload();
@@ -313,7 +329,7 @@ public class CrawlLogRegistry {
             }
         }
 
-        innerMatchCrawlLogAndRequest(status);
+        innerMatchCrawlLogAndRequest(status, false);
     }
 
     /**
@@ -327,7 +343,7 @@ public class CrawlLogRegistry {
             LOG.debug("Guessing that we are downloading a file. Status: {}", status);
             crawlLogs.forEach(c -> {
                 browserSession.getUriRequests().resolveCurrentUriRequest("1").ifPresent(parent -> {
-                    UriRequest r = UriRequest.create("1",
+                    UriRequest r = UriRequest.create("1", "GET",
                             c.getCrawlLog().getRequestedUri(), browserSession.queuedUri.getReferrer(), ResourceType.Other,
                             'R', parent, browserSession.getUriRequests().getPageSpan());
                     r.setStatusCode(c.getCrawlLog().getStatusCode());
@@ -335,7 +351,7 @@ public class CrawlLogRegistry {
                 }).otherwise(() -> {
                     // No parent, this is a root request;
                     if (c.isResponseReceived()) {
-                        UriRequest r = UriRequest.createRoot("1",
+                        UriRequest r = UriRequest.createRoot("1", "GET",
                                 c.uri, browserSession.queuedUri.getReferrer(), ResourceType.Other,
                                 browserSession.queuedUri.getDiscoveryPath(), browserSession.getUriRequests().getPageSpan());
                         r.setStatusCode(c.getCrawlLog().getStatusCode());
@@ -344,7 +360,7 @@ public class CrawlLogRegistry {
                 });
             });
 
-            innerMatchCrawlLogAndRequest(status);
+            innerMatchCrawlLogAndRequest(status, false);
         }
     }
 
@@ -358,14 +374,14 @@ public class CrawlLogRegistry {
                 // Send signal to stop waitForIdle loop
                 signalRequestsUpdated();
             }
-            innerMatchCrawlLogAndRequest(status);
+            innerMatchCrawlLogAndRequest(status, true);
             return success;
         } catch (InterruptedException e) {
             LOG.info("Pageload interrupted", e);
             finishLatch.countDown();
             // Send signal to stop waitForIdle loop
             signalRequestsUpdated();
-            innerMatchCrawlLogAndRequest(status);
+            innerMatchCrawlLogAndRequest(status, true);
             return false;
         }
     }
@@ -393,6 +409,10 @@ public class CrawlLogRegistry {
     }
 
     private boolean innerFindRequestForCrawlLog(Entry crawlLogEntry, UriRequest r) {
+        if (crawlLogEntry.isResolved()) {
+            return true;
+        }
+
         boolean requestFound = false;
         Timestamp now = ProtoUtils.getNowTs();
         if (r.getCrawlLog() == null
@@ -438,6 +458,11 @@ public class CrawlLogRegistry {
                     // Update request to match crawllog
                     r.setStatusCode(crawlLogEntry.getCrawlLog().getStatusCode());
                     requestFound = true;
+                } else if (r.getStatusCode() == 0) {
+                    // Browser failed reading response, but the crawl log returned a status which we will keep
+                    LOG.warn("Don't understand a thing, but anyway {} -- {}", crawlLogEntry.uri, "r.getStatusCode() == 0");
+                    r.setStatusCode(crawlLogEntry.getCrawlLog().getStatusCode());
+                    requestFound = true;
                 } else {
                     LOG.warn("Unhandled response: Request status: {}, CrawlLog status: {}, URL:{}", r.getStatusCode(), crawlLogEntry.getCrawlLog().getStatusCode(), r.getUrl());
                 }
@@ -469,13 +494,17 @@ public class CrawlLogRegistry {
         return requestFound;
     }
 
-    private void innerMatchCrawlLogAndRequest(MatchStatus status) {
+    private void innerMatchCrawlLogAndRequest(MatchStatus status, boolean lastInvocation) {
         status.reset();
         if (!isCrawlLogsResolved()) {
             crawlLogs.stream().filter(e -> (!e.isResolved()))
                     .forEach(e -> findRequestForCrawlLog(e, browserSession.getUriRequests().getInitialRequest()));
             if (!isCrawlLogsResolved()) {
-                LOG.trace("There are still unhandled crawl logs");
+                if (lastInvocation) {
+                    LOG.error("There are still unhandled crawl logs");
+                } else {
+                    LOG.trace("There are still unhandled crawl logs");
+                }
             }
         }
 
@@ -483,8 +512,13 @@ public class CrawlLogRegistry {
             if (re.getCrawlLog() == null) {
                 // Only requests that comes from the origin server should be added to the unhandled requests list
                 if (!re.isFromCache() && re.isFromProxy() && re.getStatusCode() >= 0) {
-                    LOG.error("Missing CrawlLog for {} {} {} {}, fromCache: {}, fromProxy: {}", re.getRequestId(),
-                            re.getStatusCode(), re.getUrl(), re.getDiscoveryPath(), re.isFromCache(), re.isFromProxy());
+                    if (lastInvocation) {
+                        LOG.error("Missing CrawlLog for {} {} {} {}, fromCache: {}, fromProxy: {}", re.getRequestId(),
+                                re.getStatusCode(), re.getUrl(), re.getDiscoveryPath(), re.isFromCache(), re.isFromProxy());
+                    } else {
+                        LOG.trace("Missing CrawlLog for {} {} {} {}, fromCache: {}, fromProxy: {}", re.getRequestId(),
+                                re.getStatusCode(), re.getUrl(), re.getDiscoveryPath(), re.isFromCache(), re.isFromProxy());
+                    }
 
                     status.unhandledRequests.add(re);
                 }
@@ -529,5 +563,12 @@ public class CrawlLogRegistry {
             sb.append("}");
             return sb.toString();
         }
+    }
+
+    @Override
+    public String toString() {
+        StringJoiner sj = new StringJoiner("\n", CrawlLogRegistry.class.getSimpleName() + "[", "]");
+        crawlLogs.forEach(e -> sj.add(e.toString()));
+        return sj.toString();
     }
 }

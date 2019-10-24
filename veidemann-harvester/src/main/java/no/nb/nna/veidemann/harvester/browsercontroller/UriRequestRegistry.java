@@ -175,7 +175,7 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
             }
         }).otherwise(() -> {
             MDC.put("uri", request.request().url());
-            LOG.debug("Request will be sent: {}", request.requestId());
+            LOG.debug("Request will be sent: {} {} {}, priority: {}", request.requestId(), request.request().method(), request.request().url(), request.request().initialPriority());
 
             UriRequest uriRequest;
             if (getRootRequest() == null) {
@@ -226,9 +226,7 @@ public class UriRequestRegistry implements AutoCloseable, VeidemannHeaderConstan
                             LOG.debug("Could not create tls tunnel for resource: Error '{}', Blocked reason '{}'", f.errorText(), f.blockedReason());
                             request.setStatusCode(ExtraStatusCodes.CONNECT_FAILED.getCode());
                         } else {
-
-                            LOG.error(
-                                    "Failed fetching page: Error '{}', Blocked reason '{}', Resource type: '{}', Canceled: {}, Req: {}, Req Id: {}",
+                            LOG.error("Failed fetching page: Error '{}', Blocked reason '{}', Resource type: '{}', Canceled: {}, Req: {}, Req Id: {}",
                                     f.errorText(), f.blockedReason(), f.type(), f.canceled(), request.getUrl(), f.requestId());
                         }
                     } else {

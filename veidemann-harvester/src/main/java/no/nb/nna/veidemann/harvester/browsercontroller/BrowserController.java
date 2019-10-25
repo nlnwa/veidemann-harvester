@@ -153,6 +153,7 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
 
                 PageLog.Builder pageLog = PageLog.newBuilder()
                         .setUri(queuedUri.getUri())
+                        .setJobExecutionId(queuedUri.getJobExecutionId())
                         .setExecutionId(queuedUri.getExecutionId());
                 if (session.getUriRequests().getInitialRequest() == null) {
                     LOG.error("Missing initial request");

@@ -55,6 +55,8 @@ public class Settings extends CommonSettings {
 
     private int robotsTxtEvaluatorPort;
 
+    private boolean headlessBrowser;
+
     public String getProxyHost() {
         return proxyHost;
     }
@@ -189,5 +191,13 @@ public class Settings extends CommonSettings {
 
     public void setRobotsTxtEvaluatorPort(int robotsTxtEvaluatorPort) {
         this.robotsTxtEvaluatorPort = robotsTxtEvaluatorPort;
+    }
+
+    public boolean isHeadlessBrowser() {
+        return headlessBrowser;
+    }
+
+    public void setHeadlessBrowser(boolean headlessBrowser) {
+        this.headlessBrowser = headlessBrowser;
     }
 }

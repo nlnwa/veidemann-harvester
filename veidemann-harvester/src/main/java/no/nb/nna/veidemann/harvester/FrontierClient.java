@@ -45,6 +45,8 @@ public class FrontierClient implements AutoCloseable {
 
     private final Pool<ProxySession> pool;
 
+    private final boolean headlessBrowser;
+
     private static final String METRICS_NS = "veidemann";
     private static final String METRICS_SUBSYSTEM = "harvester";
 
@@ -86,18 +88,19 @@ public class FrontierClient implements AutoCloseable {
             .register();
 
     public FrontierClient(BrowserController controller, String host, int port, int maxOpenSessions,
-                          String browserWsEndpoint, String proxyHost, int firstProxyPort) {
+                          String browserWsEndpoint, String proxyHost, int firstProxyPort, boolean headlessBrowser) {
         this(controller, ManagedChannelBuilder.forAddress(host, port).usePlaintext(), maxOpenSessions,
-                browserWsEndpoint, proxyHost, firstProxyPort);
+                browserWsEndpoint, proxyHost, firstProxyPort, headlessBrowser);
     }
 
     /**
      * Construct client for accessing RouteGuide server using the existing channel.
      */
     public FrontierClient(BrowserController controller, ManagedChannelBuilder<?> channelBuilder, int maxOpenSessions,
-                          String browserWsEndpoint, String proxyHost, int firstProxyPort) {
+                          String browserWsEndpoint, String proxyHost, int firstProxyPort, boolean headlessBrowser) {
         LOG.info("Setting up Frontier client");
         this.controller = controller;
+        this.headlessBrowser = headlessBrowser;
         ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor.Builder(GlobalTracer.get()).build();
         channel = channelBuilder.intercept(tracingInterceptor).build();
         asyncStub = FrontierGrpc.newStub(channel).withWaitForReady();
@@ -240,6 +243,7 @@ public class FrontierClient implements AutoCloseable {
                 query = query.add(proxyEntry);
             }
             query = query.add(new Entry("--ignore-certificate-errors", (String) null));
+            query = query.add(new Entry("headless", Boolean.toString(headlessBrowser)));
             browserWsEndpoint = UriConfigs.WHATWG.builder(ws).parsedQuery(query).build().toString();
             browserSessions.inc();
             LOG.info("Created session:  " + this);

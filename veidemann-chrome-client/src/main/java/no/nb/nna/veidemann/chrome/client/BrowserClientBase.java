@@ -72,7 +72,7 @@ public abstract class BrowserClientBase<T extends BrowserPage> implements Closea
         String browserVersion = getVersionNumber(protocolClient.getRemoteVersion());
         if (!clientVersion.equals(browserVersion)) {
             throw new RuntimeException("Chrome client version and browser version does not match. Client: "
-                    + clientVersion + ", BrowserClient: " + browserVersion);
+                    + clientVersion + ", Browser: " + browserVersion);
         }
     }
 

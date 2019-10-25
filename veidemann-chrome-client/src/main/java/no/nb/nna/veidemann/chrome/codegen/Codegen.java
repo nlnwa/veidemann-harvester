@@ -54,7 +54,7 @@ public class Codegen {
                 + CHROME_VERSION + "/third_party/blink/renderer/core/inspector/browser_protocol.pdl?format=text";
 
         String jsProtocol = "https://chromium.googlesource.com/v8/v8/+/chromium/"
-                + CHROME_VERSION.split("\\.")[2] + "/src/inspector/js_protocol.pdl?format=text";
+                + CHROME_VERSION.split("\\.")[2] + "/include/js_protocol.pdl?format=text";
 
         System.out.println("Using protocol definitions from:");
         System.out.println("   " + browserProtocol);

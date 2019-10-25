@@ -40,6 +40,8 @@ public class UriRequest {
 
     private static final Logger LOG = LoggerFactory.getLogger(UriRequest.class);
 
+    private String method;
+
     private String url;
 
     private String requestId;
@@ -93,8 +95,9 @@ public class UriRequest {
     private final Condition noReferrer = referrerLock.newCondition();
     private final Condition noDiscoveryPath = discoveryPathLock.newCondition();
 
-    private UriRequest(String requestId, String url, String referrer, ResourceType type, BaseSpan parentSpan) {
+    private UriRequest(String requestId, String method, String url, String referrer, ResourceType type, BaseSpan parentSpan) {
         this.requestId = requestId;
+        this.method = method;
         this.url = url;
         this.referrer = referrer;
         this.resourceType = type;
@@ -104,6 +107,7 @@ public class UriRequest {
 
     private UriRequest(NetworkDomain.RequestWillBeSent request, BaseSpan parentSpan) {
         this(request.requestId(),
+                request.request().method(),
                 request.request().url(),
                 (String) request.request().headers().getOrDefault("referer", ""),
                 ResourceType.forName(request.type()),
@@ -121,15 +125,15 @@ public class UriRequest {
         return result;
     }
 
-    public static UriRequest createRoot(String requestId, String url, String referrer, ResourceType type, String initialDiscoveryPath, BaseSpan parentSpan) {
-        UriRequest result = new UriRequest(requestId, url, referrer, type, parentSpan);
+    public static UriRequest createRoot(String requestId, String method, String url, String referrer, ResourceType type, String initialDiscoveryPath, BaseSpan parentSpan) {
+        UriRequest result = new UriRequest(requestId, method, url, referrer, type, parentSpan);
         result.discoveryPath = initialDiscoveryPath;
         result.rootResource = true;
         return result;
     }
 
-    public static UriRequest create(String requestId, String url, String referrer, ResourceType type, char discoveryType, UriRequest parent, BaseSpan parentSpan) {
-        UriRequest result = new UriRequest(requestId, url, referrer, type, parentSpan);
+    public static UriRequest create(String requestId, String method, String url, String referrer, ResourceType type, char discoveryType, UriRequest parent, BaseSpan parentSpan) {
+        UriRequest result = new UriRequest(requestId, method, url, referrer, type, parentSpan);
         result.setParent(parent);
         result.discoveryPath = parent.discoveryPath + discoveryType;
         return result;
@@ -153,7 +157,7 @@ public class UriRequest {
             }
         }
 
-        result = create(request.requestId(), request.request().url(), parent.getUrl(),
+        result = create(request.requestId(), request.request().method(), request.request().url(), parent.getUrl(),
                 ResourceType.forName(request.type()), discoveryType, parent, parentSpan);
 
         return result;
@@ -197,6 +201,10 @@ public class UriRequest {
         renderable = MimeTypes.forType(mimeType)
                 .filter(m -> m.resourceType.category == ResourceType.Category.Document)
                 .isPresent();
+    }
+
+    public String getMethod() {
+        return method;
     }
 
     public String getUrl() {
@@ -413,6 +421,7 @@ public class UriRequest {
         sb.append(", status=").append(statusCode);
         sb.append(", path='").append(discoveryPath).append('\'');
         sb.append(", renderable=").append(renderable);
+        sb.append(", method='").append(method).append('\'');
         sb.append(", url='").append(url).append('\'');
         sb.append(", referrer=").append(referrer);
         sb.append(", fromCache=").append(isFromCache());

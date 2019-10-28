@@ -40,7 +40,7 @@ public class BrowserSessionRegistry {
     public synchronized BrowserSession get(Integer proxyId) {
         BrowserSession session = proxyIdToSession.get(proxyId);
         if (session == null) {
-            LOG.error("Missing session for proxyId {}", proxyId);
+            LOG.info("Missing session for proxyId {}", proxyId);
         }
         return session;
     }

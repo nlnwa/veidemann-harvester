@@ -319,7 +319,9 @@ public class CrawlLogRegistry {
 
             if (!isWaitingForResponse) {
                 crawlLogs.stream()
-                        .filter(e -> (e.uri.equals(r.getUrl()) && e.getCrawlLog().getStatusCode() == r.getStatusCode()))
+                        .filter(e -> (e.uri.equals(r.getUrl())
+                                && e.getCrawlLog().getStatusCode() == r.getStatusCode()
+                                && e.getCrawlLog().getMethod().equalsIgnoreCase(r.getMethod())))
                         .findFirst().ifPresent(e -> {
                     LOG.info("Found already resolved CrawlLog for {}. Setting fromCache for request {} to true",
                             r.getUrl(), r.getRequestId());
@@ -417,7 +419,9 @@ public class CrawlLogRegistry {
         Timestamp now = ProtoUtils.getNowTs();
         if (r.getCrawlLog() == null
                 && !r.isFromCache()
-                && uriEquals(r.getUrl(), crawlLogEntry.uri)) {
+                && uriEquals(r.getUrl(), crawlLogEntry.uri)
+                && crawlLogEntry.crawlLog != null
+                && r.getMethod().equalsIgnoreCase(crawlLogEntry.crawlLog.getMethod())) {
 
             if (crawlLogEntry.isResponseReceived()) {
                 if (crawlLogEntry.getCrawlLog().getStatusCode() == r.getStatusCode()) {
@@ -546,6 +550,7 @@ public class CrawlLogRegistry {
             try {
                 crawlLogs.stream().filter(e -> !e.isResolved()).forEach(e -> sb.append("\n    [")
                         .append(e.isResponseReceived() ? e.getCrawlLog().getStatusCode() : "abort").append(", ")
+                        .append(e.isResponseReceived() ? e.getCrawlLog().getMethod() : "").append(" ")
                         .append(e.uri).append("], "));
             } finally {
                 crawlLogsLock.unlock();
@@ -557,7 +562,7 @@ public class CrawlLogRegistry {
                 if (r.isFromCache()) {
                     sb.append("From Cache, ");
                 }
-                sb.append(r.getUrl()).append("], ");
+                sb.append(r.getMethod()).append(" ").append(r.getUrl()).append("], ");
             });
 
             sb.append("}");

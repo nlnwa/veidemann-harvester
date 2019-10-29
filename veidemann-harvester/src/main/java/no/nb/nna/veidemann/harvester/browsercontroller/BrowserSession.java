@@ -59,7 +59,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
@@ -285,66 +287,78 @@ public class BrowserSession implements AutoCloseable, VeidemannHeaderConstants {
     }
 
     public void saveScreenshot(ContentWriterClient contentWriterClient) throws ClientClosedException, SessionClosedException {
-        try {
-            PageDomain.CaptureScreenshotResponse screenshot = session.page().captureScreenshot().withFormat("png").run();
-            byte[] img = Base64.getDecoder().decode(screenshot.data());
+        CompletableFuture<PageDomain.CaptureScreenshotResponse> f = session.page().captureScreenshot().withFormat("png").runAsync();
+        f.completeOnTimeout(null, 10, TimeUnit.SECONDS);
+        f.handle((screenshot, throwable) -> {
+            try {
+                byte[] img = Base64.getDecoder().decode(screenshot.data());
 
-            ContentWriterSession contentWriter = contentWriterClient.createSession();
+                ContentWriterSession contentWriter = contentWriterClient.createSession();
 
-            Sha1Digest digest = new Sha1Digest().update(img);
-            Data data = Data.newBuilder().setRecordNum(0).setData(ByteString.copyFrom(img)).build();
-            contentWriter.sendPayload(data);
+                Sha1Digest digest = new Sha1Digest().update(img);
+                Data data = Data.newBuilder().setRecordNum(0).setData(ByteString.copyFrom(img)).build();
+                contentWriter.sendPayload(data);
 
-            CrawlLog log = uriRequests.getRootRequest().getCrawlLog();
+                CrawlLog log = uriRequests.getRootRequest().getCrawlLog();
 
-            ByteString screenshotMetaRecord = ByteString.copyFromUtf8(
-                    "browserVersion: " + browser.version()
-                            + "\r\nwindowHeight: " + browserConfig.getBrowserConfig().getWindowHeight()
-                            + "\r\nwindowWidth: " + browserConfig.getBrowserConfig().getWindowWidth()
-                            + "\r\nuserAgent: " + browserConfig.getBrowserConfig().getUserAgent()
-                            + "\r\n");
-            contentWriter.sendPayload(Data.newBuilder().setRecordNum(1).setData(screenshotMetaRecord).build());
-            Sha1Digest screenshotMetaRecordDigest = new Sha1Digest().update(screenshotMetaRecord);
+                ByteString screenshotMetaRecord = ByteString.copyFromUtf8(
+                        "browserVersion: " + browser.version()
+                                + "\r\nwindowHeight: " + browserConfig.getBrowserConfig().getWindowHeight()
+                                + "\r\nwindowWidth: " + browserConfig.getBrowserConfig().getWindowWidth()
+                                + "\r\nuserAgent: " + browserConfig.getBrowserConfig().getUserAgent()
+                                + "\r\n");
+                contentWriter.sendPayload(Data.newBuilder().setRecordNum(1).setData(screenshotMetaRecord).build());
+                Sha1Digest screenshotMetaRecordDigest = new Sha1Digest().update(screenshotMetaRecord);
 
-            RecordMeta screenshotRecordMeta = RecordMeta.newBuilder()
-                    .setRecordNum(0)
-                    .setSubCollection(SubCollectionType.SCREENSHOT)
-                    .setType(RecordType.RESOURCE)
-                    .setSize(img.length)
-                    .setBlockDigest(digest.getPrefixedDigestString())
-                    .setRecordContentType("image/png")
-                    .addWarcConcurrentTo(log.getWarcId())
-                    .build();
-            RecordMeta screenshotMetaRecordMeta = RecordMeta.newBuilder()
-                    .setRecordNum(1)
-                    .setSubCollection(SubCollectionType.SCREENSHOT)
-                    .setType(RecordType.METADATA)
-                    .setSize(screenshotMetaRecord.size())
-                    .setBlockDigest(screenshotMetaRecordDigest.getPrefixedDigestString())
-                    .setRecordContentType("application/warc-fields")
-                    .build();
+                RecordMeta screenshotRecordMeta = RecordMeta.newBuilder()
+                        .setRecordNum(0)
+                        .setSubCollection(SubCollectionType.SCREENSHOT)
+                        .setType(RecordType.RESOURCE)
+                        .setSize(img.length)
+                        .setBlockDigest(digest.getPrefixedDigestString())
+                        .setRecordContentType("image/png")
+                        .addWarcConcurrentTo(log.getWarcId())
+                        .build();
+                RecordMeta screenshotMetaRecordMeta = RecordMeta.newBuilder()
+                        .setRecordNum(1)
+                        .setSubCollection(SubCollectionType.SCREENSHOT)
+                        .setType(RecordType.METADATA)
+                        .setSize(screenshotMetaRecord.size())
+                        .setBlockDigest(screenshotMetaRecordDigest.getPrefixedDigestString())
+                        .setRecordContentType("application/warc-fields")
+                        .build();
 
-            String ip = log.getIpAddress();
-            if (ip == null || ip.isEmpty()) {
-                LOG.error("Missing IP address for screenshot, using 127.0.0.1");
-                ip = "127.0.0.1";
+                String ip = log.getIpAddress();
+                if (ip == null || ip.isEmpty()) {
+                    LOG.error("Missing IP address for screenshot, using 127.0.0.1");
+                    ip = "127.0.0.1";
+                }
+
+                WriteRequestMeta meta = WriteRequestMeta.newBuilder()
+                        .setIpAddress(ip)
+                        .setCollectionRef(crawlConfig.getCrawlConfig().getCollectionRef())
+                        .setExecutionId(log.getExecutionId())
+                        .setFetchTimeStamp(log.getFetchTimeStamp())
+                        .setTargetUri(log.getRequestedUri())
+                        .putRecordMeta(0, screenshotRecordMeta)
+                        .putRecordMeta(1, screenshotMetaRecordMeta)
+                        .build();
+                contentWriter.sendMetadata(meta);
+                WriteResponseMeta response = contentWriter.finish();
+            } catch (InterruptedException | StatusException ex) {
+                LOG.error("Error writing screenshot", ex);
+                throw new RuntimeException(ex);
             }
-
-            WriteRequestMeta meta = WriteRequestMeta.newBuilder()
-                    .setIpAddress(ip)
-                    .setCollectionRef(crawlConfig.getCrawlConfig().getCollectionRef())
-                    .setExecutionId(log.getExecutionId())
-                    .setFetchTimeStamp(log.getFetchTimeStamp())
-                    .setTargetUri(log.getRequestedUri())
-                    .putRecordMeta(0, screenshotRecordMeta)
-                    .putRecordMeta(1, screenshotMetaRecordMeta)
-                    .build();
-            contentWriter.sendMetadata(meta);
-            WriteResponseMeta response = contentWriter.finish();
-        } catch (ExecutionException | TimeoutException | InterruptedException ex) {
-            throw new RuntimeException(ex);
-        } catch (StatusException ex) {
+            return screenshot;
+        });
+        try {
+            PageDomain.CaptureScreenshotResponse screenshot = f.get();
+            if (f.get() == null) {
+                LOG.error("Timed out while taking screenshot");
+            }
+        } catch (ExecutionException | InterruptedException ex) {
             LOG.error("Error writing screenshot", ex);
+            throw new RuntimeException(ex);
         }
     }
 

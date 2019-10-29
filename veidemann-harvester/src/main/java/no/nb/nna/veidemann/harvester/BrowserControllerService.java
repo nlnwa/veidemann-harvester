@@ -42,6 +42,7 @@ import org.netpreserve.commons.uri.Uri;
 import org.netpreserve.commons.uri.UriConfigs;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 /**
  *
@@ -68,6 +69,9 @@ public class BrowserControllerService extends BrowserControllerGrpc.BrowserContr
             public void onNext(DoRequest value) {
                 switch (value.getActionCase()) {
                     case NEW:
+                        MDC.put("eid", value.getNew().getCrawlExecutionId());
+                        MDC.put("uri", value.getNew().getUri());
+
                         DoReply.Builder b = DoReply.newBuilder();
 
                         // Robots.txt request comes directly to proxy from Robots evaluator and should be handled separately
@@ -82,6 +86,25 @@ public class BrowserControllerService extends BrowserControllerGrpc.BrowserContr
                         }
 
                         BrowserSession session = sessionRegistry.get(value.getNew().getProxyId());
+
+                        // If the register new request is for a CONNECT request, this will not be logged or handled by the
+                        // browser controller, but the proxy needs to know the ID's to use for DNS requests.
+                        if ("CONNECT".equalsIgnoreCase(value.getNew().getMethod())) {
+                            if (session == null) {
+                                // No session found, this is probably a CONNECT for robots.txt
+                                b.getNewBuilder()
+                                        .setCrawlExecutionId(value.getNew().getCrawlExecutionId())
+                                        .setJobExecutionId(value.getNew().getJobExecutionId())
+                                        .setCollectionRef(value.getNew().getCollectionRef());
+                            } else {
+                                b.getNewBuilder()
+                                        .setCrawlExecutionId(session.getCrawlExecutionId())
+                                        .setJobExecutionId(session.getJobExecutionId())
+                                        .setCollectionRef(session.getCollectionRef());
+                            }
+                            responseObserver.onNext(b.build());
+                            break;
+                        }
 
                         proxyRequest = session.getCrawlLogs().registerProxyRequest(value.getNew().getUri());
                         proxyRequest.setResponseObserver(responseObserver);

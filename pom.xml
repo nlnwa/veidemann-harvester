@@ -35,8 +35,8 @@
 
         <chrome.version>78.0.3882.0</chrome.version>
 
-        <veidemann.commons.version>0.3.11</veidemann.commons.version>
-        <veidemann.rethinkdbadapter.version>0.3.18</veidemann.rethinkdbadapter.version>
+        <veidemann.commons.version>0.3.12</veidemann.commons.version>
+        <veidemann.rethinkdbadapter.version>0.3.19</veidemann.rethinkdbadapter.version>
 
         <log4j.version>2.7</log4j.version>
         <org.jwat.version>1.1.1</org.jwat.version>
@@ -54,9 +54,9 @@
         <veidemann.dns.resolver.version>0.2.5</veidemann.dns.resolver.version>
         <veidemann.contentwriter.version>0.2.5</veidemann.contentwriter.version>
         <veidemann.robotsevaluator.version>0.3.8</veidemann.robotsevaluator.version>
-        <veidemann.frontier.version>0.3.20</veidemann.frontier.version>
+        <veidemann.frontier.version>0.3.22</veidemann.frontier.version>
         <veidemann.controller.version>0.3.17</veidemann.controller.version>
-        <veidemann.recorderproxy.version>0.2.0</veidemann.recorderproxy.version>
+        <veidemann.recorderproxy.version>0.2.2</veidemann.recorderproxy.version>
     </properties>
 
     <repositories>

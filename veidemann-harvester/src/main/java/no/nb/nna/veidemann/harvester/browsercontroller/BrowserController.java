@@ -18,8 +18,6 @@ package no.nb.nna.veidemann.harvester.browsercontroller;
 import io.opentracing.Span;
 import io.opentracing.tag.Tags;
 import io.opentracing.util.GlobalTracer;
-import no.nb.nna.veidemann.api.config.v1.Collection.SubCollection;
-import no.nb.nna.veidemann.api.config.v1.Collection.SubCollectionType;
 import no.nb.nna.veidemann.api.config.v1.ConfigObject;
 import no.nb.nna.veidemann.api.config.v1.ConfigRef;
 import no.nb.nna.veidemann.api.config.v1.Kind;
@@ -34,7 +32,6 @@ import no.nb.nna.veidemann.commons.client.ContentWriterClient;
 import no.nb.nna.veidemann.commons.db.ChangeFeed;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbService;
-import no.nb.nna.veidemann.commons.util.CollectionNameGenerator;
 import no.nb.nna.veidemann.harvester.BrowserSessionRegistry;
 import no.nb.nna.veidemann.harvester.FrontierClient.ProxySession;
 import org.slf4j.Logger;
@@ -130,44 +127,57 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
             session.loadPage();
             session.getCrawlLogs().waitForMatcherToFinish();
 
-            if (session.isPageRenderable()) {
-                if (crawlConfig.getCrawlConfig().getExtra().getCreateScreenshot()) {
-                    LOG.debug("Save screenshot");
-                    session.saveScreenshot(contentWriterClient);
-                }
-
-                LOG.debug("Extract outlinks");
-                try {
-                    result.withOutlinks(session.extractOutlinks());
-                } catch (Exception t) {
-                    LOG.error("Failed extracting outlinks", t);
-                }
-
-                session.scrollToTop();
-
+            ExtraStatusCodes eCode = ExtraStatusCodes.fromCode(session.getUriRequests().getRootRequest().getStatusCode());
+            if (eCode != null) {
+                result.withError(eCode.toFetchError());
+            } else if (session.getUriRequests().getInitialRequest().isFromCache()) {
+                result.withError(ExtraStatusCodes.ALREADY_SEEN.toFetchError());
             } else {
-                LOG.info("Page is not renderable");
-            }
-            try {
-                LOG.debug("======== PAGELOG ========\n{}", session.getUriRequests());
+                UriRequest initialRequest = session.getUriRequests().getInitialRequest();
 
-                PageLog.Builder pageLog = PageLog.newBuilder()
-                        .setUri(queuedUri.getUri())
-                        .setJobExecutionId(queuedUri.getJobExecutionId())
-                        .setExecutionId(queuedUri.getExecutionId());
-                if (session.getUriRequests().getInitialRequest() == null) {
-                    LOG.error("Missing initial request");
+                if (initialRequest == null || initialRequest.getCrawlLog() == null) {
+                    LOG.warn("No crawl log found for root request, skipping screenshot and pagelog");
                 } else {
-                    pageLog.setWarcId(session.getUriRequests().getInitialRequest().getWarcId())
-                            .setReferrer(session.getUriRequests().getInitialRequest().getReferrer())
-                            .setCollectionFinalName(session.getUriRequests().getInitialRequest().getCrawlLog().getCollectionFinalName());
-                }
+                    if (session.isPageRenderable()) {
+                        if (crawlConfig.getCrawlConfig().getExtra().getCreateScreenshot()) {
+                            LOG.debug("Save screenshot");
+                            session.saveScreenshot(contentWriterClient);
+                        }
 
-                session.getUriRequests().getPageLogResources().forEach(r -> pageLog.addResource(r));
-                result.getOutlinks().forEach(o -> pageLog.addOutlink(o.getUri()));
-                DbService.getInstance().getDbAdapter().savePageLog(pageLog.build());
-            } catch (Exception t) {
-                LOG.error("Failed writing pagelog", t);
+                        LOG.debug("Extract outlinks");
+                        try {
+                            result.withOutlinks(session.extractOutlinks());
+                        } catch (Exception t) {
+                            LOG.error("Failed extracting outlinks", t);
+                        }
+
+                        session.scrollToTop();
+
+                    } else {
+                        LOG.info("Page is not renderable");
+                    }
+
+                    try {
+                        PageLog.Builder pageLog = PageLog.newBuilder()
+                                .setUri(queuedUri.getUri())
+                                .setJobExecutionId(queuedUri.getJobExecutionId())
+                                .setExecutionId(queuedUri.getExecutionId());
+                        if (initialRequest == null) {
+                            LOG.error("Missing initial request");
+                        } else {
+                            pageLog.setWarcId(initialRequest.getWarcId())
+                                    .setReferrer(initialRequest.getReferrer())
+                                    .setCollectionFinalName(initialRequest.getCrawlLog().getCollectionFinalName())
+                                    .setMethod(initialRequest.getMethod());
+                        }
+
+                        session.getUriRequests().getPageLogResources().forEach(r -> pageLog.addResource(r));
+                        result.getOutlinks().forEach(o -> pageLog.addOutlink(o.getUri()));
+                        DbService.getInstance().getDbAdapter().savePageLog(pageLog.build());
+                    } catch (Exception t) {
+                        LOG.error("Failed writing pagelog", t);
+                    }
+                }
             }
 
             result.withBytesDownloaded(session.getUriRequests().getBytesDownloaded())

@@ -91,17 +91,13 @@
             <plugin>
                 <groupId>com.google.cloud.tools</groupId>
                 <artifactId>jib-maven-plugin</artifactId>
-                <version>1.2.0</version>
+                <version>1.7.0</version>
                 <configuration>
                     <to>
                         <image>docker.io/norsknettarkiv/${project.artifactId}</image>
                         <tags>
                             <tag>${docker.tag}</tag>
                         </tags>
-                        <auth>
-                            <username>${env.DOCKER_USERNAME}</username>
-                            <password>${env.DOCKER_PASSWORD}</password>
-                        </auth>
                     </to>
                     <container>
                         <ports>
@@ -156,6 +152,18 @@
                                 <goals>
                                     <goal>build</goal>
                                 </goals>
+                                <configuration>
+                                    <to>
+                                        <image>docker.io/norsknettarkiv/${project.artifactId}</image>
+                                        <tags>
+                                            <tag>${docker.tag}</tag>
+                                        </tags>
+                                        <auth>
+                                            <username>${env.DOCKER_USERNAME}</username>
+                                            <password>${env.DOCKER_PASSWORD}</password>
+                                        </auth>
+                                    </to>
+                                </configuration>
                             </execution>
                         </executions>
                     </plugin>

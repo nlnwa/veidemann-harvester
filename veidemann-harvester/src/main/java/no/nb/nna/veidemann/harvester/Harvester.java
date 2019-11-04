@@ -90,21 +90,27 @@ public class Harvester {
 
              BrowserControllerApiServer apiServer = new BrowserControllerApiServer(SETTINGS.getBrowserControllerPort(), sessionRegistry, robotsServiceClient).start()
         ) {
-            Runtime.getRuntime().addShutdownHook(new Thread(() -> shouldRun = false));
+            registerShutdownHook();
 
             Thread.sleep(4000);
+
             LOG.info("Veidemann harvester (v. {}) started", Harvester.class.getPackage().getImplementationVersion());
+
             while (shouldRun) {
-                // Ensure that the browser gets a little time to settle before opening a new session
-                Thread.sleep(2000);
-                frontierClient.requestNextPage();
+                try {
+                    // Ensure that the browser gets a little time to settle before opening a new session
+                    Thread.sleep(2000);
+                    frontierClient.requestNextPage();
+                } catch (InterruptedException e) {
+                    //
+                }
             }
         } catch (ConfigException ex) {
             System.err.println("Configuration error: " + ex.getLocalizedMessage());
             System.exit(2);
         } catch (Exception ex) {
-            LOG.error("Could not start service", ex);
-            throw new RuntimeException(ex);
+            System.err.println("Could not start service: " + ex.getLocalizedMessage());
+            System.exit(1);
         }
 
         return this;
@@ -120,4 +126,21 @@ public class Harvester {
         return SETTINGS;
     }
 
+    private void registerShutdownHook() {
+        Thread mainThread = Thread.currentThread();
+
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            // Use stderr here since the logger may have been reset by its JVM shutdown hook.
+            System.err.println("*** shutting down since JVM is shutting down");
+
+            shouldRun = false;
+            mainThread.interrupt();
+            try {
+                mainThread.join();
+            } catch (InterruptedException e) {
+                //
+            }
+            System.err.println("*** gracefully shut down");
+        }));
+    }
 }

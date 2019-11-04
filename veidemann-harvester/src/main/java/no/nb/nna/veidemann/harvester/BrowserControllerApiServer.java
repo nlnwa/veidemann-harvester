@@ -26,12 +26,16 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 public class BrowserControllerApiServer implements AutoCloseable {
 
     private static final Logger LOG = LoggerFactory.getLogger(BrowserControllerApiServer.class);
 
     private final Server server;
+    private final ExecutorService threadPool;
 
     private final BrowserSessionRegistry sessionRegistry;
 
@@ -47,6 +51,9 @@ public class BrowserControllerApiServer implements AutoCloseable {
                         ServerTracingInterceptor.ServerRequestAttribute.METHOD_TYPE)
                 .build();
 
+        threadPool = Executors.newCachedThreadPool();
+        serverBuilder.executor(threadPool);
+
         server = serverBuilder.addService(tracingInterceptor.intercept(new BrowserControllerService(sessionRegistry, robotsServiceClient))).build();
     }
 
@@ -56,28 +63,32 @@ public class BrowserControllerApiServer implements AutoCloseable {
 
             LOG.info("Browser controller api listening on {}", server.getPort());
 
-            Runtime.getRuntime().addShutdownHook(new Thread() {
-                @Override
-                public void run() {
-                    // Use stderr here since the logger may have been reset by its JVM shutdown hook.
-                    System.err.println("*** shutting down gRPC server since JVM is shutting down");
-                    BrowserControllerApiServer.this.close();
-                }
-
-            });
-
             return this;
         } catch (IOException ex) {
-            close();
             throw new UncheckedIOException(ex);
         }
     }
 
     @Override
     public void close() {
-        if (server != null) {
-            server.shutdown();
+        if (server == null) {
+            return;
         }
+        System.err.println("*** shutting down gRPC server since JVM is shutting down");
+
+        server.shutdown();
+        try {
+            server.awaitTermination();
+        } catch (InterruptedException e) {
+            server.shutdownNow();
+        }
+        threadPool.shutdown();
+        try {
+            threadPool.awaitTermination(5L, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            threadPool.shutdownNow();
+        }
+
         System.err.println("*** server shut down");
     }
 

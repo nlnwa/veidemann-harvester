@@ -2,16 +2,15 @@ package no.nb.nna.veidemann.integrationtests;
 
 import com.rethinkdb.RethinkDB;
 import com.rethinkdb.net.Cursor;
-import no.nb.nna.veidemann.api.ControllerGrpc;
-import no.nb.nna.veidemann.api.ControllerProto;
-import no.nb.nna.veidemann.api.StatusGrpc;
-import no.nb.nna.veidemann.api.StatusProto.ExecutionId;
-import no.nb.nna.veidemann.api.StatusProto.ListExecutionsRequest;
-import no.nb.nna.veidemann.api.frontier.v1.CrawlExecutionStatus;
+import no.nb.nna.veidemann.api.controller.v1.ControllerGrpc;
+import no.nb.nna.veidemann.api.controller.v1.RunCrawlReply;
+import no.nb.nna.veidemann.api.controller.v1.RunCrawlRequest;
 import no.nb.nna.veidemann.api.frontier.v1.JobExecutionStatus;
-import no.nb.nna.veidemann.commons.util.ApiTools.ListReplyWalker;
+import no.nb.nna.veidemann.api.report.v1.CrawlExecutionsListRequest;
+import no.nb.nna.veidemann.commons.db.DbException;
+import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.db.ProtoUtils;
-import no.nb.nna.veidemann.db.RethinkDbAdapter;
+import no.nb.nna.veidemann.db.RethinkDbConnection;
 import no.nb.nna.veidemann.db.Tables;
 
 import java.util.ArrayList;
@@ -25,37 +24,35 @@ import java.util.stream.StreamSupport;
 public class JobCompletion extends ForkJoinTask<JobExecutionStatus> implements RunnableFuture<JobExecutionStatus> {
     static RethinkDB r = RethinkDB.r;
 
-    final StatusGrpc.StatusBlockingStub statusClient;
-
     final String jobExecutionId;
 
     final List<String> eIds;
 
     JobExecutionStatus result;
 
-    RethinkDbAdapter db;
+    RethinkDbConnection db;
 
-    public static JobCompletion executeJob(RethinkDbAdapter db, StatusGrpc.StatusBlockingStub statusClient,
+    public static JobCompletion executeJob(RethinkDbConnection db,
                                            ControllerGrpc.ControllerBlockingStub controllerClient,
-                                           ControllerProto.RunCrawlRequest crawlRequest) {
+                                           RunCrawlRequest crawlRequest) throws DbException {
         return (JobCompletion) ForkJoinPool.commonPool().submit(
-                (ForkJoinTask) new JobCompletion(db, statusClient, controllerClient, crawlRequest));
+                (ForkJoinTask) new JobCompletion(db, controllerClient, crawlRequest));
     }
 
-    JobCompletion(RethinkDbAdapter db, StatusGrpc.StatusBlockingStub statusClient,
-                  ControllerGrpc.ControllerBlockingStub controllerClient, ControllerProto.RunCrawlRequest request) {
+    JobCompletion(RethinkDbConnection db,
+                  ControllerGrpc.ControllerBlockingStub controllerClient, RunCrawlRequest request) throws DbException {
         this.db = db;
-        this.statusClient = statusClient;
 
-        ControllerProto.RunCrawlReply crawlReply = controllerClient.runCrawl(request);
+        RunCrawlReply crawlReply = controllerClient.runCrawl(request);
 
         jobExecutionId = crawlReply.getJobExecutionId();
         eIds = new ArrayList<>();
 
-        ListReplyWalker<ListExecutionsRequest, CrawlExecutionStatus> w = new ListReplyWalker<>();
-        w.walk(ListExecutionsRequest.newBuilder().setJobExecutionId(jobExecutionId),
-                r -> statusClient.listExecutions(r),
-                s -> eIds.add(s.getId()));
+        CrawlExecutionsListRequest.Builder celr = CrawlExecutionsListRequest.newBuilder();
+        celr.getQueryTemplateBuilder().setJobExecutionId(jobExecutionId);
+        celr.getQueryMaskBuilder().addPaths("jobExecutionId");
+        DbService.getInstance().getExecutionsAdapter().listCrawlExecutionStatus(celr.build()).stream()
+                .forEach(jes -> eIds.add(jes.getId()));
     }
 
     @Override
@@ -75,7 +72,7 @@ public class JobCompletion extends ForkJoinTask<JobExecutionStatus> implements R
 
     @Override
     protected boolean exec() {
-        try (Cursor<Map<String, Object>> cursor = db.executeRequest("list", r.table(Tables.JOB_EXECUTIONS.name)
+        try (Cursor<Map<String, Object>> cursor = db.exec("list", r.table(Tables.JOB_EXECUTIONS.name)
                 .get(jobExecutionId)
                 .changes().optArg("include_initial", true))) {
 
@@ -90,7 +87,7 @@ public class JobCompletion extends ForkJoinTask<JobExecutionStatus> implements R
                         }
                     });
 
-            setRawResult(statusClient.getJobExecution(ExecutionId.newBuilder().setId(jobExecutionId).build()));
+            setRawResult(DbService.getInstance().getExecutionsAdapter().getJobExecutionStatus(jobExecutionId));
             return true;
         } catch (Error err) {
             throw err;

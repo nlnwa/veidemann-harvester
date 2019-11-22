@@ -17,7 +17,7 @@ package no.nb.nna.veidemann.contentexplorer;
 
 import com.google.common.io.ByteStreams;
 import com.google.gson.Gson;
-import no.nb.nna.veidemann.commons.db.DbAdapter;
+import no.nb.nna.veidemann.commons.db.ExecutionsAdapter;
 import org.jwat.warc.WarcReader;
 import org.jwat.warc.WarcReaderFactory;
 import org.jwat.warc.WarcRecord;
@@ -59,7 +59,7 @@ public class ContentExplorerResource {
     private static final Logger LOG = LoggerFactory.getLogger(ContentExplorerResource.class);
 
     @Context
-    DbAdapter db;
+    ExecutionsAdapter db;
 
     @Context
     File warcDir;

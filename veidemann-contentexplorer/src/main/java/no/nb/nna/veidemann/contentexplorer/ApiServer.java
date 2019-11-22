@@ -16,8 +16,8 @@
 
 package no.nb.nna.veidemann.contentexplorer;
 
-import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.db.DbService;
+import no.nb.nna.veidemann.commons.db.ExecutionsAdapter;
 import org.glassfish.grizzly.http.server.HttpServer;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.grizzly2.httpserver.GrizzlyHttpServerFactory;
@@ -55,7 +55,7 @@ public class ApiServer {
                 .register(new AbstractBinder() {
                     @Override
                     protected void configure() {
-                        bind(DbService.getInstance().getDbAdapter()).to(DbAdapter.class);
+                        bind(DbService.getInstance().getExecutionsAdapter()).to(ExecutionsAdapter.class);
                     }
 
                 });

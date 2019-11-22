@@ -458,7 +458,13 @@
                                         <env>
                                             <DB_HOST>db</DB_HOST>
                                             <FRONTIER_HOST>frontier</FRONTIER_HOST>
+                                            <APIKEY_ROLE_MAPPING_FILE>/app/resources/apikeys/apiKeyRoleMapping.txt</APIKEY_ROLE_MAPPING_FILE>
                                         </env>
+                                        <volumes>
+                                            <bind>
+                                                <volume>src/test/resources/apikeys:/app/resources/apikeys:ro</volume>
+                                            </bind>
+                                        </volumes>
                                         <log>
                                             <enabled>true</enabled>
                                         </log>

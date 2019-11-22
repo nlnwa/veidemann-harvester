@@ -15,34 +15,36 @@
  */
 package no.nb.nna.veidemann.integrationtests;
 
-import com.google.protobuf.Empty;
 import com.rethinkdb.RethinkDB;
+import io.grpc.CallCredentials;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
-import no.nb.nna.veidemann.api.ConfigProto.LogLevels;
-import no.nb.nna.veidemann.api.ConfigProto.LogLevels.Level;
-import no.nb.nna.veidemann.api.ControllerGrpc;
-import no.nb.nna.veidemann.api.ReportGrpc;
-import no.nb.nna.veidemann.api.StatusGrpc;
+import io.grpc.Metadata;
 import no.nb.nna.veidemann.api.config.v1.Collection.SubCollectionType;
 import no.nb.nna.veidemann.api.config.v1.ConfigGrpc;
 import no.nb.nna.veidemann.api.config.v1.ConfigObject;
 import no.nb.nna.veidemann.api.config.v1.ConfigRef;
 import no.nb.nna.veidemann.api.config.v1.Kind;
 import no.nb.nna.veidemann.api.config.v1.ListRequest;
+import no.nb.nna.veidemann.api.config.v1.LogLevels;
+import no.nb.nna.veidemann.api.config.v1.LogLevels.Level;
 import no.nb.nna.veidemann.api.config.v1.Meta;
 import no.nb.nna.veidemann.api.config.v1.Seed;
 import no.nb.nna.veidemann.api.contentwriter.v1.ContentWriterGrpc;
-import no.nb.nna.veidemann.commons.db.DbConnectionException;
+import no.nb.nna.veidemann.api.controller.v1.ControllerGrpc;
+import no.nb.nna.veidemann.api.report.v1.ReportGrpc;
+import no.nb.nna.veidemann.commons.auth.AuAuServerInterceptor;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbService;
 import no.nb.nna.veidemann.commons.settings.CommonSettings;
 import no.nb.nna.veidemann.commons.util.ApiTools;
-import no.nb.nna.veidemann.db.RethinkDbAdapter;
+import no.nb.nna.veidemann.db.RethinkDbConnection;
+import no.nb.nna.veidemann.db.initializer.RethinkDbInitializer;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 
 public abstract class CrawlTestBase {
@@ -54,13 +56,11 @@ public abstract class CrawlTestBase {
 
     static ControllerGrpc.ControllerBlockingStub controllerClient;
 
-    static StatusGrpc.StatusBlockingStub statusClient;
-
     static ReportGrpc.ReportStub reportClient;
 
     static ContentWriterGrpc.ContentWriterBlockingStub contentWriterClient;
 
-    static RethinkDbAdapter db;
+    static RethinkDbConnection db;
 
     static RethinkDB r = RethinkDB.r;
 
@@ -70,8 +70,24 @@ public abstract class CrawlTestBase {
     ConfigObject crawlConfig;
     ConfigObject job;
 
+    private static CallCredentials createCredentials(String apiKey) {
+        return new CallCredentials() {
+            @Override
+            public void applyRequestMetadata(RequestInfo requestInfo, Executor appExecutor, MetadataApplier applier) {
+                Metadata headers = new Metadata();
+                headers.put(AuAuServerInterceptor.AUTHORIZATION_KEY, "ApiKey " + apiKey);
+                applier.apply(headers);
+            }
+
+            @Override
+            public void thisUsesUnstableApi() {
+
+            }
+        };
+    }
+
     @BeforeClass
-    public static void init() throws DbConnectionException {
+    public static void init() throws DbException {
         String controllerHost = System.getProperty("controller.host");
         int controllerPort = Integer.parseInt(System.getProperty("controller.port"));
         String contentWriterHost = System.getProperty("contentwriter.host");
@@ -82,13 +98,17 @@ public abstract class CrawlTestBase {
 
         controllerChannel = ManagedChannelBuilder.forAddress(controllerHost, controllerPort).usePlaintext().build();
 
-        controllerClient = ControllerGrpc.newBlockingStub(controllerChannel).withWaitForReady();
+        controllerClient = ControllerGrpc.newBlockingStub(controllerChannel)
+                .withCallCredentials(createCredentials("myApiKey"))
+                .withWaitForReady();
 
-        configClient = ConfigGrpc.newBlockingStub(controllerChannel).withWaitForReady();
+        configClient = ConfigGrpc.newBlockingStub(controllerChannel)
+                .withCallCredentials(createCredentials("myApiKey"))
+                .withWaitForReady();
 
-        statusClient = StatusGrpc.newBlockingStub(controllerChannel).withWaitForReady();
-
-        reportClient = ReportGrpc.newStub(controllerChannel).withWaitForReady();
+        reportClient = ReportGrpc.newStub(controllerChannel)
+                .withCallCredentials(createCredentials("myApiKey"))
+                .withWaitForReady();
 
         contentWriterChannel = ManagedChannelBuilder.forAddress(contentWriterHost, contentWriterPort).usePlaintext()
                 .build();
@@ -103,11 +123,11 @@ public abstract class CrawlTestBase {
                     .withDbPassword("");
             DbService.configure(dbSettings);
         }
-        db = (RethinkDbAdapter) DbService.getInstance().getDbAdapter();
+        db = (RethinkDbConnection) ((RethinkDbInitializer) DbService.getInstance().getDbInitializer()).getDbConnection();
 
-        LogLevels.Builder logLevels = controllerClient.getLogConfig(Empty.getDefaultInstance()).toBuilder();
+        LogLevels.Builder logLevels = DbService.getInstance().getConfigAdapter().getLogConfig().toBuilder();
         logLevels.addLogLevelBuilder().setLogger("no.nb.nna.veidemann.frontier").setLevel(Level.INFO);
-        controllerClient.saveLogConfig(logLevels.build());
+        DbService.getInstance().getConfigAdapter().saveLogConfig(logLevels.build());
     }
 
     @AfterClass

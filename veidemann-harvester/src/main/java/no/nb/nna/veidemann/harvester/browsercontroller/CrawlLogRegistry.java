@@ -485,7 +485,7 @@ public class CrawlLogRegistry {
                 CrawlLog enrichedCrawlLog = r.setCrawlLog(crawlLogEntry.getCrawlLog(), crawlLogEntry.isFromCache());
                 if (!r.isFromCache()) {
                     try {
-                        DbService.getInstance().getDbAdapter().saveCrawlLog(enrichedCrawlLog);
+                        DbService.getInstance().getExecutionsAdapter().saveCrawlLog(enrichedCrawlLog);
                     } catch (DbException e) {
                         throw new RuntimeException("Could not save crawl log", e);
                     }

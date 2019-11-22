@@ -173,7 +173,7 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
 
                         session.getUriRequests().getPageLogResources().forEach(r -> pageLog.addResource(r));
                         result.getOutlinks().forEach(o -> pageLog.addOutlink(o.getUri()));
-                        DbService.getInstance().getDbAdapter().savePageLog(pageLog.build());
+                        DbService.getInstance().getExecutionsAdapter().savePageLog(pageLog.build());
                     } catch (Exception t) {
                         LOG.error("Failed writing pagelog", t);
                     }

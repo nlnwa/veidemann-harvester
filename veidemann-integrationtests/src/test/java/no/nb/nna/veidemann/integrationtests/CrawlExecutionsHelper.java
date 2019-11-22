@@ -15,34 +15,27 @@
  */
 package no.nb.nna.veidemann.integrationtests;
 
-import no.nb.nna.veidemann.api.StatusProto.ExecutionsListReply;
-import no.nb.nna.veidemann.api.StatusProto.ListExecutionsRequest;
 import no.nb.nna.veidemann.api.frontier.v1.CrawlExecutionStatus;
+import no.nb.nna.veidemann.api.report.v1.CrawlExecutionsListRequest;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbService;
 
 import java.util.List;
-
-import static org.assertj.core.api.Assertions.assertThat;
+import java.util.stream.Collectors;
 
 public class CrawlExecutionsHelper {
-    final ExecutionsListReply executionsListReply;
-    int reportedCount;
+    final List<CrawlExecutionStatus> executionsListReply;
 
     public CrawlExecutionsHelper(String jobExecutionId) throws DbException {
+        CrawlExecutionsListRequest.Builder celr = CrawlExecutionsListRequest.newBuilder().setPageSize(500);
+        celr.getQueryTemplateBuilder().setJobExecutionId(jobExecutionId);
+        celr.getQueryMaskBuilder().addPaths("jobExecutionId");
         executionsListReply = DbService.getInstance().getExecutionsAdapter()
-                .listCrawlExecutionStatus(ListExecutionsRequest.newBuilder()
-                        .setJobExecutionId(jobExecutionId).setPageSize(500).build());
-        reportedCount = (int) executionsListReply.getCount();
-        checkCount();
-    }
-
-    private void checkCount() {
-        assertThat(getCrawlExecutionStatus().size()).isEqualTo(reportedCount);
+                .listCrawlExecutionStatus(celr.build()).stream().collect(Collectors.toList());
     }
 
     public List<CrawlExecutionStatus> getCrawlExecutionStatus() {
-        return executionsListReply.getValueList();
+        return executionsListReply;
     }
 
     public CrawlExecutionStatus getCrawlExecutionStatus(String id) {

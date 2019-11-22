@@ -271,7 +271,7 @@ public class BrowserControllerService extends BrowserControllerGrpc.BrowserContr
 
             if (!this.crawlLog.getBlockDigest().isEmpty()) {
                 try {
-                    DbService.getInstance().getDbAdapter().saveCrawlLog(this.crawlLog.build());
+                    DbService.getInstance().getExecutionsAdapter().saveCrawlLog(this.crawlLog.build());
                 } catch (DbException e) {
                     throw new RuntimeException("Could not save crawl log", e);
                 }

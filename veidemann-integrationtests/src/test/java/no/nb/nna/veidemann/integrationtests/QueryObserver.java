@@ -3,7 +3,7 @@ package no.nb.nna.veidemann.integrationtests;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.ClientCallStreamObserver;
 import io.grpc.stub.ClientResponseObserver;
-import no.nb.nna.veidemann.api.ReportProto.ExecuteDbQueryReply;
+import no.nb.nna.veidemann.api.report.v1.ExecuteDbQueryReply;
 
 import java.util.ArrayList;
 import java.util.List;

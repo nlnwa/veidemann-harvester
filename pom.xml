@@ -35,16 +35,15 @@
 
         <chrome.version>78.0.3882.0</chrome.version>
 
-        <veidemann.commons.version>0.3.12</veidemann.commons.version>
-        <veidemann.rethinkdbadapter.version>0.3.19</veidemann.rethinkdbadapter.version>
+        <veidemann.commons.version>0.4.0</veidemann.commons.version>
+        <veidemann.rethinkdbadapter.version>0.4.0</veidemann.rethinkdbadapter.version>
 
         <log4j.version>2.7</log4j.version>
         <org.jwat.version>1.1.1</org.jwat.version>
         <org.glassfish.jersey.version>2.25.1</org.glassfish.jersey.version>
         <io.opentracing.version>0.30.0</io.opentracing.version>
         <com.uber.jaeger.version>0.21.0</com.uber.jaeger.version>
-        <io.grpc.version>1.20.0</io.grpc.version>
-        <io.prometheus.version>0.5.0</io.prometheus.version>
+        <io.prometheus.version>0.8.0</io.prometheus.version>
         <netty.version>4.1.42.Final</netty.version>
 
         <!-- Versions of external docker containers used in integration tests -->
@@ -54,8 +53,8 @@
         <veidemann.dns.resolver.version>0.2.5</veidemann.dns.resolver.version>
         <veidemann.contentwriter.version>0.2.5</veidemann.contentwriter.version>
         <veidemann.robotsevaluator.version>0.3.8</veidemann.robotsevaluator.version>
-        <veidemann.frontier.version>0.3.22</veidemann.frontier.version>
-        <veidemann.controller.version>0.3.17</veidemann.controller.version>
+        <veidemann.frontier.version>0.4.0</veidemann.frontier.version>
+        <veidemann.controller.version>0.5.0</veidemann.controller.version>
         <veidemann.recorderproxy.version>0.2.2</veidemann.recorderproxy.version>
     </properties>
 

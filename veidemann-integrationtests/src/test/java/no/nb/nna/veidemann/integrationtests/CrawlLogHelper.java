@@ -15,11 +15,10 @@
  */
 package no.nb.nna.veidemann.integrationtests;
 
-import no.nb.nna.veidemann.api.ReportProto.CrawlLogListReply;
-import no.nb.nna.veidemann.api.ReportProto.CrawlLogListRequest;
 import no.nb.nna.veidemann.api.frontier.v1.CrawlLog;
+import no.nb.nna.veidemann.api.report.v1.CrawlLogListRequest;
 import no.nb.nna.veidemann.commons.ExtraStatusCodes;
-import no.nb.nna.veidemann.commons.db.DbAdapter;
+import no.nb.nna.veidemann.commons.db.ChangeFeed;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbService;
 
@@ -38,11 +37,9 @@ public class CrawlLogHelper {
     final Map<String, List<CrawlLog>> crawlLogsByJobEid = new HashMap();
 
     public CrawlLogHelper(String collectionName) throws DbException {
-        DbAdapter db = DbService.getInstance().getDbAdapter();
-        CrawlLogListReply reply = db.listCrawlLogs(CrawlLogListRequest.newBuilder()
+        ChangeFeed<CrawlLog> reply = DbService.getInstance().getExecutionsAdapter().listCrawlLogs(CrawlLogListRequest.newBuilder()
                 .setPageSize(5000).build());
-        reply.getValueList()
-                .stream()
+        reply.stream()
                 .filter(c -> c.getCollectionFinalName().startsWith(collectionName))
                 .forEach(c -> addCrawlLog(c));
     }

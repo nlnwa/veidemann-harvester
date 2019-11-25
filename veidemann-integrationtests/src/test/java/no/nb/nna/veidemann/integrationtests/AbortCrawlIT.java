@@ -15,9 +15,9 @@
  */
 package no.nb.nna.veidemann.integrationtests;
 
-import no.nb.nna.veidemann.api.ControllerProto;
-import no.nb.nna.veidemann.api.StatusProto.ExecutionId;
 import no.nb.nna.veidemann.api.config.v1.ConfigObject;
+import no.nb.nna.veidemann.api.controller.v1.ExecutionId;
+import no.nb.nna.veidemann.api.controller.v1.RunCrawlRequest;
 import no.nb.nna.veidemann.api.frontier.v1.JobExecutionStatus;
 import no.nb.nna.veidemann.commons.VeidemannHeaderConstants;
 import no.nb.nna.veidemann.commons.db.DbException;
@@ -39,11 +39,11 @@ public class AbortCrawlIT extends CrawlTestBase implements VeidemannHeaderConsta
 
         setupConfigAndSeeds(job);
 
-        ControllerProto.RunCrawlRequest request = ControllerProto.RunCrawlRequest.newBuilder()
+        RunCrawlRequest request = RunCrawlRequest.newBuilder()
                 .setJobId(job.getId())
                 .build();
 
-        JobExecutionStatus jes = JobCompletion.executeJob(db, statusClient, controllerClient, request).get();
+        JobExecutionStatus jes = JobCompletion.executeJob(db, controllerClient, request).get();
 
         new CrawlExecutionValidator(jes)
                 .validate();
@@ -64,11 +64,11 @@ public class AbortCrawlIT extends CrawlTestBase implements VeidemannHeaderConsta
 
         setupConfigAndSeeds(job);
 
-        ControllerProto.RunCrawlRequest request = ControllerProto.RunCrawlRequest.newBuilder()
+        RunCrawlRequest request = RunCrawlRequest.newBuilder()
                 .setJobId(job.getId())
                 .build();
 
-        JobExecutionStatus jes = JobCompletion.executeJob(db, statusClient, controllerClient, request).get();
+        JobExecutionStatus jes = JobCompletion.executeJob(db, controllerClient, request).get();
 
         new CrawlExecutionValidator(jes)
                 .validate();
@@ -82,14 +82,14 @@ public class AbortCrawlIT extends CrawlTestBase implements VeidemannHeaderConsta
 
         setupConfigAndSeeds(job);
 
-        ControllerProto.RunCrawlRequest request = ControllerProto.RunCrawlRequest.newBuilder()
+        RunCrawlRequest request = RunCrawlRequest.newBuilder()
                 .setJobId(job.getId())
                 .build();
 
-        JobCompletion jc = JobCompletion.executeJob(db, statusClient, controllerClient, request);
+        JobCompletion jc = JobCompletion.executeJob(db, controllerClient, request);
         Thread.sleep(2000);
         System.out.println("ABORTING");
-        statusClient.abortJobExecution(ExecutionId.newBuilder().setId(jc.jobExecutionId).build());
+        controllerClient.abortJobExecution(ExecutionId.newBuilder().setId(jc.jobExecutionId).build());
         JobExecutionStatus jes = jc.get();
         Thread.sleep(8000);
 

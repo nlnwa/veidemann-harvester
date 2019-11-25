@@ -1,0 +1,5 @@
+# Empty api key to role file
+# To enable this file should be overridden by a kubernetes secret
+
+# Example mapping
+myApiKey SYSTEM ADMIN

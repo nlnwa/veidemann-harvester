@@ -16,7 +16,7 @@
 package no.nb.nna.veidemann.harvester.browsercontroller;
 
 import com.google.common.net.InetAddresses;
-import no.nb.nna.veidemann.api.ConfigProto.BrowserConfig;
+import no.nb.nna.veidemann.api.config.v1.BrowserConfig;
 import no.nb.nna.veidemann.api.config.v1.ConfigObject;
 import no.nb.nna.veidemann.api.config.v1.ConfigRef;
 import no.nb.nna.veidemann.api.config.v1.ExtraConfig;
@@ -32,8 +32,8 @@ import no.nb.nna.veidemann.commons.client.ContentWriterClient;
 import no.nb.nna.veidemann.commons.client.DnsServiceClient;
 import no.nb.nna.veidemann.commons.db.ChangeFeed;
 import no.nb.nna.veidemann.commons.db.ConfigAdapter;
-import no.nb.nna.veidemann.commons.db.DbAdapter;
 import no.nb.nna.veidemann.commons.db.DbException;
+import no.nb.nna.veidemann.commons.db.ExecutionsAdapter;
 import no.nb.nna.veidemann.commons.util.ApiTools;
 import no.nb.nna.veidemann.harvester.BrowserSessionRegistry;
 import org.junit.BeforeClass;
@@ -133,7 +133,7 @@ public class BrowserControllerIT {
             when(contentWriterSession.sendMetadata(any())).thenReturn(contentWriterSession);
             when(contentWriterSession.sendPayload(any())).thenReturn(contentWriterSession);
 
-            DbAdapter db = getDbMock();
+            ExecutionsAdapter db = getDbMock();
 
             QueuedUri queuedUri = QueuedUri.newBuilder()
                     .setUri("http://a1.com")
@@ -251,14 +251,15 @@ public class BrowserControllerIT {
         return crawlConfig.build();
     }
 
-    private DbAdapter getDbMock() throws DbException {
-        DbAdapter db = mock(DbAdapter.class);
+    private ExecutionsAdapter getDbMock() throws DbException {
+        ExecutionsAdapter db = mock(ExecutionsAdapter.class);
         ConfigAdapter configAdapter = mock(ConfigAdapter.class);
 
-        when(configAdapter.getBrowserConfig(any())).thenReturn(BrowserConfig.newBuilder()
-                .setWindowWidth(900)
-                .setWindowHeight(900)
-                .build());
+        when(configAdapter.getConfigObject(any())).thenReturn(ConfigObject.newBuilder()
+                .setBrowserConfig(BrowserConfig.newBuilder()
+                        .setWindowWidth(900)
+                        .setWindowHeight(900)
+                ).build());
         when(db.hasCrawledContent(any())).thenReturn(Optional.empty());
         when(db.saveCrawlLog(any())).thenAnswer((InvocationOnMock i) -> {
             CrawlLog cl = i.getArgument(0);

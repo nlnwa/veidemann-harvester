@@ -15,8 +15,8 @@
  */
 package no.nb.nna.veidemann.integrationtests;
 
-import no.nb.nna.veidemann.api.ControllerProto;
 import no.nb.nna.veidemann.api.config.v1.ConfigObject;
+import no.nb.nna.veidemann.api.controller.v1.RunCrawlRequest;
 import no.nb.nna.veidemann.api.frontier.v1.JobExecutionStatus;
 import no.nb.nna.veidemann.commons.VeidemannHeaderConstants;
 import no.nb.nna.veidemann.commons.db.DbException;
@@ -49,11 +49,11 @@ public class MultiSiteCrawlIT extends CrawlTestBase implements VeidemannHeaderCo
         ConfigObject entity4 = createEntity("Test entity 4");
         ConfigObject notFoundSeed = createSeed("https://static.com/not-found.gif", entity4, jobId);
 
-        ControllerProto.RunCrawlRequest request = ControllerProto.RunCrawlRequest.newBuilder()
+        RunCrawlRequest request = RunCrawlRequest.newBuilder()
                 .setJobId(jobId)
                 .build();
 
-        JobExecutionStatus jes = JobCompletion.executeJob(db, statusClient, controllerClient, request).get();
+        JobExecutionStatus jes = JobCompletion.executeJob(db, controllerClient, request).get();
         assertThat(jes.getExecutionsStateMap()).contains(new SimpleEntry<>("FINISHED", 5));
 
         new CrawlExecutionValidator(jes)
@@ -64,7 +64,7 @@ public class MultiSiteCrawlIT extends CrawlTestBase implements VeidemannHeaderCo
                 .checkCrawlLogCount(58, "response", "revisit")
                 .checkPageLogCount(20);
 
-        jes = JobCompletion.executeJob(db, statusClient, controllerClient, request).get();
+        jes = JobCompletion.executeJob(db, controllerClient, request).get();
         assertThat(jes.getExecutionsStateMap()).contains(new SimpleEntry<>("FINISHED", 5));
 
         new CrawlExecutionValidator(jes)

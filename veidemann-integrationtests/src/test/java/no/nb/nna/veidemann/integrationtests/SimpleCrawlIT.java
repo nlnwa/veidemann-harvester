@@ -15,8 +15,8 @@
  */
 package no.nb.nna.veidemann.integrationtests;
 
-import no.nb.nna.veidemann.api.ControllerProto;
 import no.nb.nna.veidemann.api.config.v1.ConfigObject;
+import no.nb.nna.veidemann.api.controller.v1.RunCrawlRequest;
 import no.nb.nna.veidemann.api.frontier.v1.JobExecutionStatus;
 import no.nb.nna.veidemann.commons.VeidemannHeaderConstants;
 import no.nb.nna.veidemann.commons.db.DbException;
@@ -39,12 +39,12 @@ public class SimpleCrawlIT extends CrawlTestBase implements VeidemannHeaderConst
         ConfigObject entity = createEntity("Test entity 1");
         ConfigObject seed = createSeed("http://a1.com", entity, jobId);
 
-        ControllerProto.RunCrawlRequest request = ControllerProto.RunCrawlRequest.newBuilder()
+        RunCrawlRequest request = RunCrawlRequest.newBuilder()
                 .setJobId(jobId)
                 .setSeedId(seed.getId())
                 .build();
 
-        JobExecutionStatus jes = JobCompletion.executeJob(db, statusClient, controllerClient, request).get();
+        JobExecutionStatus jes = JobCompletion.executeJob(db, controllerClient, request).get();
         assertThat(jes.getExecutionsStateMap()).contains(new SimpleEntry<>("FINISHED", 1), new SimpleEntry<>("FAILED", 0));
 
         // The goal is to get as low as 14 when we cache 404, 302, etc
@@ -55,7 +55,7 @@ public class SimpleCrawlIT extends CrawlTestBase implements VeidemannHeaderConst
                 .checkCrawlLogCount("dns", 3)
                 .checkPageLogCount(6);
 
-        jes = JobCompletion.executeJob(db, statusClient, controllerClient, request).get();
+        jes = JobCompletion.executeJob(db, controllerClient, request).get();
         assertThat(jes.getExecutionsStateMap()).contains(new SimpleEntry<>("FINISHED", 1), new SimpleEntry<>("FAILED", 0));
 
         new CrawlExecutionValidator(jes)

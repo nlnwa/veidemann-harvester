@@ -16,7 +16,7 @@
 package no.nb.nna.veidemann.integrationtests;
 
 import io.grpc.Status;
-import no.nb.nna.veidemann.api.ReportProto.ExecuteDbQueryRequest;
+import no.nb.nna.veidemann.api.report.v1.ExecuteDbQueryRequest;
 import no.nb.nna.veidemann.commons.VeidemannHeaderConstants;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbService;

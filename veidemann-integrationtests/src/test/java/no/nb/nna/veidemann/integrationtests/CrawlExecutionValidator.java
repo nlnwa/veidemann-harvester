@@ -15,8 +15,6 @@
  */
 package no.nb.nna.veidemann.integrationtests;
 
-import no.nb.nna.veidemann.api.ReportProto.ExecuteDbQueryRequest;
-import no.nb.nna.veidemann.api.ReportProto.PageLogListRequest;
 import no.nb.nna.veidemann.api.config.v1.ConfigObject;
 import no.nb.nna.veidemann.api.config.v1.ConfigRef;
 import no.nb.nna.veidemann.api.config.v1.Kind;
@@ -24,11 +22,13 @@ import no.nb.nna.veidemann.api.contentwriter.v1.StorageRef;
 import no.nb.nna.veidemann.api.frontier.v1.CrawlLog;
 import no.nb.nna.veidemann.api.frontier.v1.JobExecutionStatus;
 import no.nb.nna.veidemann.api.frontier.v1.PageLog;
+import no.nb.nna.veidemann.api.report.v1.ExecuteDbQueryRequest;
+import no.nb.nna.veidemann.api.report.v1.PageLogListRequest;
 import no.nb.nna.veidemann.commons.ExtraStatusCodes;
 import no.nb.nna.veidemann.commons.db.ConfigAdapter;
 import no.nb.nna.veidemann.commons.db.DbException;
 import no.nb.nna.veidemann.commons.db.DbService;
-import no.nb.nna.veidemann.db.RethinkDbAdapter;
+import no.nb.nna.veidemann.commons.db.ExecutionsAdapter;
 import org.jwat.common.HttpHeader;
 import org.jwat.warc.WarcRecord;
 
@@ -45,7 +45,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 
 public class CrawlExecutionValidator {
-    final RethinkDbAdapter db;
+    final ExecutionsAdapter db;
     final ConfigAdapter configAdapter;
 
     CrawlLogHelper crawlLogs;
@@ -57,7 +57,7 @@ public class CrawlExecutionValidator {
     final JobExecutionStatus jobExecutionStatus;
 
     public CrawlExecutionValidator(JobExecutionStatus jobExecutionStatus) {
-        this.db = (RethinkDbAdapter) DbService.getInstance().getDbAdapter();
+        this.db = DbService.getInstance().getExecutionsAdapter();
         this.configAdapter = DbService.getInstance().getConfigAdapter();
         this.jobExecutionStatus = jobExecutionStatus;
     }
@@ -405,7 +405,7 @@ public class CrawlExecutionValidator {
         ConfigObject collection = configAdapter.getConfigObject(crawlConfig.getCrawlConfig().getCollectionRef());
 
         crawlLogs = new CrawlLogHelper(collection.getMeta().getName());
-        db.listPageLogs(PageLogListRequest.newBuilder().setPageSize(5000).build()).getValueList()
+        db.listPageLogs(PageLogListRequest.newBuilder().setPageSize(5000).build())
                 .stream()
                 .filter(pl -> pl.getCollectionFinalName().startsWith(collection.getMeta().getName()))
                 .forEach(pl -> pageLogs.add(pl));

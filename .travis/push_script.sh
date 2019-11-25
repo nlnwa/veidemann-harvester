@@ -7,5 +7,5 @@ if [[ -n "$TRAVIS_TAG" || "$TRAVIS_BRANCH" == "master" && "$TRAVIS_EVENT_TYPE" =
     DOCKER_TAG=${TRAVIS_TAG}
   fi
 
-  mvn -B -Pdocker-build-and-push -Ddocker.tag="$DOCKER_TAG" install;
+  ./mvnw -B -Pdocker-build-and-push -Ddocker.tag="$DOCKER_TAG" install;
 fi

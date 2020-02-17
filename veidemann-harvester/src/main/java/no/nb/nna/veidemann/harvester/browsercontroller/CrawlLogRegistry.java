@@ -405,9 +405,14 @@ public class CrawlLogRegistry {
     }
 
     private boolean uriEquals(String u1, String u2) {
-        Uri uri1 = UriConfigs.WHATWG.buildUri(u1);
-        Uri uri2 = UriConfigs.WHATWG.buildUri(u2);
-        return uri1.equals(uri2);
+        try {
+            Uri uri1 = UriConfigs.WHATWG.buildUri(u1);
+            Uri uri2 = UriConfigs.WHATWG.buildUri(u2);
+            return uri1.equals(uri2);
+        } catch (Exception e) {
+            LOG.warn("Could not parse URI", e);
+            return false;
+        }
     }
 
     private boolean innerFindRequestForCrawlLog(Entry crawlLogEntry, UriRequest r) {

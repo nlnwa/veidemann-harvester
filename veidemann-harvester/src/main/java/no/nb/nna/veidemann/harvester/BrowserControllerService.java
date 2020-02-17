@@ -157,17 +157,21 @@ public class BrowserControllerService extends BrowserControllerGrpc.BrowserContr
     }
 
     private BrowserScript getReplacementScript(BrowserSession session, String uri) {
-        String normalizedUri = UriConfigs.WHATWG.buildUri(uri).toString();
-        Label replacementLabel = ApiTools.buildLabel("type", "replacement");
-        for (ConfigObject script : session.getScripts()) {
-            if (ApiTools.hasLabel(script.getMeta(), replacementLabel)) {
-                for (String urlRegexp : script.getBrowserScript().getUrlRegexpList()) {
-                    if (normalizedUri.matches(urlRegexp)) {
-                        LOG.warn("Check script {} {} {} {}", script.getMeta().getName(), normalizedUri, urlRegexp, normalizedUri.matches(urlRegexp));
-                        return script.getBrowserScript();
+        try {
+            String normalizedUri = UriConfigs.WHATWG.buildUri(uri).toString();
+            Label replacementLabel = ApiTools.buildLabel("type", "replacement");
+            for (ConfigObject script : session.getScripts()) {
+                if (ApiTools.hasLabel(script.getMeta(), replacementLabel)) {
+                    for (String urlRegexp : script.getBrowserScript().getUrlRegexpList()) {
+                        if (normalizedUri.matches(urlRegexp)) {
+                            LOG.warn("Check script {} {} {} {}", script.getMeta().getName(), normalizedUri, urlRegexp, normalizedUri.matches(urlRegexp));
+                            return script.getBrowserScript();
+                        }
                     }
                 }
             }
+        } catch (Exception e) {
+            LOG.warn("Could not get replacement script", e);
         }
         return null;
     }

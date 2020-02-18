@@ -43,7 +43,7 @@
         <dependency>
             <groupId>com.github.nlnwa.veidemann-robotsevaluator</groupId>
             <artifactId>veidemann-robotsevaluator-service</artifactId>
-            <version>0.3.4</version>
+            <version>0.3.8</version>
         </dependency>
 
         <!-- ARC/WARC libraries -->
@@ -462,7 +462,7 @@
                                         </env>
                                         <volumes>
                                             <bind>
-                                                <volume>src/test/resources/apikeys:/app/resources/apikeys:ro</volume>
+                                                <volume>src/test/resources/apikeys:/app/resources/apikeys:ro,Z</volume>
                                             </bind>
                                         </volumes>
                                         <log>

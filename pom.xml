@@ -36,7 +36,7 @@
         <chrome.version>78.0.3882.0</chrome.version>
 
         <veidemann.commons.version>0.4.1</veidemann.commons.version>
-        <veidemann.rethinkdbadapter.version>0.4.3</veidemann.rethinkdbadapter.version>
+        <veidemann.rethinkdbadapter.version>0.4.5</veidemann.rethinkdbadapter.version>
 
         <log4j.version>2.7</log4j.version>
         <org.jwat.version>1.1.1</org.jwat.version>

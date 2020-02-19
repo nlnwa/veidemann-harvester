@@ -12,8 +12,7 @@
     <packaging>jar</packaging>
 
     <properties>
-        <test.dns.server>testsites</test.dns.server>
-        <!--<test.dns.server>8.8.8.8</test.dns.server>-->
+        <io.prometheus.version>0.8.1</io.prometheus.version>
     </properties>
 
     <dependencies>
@@ -30,21 +29,34 @@
             <groupId>com.github.nlnwa</groupId>
             <artifactId>veidemann-commons</artifactId>
         </dependency>
+
         <dependency>
             <groupId>org.netpreserve.commons</groupId>
             <artifactId>webarchive-commons-uri</artifactId>
+            <version>2.0.0-SNAPSHOT</version>
         </dependency>
+
         <dependency>
             <groupId>org.netpreserve.commons</groupId>
             <artifactId>webarchive-commons-util</artifactId>
+            <version>2.0.0-SNAPSHOT</version>
+        </dependency>
+
+        <!-- Prometheus metrics -->
+        <dependency>
+            <groupId>io.prometheus</groupId>
+            <artifactId>simpleclient</artifactId>
+            <version>${io.prometheus.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.apache.commons</groupId>
-            <artifactId>commons-io</artifactId>
+            <groupId>io.prometheus</groupId>
+            <artifactId>simpleclient_hotspot</artifactId>
+            <version>${io.prometheus.version}</version>
         </dependency>
         <dependency>
-            <groupId>com.google.code.gson</groupId>
-            <artifactId>gson</artifactId>
+            <groupId>io.prometheus</groupId>
+            <artifactId>simpleclient_httpserver</artifactId>
+            <version>${io.prometheus.version}</version>
         </dependency>
 
         <!-- Configuration framework -->
@@ -57,19 +69,6 @@
             <groupId>org.mockito</groupId>
             <artifactId>mockito-core</artifactId>
         </dependency>
-
-        <dependency>
-            <groupId>io.prometheus</groupId>
-            <artifactId>simpleclient</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.prometheus</groupId>
-            <artifactId>simpleclient_hotspot</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.prometheus</groupId>
-            <artifactId>simpleclient_httpserver</artifactId>
-        </dependency>
     </dependencies>
 
     <build>
@@ -78,7 +77,6 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
-                <version>3.0.2</version>
                 <configuration>
                     <archive>
                         <manifest>
@@ -91,7 +89,6 @@
             <plugin>
                 <groupId>com.google.cloud.tools</groupId>
                 <artifactId>jib-maven-plugin</artifactId>
-                <version>2.0.0</version>
                 <configuration>
                     <to>
                         <image>docker.io/norsknettarkiv/${project.artifactId}</image>
@@ -118,7 +115,6 @@
             </plugin>
         </plugins>
     </build>
-
     <profiles>
         <profile>
             <id>docker-build</id>
@@ -159,8 +155,8 @@
                                             <tag>${docker.tag}</tag>
                                         </tags>
                                         <auth>
-                                            <username>${env.DOCKER_USERNAME}</username>
-                                            <password>${env.DOCKER_PASSWORD}</password>
+                                            <username>${docker.username}</username>
+                                            <password>${docker.password}</password>
                                         </auth>
                                     </to>
                                 </configuration>

@@ -44,7 +44,7 @@
         <io.opentracing.version>0.30.0</io.opentracing.version>
         <com.uber.jaeger.version>0.21.0</com.uber.jaeger.version>
         <io.prometheus.version>0.8.0</io.prometheus.version>
-        <netty.version>4.1.42.Final</netty.version>
+        <netty.version>4.1.45.Final</netty.version>
 
         <!-- Versions of external docker containers used in integration tests -->
         <browserless.chrome.version>1.18.1-puppeteer-1.20.0</browserless.chrome.version>

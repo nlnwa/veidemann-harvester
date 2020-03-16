@@ -53,7 +53,7 @@
         <veidemann.dns.resolver.version>0.2.6</veidemann.dns.resolver.version>
         <veidemann.contentwriter.version>0.2.8</veidemann.contentwriter.version>
         <veidemann.robotsevaluator.version>0.3.8</veidemann.robotsevaluator.version>
-        <veidemann.frontier.version>0.4.4</veidemann.frontier.version>
+        <veidemann.frontier.version>0.4.5</veidemann.frontier.version>
         <veidemann.controller.version>0.5.2</veidemann.controller.version>
         <veidemann.recorderproxy.version>0.2.2</veidemann.recorderproxy.version>
     </properties>

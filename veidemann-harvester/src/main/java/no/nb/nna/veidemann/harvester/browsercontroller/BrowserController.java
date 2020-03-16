@@ -130,8 +130,6 @@ public class BrowserController implements AutoCloseable, VeidemannHeaderConstant
             ExtraStatusCodes eCode = ExtraStatusCodes.fromCode(session.getUriRequests().getRootRequest().getStatusCode());
             if (eCode != null) {
                 result.withError(eCode.toFetchError());
-            } else if (session.getUriRequests().getInitialRequest().isFromCache()) {
-                result.withError(ExtraStatusCodes.ALREADY_SEEN.toFetchError());
             } else {
                 UriRequest initialRequest = session.getUriRequests().getInitialRequest();
 

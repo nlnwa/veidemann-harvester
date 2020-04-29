@@ -89,14 +89,9 @@
                 <version>${veidemann.rethinkdbadapter.version}</version>
             </dependency>
             <dependency>
-                <groupId>org.netpreserve.commons</groupId>
-                <artifactId>webarchive-commons-uri</artifactId>
-                <version>2.0.0-SNAPSHOT</version>
-            </dependency>
-            <dependency>
-                <groupId>org.netpreserve.commons</groupId>
-                <artifactId>webarchive-commons-util</artifactId>
-                <version>2.0.0-SNAPSHOT</version>
+                <groupId>com.github.nlnwa</groupId>
+                <artifactId>webarchive-commons</artifactId>
+                <version>fixIpv4Parser-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>io.netty</groupId>

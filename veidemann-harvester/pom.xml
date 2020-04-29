@@ -31,12 +31,8 @@
             <artifactId>veidemann-commons</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.netpreserve.commons</groupId>
-            <artifactId>webarchive-commons-uri</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.netpreserve.commons</groupId>
-            <artifactId>webarchive-commons-util</artifactId>
+            <groupId>com.github.nlnwa</groupId>
+            <artifactId>webarchive-commons</artifactId>
         </dependency>
         <dependency>
             <groupId>org.apache.commons</groupId>
